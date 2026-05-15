@@ -13,9 +13,33 @@
 
 ## Features
 
-| ID | Feature | Status | Spec | Created |
-|----|---------|--------|------|---------|
+| ID | Feature | Prio | Status | Abhängigkeiten | Spec | Erstellt |
+|----|---------|------|--------|----------------|------|---------|
+| PROJ-1 | Supabase-Datenmodell & RLS | P0 | Roadmap | — | — | 2026-05-15 |
+| PROJ-2 | Auth + SSR | P0 | Roadmap | PROJ-1 | — | 2026-05-15 |
+| PROJ-3 | Persönlicher Bereich + Konto | P0 | Roadmap | PROJ-2 | — | 2026-05-15 |
+| PROJ-4 | Kapitel-Routing & Persistenz | P0 | Roadmap | PROJ-2 | — | 2026-05-15 |
+| PROJ-5 | Kapitel-Editor (A5, TipTap, Tablet) | P0 | Roadmap | PROJ-4 | — | 2026-05-15 |
+| PROJ-6 | Stripe-Zahlungen (Portal + Vapi-Paket) | P0 | Roadmap | PROJ-2 | — | 2026-05-15 |
+| PROJ-7 | Buchweite Seitenzahl – Live-Anzeige | P1 | Roadmap | PROJ-5 | — | 2026-05-15 |
+| PROJ-8 | Erzähl-Impulse (Katalog + API) | P1 | Roadmap | PROJ-4 | — | 2026-05-15 |
+| PROJ-9 | Projekt-Mitglieder + Einladungen | P1 | Roadmap | PROJ-2, PROJ-4 | — | 2026-05-15 |
+| PROJ-10 | Cover-Editor | P1 | Roadmap | PROJ-4 | — | 2026-05-15 |
+| PROJ-11 | Resend-Transaktionsmails | P1 | Roadmap | PROJ-6 | — | 2026-05-15 |
+| PROJ-12 | Vapi-Pipeline | P1 | Roadmap | PROJ-5, PROJ-6 | — | 2026-05-15 |
+| PROJ-13 | Querschnitt: Stabilität & Observability | P1 | Roadmap | PROJ-2, PROJ-5 | — | 2026-05-15 |
+| PROJ-14 | KI-Review + LLM-Abstraktion | P2 | Roadmap | PROJ-5, PROJ-6 | — | 2026-05-15 |
+| PROJ-15 | Mehrnutzer-Concurrency & Versioning | P2 | Roadmap | PROJ-5 | — | 2026-05-15 |
+| PROJ-16 | Print-on-Demand Adapter | P2 | Roadmap | PROJ-5, PROJ-6, PROJ-10, PROJ-11 | — | 2026-05-15 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-1
+## Next Available ID: PROJ-17
+
+## Empfohlene Build-Reihenfolge
+```
+PROJ-1 → PROJ-2 → PROJ-3, PROJ-4, PROJ-6 (parallel)
+       → PROJ-5 → PROJ-7, PROJ-8, PROJ-9, PROJ-10, PROJ-13 (parallel)
+                → PROJ-11, PROJ-12
+                         → PROJ-14, PROJ-15, PROJ-16
+```
