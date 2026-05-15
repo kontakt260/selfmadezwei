@@ -29,7 +29,7 @@ und Technik-Angst als größte Hürden. Brauchen emotionalen Einstieg, Struktur
 | P0 (MVP)  | Persönlicher Bereich + Konto         | Planned ✓ |
 | P0 (MVP)  | Kapitel-Routing & Persistenz         | Planned ✓ |
 | P0 (MVP)  | Kapitel-Editor (A5, TipTap, Tablet)  | Planned ✓ |
-| P0 (MVP)  | Stripe-Zahlungen (Portal + Vapi)     | Planned |
+| P0 (MVP)  | Stripe-Zahlungen (Portal + Vapi)     | Planned ✓ |
 | P1        | Buchweite Seitenzahl — Live-Anzeige  | Planned |
 | P1        | Erzähl-Impulse (Katalog + API)       | Planned |
 | P1        | Projekt-Mitglieder + Einladungen     | Planned |
