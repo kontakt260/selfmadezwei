@@ -15,7 +15,7 @@
 
 | ID | Feature | Prio | Status | Abhängigkeiten | Spec | Erstellt |
 |----|---------|------|--------|----------------|------|---------|
-| PROJ-1 | Supabase-Datenmodell & RLS | P0 | Roadmap | — | — | 2026-05-15 |
+| PROJ-1 | Supabase-Datenmodell & RLS | P0 | Planned | — | [Spec](PROJ-1-supabase-datenmodell-rls.md) | 2026-05-15 |
 | PROJ-2 | Auth + SSR | P0 | Roadmap | PROJ-1 | — | 2026-05-15 |
 | PROJ-3 | Persönlicher Bereich + Konto | P0 | Roadmap | PROJ-2 | — | 2026-05-15 |
 | PROJ-4 | Kapitel-Routing & Persistenz | P0 | Roadmap | PROJ-2 | — | 2026-05-15 |
