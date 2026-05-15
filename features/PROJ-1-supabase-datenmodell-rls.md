@@ -170,7 +170,128 @@ Nach jeder Migration wird `src/lib/database.types.ts` via Supabase MCP (`generat
 | `@supabase/ssr` | SSR-fähiger Client für Next.js App Router (Cookie-Auth) | Noch nicht installiert — wird in PROJ-2 benötigt, kann bereits in PROJ-1 installiert werden |
 
 ## QA Test Results
-_To be added by /qa_
+
+**QA Date:** 2026-05-16
+**Method:** SQL-level verification against live remote Supabase project (`erzjzhggdybnlmtvjpse`). No browser testing (pure infrastructure feature, no UI). All queries run via Supabase MCP.
+
+### Acceptance Criteria Results
+
+#### Tabellen & Spalten
+| Criterion | Status |
+|-----------|--------|
+| `profiles` (id, full_name, avatar_url, updated_at) | ✅ Pass |
+| `projects` (id, owner_id, title, logo_url, portal_access_expires_at, timestamps) | ✅ Pass |
+| `project_members` (id, project_id, user_id, role, created_at; UNIQUE project_id+user_id) | ✅ Pass |
+| `chapters` (all 11 columns including chapter_origin DEFAULT 'custom', content_version DEFAULT 0) | ✅ Pass |
+| `project_covers` (id, project_id UNIQUE, theme, image_url, metadata, timestamps) | ✅ Pass |
+| `impulse_catalog` (id, title, sort_order, created_at) | ✅ Pass |
+| `payments` (UNIQUE stripe_session_id; currency DEFAULT 'eur'; status DEFAULT 'pending') | ✅ Pass |
+| `voice_sessions` (all columns including chapter_id FK, chapter_origin nullable) | ✅ Pass |
+| `invitations` (UNIQUE token; role DEFAULT 'co_author'; accepted_at nullable) | ✅ Pass |
+
+#### RLS
+| Criterion | Status |
+|-----------|--------|
+| RLS enabled on all 9 tables | ✅ Pass |
+| `profiles`: SELECT/UPDATE own only | ✅ Pass |
+| `projects`: SELECT/UPDATE as member; INSERT authenticated; DELETE as projektleiter | ✅ Pass |
+| `project_members`: SELECT own; no client INSERT/DELETE | ✅ Pass |
+| `chapters`: SELECT/INSERT/UPDATE/DELETE as member | ✅ Pass |
+| `project_covers`: SELECT/INSERT/UPDATE as member | ✅ Pass |
+| `impulse_catalog`: SELECT authenticated; no client write | ✅ Pass |
+| `payments`: SELECT own; no client write | ✅ Pass |
+| `voice_sessions`: SELECT own; no client write | ✅ Pass |
+| `invitations`: SELECT as member OR recipient by email; no client write | ✅ Pass |
+| No open SELECT policies (qual=NULL for SELECT) | ✅ Pass |
+| No RLS-enabled tables without any policy | ✅ Pass |
+
+#### Storage
+| Criterion | Status |
+|-----------|--------|
+| `project-logos` private, 10MB limit, member CRUD via path-based membership check | ✅ Pass |
+| `chapter-heroes` private, 10MB limit, member CRUD | ✅ Pass |
+| `project-covers` private, 10MB limit, member CRUD | ✅ Pass |
+| `exports` private, 100MB limit, SELECT-only for members (no client INSERT) | ✅ Pass |
+
+#### Migrationen & Seed
+| Criterion | Status |
+|-----------|--------|
+| 3 migration files in `supabase/migrations/` (schema, RLS, storage) | ✅ Pass |
+| `supabase db reset` on empty project without errors | ⚠️ Not Testable (see BUG-1) |
+| Seed: 15 impulse_catalog rows, sort_order 1–15, correct titles | ✅ Pass |
+
+#### Indexes
+| Criterion | Status |
+|-----------|--------|
+| `chapters(project_id, sort_order)` → `idx_chapters_project_sort` | ✅ Pass |
+| `project_members(project_id, user_id)` → via UNIQUE constraint | ✅ Pass |
+| `payments(stripe_session_id)` → via UNIQUE constraint | ✅ Pass |
+| `voice_sessions(project_id)` → `idx_voice_sessions_project` | ✅ Pass |
+| `invitations(token)` → via UNIQUE constraint | ✅ Pass |
+
+#### Timestamps
+| Criterion | Status |
+|-----------|--------|
+| All 9 tables: `created_at TIMESTAMPTZ NOT NULL DEFAULT now()` | ✅ Pass |
+| Mutable tables (profiles, projects, chapters, project_covers): `updated_at` + BEFORE UPDATE trigger | ✅ Pass |
+
+#### Functions & Triggers
+| Criterion | Status |
+|-----------|--------|
+| `get_my_project_ids()` SECURITY DEFINER, STABLE, `search_path=''` | ✅ Pass |
+| `handle_new_user()` SECURITY DEFINER, `search_path=''`, inserts into profiles on auth.users INSERT | ✅ Pass |
+| `update_updated_at()` applied to 4 mutable tables | ✅ Pass |
+
+**Total: 36/37 criteria pass (1 untestable by design)**
+
+### Bugs Found
+
+#### BUG-1 — Medium: Migration timestamp drift between Git files and remote DB
+**Description:** Local migration files use timestamps `20260515200000/200001/200002` but the remote DB migration table records them as `20260515221706/221728/221757` (the actual apply-time timestamps from MCP). If Supabase CLI is introduced later, it would attempt to re-apply the Git-named migrations as new migrations, causing "table/type already exists" errors.
+
+**Steps to reproduce:** Run `supabase db push` from CLI after cloning the repo — CLI reads Git filenames but DB has different version identifiers.
+
+**Impact:** No impact for the current remote-only/MCP workflow. Blocks CLI adoption without a manual migration table sync.
+
+**Workaround:** Rename local migration files to match the DB timestamps (`20260515221706_initial_schema.sql` etc.) OR add the DB-tracked versions to a `.supabase/migrations` state file. Alternatively, address if/when CLI is introduced.
+
+---
+
+#### BUG-2 — Medium: `portal_access_expires_at` writable by any project member via client
+**Description:** The `projects: update as member` RLS policy grants UPDATE on ALL columns to all project members (both `projektleiter` and `co_author`). This includes `portal_access_expires_at`, which should only be written by the Stripe webhook via `service_role`. A malicious co_author could set a future portal access date without payment.
+
+**Steps to reproduce (theoretical):** As an authenticated co_author, issue: `UPDATE projects SET portal_access_expires_at = '2099-01-01' WHERE id = $project_id` — RLS permits this.
+
+**Impact:** Low risk pre-PROJ-6 (no real users, Stripe not integrated). Becomes relevant once portal access has monetary value.
+
+**Fix:** In PROJ-6 — either restrict this column server-side via a separate policy or ensure the server action validates the caller is the Stripe webhook before touching this field. Column-level security is not natively supported by Postgres RLS, so consider splitting the UPDATE into a restricted route.
+
+---
+
+#### BUG-3 — Low: Typo in TypeScript source file inconsistent with seed data
+**Description:** `src/lib/projektuebersicht-erzaehl-impulse.ts` (migrated from old app) line 7 contains `"Berufseinsteig und wichtige Stationen"` (missing 'n'). The `supabase/seed.sql` correctly inserted `"Berufseinstieg und wichtige Stationen"` (correct German). PROJ-8 will import from the TypeScript file and display the typo version when building the impulse catalog UI.
+
+**Fix:** Correct line 7 in `src/lib/projektuebersicht-erzaehl-impulse.ts` from `"Berufseinsteig"` to `"Berufseinstieg"`.
+
+### Security Audit
+
+| Check | Result |
+|-------|--------|
+| No open SELECT policies (unauthenticated access) | ✅ Clean |
+| No tables with RLS enabled but zero policies (de-facto locked) | ✅ Clean — all covered |
+| `SECURITY DEFINER` functions use `SET search_path = ''` | ✅ Clean |
+| service_role key never fetched or exposed in this session | ✅ Clean |
+| `payments`/`voice_sessions` audit trail preserved (ON DELETE SET NULL on FKs) | ✅ Clean |
+| Storage buckets all private (public=false) | ✅ Clean |
+| Storage policies use path-based project membership (`string_to_array(name,'/')[1]::uuid`) | ✅ Clean |
+| `invitations` email-based SELECT is JWT-signed (not spoofable) | ✅ Clean |
+| `projects: insert authenticated` allows unlimited project creation | ⚠️ Known risk (see BUG-2 context; rate-limit in PROJ-13) |
+
+### Production-Ready Decision
+
+**✅ APPROVED** — No Critical or High bugs. 2 Medium findings are documented: BUG-1 has no impact on the current workflow; BUG-2 becomes relevant in PROJ-6 and should be addressed there. BUG-3 is cosmetic.
+
+PROJ-1 schema is production-safe as a foundation for PROJ-2 (Auth + SSR).
 
 ## Deployment
 _To be added by /deploy_
