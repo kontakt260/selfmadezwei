@@ -1,6 +1,6 @@
 # PROJ-1: Supabase-Datenmodell & RLS
 
-## Status: Planned
+## Status: In Progress
 **Created:** 2026-05-15
 **Last Updated:** 2026-05-15
 
@@ -20,7 +20,7 @@
 ### Tabellen & Spalten
 - [ ] `profiles`: `id` (FK auth.users PK), `full_name` TEXT, `avatar_url` TEXT nullable, `updated_at` TIMESTAMPTZ
 - [ ] `projects`: `id` UUID PK, `owner_id` FK profiles, `title` TEXT NOT NULL, `logo_url` TEXT nullable (Storage-Ref), `portal_access_expires_at` TIMESTAMPTZ nullable (NULL bis erster Kauf), `created_at`, `updated_at`
-- [ ] `project_members`: `id` UUID PK, `project_id` FK projects ON DELETE CASCADE, `user_id` FK profiles, `role` ENUM(owner, editor), `created_at`; UNIQUE(project_id, user_id)
+- [ ] `project_members`: `id` UUID PK, `project_id` FK projects ON DELETE CASCADE, `user_id` FK profiles, `role` ENUM(projektleiter, co_author), `created_at`; UNIQUE(project_id, user_id); nur `projektleiter` darf Projekt löschen und finalen Druckauftrag erteilen; mehrere Projektleiter pro Projekt erlaubt
 - [ ] `chapters`: `id` UUID PK, `project_id` FK projects ON DELETE CASCADE, `title` TEXT NOT NULL, `body` JSONB (TipTap-Doc), `hero_image_url` TEXT nullable, `sort_order` INTEGER NOT NULL, `chapter_origin` ENUM(custom, catalog_impulse) NOT NULL DEFAULT 'custom', `source_impulse_id` FK impulse_catalog nullable, `content_version` INTEGER NOT NULL DEFAULT 0, `created_at`, `updated_at`
 - [ ] `project_covers`: `id` UUID PK, `project_id` FK projects ON DELETE CASCADE UNIQUE, `theme` TEXT, `image_url` TEXT nullable, `metadata` JSONB, `updated_at`
 - [ ] `impulse_catalog`: `id` UUID PK, `title` TEXT NOT NULL, `sort_order` INTEGER NOT NULL, `created_at`
@@ -82,7 +82,92 @@
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Übersicht
+PROJ-1 ist ein reines Infrastruktur-Feature — keine UI, keine API-Routen. Das Ergebnis ist ein versioniertes, vollständig in Git eingechecktes Datenbankschema, das alle folgenden Features als stabile Grundlage nutzt.
+
+### Was wird gebaut
+
+```
+supabase/
+  migrations/
+    20260515000000_initial_schema.sql   ← ENUMs, 9 Tabellen, Indizes, updated_at-Trigger
+    20260515000001_rls_policies.sql     ← RLS aktivieren + alle Policies auf 9 Tabellen
+    20260515000002_storage.sql          ← 4 private Buckets + Storage-Policies
+  seed.sql                              ← 15 Erzähl-Impulse für impulse_catalog
+src/lib/
+  database.types.ts                     ← Auto-generierte TypeScript-Typen (via Supabase MCP)
+  supabase.ts                           ← Supabase-Client (anon key; Platzhalter wird aktiviert)
+```
+
+> **Dev-Workflow:** Kein lokaler Supabase-Stack, keine CLI-Installation. Migrations werden via Supabase MCP-Tool direkt gegen das Remote-Projekt angewendet. TypeScript-Typen werden ebenfalls via MCP generiert. Die Migrations-Dateien in Git bleiben die Quelle der Wahrheit.
+
+### Datenmodell (9 Tabellen)
+
+**Nutzer & Zugang**
+- `profiles` — Erweiterung des Supabase-Auth-Eintrags; wird via DB-Trigger automatisch bei Registrierung angelegt
+- `project_members` — zentrale Berechtigungstabelle: wer hat in welcher Rolle Zugang zu welchem Projekt (projektleiter / co_author)
+- `invitations` — offene Einladungen (token-basiert, mit Ablaufdatum); Annahme-Logik in PROJ-9
+
+**Inhalt**
+- `projects` — das Buchprojekt (Titel, Logo-Referenz, Portal-Zugangs-Ablaufdatum)
+- `chapters` — Kapitel mit TipTap-Inhalt (JSONB), Sortierung, Bild-Referenz, Ursprung (manuell oder Impuls)
+- `project_covers` — Buchcover-Design pro Projekt (1:1-Relation zu `projects`)
+- `impulse_catalog` — die 15 vordefinierten Erzähl-Impulse; read-only, per Seed befüllt
+
+**Abrechnung & Nutzung**
+- `payments` — abgeschlossene Stripe-Transaktionen; Idempotenz via UNIQUE auf `stripe_session_id`
+- `voice_sessions` — Vapi-Anrufe pro Projekt; `duration_seconds` als Basis für Sprechzeit-Berechnung
+
+### 4 PostgreSQL-ENUMs
+
+| ENUM | Werte |
+|------|-------|
+| `member_role` | projektleiter, co_author |
+| `chapter_origin` | custom, catalog_impulse |
+| `payment_type` | initial_portal_access, portal_access_renewal, vapi_voice_minutes_60, print_order |
+| `payment_status` | pending, completed, failed |
+
+### Autorisierungs-Logik (RLS)
+
+Die zentrale Frage jeder Policy: **"Ist dieser Nutzer Mitglied des Projekts, zu dem diese Zeile gehört?"** Die `project_members`-Tabelle ist die einzige Wahrheitsquelle für Zugriffsrechte.
+
+Besondere Fälle:
+- `profiles` — nur eigene Zeile lesbar/schreibbar (kein Projektbezug)
+- `payments` / `voice_sessions` — nur eigene Zeilen lesbar; kein Client-Write erlaubt
+- `impulse_catalog` — alle authentifizierten Nutzer lesen; kein Write
+- `invitations` — lesbar für Projektmitglieder ODER für den Nutzer, dessen E-Mail mit der Einladung übereinstimmt
+
+Server-seitige Operationen (Stripe-Webhook, Auth-Trigger) nutzen den `service_role`-Key und umgehen RLS vollständig. So werden Projekte und Payments ohne Client-Write-Berechtigung angelegt.
+
+### Storage-Architektur
+
+4 private Buckets — kein Public-Access; alle Dateien über zeitlich begrenzte Signed URLs:
+
+| Bucket | Upload | Lesen |
+|--------|--------|-------|
+| `project-logos` | Projektmitglieder | Projektmitglieder (Signed URL) |
+| `chapter-heroes` | Projektmitglieder | Projektmitglieder (Signed URL) |
+| `project-covers` | Projektmitglieder | Projektmitglieder (Signed URL) |
+| `exports` | Nur Server | Projektmitglieder (Signed URL) |
+
+### Migrations-Strategie
+
+- 3 Migrations-Dateien in fester Reihenfolge: Schema → RLS-Policies → Storage
+- Migrations werden via Supabase MCP-Tool direkt gegen das Remote-Projekt angewendet
+- Kein Schema-Objekt außerhalb von Migrations-Dateien — kein manuelles SQL in der Supabase-UI
+- Zukünftige Ergänzungen (z. B. `chapters.color_page_count` aus PROJ-5) erhalten jeweils eine eigene nummerierte Migrations-Datei
+
+### TypeScript-Typen
+
+Nach jeder Migration wird `src/lib/database.types.ts` via Supabase MCP (`generate_typescript_types`) neu generiert. Alle Server Actions und API-Routen importieren diese Typen — kein manuelles Tippen von Datenbankstrukturen.
+
+### Benötigte Pakete
+
+| Paket | Zweck | Status |
+|-------|-------|--------|
+| `@supabase/supabase-js` | Supabase-Client | ✓ installiert |
+| `@supabase/ssr` | SSR-fähiger Client für Next.js App Router (Cookie-Auth) | Noch nicht installiert — wird in PROJ-2 benötigt, kann bereits in PROJ-1 installiert werden |
 
 ## QA Test Results
 _To be added by /qa_
