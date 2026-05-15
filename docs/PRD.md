@@ -25,10 +25,10 @@ und Technik-Angst als größte Hürden. Brauchen emotionalen Einstieg, Struktur
 | Priority  | Feature                              | Status  |
 |-----------|--------------------------------------|---------|
 | P0 (MVP)  | Supabase-Datenmodell & RLS           | Planned ✓ |
-| P0 (MVP)  | Auth + SSR                           | Planned |
-| P0 (MVP)  | Persönlicher Bereich + Konto         | Planned |
-| P0 (MVP)  | Kapitel-Routing & Persistenz         | Planned |
-| P0 (MVP)  | Kapitel-Editor (A5, TipTap, Tablet)  | Planned |
+| P0 (MVP)  | Auth + SSR                           | Planned ✓ |
+| P0 (MVP)  | Persönlicher Bereich + Konto         | Planned ✓ |
+| P0 (MVP)  | Kapitel-Routing & Persistenz         | Planned ✓ |
+| P0 (MVP)  | Kapitel-Editor (A5, TipTap, Tablet)  | Planned ✓ |
 | P0 (MVP)  | Stripe-Zahlungen (Portal + Vapi)     | Planned |
 | P1        | Buchweite Seitenzahl — Live-Anzeige  | Planned |
 | P1        | Erzähl-Impulse (Katalog + API)       | Planned |
