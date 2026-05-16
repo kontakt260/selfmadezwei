@@ -4,74 +4,32 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    --background: 36 33% 97%;
+    --foreground: 0 0% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 0 0% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-    --radius: 0.5rem;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
+    --popover-foreground: 0 0% 10%;
+    --primary: 0 0% 10%;
+    --primary-foreground: 36 33% 97%;
+    --secondary: 36 27% 96%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 36 18% 92%;
+    --muted-foreground: 0 0% 46%;
+    --accent: 225 93% 54%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 36 18% 86%;
+    --input: 36 18% 86%;
+    --ring: 225 93% 54%;
+    --radius: 0rem;
 
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --neutral-100: 36 27% 96%;
+    --neutral-200: 36 18% 92%;
+    --neutral-400: 36 7% 81%;
+    --neutral-600: 0 0% 46%;
+    --neutral-700: 0 0% 10%;
   }
 }
 
@@ -79,7 +37,39 @@
   * {
     @apply border-border;
   }
+
+  html {
+    overflow-x: hidden;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply overflow-x-hidden bg-background text-foreground antialiased;
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-foreground;
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .heading-style-h1 {
+    @apply text-[3.5rem] leading-[1.1] font-normal tracking-[-0.04rem] md:text-[5.25rem] md:tracking-[-0.0525rem];
+  }
+  .heading-style-h2 {
+    @apply text-5xl leading-[1.2] font-normal tracking-[-0.0375rem] md:text-6xl;
+  }
+  .heading-style-h3 {
+    @apply text-4xl leading-[1.2] font-normal md:text-5xl;
+  }
+  .heading-style-h4 {
+    @apply text-3xl leading-[1.3] font-normal tracking-[-0.025rem] md:text-4xl;
+  }
+  .heading-style-h5 {
+    @apply text-2xl leading-[1.3] font-normal tracking-[-0.02rem] md:text-3xl;
+  }
+  .heading-style-h6 {
+    @apply text-xl leading-[1.4] font-normal tracking-[-0.01625rem] md:text-2xl;
   }
 }
