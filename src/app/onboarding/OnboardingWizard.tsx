@@ -183,15 +183,20 @@ export function OnboardingWizard({
           )}
 
           <div className="mt-8 flex justify-between gap-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={back}
-              disabled={isFirst}
-              className="h-12 min-w-32"
-            >
-              Zurück
-            </Button>
+            {isFirst ? (
+              <Button asChild variant="outline" className="h-12 min-w-32">
+                <a href="https://www.narravit.de">Zurück</a>
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={back}
+                className="h-12 min-w-32"
+              >
+                Zurück
+              </Button>
+            )}
 
             {isLast ? (
               <Button type="button" onClick={handlePurchase} className="h-12 min-w-44">
