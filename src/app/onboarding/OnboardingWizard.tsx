@@ -195,7 +195,7 @@ export function OnboardingWizard({
 
             {isLast ? (
               <Button type="button" onClick={handlePurchase} className="h-11 min-w-36">
-                Jetzt kaufen — 79 €
+                Jetzt kaufen — 249 €
               </Button>
             ) : (
               <Button type="button" onClick={next} className="h-11 min-w-28">
@@ -463,7 +463,7 @@ function StepPurchase({ state }: { state: WizardState }) {
 
       <div className="border border-[#e0dcd5] bg-[#FAF8F6] p-6">
         <p className="text-sm text-[#848484]">12 Monate Portal-Zugang</p>
-        <p className="heading-style-h4 mt-1">79 €</p>
+        <p className="heading-style-h4 mt-1">249 €</p>
         <p className="mt-2 text-sm text-[#535252]">
           Inklusive 10 Stunden Vapi-Erzählzeit, Editor und Druck-Vorbereitung.
         </p>
