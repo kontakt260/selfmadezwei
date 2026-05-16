@@ -4,7 +4,7 @@
   "description": "AI Coding Starter Kit with AI Agent Team System for Claude Code",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

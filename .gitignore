@@ -27,12 +27,19 @@ yarn-error.log*
 
 # local env files
 .env*.local
-
+.env.local
 # vercel
 .vercel
+.claude/
+.cursor/
+.cursorrules
+.vscode/
 
 # claude code personal settings
 .claude/settings.local.json
+
+# mcp config (contains secrets)
+.mcp.json
 
 # typescript
 *.tsbuildinfo

@@ -70,8 +70,8 @@ const config: Config = {
   		},
   		borderRadius: {
   			lg: 'var(--radius)',
-  			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
+  			md: 'max(calc(var(--radius) - 2px), 0px)',
+  			sm: 'max(calc(var(--radius) - 4px), 0px)'
   		},
   		keyframes: {
   			'accordion-down': {

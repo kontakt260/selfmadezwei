@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +65,16 @@ export function OnboardingWizard({
   const isLast = stepIndex === steps.length - 1;
   const isFirst = stepIndex === 0;
 
+  // #region agent log
+  fetch("http://127.0.0.1:7800/ingest/fd631e72-4665-4122-b32e-2df0088c7344", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "5dfb08" }, body: JSON.stringify({ sessionId: "5dfb08", runId: "initial", hypothesisId: "H5-client-render", location: "src/app/onboarding/OnboardingWizard.tsx:70", message: "OnboardingWizard render reached", data: { stepIndex, stepCount: steps.length, currentStep }, timestamp: Date.now() }) }).catch(() => {});
+  // #endregion
+
+  useEffect(() => {
+    // #region agent log
+    fetch("http://127.0.0.1:7800/ingest/fd631e72-4665-4122-b32e-2df0088c7344", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "5dfb08" }, body: JSON.stringify({ sessionId: "5dfb08", runId: "initial", hypothesisId: "H5-client-hydration", location: "src/app/onboarding/OnboardingWizard.tsx:76", message: "OnboardingWizard hydrated", data: { stepIndex, stepCount: steps.length, currentStep }, timestamp: Date.now() }) }).catch(() => {});
+    // #endregion
+  }, [currentStep, stepIndex, steps.length]);
+
   const validateCurrent = (): string | null => {
     switch (currentStep) {
       case "name":
@@ -117,13 +128,18 @@ export function OnboardingWizard({
   };
 
   return (
-    <section className="flex min-h-screen flex-col bg-background">
-      <header className="border-b border-border px-[5%] py-4">
-        <p className="text-sm font-medium tracking-tight">NARRAVIT</p>
+    <section className="flex min-h-screen flex-col bg-[#FAF8F6] text-[#3E3831]">
+      <header className="border-b border-[#e0dcd5] px-[5%] py-4">
+        <div className="flex items-center gap-4">
+          <Image src="/logo.svg" alt="" width={72} height={64} className="h-14 w-auto" priority />
+          <span className="[font-family:var(--font-merriweather)] text-3xl font-normal leading-none tracking-[0.02em] text-[#2f3b30]">
+            NARRAVIT
+          </span>
+        </div>
       </header>
 
       <div className="flex flex-1 items-center justify-center px-[5%] py-12 md:py-20">
-        <div className="w-full max-w-xl">
+        <div className="w-full max-w-2xl border border-[#e0dcd5] bg-white p-6 sm:p-8 md:p-10">
           <ProgressBar total={steps.length} current={stepIndex} />
 
           <div className="mt-8">
@@ -166,17 +182,17 @@ export function OnboardingWizard({
               variant="outline"
               onClick={back}
               disabled={isFirst}
-              className="h-11"
+              className="h-11 min-w-28"
             >
               Zurück
             </Button>
 
             {isLast ? (
-              <Button type="button" onClick={handlePurchase} className="h-11">
+              <Button type="button" onClick={handlePurchase} className="h-11 min-w-36">
                 Jetzt kaufen — 79 €
               </Button>
             ) : (
-              <Button type="button" onClick={next} className="h-11">
+              <Button type="button" onClick={next} className="h-11 min-w-28">
                 Weiter
               </Button>
             )}
@@ -189,15 +205,15 @@ export function OnboardingWizard({
 
 function ProgressBar({ total, current }: { total: number; current: number }) {
   return (
-    <div className="relative flex justify-between before:absolute before:left-0 before:top-1/2 before:-z-10 before:h-px before:w-full before:-translate-y-1/2 before:bg-border">
+    <div className="relative flex justify-between before:absolute before:left-0 before:top-1/2 before:z-0 before:h-px before:w-full before:-translate-y-1/2 before:bg-[#e0dcd5]">
       {Array.from({ length: total }, (_, index) => (
         <div
           key={index}
           className={cn(
-            "flex h-8 w-8 items-center justify-center border border-border text-sm",
+            "relative z-10 flex h-8 w-8 items-center justify-center border text-sm font-bold",
             current >= index
-              ? "bg-primary text-primary-foreground"
-              : "bg-background text-muted-foreground",
+              ? "border-[#96B897] bg-[#96B897] text-white"
+              : "border-[#e0dcd5] bg-white text-[#848484]",
           )}
         >
           {current > index ? <Check className="h-4 w-4" /> : index + 1}
@@ -217,7 +233,7 @@ function StepName({
   return (
     <div>
       <h2 className="heading-style-h3 mb-3">Wie heißt du?</h2>
-      <p className="mb-6 text-muted-foreground">
+      <p className="mb-6 text-[#535252]">
         Dein Name erscheint später in deinem Profil und im Buch.
       </p>
       <div className="grid gap-1.5">
@@ -246,7 +262,7 @@ function StepForWhom({
   return (
     <div>
       <h2 className="heading-style-h3 mb-3">Für wen ist das Lebensbuch?</h2>
-      <p className="mb-6 text-muted-foreground">
+      <p className="mb-6 text-[#535252]">
         Du kannst es für dich selbst anlegen oder als Geschenk für jemanden.
       </p>
       <div className="grid gap-3">
@@ -281,7 +297,7 @@ function StepGiftDetails({
   return (
     <div>
       <h2 className="heading-style-h3 mb-3">Für wen ist das Geschenk?</h2>
-      <p className="mb-6 text-muted-foreground">
+      <p className="mb-6 text-[#535252]">
         Erzähl uns ein bisschen über die beschenkte Person.
       </p>
 
@@ -314,7 +330,7 @@ function StepGiftDetails({
       </div>
 
       {giftMode === "phone-only" && (
-        <p className="mt-6 border border-border bg-secondary p-4 text-sm">
+        <p className="mt-6 border border-[#e0dcd5] bg-[#FAF8F6] p-4 text-sm text-[#535252]">
           Hinweis: Du erhältst als Käufer vollen Zugriff auf das Projekt (Projektleiter).
         </p>
       )}
@@ -340,7 +356,7 @@ function StepGiftComputer({
   return (
     <div>
       <h2 className="heading-style-h3 mb-3">Zugang einrichten</h2>
-      <p className="mb-6 text-muted-foreground">
+      <p className="mb-6 text-[#535252]">
         Wir laden die beschenkte Person per E-Mail in das Projekt ein.
       </p>
 
@@ -372,10 +388,10 @@ function StepGiftComputer({
         />
       </div>
 
-      <div className="mt-8 flex items-start justify-between border border-border p-4">
+      <div className="mt-8 flex items-start justify-between border border-[#e0dcd5] bg-[#FAF8F6] p-4">
         <div className="pr-6">
           <p className="font-medium">Möchtest du selbst Zugang zum Projekt?</p>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-[#535252]">
             Wenn ja, wirst du als Projektleiter eingetragen.
           </p>
         </div>
@@ -418,23 +434,23 @@ function StepPurchase({ state }: { state: WizardState }) {
   return (
     <div>
       <h2 className="heading-style-h3 mb-3">Bereit zum Start?</h2>
-      <p className="mb-6 text-muted-foreground">
+      <p className="mb-6 text-[#535252]">
         Mit dem Kauf schalten wir dein Projekt frei und du kannst sofort loslegen.
       </p>
 
-      <dl className="mb-8 grid gap-3 border border-border bg-card p-6">
+      <dl className="mb-8 grid gap-3 border border-[#e0dcd5] bg-white p-6">
         {summary.map(({ label, value }) => (
           <div key={label} className="flex justify-between gap-4 text-sm">
-            <dt className="text-muted-foreground">{label}</dt>
+            <dt className="text-[#848484]">{label}</dt>
             <dd className="text-right font-medium">{value || "—"}</dd>
           </div>
         ))}
       </dl>
 
-      <div className="border border-border bg-secondary p-6">
-        <p className="text-sm text-muted-foreground">12 Monate Portal-Zugang</p>
+      <div className="border border-[#e0dcd5] bg-[#FAF8F6] p-6">
+        <p className="text-sm text-[#848484]">12 Monate Portal-Zugang</p>
         <p className="heading-style-h4 mt-1">79 €</p>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 text-sm text-[#535252]">
           Inklusive 10 Stunden Vapi-Erzählzeit, Editor und Druck-Vorbereitung.
         </p>
       </div>
@@ -460,12 +476,12 @@ function ChoiceCard({
       className={cn(
         "w-full border p-4 text-left transition-colors",
         selected
-          ? "border-foreground bg-secondary"
-          : "border-border bg-card hover:border-foreground/50",
+          ? "border-[#96B897] bg-[#F3F7F3]"
+          : "border-[#e0dcd5] bg-white hover:border-[#96B897]",
       )}
     >
       <p className="font-medium">{title}</p>
-      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      <p className="mt-1 text-sm text-[#535252]">{description}</p>
     </button>
   );
 }

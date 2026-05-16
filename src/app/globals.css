@@ -4,25 +4,25 @@
 
 @layer base {
   :root {
-    --background: 36 33% 97%;
-    --foreground: 0 0% 10%;
+    --background: 30 29% 97%;
+    --foreground: 28 12% 22%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 10%;
+    --card-foreground: 28 12% 22%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 10%;
-    --primary: 0 0% 10%;
-    --primary-foreground: 36 33% 97%;
-    --secondary: 36 27% 96%;
-    --secondary-foreground: 0 0% 10%;
+    --popover-foreground: 28 12% 22%;
+    --primary: 33 27% 73%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 30 26% 95%;
+    --secondary-foreground: 28 12% 22%;
     --muted: 36 18% 92%;
-    --muted-foreground: 0 0% 46%;
-    --accent: 225 93% 54%;
+    --muted-foreground: 0 0% 52%;
+    --accent: 121 23% 65%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 84% 60%;
+    --destructive: 340 10% 30%;
     --destructive-foreground: 0 0% 100%;
     --border: 36 18% 86%;
     --input: 36 18% 86%;
-    --ring: 225 93% 54%;
+    --ring: 121 23% 65%;
     --radius: 0rem;
 
     --neutral-100: 36 27% 96%;
@@ -30,6 +30,15 @@
     --neutral-400: 36 7% 81%;
     --neutral-600: 0 0% 46%;
     --neutral-700: 0 0% 10%;
+
+    --narravit-page: #faf8f6;
+    --narravit-text: #3e3831;
+    --narravit-muted: #848484;
+    --narravit-border: #e0dcd5;
+    --narravit-green: #96b897;
+    --narravit-sand: #d0bca6;
+    --narravit-sand-hover: #c0ad98;
+    --narravit-bluegray: #597083;
   }
 }
 
@@ -44,12 +53,12 @@
 
   body {
     @apply overflow-x-hidden bg-background text-foreground antialiased;
-    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-lato), ui-sans-serif, system-ui, sans-serif;
   }
 
   h1, h2, h3, h4, h5, h6 {
     @apply text-foreground;
-    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-merriweather), ui-serif, Georgia, "Times New Roman", serif;
   }
 }
 
@@ -58,10 +67,10 @@
     @apply text-[3.5rem] leading-[1.1] font-normal tracking-[-0.04rem] md:text-[5.25rem] md:tracking-[-0.0525rem];
   }
   .heading-style-h2 {
-    @apply text-5xl leading-[1.2] font-normal tracking-[-0.0375rem] md:text-6xl;
+    @apply text-[2.75rem] leading-[1.15] font-normal tracking-[-0.03rem] md:text-6xl md:leading-[1.2] md:tracking-[-0.0375rem];
   }
   .heading-style-h3 {
-    @apply text-4xl leading-[1.2] font-normal md:text-5xl;
+    @apply text-[2rem] leading-[1.2] font-normal md:text-5xl;
   }
   .heading-style-h4 {
     @apply text-3xl leading-[1.3] font-normal tracking-[-0.025rem] md:text-4xl;
@@ -71,5 +80,49 @@
   }
   .heading-style-h6 {
     @apply text-xl leading-[1.4] font-normal tracking-[-0.01625rem] md:text-2xl;
+  }
+
+  .page-wrapper {
+    @apply flex min-h-screen flex-col;
+  }
+
+  .padding-global {
+    @apply px-[5%];
+  }
+
+  .container-large {
+    @apply mx-auto w-full max-w-[80rem];
+  }
+
+  .container-medium {
+    @apply mx-auto w-full max-w-[64rem];
+  }
+
+  .container-small {
+    @apply mx-auto w-full max-w-[48rem];
+  }
+
+  .button {
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 border border-border bg-primary px-6 py-3 text-center font-bold text-primary-foreground transition-colors duration-200 hover:bg-[#c0ad98] disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .button.is-secondary {
+    @apply bg-transparent text-foreground hover:bg-neutral-100;
+  }
+
+  .button.is-link {
+    @apply border-none bg-transparent p-0 text-foreground underline-offset-4 hover:underline;
+  }
+
+  .card {
+    @apply rounded-none border border-border bg-card;
+  }
+
+  .form_input {
+    @apply flex min-h-[2.75rem] w-full border border-border bg-white px-3 py-2 text-foreground outline-none transition-colors focus:border-accent;
+  }
+
+  .divider-horizontal {
+    @apply h-px w-full bg-border;
   }
 }

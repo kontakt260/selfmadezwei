@@ -28,7 +28,7 @@ function ExpiredLinkBanner() {
 
   if (resendState.success) {
     return (
-      <div className="mb-6 border border-border bg-secondary p-4 text-sm">
+      <div className="mb-6 border border-[#e0dcd5] bg-[#FAF8F6] p-4 text-sm text-[#535252]">
         Falls ein Konto mit dieser E-Mail existiert, hast du eine neue
         Bestätigungs-E-Mail erhalten.
       </div>
@@ -36,9 +36,9 @@ function ExpiredLinkBanner() {
   }
 
   return (
-    <form action={resendForm} className="mb-6 grid gap-3 border border-border bg-secondary p-4 text-sm">
+    <form action={resendForm} className="mb-6 grid gap-3 border border-[#e0dcd5] bg-[#FAF8F6] p-4 text-sm">
       <p className="font-medium">Dieser Link ist nicht mehr gültig.</p>
-      <p className="text-muted-foreground">
+      <p className="text-[#535252]">
         Trage deine E-Mail ein, und wir schicken dir eine neue Bestätigungs-E-Mail.
       </p>
       <div className="grid gap-1.5">
@@ -71,7 +71,7 @@ export default function AnmeldenPage() {
     <AuthLayout>
       <div className="mb-8 text-center md:mb-10">
         <h1 className="heading-style-h2 mb-4">Anmelden</h1>
-        <p className="text-muted-foreground">
+        <p className="text-[#535252]">
           Willkommen zurück bei NARRAVIT.
         </p>
       </div>
@@ -123,9 +123,9 @@ export default function AnmeldenPage() {
           {pending ? "Anmeldung …" : "Anmelden"}
         </Button>
 
-        <div className="my-2 flex items-center gap-3">
+        <div className="my-3 flex items-center gap-3">
           <Separator className="flex-1" />
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">oder</span>
+          <span className="text-xs font-bold uppercase tracking-[0.18em] text-[#848484]">oder</span>
           <Separator className="flex-1" />
         </div>
 
@@ -139,7 +139,7 @@ export default function AnmeldenPage() {
       </div>
 
       <div className="mt-3 flex justify-center gap-x-1 text-center text-sm">
-        <p className="text-muted-foreground">Noch kein Konto?</p>
+        <p className="text-[#848484]">Noch kein Konto?</p>
         <Link href="/registrieren" className="underline underline-offset-4">
           Jetzt registrieren
         </Link>

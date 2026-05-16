@@ -20,7 +20,7 @@ export default function RegistrierenPage() {
     <AuthLayout>
       <div className="mb-8 text-center md:mb-10">
         <h1 className="heading-style-h2 mb-4">Konto erstellen</h1>
-        <p className="text-muted-foreground">
+        <p className="text-[#535252]">
           Starte dein Lebensbuch in wenigen Minuten.
         </p>
       </div>
@@ -104,9 +104,9 @@ export default function RegistrierenPage() {
           {pending ? "Konto wird erstellt …" : "Konto erstellen"}
         </Button>
 
-        <div className="my-2 flex items-center gap-3">
+        <div className="my-3 flex items-center gap-3">
           <Separator className="flex-1" />
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">oder</span>
+          <span className="text-xs font-bold uppercase tracking-[0.18em] text-[#848484]">oder</span>
           <Separator className="flex-1" />
         </div>
 
@@ -114,7 +114,7 @@ export default function RegistrierenPage() {
       </form>
 
       <div className="mt-6 flex justify-center gap-x-1 text-center text-sm">
-        <p className="text-muted-foreground">Bereits ein Konto?</p>
+        <p className="text-[#848484]">Bereits ein Konto?</p>
         <Link href="/anmelden" className="underline underline-offset-4">
           Anmelden
         </Link>

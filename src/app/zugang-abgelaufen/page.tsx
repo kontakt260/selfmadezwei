@@ -7,7 +7,7 @@ export default function ZugangAbgelaufenPage() {
     <AuthLayout>
       <div className="text-center">
         <h1 className="heading-style-h2 mb-4">Dein Zugang ist abgelaufen</h1>
-        <p className="mb-8 text-muted-foreground">
+        <p className="mb-8 text-[#535252]">
           Dein NARRAVIT-Portalzugang ist nicht mehr aktiv. Verlängere ihn, um wieder
           in deinem Projekt zu schreiben.
         </p>
