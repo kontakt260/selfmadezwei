@@ -54,14 +54,14 @@ export default function PasswortVergessenPage() {
             autoComplete="email"
             required
             aria-invalid={Boolean(state.fieldErrors?.email)}
-            className="h-11"
+            className="h-12"
           />
           {state.fieldErrors?.email && (
             <p className="text-sm text-destructive">{state.fieldErrors.email}</p>
           )}
         </div>
 
-        <Button type="submit" className="h-11" disabled={pending}>
+        <Button type="submit" className="h-12" disabled={pending}>
           {pending ? "Wird gesendet …" : "Reset-Link senden"}
         </Button>
       </form>

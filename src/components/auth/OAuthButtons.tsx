@@ -38,7 +38,7 @@ export function OAuthButtons({ mode }: OAuthButtonsProps) {
       <Button
         type="button"
         variant="outline"
-        className="h-11 gap-3"
+        className="h-12 gap-3"
         onClick={() => handleOAuth("google")}
         disabled={loading !== null}
       >
@@ -48,7 +48,7 @@ export function OAuthButtons({ mode }: OAuthButtonsProps) {
       <Button
         type="button"
         variant="outline"
-        className="h-11 gap-3"
+        className="h-12 gap-3"
         onClick={() => handleOAuth("apple")}
         disabled={loading !== null}
       >

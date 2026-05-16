@@ -21,7 +21,7 @@ export function SignOutButton() {
       type="button"
       onClick={handleSignOut}
       disabled={pending}
-      className="text-sm font-bold text-[#534B42] underline underline-offset-4 transition-colors hover:text-[#96B897] disabled:opacity-50"
+      className="[font-family:var(--font-lato)] text-sm font-bold text-[#534B42] underline underline-offset-4 transition-colors hover:text-[#96B897] disabled:opacity-50"
     >
       {pending ? "Abmelden …" : "Abmelden"}
     </button>

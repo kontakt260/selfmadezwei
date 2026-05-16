@@ -35,7 +35,7 @@ export default function RegistrierenPage() {
             autoComplete="name"
             required
             aria-invalid={Boolean(state.fieldErrors?.fullName)}
-            className="h-11"
+            className="h-12"
           />
           {state.fieldErrors?.fullName && (
             <p className="text-sm text-destructive">{state.fieldErrors.fullName}</p>
@@ -51,7 +51,7 @@ export default function RegistrierenPage() {
             autoComplete="email"
             required
             aria-invalid={Boolean(state.fieldErrors?.email)}
-            className="h-11"
+            className="h-12"
           />
           {state.fieldErrors?.email && (
             <p className="text-sm text-destructive">{state.fieldErrors.email}</p>
@@ -68,7 +68,7 @@ export default function RegistrierenPage() {
             required
             minLength={8}
             aria-invalid={Boolean(state.fieldErrors?.password)}
-            className="h-11"
+            className="h-12"
           />
           {state.fieldErrors?.password && (
             <p className="text-sm text-destructive">{state.fieldErrors.password}</p>
@@ -85,7 +85,7 @@ export default function RegistrierenPage() {
             required
             minLength={8}
             aria-invalid={Boolean(state.fieldErrors?.confirmPassword)}
-            className="h-11"
+            className="h-12"
           />
           {state.fieldErrors?.confirmPassword && (
             <p className="text-sm text-destructive">
@@ -100,7 +100,7 @@ export default function RegistrierenPage() {
           </p>
         )}
 
-        <Button type="submit" className="h-11" disabled={pending}>
+        <Button type="submit" className="h-12" disabled={pending}>
           {pending ? "Konto wird erstellt …" : "Konto erstellen"}
         </Button>
 

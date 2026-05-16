@@ -13,7 +13,7 @@ export default function ZugangAbgelaufenPage() {
         </p>
 
         {/* TODO PROJ-6: Button auf Stripe-Checkout-Session umstellen. */}
-        <Button disabled className="mb-6 h-11 w-full">
+        <Button disabled className="mb-6 h-12 w-full">
           Zugang verlängern — 79 €
         </Button>
 

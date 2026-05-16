@@ -48,13 +48,13 @@ function ExpiredLinkBanner() {
           name="email"
           type="email"
           required
-          className="h-10"
+          className="h-12"
         />
       </div>
       {resendState.error && (
         <p className="text-destructive">{resendState.error}</p>
       )}
-      <Button type="submit" variant="outline" disabled={resendPending} className="h-10">
+      <Button type="submit" variant="outline" disabled={resendPending} className="h-12">
         {resendPending ? "Wird gesendet …" : "Neue Bestätigungs-E-Mail anfordern"}
       </Button>
     </form>
@@ -90,7 +90,7 @@ export default function AnmeldenPage() {
             autoComplete="email"
             required
             aria-invalid={Boolean(state.fieldErrors?.email)}
-            className="h-11"
+            className="h-12"
           />
           {state.fieldErrors?.email && (
             <p className="text-sm text-destructive">{state.fieldErrors.email}</p>
@@ -106,7 +106,7 @@ export default function AnmeldenPage() {
             autoComplete="current-password"
             required
             aria-invalid={Boolean(state.fieldErrors?.password)}
-            className="h-11"
+            className="h-12"
           />
           {state.fieldErrors?.password && (
             <p className="text-sm text-destructive">{state.fieldErrors.password}</p>
@@ -119,7 +119,7 @@ export default function AnmeldenPage() {
           </p>
         )}
 
-        <Button type="submit" className="h-11" disabled={pending}>
+        <Button type="submit" className="h-12" disabled={pending}>
           {pending ? "Anmeldung …" : "Anmelden"}
         </Button>
 

@@ -33,7 +33,7 @@ export default function PasswortZuruecksetzenPage() {
             required
             minLength={8}
             aria-invalid={Boolean(state.fieldErrors?.password)}
-            className="h-11"
+            className="h-12"
           />
           {state.fieldErrors?.password && (
             <p className="text-sm text-destructive">{state.fieldErrors.password}</p>
@@ -50,7 +50,7 @@ export default function PasswortZuruecksetzenPage() {
             required
             minLength={8}
             aria-invalid={Boolean(state.fieldErrors?.confirmPassword)}
-            className="h-11"
+            className="h-12"
           />
           {state.fieldErrors?.confirmPassword && (
             <p className="text-sm text-destructive">{state.fieldErrors.confirmPassword}</p>
@@ -63,7 +63,7 @@ export default function PasswortZuruecksetzenPage() {
           </p>
         )}
 
-        <Button type="submit" className="h-11" disabled={pending}>
+        <Button type="submit" className="h-12" disabled={pending}>
           {pending ? "Speichern …" : "Passwort setzen"}
         </Button>
       </form>

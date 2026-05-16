@@ -26,7 +26,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
       </header>
 
       <div className="relative z-10 flex min-h-screen items-center justify-center px-[5%] pb-20 pt-36 lg:py-24">
-        <div className="w-full max-w-[29rem] border border-[#e0dcd5] bg-white p-6 sm:p-8 md:p-10">
+        <div className="w-full max-w-[32rem] border border-[#e0dcd5] bg-white p-7 sm:p-10 md:p-12">
           {children}
         </div>
       </div>

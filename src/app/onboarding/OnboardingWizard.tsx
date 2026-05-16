@@ -145,7 +145,7 @@ export function OnboardingWizard({
       </header>
 
       <div className="flex flex-1 items-center justify-center px-[5%] py-12 md:py-20">
-        <div className="w-full max-w-2xl border border-[#e0dcd5] bg-white p-6 sm:p-8 md:p-10">
+        <div className="w-full max-w-3xl border border-[#e0dcd5] bg-white p-7 sm:p-10 md:p-12">
           <ProgressBar total={steps.length} current={stepIndex} />
 
           <div className="mt-8">
@@ -188,17 +188,17 @@ export function OnboardingWizard({
               variant="outline"
               onClick={back}
               disabled={isFirst}
-              className="h-11 min-w-28"
+              className="h-12 min-w-32"
             >
               Zurück
             </Button>
 
             {isLast ? (
-              <Button type="button" onClick={handlePurchase} className="h-11 min-w-36">
+              <Button type="button" onClick={handlePurchase} className="h-12 min-w-44">
                 Jetzt kaufen — 249 €
               </Button>
             ) : (
-              <Button type="button" onClick={next} className="h-11 min-w-28">
+              <Button type="button" onClick={next} className="h-12 min-w-32">
                 Weiter
               </Button>
             )}
@@ -216,13 +216,13 @@ function ProgressBar({ total, current }: { total: number; current: number }) {
         <div
           key={index}
           className={cn(
-            "relative z-10 flex h-8 w-8 items-center justify-center border text-sm font-bold",
+            "relative z-10 flex h-10 w-10 items-center justify-center border text-base font-bold",
             current >= index
               ? "border-[#96B897] bg-[#96B897] text-white"
               : "border-[#e0dcd5] bg-white text-[#848484]",
           )}
         >
-          {current > index ? <Check className="h-4 w-4" /> : index + 1}
+          {current > index ? <Check className="h-5 w-5" /> : index + 1}
         </div>
       ))}
     </div>
@@ -242,7 +242,7 @@ function StepName({
       <p className="mb-6 text-[#535252]">
         Dein Name erscheint später in deinem Profil und im Buch.
       </p>
-      <div className="grid gap-1.5">
+      <div className="grid gap-2">
         <Label htmlFor="fullName">Vollständiger Name</Label>
         <Input
           id="fullName"
@@ -250,7 +250,7 @@ function StepName({
           value={fullName}
           onChange={(e) => onChange(e.target.value)}
           autoComplete="name"
-          className="h-11"
+          className="h-12"
           autoFocus
         />
       </div>
@@ -307,14 +307,14 @@ function StepGiftDetails({
         Erzähl uns ein bisschen über die beschenkte Person.
       </p>
 
-      <div className="grid gap-1.5">
+      <div className="grid gap-2">
         <Label htmlFor="recipientName">Name der beschenkten Person</Label>
         <Input
           id="recipientName"
           type="text"
           value={recipientName}
           onChange={(e) => onChangeName(e.target.value)}
-          className="h-11"
+          className="h-12"
           autoFocus
         />
       </div>
@@ -336,7 +336,7 @@ function StepGiftDetails({
       </div>
 
       {giftMode === "phone-only" && (
-        <p className="mt-6 border border-[#e0dcd5] bg-[#FAF8F6] p-4 text-sm text-[#535252]">
+        <p className="mt-6 border border-[#e0dcd5] bg-[#FAF8F6] p-5 text-base text-[#535252]">
           Hinweis: Du erhältst als Käufer vollen Zugriff auf das Projekt (Projektleiter).
         </p>
       )}
@@ -366,22 +366,22 @@ function StepGiftComputer({
         Wir laden die beschenkte Person per E-Mail in das Projekt ein.
       </p>
 
-      <div className="grid gap-1.5">
+      <div className="grid gap-2">
         <Label htmlFor="recipientEmail">E-Mail der beschenkten Person</Label>
         <Input
           id="recipientEmail"
           type="email"
           value={email}
           onChange={(e) => onChangeEmail(e.target.value)}
-          className="h-11"
+          className="h-12"
           autoFocus
         />
       </div>
 
-      <div className="mt-8 flex items-start justify-between border border-[#e0dcd5] bg-[#FAF8F6] p-4">
+      <div className="mt-8 flex items-start justify-between border border-[#e0dcd5] bg-[#FAF8F6] p-5">
         <div className="pr-6">
           <p className="font-medium">Möchtest du selbst Zugang zum Projekt?</p>
-          <p className="mt-1 text-sm text-[#535252]">
+          <p className="mt-1 text-base text-[#535252]">
             Wenn ja, wirst du als Projektleiter eingetragen.
           </p>
         </div>
@@ -406,7 +406,7 @@ function StepGiftComputer({
       </div>
 
       {!buyerWantsAccess && (
-        <p className="mt-4 border border-[#e0dcd5] bg-[#FAF8F6] p-4 text-sm text-[#535252]">
+        <p className="mt-4 border border-[#e0dcd5] bg-[#FAF8F6] p-5 text-base text-[#535252]">
           Da du selbst keinen Zugang möchtest, wird die beschenkte Person automatisch Projektleiter
           — jedes Projekt braucht mindestens eine:n Projektleiter:in.
         </p>
@@ -454,17 +454,17 @@ function StepPurchase({ state }: { state: WizardState }) {
 
       <dl className="mb-8 grid gap-3 border border-[#e0dcd5] bg-white p-6">
         {summary.map(({ label, value }) => (
-          <div key={label} className="flex justify-between gap-4 text-sm">
+          <div key={label} className="flex justify-between gap-5 text-base">
             <dt className="text-[#848484]">{label}</dt>
             <dd className="text-right font-medium">{value || "—"}</dd>
           </div>
         ))}
       </dl>
 
-      <div className="border border-[#e0dcd5] bg-[#FAF8F6] p-6">
-        <p className="text-sm text-[#848484]">12 Monate Portal-Zugang</p>
+      <div className="border border-[#e0dcd5] bg-[#FAF8F6] p-7">
+        <p className="text-base text-[#848484]">12 Monate Portal-Zugang</p>
         <p className="heading-style-h4 mt-1">249 €</p>
-        <p className="mt-2 text-sm text-[#535252]">
+        <p className="mt-2 text-base text-[#535252]">
           Inklusive 10 Stunden Vapi-Erzählzeit, Editor und Druck-Vorbereitung.
         </p>
       </div>
@@ -491,15 +491,15 @@ function ChoiceCard({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "w-full border p-4 text-left transition-colors",
+        "w-full border p-5 text-left [font-family:var(--font-lato)] text-lg font-bold transition-colors",
         selected
           ? "border-[#96B897] bg-[#F3F7F3]"
           : "border-[#e0dcd5] bg-white hover:border-[#96B897]",
         disabled && "cursor-not-allowed opacity-50 hover:border-[#e0dcd5]",
       )}
     >
-      <p className="font-medium">{title}</p>
-      <p className="mt-1 text-sm text-[#535252]">{description}</p>
+      <p>{title}</p>
+      <p className="mt-2 text-base font-normal text-[#535252]">{description}</p>
     </button>
   );
 }
