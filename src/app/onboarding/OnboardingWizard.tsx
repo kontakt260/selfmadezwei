@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,16 +68,6 @@ export function OnboardingWizard({
   const currentStep = steps[stepIndex];
   const isLast = stepIndex === steps.length - 1;
   const isFirst = stepIndex === 0;
-
-  // #region agent log
-  fetch("http://127.0.0.1:7800/ingest/fd631e72-4665-4122-b32e-2df0088c7344", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "5dfb08" }, body: JSON.stringify({ sessionId: "5dfb08", runId: "initial", hypothesisId: "H5-client-render", location: "src/app/onboarding/OnboardingWizard.tsx:70", message: "OnboardingWizard render reached", data: { stepIndex, stepCount: steps.length, currentStep }, timestamp: Date.now() }) }).catch(() => {});
-  // #endregion
-
-  useEffect(() => {
-    // #region agent log
-    fetch("http://127.0.0.1:7800/ingest/fd631e72-4665-4122-b32e-2df0088c7344", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "5dfb08" }, body: JSON.stringify({ sessionId: "5dfb08", runId: "initial", hypothesisId: "H5-client-hydration", location: "src/app/onboarding/OnboardingWizard.tsx:76", message: "OnboardingWizard hydrated", data: { stepIndex, stepCount: steps.length, currentStep }, timestamp: Date.now() }) }).catch(() => {});
-    // #endregion
-  }, [currentStep, stepIndex, steps.length]);
 
   const validateCurrent = (): string | null => {
     switch (currentStep) {

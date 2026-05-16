@@ -1,6 +1,6 @@
 # PROJ-18: Debug-Telemetrie-Cleanup
 
-## Status: Planned
+## Status: In Progress
 **Created:** 2026-05-16
 **Last Updated:** 2026-05-16
 **Priority:** P0 (Production-Build-Blocker)
