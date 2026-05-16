@@ -515,5 +515,56 @@ Nach dem ersten QA-Lauf wurden alle Critical/High/Medium Bugs gefixt. Re-Test mi
 ### Production-Ready Decision
 ✅ **APPROVED** — Critical + High + Medium Bugs behoben, alle 22 E2E-Tests grün. Verbleibende Low-Bugs (BUG-9 shadcn-Radius, BUG-10 Lockfiles) sind kosmetisch und blockieren den Produktiv-Einsatz nicht.
 
+---
+
+## Re-QA (2026-05-16) — Nach Resend-Integration + neueren Commits
+
+**Anlass:** Resend als SMTP-Provider verknüpft; weitere Commits seit letztem QA-Lauf (535f502, 4de2b89 u. a.) haben Auth-Dateien und Onboarding geändert.
+
+**Methode:** Playwright E2E gegen laufenden Dev-Server (Chromium, 4 Worker); Code Review aller geänderten Dateien.
+
+### Neu gefundene Befunde
+
+#### BUG-11 — **High (Regression, gefixt)**: Alle 7 Onboarding-Wizard-E2E-Tests brachen
+**Ursache:** Commit `535f502 change onboarding order for better flow` hat die Schrittreihenfolge von `name → for-whom → …` auf `for-whom → name → …` geändert. Die E2E-Tests testeten aber noch die alte Reihenfolge.
+
+**Fix (QA):** E2E-Tests in `tests/PROJ-2-auth-ssr.spec.ts` an neue Schrittfolge angepasst. Zusätzlich `test.describe.configure({ mode: "serial" })` für die Onboarding-Gruppe ergänzt: gleichzeitige Supabase-Auth-Calls vom Dev-Server überschritten den 30s-Timeout wenn die Tests parallel liefen.
+
+**Spec-Abweichung:** Spec beschreibt "Schritt 1: Name, Schritt 2: Für wen?" — Code weicht intentional davon ab. Spec sollte angepasst werden, da der neue Flow sinnvoller ist (Pfad-Branching zuerst).
+
+---
+
+#### BUG-12 — **High**: Debug-Telemetrie-Fetch-Calls in Produktion aktiv
+**Beschreibung:** In `src/app/onboarding/page.tsx` (4×) und `src/app/onboarding/OnboardingWizard.tsx` (2×) befinden sich Debug-fetch-Calls zu `http://127.0.0.1:7800/ingest/…`. Der Call in `OnboardingWizard.tsx` (Zeile 73) liegt **im Render-Body** (nicht in `useEffect`) — er feuert bei jedem Re-Render als Render-Seiteneffekt, was ein React-Anti-Pattern ist.
+
+**Impact:**
+- Feuern in Produktion (Fehler wird mit `.catch(() => {})` verworfen, aber der Netzwerk-Call findet statt)
+- Unnötige Latenz bei jedem Onboarding-Request
+- React-Anti-Pattern: Side-Effect im Render-Body kann zu StrictMode-Doppel-Ausführung führen
+- Betrifft PROJ-18 (Debug-Telemetrie-Cleanup), das noch im Status "Planned" ist
+
+**Fix:** Alle `#region agent log`-Blöcke entfernen (`/frontend` oder separater Cleanup-Commit). PROJ-18 priorisieren.
+
+---
+
+#### BUG-13 — **Low**: Preis-Abweichung zwischen Spec und UI
+**Beschreibung:** Spec sagt "12 Monate Portal-Zugang — 79 €"; nach Commit `c5fa064 change pricing in onboarding` zeigt die UI "249 €". Intentionale Änderung, aber Spec nicht aktualisiert.
+
+**Fix:** Spec-Felder für Preis aktualisieren (Schritt 3, `/zugang-abgelaufen`).
+
+---
+
+### Re-Test-Ergebnis
+**22/22 ✅** (22.1s, Chromium) — nach Test-Updates. Alle Security-Checks aus vorheriger Runde unverändert OK.
+
+### Production-Ready Decision
+**⚠️ IN REVIEW** — BUG-12 (Debug-Telemetrie, High) blockiert Production-Ready-Freigabe. Resend läuft, Signup-Flow funktioniert. Nach Bereinigung von PROJ-18 (BUG-12) erneuter Quick-Check erforderlich.
+
+| Bug | Status | Priorität |
+|-----|--------|-----------|
+| BUG-11 | ✅ Gefixt (E2E-Tests aktualisiert) | — |
+| BUG-12 | ❌ Offen | Vor nächstem Deploy |
+| BUG-13 | ❌ Offen (Spec-Update) | Low |
+
 ## Deployment
 _To be added by /deploy_

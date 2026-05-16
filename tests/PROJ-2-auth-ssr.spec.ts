@@ -130,15 +130,25 @@ test.describe("PROJ-2 — Form validation (Zod, server actions)", () => {
 });
 
 test.describe("PROJ-2 — Onboarding wizard", () => {
-  test("Path A (self): name → for-whom → purchase (3 steps)", async ({ page }) => {
+  // Serial: /onboarding makes a Supabase auth call on every request; concurrent hits
+  // against the dev server's Turbopack compiler exceed the 30s timeout.
+  test.describe.configure({ mode: "serial" });
+
+  // Step order after commit 535f502 ("change onboarding order for better flow"):
+  // for-whom → name → [gift-details] → [gift-computer] → purchase
+  // Path A (self):              for-whom → name → purchase            (3 steps)
+  // Path B1 (gift+phone-only):  for-whom → name → gift-details → purchase  (4 steps)
+  // Path B2 (gift+computer):    for-whom → name → gift-details → gift-computer → purchase (5 steps)
+
+  test("Path A (self): for-whom → name → purchase (3 steps)", async ({ page }) => {
     await page.goto("/onboarding");
 
-    // Step 1: Name
-    await page.locator('input[id="fullName"]').fill("Max Mustermann");
+    // Step 1: For whom?
+    await page.getByRole("button", { name: /Für mich selbst/ }).click();
     await page.getByRole("button", { name: "Weiter" }).click();
 
-    // Step 2: For whom?
-    await page.getByRole("button", { name: /Für mich selbst/ }).click();
+    // Step 2: Name
+    await page.locator('input[id="fullName"]').fill("Max Mustermann");
     await page.getByRole("button", { name: "Weiter" }).click();
 
     // Step 3: Purchase CTA
@@ -151,12 +161,15 @@ test.describe("PROJ-2 — Onboarding wizard", () => {
   test("Path B1 (gift + phone-only): 4 steps", async ({ page }) => {
     await page.goto("/onboarding");
 
-    await page.locator('input[id="fullName"]').fill("Max Mustermann");
-    await page.getByRole("button", { name: "Weiter" }).click();
-
+    // Step 1: For whom?
     await page.getByRole("button", { name: /Als Geschenk/ }).click();
     await page.getByRole("button", { name: "Weiter" }).click();
 
+    // Step 2: Name
+    await page.locator('input[id="fullName"]').fill("Max Mustermann");
+    await page.getByRole("button", { name: "Weiter" }).click();
+
+    // Step 3: Gift details
     await page.locator('input[id="recipientName"]').fill("Oma Helga");
     await page.getByRole("button", { name: /Nur per Telefon erzählen/ }).click();
 
@@ -164,7 +177,7 @@ test.describe("PROJ-2 — Onboarding wizard", () => {
     await expect(page.getByText(/vollen Zugriff auf das Projekt/)).toBeVisible();
     await page.getByRole("button", { name: "Weiter" }).click();
 
-    // Purchase step shows gift summary
+    // Step 4: Purchase step shows gift summary
     await expect(page.getByText("Oma Helga")).toBeVisible();
     await expect(page.getByText("Nur Telefon")).toBeVisible();
   });
@@ -172,28 +185,35 @@ test.describe("PROJ-2 — Onboarding wizard", () => {
   test("Path B2 (gift + phone+computer): 5 steps with role selection", async ({ page }) => {
     await page.goto("/onboarding");
 
-    await page.locator('input[id="fullName"]').fill("Max Mustermann");
-    await page.getByRole("button", { name: "Weiter" }).click();
-
+    // Step 1: For whom?
     await page.getByRole("button", { name: /Als Geschenk/ }).click();
     await page.getByRole("button", { name: "Weiter" }).click();
 
+    // Step 2: Name
+    await page.locator('input[id="fullName"]').fill("Max Mustermann");
+    await page.getByRole("button", { name: "Weiter" }).click();
+
+    // Step 3: Gift details
     await page.locator('input[id="recipientName"]').fill("Oma Helga");
     await page.getByRole("button", { name: /Auch am Computer schreiben/ }).click();
     await page.getByRole("button", { name: "Weiter" }).click();
 
-    // Gift computer step: email + role + buyer-access toggle
+    // Step 4: Gift computer — email + role + buyer-access toggle
     await page.locator('input[id="recipientEmail"]').fill("oma@example.com");
     await page.getByRole("button", { name: /^Projektleiter/ }).first().click();
     await page.getByRole("button", { name: "Weiter" }).click();
 
-    // Purchase step
+    // Step 5: Purchase step
     await expect(page.getByText("oma@example.com")).toBeVisible();
     await expect(page.getByText("Auch Computer")).toBeVisible();
   });
 
   test("name step requires min. 2 characters", async ({ page }) => {
     await page.goto("/onboarding");
+    // Must pass for-whom first (step 1)
+    await page.getByRole("button", { name: /Für mich selbst/ }).click();
+    await page.getByRole("button", { name: "Weiter" }).click();
+    // Now on name step (step 2)
     await page.locator('input[id="fullName"]').fill("A");
     await page.getByRole("button", { name: "Weiter" }).click();
     await expect(page.getByText(/mind. 2 Zeichen/)).toBeVisible();
@@ -201,18 +221,18 @@ test.describe("PROJ-2 — Onboarding wizard", () => {
 
   test("for-whom step requires a choice", async ({ page }) => {
     await page.goto("/onboarding");
-    await page.locator('input[id="fullName"]').fill("Max Mustermann");
-    await page.getByRole("button", { name: "Weiter" }).click();
+    // for-whom is now step 1 — click Weiter without selecting
     await page.getByRole("button", { name: "Weiter" }).click();
     await expect(page.getByText(/Bitte triff eine Auswahl/)).toBeVisible();
   });
 
   test("gift-computer step rejects invalid email", async ({ page }) => {
     await page.goto("/onboarding");
-    await page.locator('input[id="fullName"]').fill("Max Mustermann");
-    await page.getByRole("button", { name: "Weiter" }).click();
 
     await page.getByRole("button", { name: /Als Geschenk/ }).click();
+    await page.getByRole("button", { name: "Weiter" }).click();
+
+    await page.locator('input[id="fullName"]').fill("Max Mustermann");
     await page.getByRole("button", { name: "Weiter" }).click();
 
     await page.locator('input[id="recipientName"]').fill("Oma Helga");
@@ -226,15 +246,18 @@ test.describe("PROJ-2 — Onboarding wizard", () => {
 
   test("back button returns to previous step and preserves state", async ({ page }) => {
     await page.goto("/onboarding");
-    await page.locator('input[id="fullName"]').fill("Max Mustermann");
-    await page.getByRole("button", { name: "Weiter" }).click();
+    // Path A: for-whom → name → purchase
     await page.getByRole("button", { name: /Für mich selbst/ }).click();
     await page.getByRole("button", { name: "Weiter" }).click();
+    await page.locator('input[id="fullName"]').fill("Max Mustermann");
+    await page.getByRole("button", { name: "Weiter" }).click();
 
-    // We're at purchase. Go back twice.
+    // We're at purchase (step 3). Go back once → name step.
     await page.getByRole("button", { name: "Zurück" }).click();
-    await page.getByRole("button", { name: "Zurück" }).click();
-
     await expect(page.locator('input[id="fullName"]')).toHaveValue("Max Mustermann");
+
+    // Go back again → for-whom step. State should be preserved (go forward to verify).
+    await page.getByRole("button", { name: "Zurück" }).click();
+    await expect(page.getByRole("button", { name: /Für mich selbst/ })).toBeVisible();
   });
 });
