@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +11,12 @@ import { AuthLayout } from "@/components/auth/AuthLayout";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { registerAction, type RegisterState } from "./actions";
 
-export default function RegistrierenPage() {
+function RegistrierenContent() {
+  const searchParams = useSearchParams();
+  const onboardingIntent = searchParams.get("for") ?? searchParams.get("forWhom") ?? "";
+  const onboardingPath = onboardingIntent
+    ? `/onboarding?for=${encodeURIComponent(onboardingIntent)}`
+    : "/onboarding";
   const [state, formAction, pending] = useActionState<RegisterState, FormData>(
     registerAction,
     {},
@@ -26,6 +32,8 @@ export default function RegistrierenPage() {
       </div>
 
       <form action={formAction} className="grid gap-4" noValidate>
+        <input type="hidden" name="onboardingIntent" value={onboardingIntent} />
+
         <div className="grid gap-1.5">
           <Label htmlFor="fullName">Vollständiger Name</Label>
           <Input
@@ -110,7 +118,7 @@ export default function RegistrierenPage() {
           <Separator className="flex-1" />
         </div>
 
-        <OAuthButtons mode="registrieren" />
+        <OAuthButtons mode="registrieren" redirectPath={onboardingPath} />
       </form>
 
       <div className="mt-6 flex justify-center gap-x-1 text-center text-sm">
@@ -120,5 +128,13 @@ export default function RegistrierenPage() {
         </Link>
       </div>
     </AuthLayout>
+  );
+}
+
+export default function RegistrierenPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegistrierenContent />
+    </Suspense>
   );
 }

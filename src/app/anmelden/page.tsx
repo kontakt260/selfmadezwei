@@ -61,7 +61,9 @@ function ExpiredLinkBanner() {
   );
 }
 
-export default function AnmeldenPage() {
+function AnmeldenContent() {
+  const searchParams = useSearchParams();
+  const nextPath = searchParams.get("next") ?? "/";
   const [state, formAction, pending] = useActionState<LoginState, FormData>(
     loginAction,
     {},
@@ -81,6 +83,8 @@ export default function AnmeldenPage() {
       </Suspense>
 
       <form action={formAction} className="grid gap-4" noValidate>
+        <input type="hidden" name="next" value={nextPath} />
+
         <div className="grid gap-1.5">
           <Label htmlFor="email">E-Mail</Label>
           <Input
@@ -129,7 +133,7 @@ export default function AnmeldenPage() {
           <Separator className="flex-1" />
         </div>
 
-        <OAuthButtons mode="anmelden" />
+        <OAuthButtons mode="anmelden" redirectPath={nextPath} />
       </form>
 
       <div className="mt-6 text-center">
@@ -145,5 +149,13 @@ export default function AnmeldenPage() {
         </Link>
       </div>
     </AuthLayout>
+  );
+}
+
+export default function AnmeldenPage() {
+  return (
+    <Suspense fallback={null}>
+      <AnmeldenContent />
+    </Suspense>
   );
 }

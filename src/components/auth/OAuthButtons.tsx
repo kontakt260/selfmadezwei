@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 
 type OAuthButtonsProps = {
   mode: "anmelden" | "registrieren";
+  redirectPath?: string;
 };
 
 const labels = {
@@ -14,7 +15,7 @@ const labels = {
   registrieren: { google: "Mit Google registrieren", apple: "Mit Apple registrieren" },
 } as const;
 
-export function OAuthButtons({ mode }: OAuthButtonsProps) {
+export function OAuthButtons({ mode, redirectPath = "/" }: OAuthButtonsProps) {
   const [loading, setLoading] = useState<"google" | "apple" | null>(null);
 
   const handleOAuth = async (provider: "google" | "apple") => {
@@ -23,7 +24,7 @@ export function OAuthButtons({ mode }: OAuthButtonsProps) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectPath)}`,
       },
     });
 

@@ -7,7 +7,13 @@ import { createClient } from "@/lib/supabase/server";
 const schema = z.object({
   email: z.string().email("Bitte eine gültige E-Mail-Adresse angeben."),
   password: z.string().min(1, "Passwort eingeben."),
+  next: z.string().optional(),
 });
+
+function safeNext(next: string | undefined): string {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/";
+  return next;
+}
 
 export type LoginState = {
   error?: string;
@@ -21,6 +27,7 @@ export async function loginAction(
   const parsed = schema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
+    next: formData.get("next"),
   });
 
   if (!parsed.success) {
@@ -42,7 +49,7 @@ export async function loginAction(
     return { error: "E-Mail oder Passwort falsch." };
   }
 
-  redirect("/");
+  redirect(safeNext(parsed.data.next));
 }
 
 const resendSchema = z.object({

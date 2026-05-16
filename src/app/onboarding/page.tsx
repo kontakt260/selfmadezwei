@@ -2,7 +2,36 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { OnboardingWizard } from "./OnboardingWizard";
 
-export default async function OnboardingPage() {
+type SearchParams = Record<string, string | string[] | undefined>;
+type InitialForWhom = "self" | "gift" | null;
+
+function parseInitialForWhom(searchParams: SearchParams): InitialForWhom {
+  const rawValue = searchParams.forWhom ?? searchParams.for ?? searchParams.intent;
+  const value = (Array.isArray(rawValue) ? rawValue[0] : rawValue)?.toLowerCase();
+
+  switch (value) {
+    case "self":
+    case "me":
+    case "ich":
+    case "fuer-mich":
+    case "für-mich":
+      return "self";
+    case "gift":
+    case "geschenk":
+      return "gift";
+    default:
+      return null;
+  }
+}
+
+export default async function OnboardingPage({
+  searchParams,
+}: {
+  searchParams?: Promise<SearchParams>;
+}) {
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const initialForWhom = parseInitialForWhom(resolvedSearchParams);
+
   // #region agent log
   fetch("http://127.0.0.1:7800/ingest/fd631e72-4665-4122-b32e-2df0088c7344", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "5dfb08" }, body: JSON.stringify({ sessionId: "5dfb08", runId: "initial", hypothesisId: "H2-route-entry", location: "src/app/onboarding/page.tsx:6", message: "Onboarding server component entered", data: {}, timestamp: Date.now() }) }).catch(() => {});
   // #endregion
@@ -42,6 +71,10 @@ export default async function OnboardingPage() {
     (user?.user_metadata?.full_name as string | undefined) ?? "";
 
   return (
-    <OnboardingWizard defaultFullName={defaultFullName} buyerEmail={user?.email ?? ""} />
+    <OnboardingWizard
+      defaultFullName={defaultFullName}
+      buyerEmail={user?.email ?? ""}
+      initialForWhom={initialForWhom}
+    />
   );
 }

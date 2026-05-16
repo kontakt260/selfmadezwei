@@ -38,19 +38,23 @@ const INITIAL_STATE: WizardState = {
 export function OnboardingWizard({
   defaultFullName,
   buyerEmail,
+  initialForWhom,
 }: {
   defaultFullName: string;
   buyerEmail: string;
+  initialForWhom?: ForWhom | null;
 }) {
   const [state, setState] = useState<WizardState>({
     ...INITIAL_STATE,
     fullName: defaultFullName,
+    forWhom: initialForWhom ?? null,
   });
   const [stepIndex, setStepIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const shouldSkipForWhomStep = initialForWhom !== null && initialForWhom !== undefined;
 
   const steps = useMemo<StepId[]>(() => {
-    const base: StepId[] = ["name", "for-whom"];
+    const base: StepId[] = shouldSkipForWhomStep ? ["name"] : ["for-whom", "name"];
     if (state.forWhom === "gift") {
       base.push("gift-details");
       if (state.giftMode === "phone-plus-computer") {
@@ -59,7 +63,7 @@ export function OnboardingWizard({
     }
     base.push("purchase");
     return base;
-  }, [state.forWhom, state.giftMode]);
+  }, [shouldSkipForWhomStep, state.forWhom, state.giftMode]);
 
   const currentStep = steps[stepIndex];
   const isLast = stepIndex === steps.length - 1;
@@ -216,7 +220,7 @@ export function OnboardingWizard({
 
 function ProgressBar({ total, current }: { total: number; current: number }) {
   return (
-    <div className="relative flex justify-between before:absolute before:left-0 before:top-1/2 before:z-0 before:h-px before:w-full before:-translate-y-1/2 before:bg-[#e0dcd5]">
+    <div className="relative mx-auto flex w-fit justify-center gap-8 before:absolute before:left-5 before:right-5 before:top-1/2 before:z-0 before:h-px before:-translate-y-1/2 before:bg-[#e0dcd5]">
       {Array.from({ length: total }, (_, index) => (
         <div
           key={index}

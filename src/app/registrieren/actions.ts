@@ -10,11 +10,28 @@ const schema = z
     email: z.string().email("Bitte eine gültige E-Mail-Adresse angeben."),
     password: z.string().min(8, "Mindestens 8 Zeichen."),
     confirmPassword: z.string(),
+    onboardingIntent: z.string().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     path: ["confirmPassword"],
     message: "Passwörter stimmen nicht überein.",
   });
+
+function getOnboardingRedirect(intent?: string): string {
+  switch (intent?.toLowerCase()) {
+    case "self":
+    case "me":
+    case "ich":
+    case "fuer-mich":
+    case "für-mich":
+      return "/onboarding?for=self";
+    case "gift":
+    case "geschenk":
+      return "/onboarding?for=gift";
+    default:
+      return "/onboarding";
+  }
+}
 
 export type RegisterState = {
   error?: string;
@@ -32,6 +49,7 @@ export async function registerAction(
     email: formData.get("email"),
     password: formData.get("password"),
     confirmPassword: formData.get("confirmPassword"),
+    onboardingIntent: formData.get("onboardingIntent"),
   });
 
   if (!parsed.success) {
@@ -45,13 +63,14 @@ export async function registerAction(
 
   const supabase = await createClient();
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const onboardingRedirect = getOnboardingRedirect(parsed.data.onboardingIntent);
 
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
       data: { full_name: parsed.data.fullName },
-      emailRedirectTo: `${origin}/auth/callback?next=/onboarding`,
+      emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(onboardingRedirect)}`,
     },
   });
 
