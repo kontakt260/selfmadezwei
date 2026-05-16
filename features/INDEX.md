@@ -31,10 +31,13 @@
 | PROJ-14 | KI-Review + LLM-Abstraktion | P2 | Roadmap | PROJ-5, PROJ-6 | — | 2026-05-15 |
 | PROJ-15 | Mehrnutzer-Concurrency & Versioning | P2 | Roadmap | PROJ-5 | — | 2026-05-15 |
 | PROJ-16 | Print-on-Demand Adapter | P2 | Roadmap | PROJ-5, PROJ-6, PROJ-10, PROJ-11 | — | 2026-05-15 |
+| PROJ-17 | Rate-Limiting für Auth-Endpunkte | P0 | Planned | PROJ-2 | [Spec](PROJ-17-rate-limiting-auth.md) | 2026-05-16 |
+| PROJ-18 | Debug-Telemetrie-Cleanup | P0 | Planned | — | [Spec](PROJ-18-debug-telemetrie-cleanup.md) | 2026-05-16 |
+| PROJ-19 | Production-Hardening (Headers, Middleware-Caching, Env-Failsafe) | P1 | Planned | PROJ-2 | [Spec](PROJ-19-production-hardening.md) | 2026-05-16 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-17
+## Next Available ID: PROJ-20
 
 ## Empfohlene Build-Reihenfolge
 ```
@@ -42,4 +45,7 @@ PROJ-1 → PROJ-2 → PROJ-3, PROJ-4, PROJ-6 (parallel)
        → PROJ-5 → PROJ-7, PROJ-8, PROJ-9, PROJ-10, PROJ-13 (parallel)
                 → PROJ-11, PROJ-12
                          → PROJ-14, PROJ-15, PROJ-16
+
+Security-Querschnitt (parallel, vor Public-Launch zwingend):
+PROJ-18 (jederzeit, kein Dep) → PROJ-17 (nach PROJ-2 ✓) → PROJ-19 (nach PROJ-2 ✓)
 ```

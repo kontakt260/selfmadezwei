@@ -18,11 +18,28 @@
 
 ## Acceptance Criteria
 
+### ⛔ Sicherheits-Blocker (aus PROJ-1 BUG-2 — High)
+Diese Kriterien sind **Go-Live-Blocker**: ohne sie darf der Stripe-Webhook nicht produktiv geschaltet werden, sonst ist die Bezahlschranke vollständig umgehbar (jeder `co_author` könnte sich via direktem `UPDATE projects SET portal_access_expires_at = ...` unbegrenzten Portal-Zugang gewähren).
+
+- [ ] **`portal_access_expires_at` ist für authentifizierte Clients schreibgeschützt.** Umsetzung über *eine* der beiden Optionen:
+  - **Option A (empfohlen):** Neue Tabelle `project_access` (`project_id UUID PK FK projects(id) ON DELETE CASCADE`, `expires_at TIMESTAMPTZ`, `updated_at`). RLS aktiviert, nur SELECT-Policy für Projektmitglieder, **keine** INSERT/UPDATE/DELETE-Policy. Spalte `projects.portal_access_expires_at` entfällt; Middleware und alle Reads lesen aus `project_access`.
+  - **Option B:** `BEFORE UPDATE`-Trigger auf `projects`, der `RAISE EXCEPTION` wirft, wenn `NEW.portal_access_expires_at IS DISTINCT FROM OLD.portal_access_expires_at` und `auth.uid() IS NOT NULL` (= nicht `service_role`).
+- [ ] **Negativtest in der QA-Suite:** Authentifizierter Client (Rolle `co_author`) versucht `UPDATE projects SET portal_access_expires_at = '2099-01-01'` → muss mit RLS-/Trigger-Fehler zurückgewiesen werden. Test muss Teil von `tests/PROJ-6-stripe-zahlungen.spec.ts` sein und vor Go-Live grün laufen.
+- [ ] **Migration für den Fix** liegt unter `supabase/migrations/<timestamp>_proj6_paywall_lockdown.sql` und wird **gegen den `stage`-Branch** angewendet (nicht direkt gegen `main`).
+
+### Webhook-Sicherheit (verpflichtend, kein Kompromiss)
+- [ ] Webhook-Route läuft mit `runtime = 'nodejs'` (nicht Edge), liest Body als Raw-String (`await req.text()`)
+- [ ] `stripe.webhooks.constructEvent(rawBody, signatureHeader, webhookSecret)` wird **vor jeder DB-Operation** aufgerufen; ungültige Signatur → `return new Response(null, { status: 400 })`
+- [ ] Webhook-Route ist im Middleware-Matcher **ausgenommen** (Stripe sendet keine User-Session; sonst 302-Redirect statt 400)
+- [ ] `SUPABASE_SERVICE_ROLE_KEY` wird ausschließlich in dieser Route (und in PROJ-11 Mail-Sender) verwendet, **niemals** mit `NEXT_PUBLIC_`-Prefix; `.env.local.example` dokumentiert das mit Dummy-Wert und Warnkommentar
+- [ ] Idempotenz-Check: vor jedem Write `SELECT 1 FROM payments WHERE stripe_session_id = $1` — wenn vorhanden, 200 OK ohne weitere Schreibvorgänge
+
 ### Produkte & Preise
 - [ ] 3 kaufbare Produkte in Stripe konfiguriert: **Portal-Zugang Initial** (249 €, 12 Monate), **Portal-Zugang Verlängerung** (99 €, 12 Monate), **Vapi +60 Min** (19 €)
 - [ ] Alle Preise in EUR; keine Abonnements (Einmalkauf)
 
 ### Einstiegspunkte
+- [ ] **`/onboarding` ist eingeloggten Nutzern vorbehalten** (Anpassung gegenüber PROJ-2-Default, wo es in `PUBLIC_ROUTES` steht): Middleware-Check ergänzen, dass nicht-authentifizierte Aufrufe auf `/registrieren?next=/onboarding` redirecten — andernfalls könnte ein anonymer User Checkout starten und der Webhook bekäme keine `user_id`-Zuordnung. Hintergrund: Vibe-Security-Audit 2026-05-16, Medium-Finding #5.
 - [ ] "Jetzt kaufen"-CTA am Ende des Onboarding-Wizards (PROJ-2) → startet Checkout für **Portal-Zugang Initial**
 - [ ] Stat-Karte "NARRAVIT-Projektzugang endet in" in `/projektuebersicht/[project_id]` → Verlängerungs-Button → startet Checkout für **Portal-Zugang Verlängerung** (mit `project_id`)
 - [ ] Stat-Karte "Telefonzeit übrig" in `/projektuebersicht/[project_id]` → Button → startet Checkout für **Vapi +60 Min** (mit `project_id`)
@@ -77,7 +94,8 @@
 
 ## Technical Requirements
 - Sicherheit: Stripe-Webhook-Signatur serverseitig mit `stripe.webhooks.constructEvent` verifiziert; ungültige Requests mit 400 ablehnen
-- Sicherheit: Stripe Secret Key und Webhook-Secret ausschließlich serverseitig (Env-Variablen); niemals im Client exponiert
+- Sicherheit: Stripe Secret Key, Webhook-Secret und `SUPABASE_SERVICE_ROLE_KEY` ausschließlich serverseitig (Env-Variablen); niemals im Client exponiert; niemals als `NEXT_PUBLIC_*`
+- Sicherheit: Paywall-Spalten (`portal_access_expires_at` etc.) niemals als Spalte in einer für Mitglieder UPDATE-baren Tabelle — separate Tabelle mit reinem `service_role`-Write (siehe Sicherheits-Blocker oben)
 - Idempotenz: `payments.stripe_session_id UNIQUE` (aus PROJ-1) ist die einzige Duplikat-Schutzmaßnahme — kein eigenes Locking nötig
 - `/kauf-erfolgreich` ruft Stripe API serverseitig auf (session_id → Session-Objekt) zur Verifikation; keine DB-Query als primäre Datenquelle für den Erfolgsfall
 - Abhängigkeit PROJ-11: Einladungs-E-Mails werden durch PROJ-11 (Resend) verschickt; PROJ-6 legt nur den `invitations`-Eintrag in der DB an

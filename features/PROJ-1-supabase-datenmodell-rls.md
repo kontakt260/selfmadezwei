@@ -100,7 +100,7 @@ src/lib/
   supabase.ts                           ← Supabase-Client (anon key; Platzhalter wird aktiviert)
 ```
 
-> **Dev-Workflow:** Kein lokaler Supabase-Stack, keine CLI-Installation. Migrations werden via Supabase MCP-Tool direkt gegen das Remote-Projekt angewendet. TypeScript-Typen werden ebenfalls via MCP generiert. Die Migrations-Dateien in Git bleiben die Quelle der Wahrheit.
+> **Dev-Workflow:** Kein lokaler Supabase-Stack, keine CLI-Installation. Migrations werden via Supabase MCP-Tool **ausschließlich gegen den `stage`-Branch** angewendet — niemals direkt gegen `main`/Production. Vor der ersten Migration immer `list_branches` aufrufen und das `project_ref` des Stage-Branches verwenden; bei fehlendem Stage-Branch zuerst mit dem User abklären (kein automatisches `create_branch`). Promotion auf `main` erfolgt erst nach QA-Freigabe via `merge_branch` und nur mit expliziter User-Bestätigung. TypeScript-Typen werden ebenfalls via MCP gegen den Stage-Branch generiert. Die Migrations-Dateien in Git bleiben die Quelle der Wahrheit.
 
 ### Datenmodell (9 Tabellen)
 
@@ -154,7 +154,9 @@ Server-seitige Operationen (Stripe-Webhook, Auth-Trigger) nutzen den `service_ro
 ### Migrations-Strategie
 
 - 3 Migrations-Dateien in fester Reihenfolge: Schema → RLS-Policies → Storage
-- Migrations werden via Supabase MCP-Tool direkt gegen das Remote-Projekt angewendet
+- Migrations werden via Supabase MCP-Tool **ausschließlich gegen den `stage`-Branch** angewendet — niemals direkt gegen `main`/Production
+- Vor jeder Migration: `list_branches` aufrufen, `project_ref` des Stage-Branches verifizieren; bei Unsicherheit Rückfrage an User
+- Promotion auf `main` ausschließlich via `merge_branch` und nur nach expliziter User-Bestätigung (Teil von `/deploy`)
 - Kein Schema-Objekt außerhalb von Migrations-Dateien — kein manuelles SQL in der Supabase-UI
 - Zukünftige Ergänzungen (z. B. `chapters.color_page_count` aus PROJ-5) erhalten jeweils eine eigene nummerierte Migrations-Datei
 
@@ -257,14 +259,28 @@ Nach jeder Migration wird `src/lib/database.types.ts` via Supabase MCP (`generat
 
 ---
 
-#### BUG-2 — Medium: `portal_access_expires_at` writable by any project member via client
-**Description:** The `projects: update as member` RLS policy grants UPDATE on ALL columns to all project members (both `projektleiter` and `co_author`). This includes `portal_access_expires_at`, which should only be written by the Stripe webhook via `service_role`. A malicious co_author could set a future portal access date without payment.
+#### BUG-2 — **High** (revidiert von Medium am 2026-05-16): `portal_access_expires_at` writable by any project member via client
+**Description:** The `projects: update as member` RLS policy grants UPDATE on ALL columns to all project members (both `projektleiter` and `co_author`). This includes `portal_access_expires_at`, which gates premium portal access and must only be written by the Stripe webhook via `service_role`. A malicious member can directly grant themselves unlimited portal access without paying — this is a complete bypass of the paywall.
 
-**Steps to reproduce (theoretical):** As an authenticated co_author, issue: `UPDATE projects SET portal_access_expires_at = '2099-01-01' WHERE id = $project_id` — RLS permits this.
+**Steps to reproduce:** As any authenticated project member, issue:
+```sql
+UPDATE projects SET portal_access_expires_at = '2099-01-01' WHERE id = '<own-project-id>';
+```
+RLS permits this. The middleware will then route the user as having active access.
 
-**Impact:** Low risk pre-PROJ-6 (no real users, Stripe not integrated). Becomes relevant once portal access has monetary value.
+**Severity rationale (2026-05-16 re-assessment):** Previously rated Medium under the assumption "no real users yet." Re-rated **High** because:
+- Becoming a `co_author` is trivial (accepting an invitation).
+- The bug is exploitable with one SQL statement via the public anon key.
+- It directly nullifies the monetization model the moment PROJ-6 (Stripe) goes live.
+- It cannot be silently shipped: PROJ-6 **must** close the gap before any payment path is enabled.
 
-**Fix:** In PROJ-6 — either restrict this column server-side via a separate policy or ensure the server action validates the caller is the Stripe webhook before touching this field. Column-level security is not natively supported by Postgres RLS, so consider splitting the UPDATE into a restricted route.
+**Impact:** Pre-PROJ-6: cosmetic (no paywall to bypass). Post-PROJ-6 without fix: **total revenue loss vector** + free Vapi inclusive-quota for anyone with co_author access.
+
+**Required fix (now mandatory for PROJ-6):** Postgres RLS does not support column-level UPDATE permissions. Choose one of:
+1. **Recommended:** Move `portal_access_expires_at` into a new table `project_access` (one row per project, no client UPDATE policy — webhook-write only via `service_role`).
+2. `BEFORE UPDATE` trigger on `projects` that rejects changes to `portal_access_expires_at` unless `auth.uid() IS NULL` (= service_role context).
+
+PROJ-6 spec has been updated to make this a blocking acceptance criterion.
 
 ---
 
@@ -289,9 +305,14 @@ Nach jeder Migration wird `src/lib/database.types.ts` via Supabase MCP (`generat
 
 ### Production-Ready Decision
 
-**✅ APPROVED** — No Critical or High bugs. 2 Medium findings are documented: BUG-1 has no impact on the current workflow; BUG-2 becomes relevant in PROJ-6 and should be addressed there. BUG-3 is cosmetic.
+**✅ APPROVED with PROJ-6 Blocker** (revidiert 2026-05-16)
 
-PROJ-1 schema is production-safe as a foundation for PROJ-2 (Auth + SSR).
+Schema-Grundgerüst ist solide und für PROJ-2 (Auth + SSR) tragfähig. Eine offene **High-Severity-Lücke** (BUG-2) muss jedoch zwingend im Rahmen von PROJ-6 (Stripe) geschlossen werden, **bevor** der Stripe-Webhook scharfgeschaltet wird. Andernfalls würde die Bezahlschranke direkt nach Aktivierung umgangen werden können.
+
+**Status pro Bug:**
+- BUG-1 (Medium): kein Impact auf aktuellen MCP-Workflow — späterer CLI-Adoption-Blocker
+- BUG-2 (**High**): **Blocker für PROJ-6 Go-Live** — Fix-Pflicht in PROJ-6-Spec verankert
+- BUG-3 (Low): kosmetischer Tippfehler im migrierten TS-File
 
 ## Deployment
 _To be added by /deploy_
