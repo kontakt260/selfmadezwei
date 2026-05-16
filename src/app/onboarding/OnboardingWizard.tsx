@@ -119,7 +119,13 @@ export function OnboardingWizard({
   };
 
   const update = <K extends keyof WizardState>(key: K, value: WizardState[K]) => {
-    setState((s) => ({ ...s, [key]: value }));
+    setState((s) => {
+      const nextState = { ...s, [key]: value };
+      if (key === "buyerWantsAccess" && value === false) {
+        nextState.giftRecipientRole = "projektleiter";
+      }
+      return nextState;
+    });
     setError(null);
   };
 
@@ -372,6 +378,16 @@ function StepGiftComputer({
         />
       </div>
 
+      <div className="mt-8 flex items-start justify-between border border-[#e0dcd5] bg-[#FAF8F6] p-4">
+        <div className="pr-6">
+          <p className="font-medium">Möchtest du selbst Zugang zum Projekt?</p>
+          <p className="mt-1 text-sm text-[#535252]">
+            Wenn ja, wirst du als Projektleiter eingetragen.
+          </p>
+        </div>
+        <Switch checked={buyerWantsAccess} onCheckedChange={onChangeBuyerAccess} />
+      </div>
+
       <p className="mt-8 mb-3 text-sm font-medium">Rolle der beschenkten Person</p>
       <div className="grid gap-3">
         <ChoiceCard
@@ -383,20 +399,18 @@ function StepGiftComputer({
         <ChoiceCard
           selected={role === "co_author"}
           onClick={() => onChangeRole("co_author")}
+          disabled={!buyerWantsAccess}
           title="Co-Autor"
           description="Darf schreiben und Kapitel bearbeiten."
         />
       </div>
 
-      <div className="mt-8 flex items-start justify-between border border-[#e0dcd5] bg-[#FAF8F6] p-4">
-        <div className="pr-6">
-          <p className="font-medium">Möchtest du selbst Zugang zum Projekt?</p>
-          <p className="mt-1 text-sm text-[#535252]">
-            Wenn ja, wirst du als Projektleiter eingetragen.
-          </p>
-        </div>
-        <Switch checked={buyerWantsAccess} onCheckedChange={onChangeBuyerAccess} />
-      </div>
+      {!buyerWantsAccess && (
+        <p className="mt-4 border border-[#e0dcd5] bg-[#FAF8F6] p-4 text-sm text-[#535252]">
+          Da du selbst keinen Zugang möchtest, wird die beschenkte Person automatisch Projektleiter
+          — jedes Projekt braucht mindestens eine:n Projektleiter:in.
+        </p>
+      )}
     </div>
   );
 }
@@ -463,21 +477,25 @@ function ChoiceCard({
   onClick,
   title,
   description,
+  disabled = false,
 }: {
   selected: boolean;
   onClick: () => void;
   title: string;
   description: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={cn(
         "w-full border p-4 text-left transition-colors",
         selected
           ? "border-[#96B897] bg-[#F3F7F3]"
           : "border-[#e0dcd5] bg-white hover:border-[#96B897]",
+        disabled && "cursor-not-allowed opacity-50 hover:border-[#e0dcd5]",
       )}
     >
       <p className="font-medium">{title}</p>
