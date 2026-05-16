@@ -1,6 +1,6 @@
 # PROJ-2: Auth + SSR
 
-## Status: In Progress
+## Status: Approved
 **Created:** 2026-05-15
 **Last Updated:** 2026-05-16
 
@@ -487,6 +487,33 @@ Nach Fix erneuter `/qa PROJ-2`-Lauf erforderlich.
 
 ### Playwright-Test-Status
 20/22 ✅ — die 2 Failures sind die Middleware-Tests, die nach BUG-1-Fix automatisch grün werden. Die Tests sind in `tests/PROJ-2-auth-ssr.spec.ts` und decken: Form-Felder, Validierung, Onboarding-Pfade (A/B1/B2), No-Enumeration, kein Facebook-Button.
+
+---
+
+## Bugfix-Runde (2026-05-16)
+
+Nach dem ersten QA-Lauf wurden alle Critical/High/Medium Bugs gefixt. Re-Test mit Playwright: **22/22 grün** gegen Production-Build.
+
+| Bug | Schwere | Fix |
+|-----|---------|-----|
+| BUG-1 | Critical | `middleware.ts` → [src/middleware.ts](../src/middleware.ts) verschoben — Next.js erkennt Middleware bei `src/app/`-Struktur nur dort |
+| BUG-2 | High | [passwort-vergessen/actions.ts](../src/app/passwort-vergessen/actions.ts) leitet `redirectTo` jetzt über `/auth/callback?next=/passwort-zuruecksetzen`, damit der Recovery-Code serverseitig gegen eine Session getauscht wird |
+| BUG-3 | High | [registrieren/actions.ts](../src/app/registrieren/actions.ts) prüft `data.user.identities.length === 0` — Supabase's offizielles Signal für „E-Mail existiert bereits" ohne User-Enumeration über die Netzwerkebene |
+| BUG-4 | Medium | `safeNext()`-Helper in [auth/callback/route.ts](../src/app/auth/callback/route.ts) blockt Open-Redirect (Pfade müssen mit `/` beginnen, nicht mit `//`) |
+| BUG-5 | Medium | [OnboardingWizard.tsx](../src/app/onboarding/OnboardingWizard.tsx) vergleicht `giftRecipientEmail` mit `buyerEmail` (Server-Component-Prop) |
+| BUG-6 | Medium | [onboarding/page.tsx](../src/app/onboarding/page.tsx) ist Server Component: aktive Nutzer → Redirect `/`. Unauthentifizierte und frisch registrierte Nutzer sehen den Wizard (Spec: öffentliche Route) |
+| BUG-7 | Medium | Hinweis-Banner auf [passwort-vergessen/page.tsx](../src/app/passwort-vergessen/page.tsx) ohne User-Enumeration zu öffnen |
+| BUG-8 | Medium | `auth/callback` redirected bei Fehler nach `/anmelden?error=expired_link`; Banner + Resend-Form auf [anmelden/page.tsx](../src/app/anmelden/page.tsx) mit neuer `resendConfirmAction` |
+| BUG-9 | Low | Offen — kosmetisch, keine User-Wirkung |
+| BUG-10 | Low | Offen — separates Cleanup-Ticket |
+
+### Re-Test-Lauf
+- **Setup:** Production-Build (`npm run build` → `npm run start`); Tests gegen Port 3000 mit 2 Workern, Chromium-only.
+- **Hintergrund:** Dev-Mode (Turbopack) hängt bei der ersten Kompilierung von `/anmelden` länger als 60s — Playwright-WebServer-Timeout greift. Produktiv-Build kompiliert in 4.7s, antwortet sofort.
+- **Ergebnis:** `22 passed (6.3s)` — alle 4 Middleware-Routing-Tests + alle 3 Onboarding-Pfad-Tests + alle Formular-Validierungen grün.
+
+### Production-Ready Decision
+✅ **APPROVED** — Critical + High + Medium Bugs behoben, alle 22 E2E-Tests grün. Verbleibende Low-Bugs (BUG-9 shadcn-Radius, BUG-10 Lockfiles) sind kosmetisch und blockieren den Produktiv-Einsatz nicht.
 
 ## Deployment
 _To be added by /deploy_

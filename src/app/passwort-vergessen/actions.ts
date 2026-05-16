@@ -28,9 +28,10 @@ export async function forgotPasswordAction(
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
   // Fire-and-forget: we intentionally don't surface whether the email exists
-  // to prevent user enumeration.
+  // to prevent user enumeration. Route through /auth/callback so the recovery
+  // code is exchanged for a session before the user lands on the reset form.
   await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: `${origin}/passwort-zuruecksetzen`,
+    redirectTo: `${origin}/auth/callback?next=/passwort-zuruecksetzen`,
   });
 
   return { success: true };

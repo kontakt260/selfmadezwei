@@ -46,7 +46,7 @@ export async function registerAction(
   const supabase = await createClient();
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
@@ -56,14 +56,19 @@ export async function registerAction(
   });
 
   if (error) {
-    if (error.message.toLowerCase().includes("already")) {
-      return {
-        fieldErrors: {
-          email: "Diese E-Mail-Adresse ist bereits registriert.",
-        },
-      };
-    }
     return { error: "Registrierung fehlgeschlagen. Bitte versuche es erneut." };
+  }
+
+  // Supabase returns a user object with an empty `identities` array when the
+  // email is already registered (security-preserving signal that does not leak
+  // user existence over the network). See:
+  // https://supabase.com/docs/reference/javascript/auth-signup
+  if (data.user && data.user.identities && data.user.identities.length === 0) {
+    return {
+      fieldErrors: {
+        email: "Diese E-Mail-Adresse ist bereits registriert.",
+      },
+    };
   }
 
   redirect("/email-bestaetigen");

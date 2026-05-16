@@ -1,14 +1,65 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
-import { loginAction, type LoginState } from "./actions";
+import {
+  loginAction,
+  resendConfirmAction,
+  type LoginState,
+  type ResendState,
+} from "./actions";
+
+function ExpiredLinkBanner() {
+  const params = useSearchParams();
+  const showExpired = params.get("error") === "expired_link";
+  const [resendState, resendForm, resendPending] = useActionState<ResendState, FormData>(
+    resendConfirmAction,
+    {},
+  );
+
+  if (!showExpired) return null;
+
+  if (resendState.success) {
+    return (
+      <div className="mb-6 border border-border bg-secondary p-4 text-sm">
+        Falls ein Konto mit dieser E-Mail existiert, hast du eine neue
+        Bestätigungs-E-Mail erhalten.
+      </div>
+    );
+  }
+
+  return (
+    <form action={resendForm} className="mb-6 grid gap-3 border border-border bg-secondary p-4 text-sm">
+      <p className="font-medium">Dieser Link ist nicht mehr gültig.</p>
+      <p className="text-muted-foreground">
+        Trage deine E-Mail ein, und wir schicken dir eine neue Bestätigungs-E-Mail.
+      </p>
+      <div className="grid gap-1.5">
+        <Label htmlFor="resend-email" className="text-xs">E-Mail</Label>
+        <Input
+          id="resend-email"
+          name="email"
+          type="email"
+          required
+          className="h-10"
+        />
+      </div>
+      {resendState.error && (
+        <p className="text-destructive">{resendState.error}</p>
+      )}
+      <Button type="submit" variant="outline" disabled={resendPending} className="h-10">
+        {resendPending ? "Wird gesendet …" : "Neue Bestätigungs-E-Mail anfordern"}
+      </Button>
+    </form>
+  );
+}
 
 export default function AnmeldenPage() {
   const [state, formAction, pending] = useActionState<LoginState, FormData>(
@@ -24,6 +75,10 @@ export default function AnmeldenPage() {
           Willkommen zurück bei NARRAVIT.
         </p>
       </div>
+
+      <Suspense fallback={null}>
+        <ExpiredLinkBanner />
+      </Suspense>
 
       <form action={formAction} className="grid gap-4" noValidate>
         <div className="grid gap-1.5">

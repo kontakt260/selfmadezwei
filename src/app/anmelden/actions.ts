@@ -44,3 +44,36 @@ export async function loginAction(
 
   redirect("/");
 }
+
+const resendSchema = z.object({
+  email: z.string().email("Bitte eine gültige E-Mail-Adresse angeben."),
+});
+
+export type ResendState = {
+  success?: boolean;
+  error?: string;
+};
+
+export async function resendConfirmAction(
+  _prev: ResendState,
+  formData: FormData,
+): Promise<ResendState> {
+  const parsed = resendSchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Ungültige E-Mail." };
+  }
+
+  const supabase = await createClient();
+  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+  // Fire-and-forget — never surface whether the email exists.
+  await supabase.auth.resend({
+    type: "signup",
+    email: parsed.data.email,
+    options: {
+      emailRedirectTo: `${origin}/auth/callback?next=/onboarding`,
+    },
+  });
+
+  return { success: true };
+}

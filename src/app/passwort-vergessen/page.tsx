@@ -39,6 +39,11 @@ export default function PasswortVergessenPage() {
         </p>
       </div>
 
+      <p className="mb-6 border border-border bg-secondary p-4 text-sm text-muted-foreground">
+        Hast du dich mit Google oder Apple registriert? Dann setzt du dein Passwort
+        bei deinem Provider zurück — NARRAVIT kann nur Passwörter für E-Mail-Konten ändern.
+      </p>
+
       <form action={formAction} className="grid gap-4" noValidate>
         <div className="grid gap-1.5">
           <Label htmlFor="email">E-Mail</Label>
