@@ -260,7 +260,233 @@ Die User-bereitgestellten Relume-Templates (Login8, Onboarding16, Sign Up) dient
 
 
 ## QA Test Results
-_To be added by /qa_
+
+**QA Date:** 2026-05-16
+**Method:** Static code review + HTTP-level smoke tests + 22 Playwright E2E tests against live dev server. OAuth-, Email-, Stripe-Flows nicht end-to-end testbar ohne reale Provider/Mailbox/Stripe-Config.
+
+### Test-Inventar
+- **Playwright E2E:** `tests/PROJ-2-auth-ssr.spec.ts` — 22 Tests, 20 ✅ passed, 2 ❌ failed (Middleware-Redirect)
+- **HTTP Smoke Tests:** alle 7 Auth-Routes liefern HTTP 200
+- **HTML Content Audit:** alle Spec-Pflichtfelder pro Page vorhanden
+- **Code Review:** Server Actions, OAuth-Component, Onboarding-State-Machine, Middleware
+- **Red-Team Bundle Scan:** Browser-Bundle nach `service_role`, Stripe-Keys, Webhook-Secrets durchsucht
+
+### Acceptance Criteria — Ergebnisse
+
+#### Registrierung (E-Mail + Passwort)
+| Criterion | Status |
+|-----------|--------|
+| Page `/registrieren` mit Feldern Vorname/Name, E-Mail, Passwort × 2 | ✅ Pass |
+| Validierung: E-Mail-Format, Passwort min. 8 Zeichen, Match | ✅ Pass (Playwright bestätigt) |
+| Nach Submit → `/email-bestaetigen` | ✅ Pass (Server Action `redirect()`) |
+| Supabase sendet Bestätigungs-E-Mail | ⚠️ Code OK, Live-Test nicht möglich |
+| Bereits registrierte E-Mail zeigt Fehler | ❌ Fail — siehe **BUG-3** |
+
+#### OAuth (Google & Apple)
+| Criterion | Status |
+|-----------|--------|
+| Google + Apple Buttons auf `/anmelden` und `/registrieren` | ✅ Pass |
+| Kein Facebook-Button | ✅ Pass (Spec-Konform) |
+| Erstlogin → `/onboarding`, Folgelogin → `/` | ⚠️ Abhängig von Middleware — siehe **BUG-1** |
+| OAuth überspringt Email-Bestätigung | ✅ Pass (Standard Supabase-Verhalten) |
+| `profiles`-Eintrag automatisch via DB-Trigger | ✅ Pass (PROJ-1 `handle_new_user`) |
+
+#### Anmeldung
+| Criterion | Status |
+|-----------|--------|
+| `/anmelden` mit E-Mail + Passwort | ✅ Pass |
+| Falsche Zugangsdaten → "E-Mail oder Passwort falsch" (keine Enumeration) | ✅ Pass |
+| Nach Login → Weiterleitung gemäß Middleware-Logik | ❌ Fail — siehe **BUG-1** |
+
+#### Passwort-Reset
+| Criterion | Status |
+|-----------|--------|
+| Link "Passwort vergessen?" auf `/anmelden` | ✅ Pass |
+| Submit zeigt immer generische Erfolgsmeldung (keine Enumeration) | ✅ Pass |
+| Reset-Link öffnet `/passwort-zuruecksetzen` mit Formular | ⚠️ Form vorhanden, Code-Exchange fehlt — siehe **BUG-2** |
+| Nach Reset → eingeloggt + Weiterleitung zu `/` | ❌ Fail (durch BUG-2 blockiert) |
+
+#### Middleware & Route Protection
+| Criterion | Status |
+|-----------|--------|
+| `middleware.ts` prüft Session serverseitig | ❌ Fail — Datei am falschen Ort, siehe **BUG-1** |
+| Öffentliche Routen (kein Auth-Check) | ⚠️ Definiert, aber irrelevant solange Middleware tot |
+| Zustand 1 — Nicht eingeloggt → `/anmelden` | ❌ Fail |
+| Zustand 2 — `portal_access_expires_at = NULL` → `/onboarding` | ❌ Fail |
+| Zustand 3 — abgelaufen → `/zugang-abgelaufen` | ❌ Fail |
+| Zustand 4 — aktiver Zugang → `/` | ❌ Fail |
+| Eingeloggter Nutzer auf `/anmelden` → `/` | ❌ Fail |
+
+#### Seite `/zugang-abgelaufen`
+| Criterion | Status |
+|-----------|--------|
+| Nachricht "Zugang abgelaufen" | ✅ Pass |
+| CTA-Button "Zugang verlängern — 79 €" | ✅ Pass (Stub für PROJ-6) |
+| Abmelden-Link | ✅ Pass |
+
+#### Onboarding-Wizard
+| Criterion | Status |
+|-----------|--------|
+| Schritt 1: Name, Pflicht, min. 2 Zeichen | ✅ Pass |
+| Schritt 2: Für wen? (self / gift) | ✅ Pass |
+| Pfad A (self): direkt zu Kauf-CTA | ✅ Pass (Playwright) |
+| Pfad B Geschenk: Name + Erzählweise | ✅ Pass (Playwright) |
+| Pfad B1 (phone-only): Käufer-Hinweis "Projektleiter" | ✅ Pass |
+| Pfad B2 (phone+computer): E-Mail + Rolle + Toggle | ✅ Pass |
+| Schritt 3: Zusammenfassung + Preis 79 € + Jetzt-kaufen-Button | ✅ Pass |
+| Rollen-Logik: Werte `projektleiter` / `co_author` | ✅ Pass |
+| Mehrere Projektleiter pro Projekt erlaubt | ⚠️ DB-seitig OK (PROJ-1), UI-seitig nicht testbar |
+
+### Edge Cases — Ergebnisse
+| Edge Case | Status |
+|-----------|--------|
+| Mehrfacher Klick auf "Registrieren" (idempotent) | ⚠️ Standard Supabase-Verhalten, nicht explizit getestet |
+| Bestätigungs-Mail-Link abgelaufen → Fehlerseite | ❌ **BUG-8** — keine dedizierte Fehlerseite |
+| OAuth-Abbruch → zurück zu `/anmelden` ohne Halbsession | ✅ Pass (Supabase + Callback-Fallback) |
+| Onboarding-Wizard in zwei Tabs | ✅ Pass (kein DB-Write vor Zahlung) |
+| `portal_access_expires_at` exakt jetzt → `/zugang-abgelaufen` | ⚠️ Abhängig von BUG-1 |
+| Aktiver Zugang ruft `/onboarding` auf → Redirect zu `/` | ❌ **BUG-6** — Guard fehlt |
+| Reset-Link doppelt geklickt → "Link ungültig" | ⚠️ Blockiert durch BUG-2 |
+| OAuth-Nutzer versucht Passwort-Reset → Hinweis | ❌ **BUG-7** — Hinweis fehlt |
+| Eigene E-Mail als Geschenk-Empfänger → Fehler | ❌ **BUG-5** — Check fehlt |
+| Beschenkter hat bereits Konto | ⚠️ Vertraulich an PROJ-9 delegiert (Spec-konform) |
+
+### Security Audit (Red Team)
+
+| Check | Ergebnis |
+|-------|----------|
+| `service_role`-Key im Browser-Bundle | ✅ Clean — nur Enum-String in Supabase-SDK |
+| Stripe-Secret / Webhook-Secret im Bundle | ✅ Clean — nichts geleakt |
+| JWT-Token im HTML/Inline-Script | ✅ Clean |
+| HTTP-only Cookies (statt localStorage) | ✅ Pass — via `@supabase/ssr` |
+| User-Enumeration via Login-Fehler | ✅ Pass — generische Meldung |
+| User-Enumeration via Forgot-Password | ✅ Pass — immer dieselbe Erfolgsmeldung |
+| XSS via Form-Inputs | ✅ Pass — React-Auto-Escape; kein `dangerouslySetInnerHTML` |
+| Open-Redirect via OAuth-Callback `?next=` | ❌ Fail — **BUG-4** |
+| OAuth-Provider-Liste (Google + Apple, kein anderer) | ✅ Pass |
+
+### Bugs Found
+
+#### BUG-1 — **Critical**: Middleware komplett inaktiv (Datei am falschen Ort)
+**Beschreibung:** Bei einer Next.js App mit `src/app/`-Struktur muss `middleware.ts` in `src/middleware.ts` liegen, nicht im Projekt-Root. Aktuell liegt die Datei unter `/middleware.ts` und wird daher von Next.js **nicht ausgeführt**.
+
+**Steps to reproduce:**
+```bash
+curl -sI http://localhost:3000/        # erwartet: 307 → /anmelden | tatsächlich: 200 OK
+curl -sI http://localhost:3000/random   # erwartet: 307 → /anmelden | tatsächlich: 404
+```
+Playwright-Tests bestätigen: `/` ist für unauthentifizierte Nutzer ohne Redirect erreichbar.
+
+**Impact:**
+- Komplettes Access-Control bypassed
+- Alle 4 Middleware-Zustände (logged-in/out × Zugang aktiv/abgelaufen) sind tot
+- Spec-AC "Eingeloggter Nutzer auf `/anmelden` → `/`" funktioniert nicht
+- Sicherheitsrisiko, sobald geschützte Seiten existieren (ab PROJ-3 kritisch)
+
+**Fix:** Datei verschieben — `mv /middleware.ts /src/middleware.ts`. Beim Build wird Next.js sie dann automatisch erkennen.
+
+---
+
+#### BUG-2 — **High**: Passwort-Reset-Flow unvollständig (kein Code-Exchange)
+**Beschreibung:** `supabase.auth.resetPasswordForEmail` setzt `redirectTo: '/passwort-zuruecksetzen'`. Supabase hängt einen `?code=` Query-Parameter an. Die Seite muss diesen Code via `exchangeCodeForSession()` einlösen, bevor `updateUser({ password })` aufgerufen werden kann. Aktuell rendert `/passwort-zuruecksetzen` nur das Formular — kein Code-Exchange.
+
+**Impact:** Wenn ein Nutzer auf den Reset-Link in der E-Mail klickt, landet er auf der Seite, gibt sein neues Passwort ein, und der Submit schlägt fehl mit "Link ungültig oder abgelaufen" — obwohl der Link gültig ist.
+
+**Fix:** Entweder
+- (a) `redirectTo` auf `/auth/callback?next=/passwort-zuruecksetzen` ändern, damit der bestehende Callback-Handler den Code einlöst, oder
+- (b) `/passwort-zuruecksetzen` zu einer Server Component machen, die den Code in einem Server-Side-Step einlöst.
+
+---
+
+#### BUG-3 — **High**: "E-Mail bereits registriert"-Erkennung fragil
+**Beschreibung:** Die Registrierungs-Action erkennt doppelte E-Mails über `error.message.toLowerCase().includes("already")`. Bei aktivierter E-Mail-Bestätigung in Supabase-Auth **gibt es keinen Fehler bei einer Doppel-Anmeldung** — Supabase verhält sich silent, um User-Enumeration zu verhindern. Stattdessen sendet Supabase eine "magic link" an die existierende Adresse oder gar nichts.
+
+**Impact:** Die Spec-AC "Bereits registrierte E-Mail zeigt Fehler" ist mit dem aktuellen Code nicht erfüllbar. Der Nutzer würde stattdessen auf `/email-bestaetigen` landen und nie eine E-Mail erhalten (oder einen Magic-Link statt einer Confirmation).
+
+**Fix:** Either accept this as "by design" (User-Enumeration-Prevention ist DSGVO-konform) und Spec-AC anpassen, oder vor dem Sign-Up serverseitig per RPC prüfen ob die E-Mail existiert (öffnet aber Enumeration-Vektor).
+
+**Empfehlung:** Spec anpassen — generische Bestätigungs-Page ist die sicherere Option.
+
+---
+
+#### BUG-4 — **Medium**: Open-Redirect-Vulnerability in `/auth/callback`
+**Beschreibung:** Der Callback-Handler liest `next` aus den Query-Params und macht `NextResponse.redirect(\`${origin}${next}\`)`. Es gibt keine Whitelist-Validierung. Ein Angreifer könnte einen Link wie `/auth/callback?code=valid_code&next=//evil.com/phish` an einen Nutzer schicken — nach erfolgreichem Login wird der Nutzer auf `evil.com` weitergeleitet.
+
+**Steps to reproduce:**
+```
+http://localhost:3000/auth/callback?code=anycode&next=//evil.com
+```
+
+**Fix:** Vor dem Redirect prüfen, ob `next` mit `/` (aber nicht `//`) beginnt:
+```ts
+const isSafeNext = typeof next === "string" && next.startsWith("/") && !next.startsWith("//");
+const target = isSafeNext ? next : "/";
+```
+
+---
+
+#### BUG-5 — **Medium**: Spec-Edge-Case fehlt — eigene E-Mail als Geschenk-Empfänger
+**Beschreibung:** Spec Edge Case: "Nutzer im 'Als Geschenk'-Pfad gibt seine eigene E-Mail als Empfänger-E-Mail ein → Validierung zeigt Fehler: 'Bitte eine andere E-Mail-Adresse angeben'". Der Wizard prüft das aktuell nicht.
+
+**Impact:** Geringe Wahrscheinlichkeit, aber Spec-Violation. Würde später zu Doppel-Membership (Käufer == Beschenkter) führen.
+
+**Fix:** Im Onboarding-Wizard zusätzlich die E-Mail des eingeloggten Käufers fetchen (Server-Component) und im Validator vergleichen.
+
+---
+
+#### BUG-6 — **Medium**: Onboarding-Guard fehlt für aktive Nutzer
+**Beschreibung:** Spec: "Nutzer mit aktivem Zugang ruft `/onboarding` direkt auf → Middleware lässt ihn durch (öffentliche Route), aber ein Guard auf der Onboarding-Seite leitet zu `/` weiter". Onboarding-Page ist Client Component ohne Auth-Check; aktive Nutzer können sich erneut durch den Wizard klicken.
+
+**Fix:** Onboarding-Page zu einer Server Component umbauen, die User + Projects abfragt; wenn aktiver Zugang vorhanden → `redirect("/")`. Client-Wizard-Logik in eine Child-Component verschieben.
+
+---
+
+#### BUG-7 — **Medium**: OAuth-Nutzer Passwort-Reset Hinweis fehlt
+**Beschreibung:** Spec Edge Case: "OAuth-Nutzer versucht Passwort-Reset → `/passwort-vergessen` zeigt Hinweis: 'Dein Konto nutzt Google/Apple-Login — Passwort-Reset nicht möglich'". Aktuell sendet die Seite immer dieselbe Erfolgsmeldung, was zwar User-Enumeration verhindert, aber den OAuth-User in eine Sackgasse führt.
+
+**Trade-off:** Spec verlangt diesen Hinweis, aber er widerspricht der User-Enumeration-Prevention. Empfehlung: Spec anpassen (Hinweis als Banner statt nach Submit zeigen, basierend auf einem optionalen Provider-Selector).
+
+---
+
+#### BUG-8 — **Medium**: Fehlerseite für abgelaufene Bestätigungs-Mail fehlt
+**Beschreibung:** Spec Edge Case: "Bestätigungs-E-Mail-Link ist abgelaufen → Fehlerseite mit Link 'Neue Bestätigungs-E-Mail anfordern'". `/auth/callback` redirected im Fehlerfall stumpf auf `/anmelden` — der Nutzer sieht keinen Hinweis, dass sein Link abgelaufen ist, und keine Option, einen neuen anzufordern.
+
+**Fix:** Bei Code-Exchange-Fehler an `/anmelden?error=expired_link` redirecten und auf der Login-Page eine entsprechende Toast/Alert + Resend-Button anzeigen.
+
+---
+
+#### BUG-9 — **Low**: shadcn-Input nutzt `rounded-md` trotz Brand `--radius: 0`
+**Beschreibung:** Visuelle Sub-Effekt: Im finalen CSS wird `border-radius: calc(0rem - 2px) = -2px` berechnet, was Browser als 0 interpretieren. Visuell unauffällig, aber semantisch unsauber.
+
+**Fix:** Optional — beim nächsten Visual-Polish ggf. Override.
+
+---
+
+#### BUG-10 — **Low**: Multiple Lockfiles Warning
+**Beschreibung:** Next.js warnt im Build/Dev: "Detected additional lockfiles" — `/Users/jakobtrierweiler/Desktop/GitHub/selfmadezwei/package-lock.json` neben dem Projekt-Lockfile. Das könnte zu inkonsistenten Dependency-Versionen führen.
+
+**Fix:** Eine der beiden Lockfiles löschen oder `turbopack.root` in next.config setzen.
+
+### Production-Ready Decision
+
+**❌ NOT READY** — 1 Critical + 2 High Bugs blockieren den Produktiv-Einsatz:
+- **BUG-1** macht das gesamte Sicherheits-Routing wirkungslos
+- **BUG-2** bricht den Passwort-Reset-Flow
+- **BUG-3** macht die Spec-AC "doppelte E-Mail" unhaltbar
+
+Empfohlene Reihenfolge der Bugfixes:
+1. BUG-1 (sehr kleiner Fix — Datei verschieben)
+2. BUG-2 (Reset-Flow)
+3. BUG-4 (Open Redirect — Security)
+4. BUG-3 (Spec-Anpassung oder serverseitige Prüfung)
+5. BUG-6 (Onboarding-Guard)
+6. BUG-5, BUG-7, BUG-8 (Edge Cases)
+7. BUG-9, BUG-10 (Cosmetic)
+
+Nach Fix erneuter `/qa PROJ-2`-Lauf erforderlich.
+
+### Playwright-Test-Status
+20/22 ✅ — die 2 Failures sind die Middleware-Tests, die nach BUG-1-Fix automatisch grün werden. Die Tests sind in `tests/PROJ-2-auth-ssr.spec.ts` und decken: Form-Felder, Validierung, Onboarding-Pfade (A/B1/B2), No-Enumeration, kein Facebook-Button.
 
 ## Deployment
 _To be added by /deploy_
