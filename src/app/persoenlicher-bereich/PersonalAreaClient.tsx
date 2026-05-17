@@ -1,9 +1,8 @@
 "use client";
 
-import { useActionState, useTransition, useState } from "react";
+import { useActionState, useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -18,26 +17,18 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   updateNameAction,
-  changeEmailAction,
   resetPasswordAction,
   deleteAccountAction,
   type UpdateNameState,
-  type ChangeEmailState,
   type ResetPasswordState,
   type DeleteAccountState,
 } from "./actions";
 
 // ─── Design tokens (matching old app exactly) ────────────────────────────────
 
-const narravitPage = "#FAF8F6";
-const narravitText = "#3E3831";
 const narravitMuted = "#848484";
 const narravitBorder = "#e0dcd5";
 const narravitGreen = "#96B897";
-const narravitSand = "#D0BCA6";
-const narravitSandHover = "#c0ad98";
-const narravitDarkBtn = "#53444B";
-const narravitDarkBtnHover = "#45383e";
 
 // ─── Shared input class (mirrors old app accountInputRowClass) ───────────────
 
@@ -146,17 +137,9 @@ function AccountSection({
     updateNameAction,
     {},
   );
-  const [emailState, emailFormAction, emailPending] = useActionState<ChangeEmailState, FormData>(
-    changeEmailAction,
-    {},
-  );
 
-  // Show toasts on state changes
   if (nameState.success) {
     toast.success("Name gespeichert.");
-  }
-  if (emailState.success) {
-    toast.success("Bestätigungs-E-Mail verschickt. Bitte bestätige deine neue Adresse.");
   }
 
   return (
@@ -175,7 +158,7 @@ function AccountSection({
       </div>
       <p className="max-w-3xl text-sm leading-6 text-[#535252] sm:text-base">
         Diese Angaben nutzen wir für Anzeigen in der App, E-Mail-Versand und Ihre
-        Mitgliedschaft. Passen Sie Name und E-Mail bei Bedarf an.
+        Mitgliedschaft. Passen Sie Ihren Namen bei Bedarf an.
       </p>
 
       <div className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 xl:grid-cols-3">
@@ -211,42 +194,23 @@ function AccountSection({
           </form>
         </FieldCard>
 
-        {/* E-Mail */}
+        {/* E-Mail (read-only) */}
         <FieldCard
           label="E-Mail"
-          hint="An diese Adresse senden wir Login-Hinweise, Rechnungen und wichtige Hinweise zu Ihren Projekten."
-          pinContentToBottom
+          hint="Um Ihre E-Mail-Adresse zu ändern, wenden Sie sich bitte an den Support."
         >
-          <form action={emailFormAction} className="flex flex-col gap-2">
-            <input type="hidden" name="currentEmail" value={email} />
-            <input
-              id="account-email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              defaultValue={email}
-              className={`${editableInputClass} text-[#3E3831]`}
-              aria-describedby="account-email-hint"
-            />
-            <p
-              id="account-email-hint"
-              className="min-h-[4.5rem] text-xs leading-5 text-[#848484] sm:min-h-[4.75rem] xl:min-h-[5.5rem]"
-            >
-              Stellen Sie sicher, dass Sie Zugriff auf dieses Postfach haben —
-              sonst verpassen Sie ggf. den Link zum Passwort-Zurücksetzen.
-            </p>
-            {emailState.success ? (
-              <p className="text-sm text-[#96B897]">
-                Bitte bestätige deine neue E-Mail-Adresse — wir haben dir einen
-                Link geschickt. Die alte Adresse bleibt bis zur Bestätigung aktiv.
-              </p>
-            ) : emailState.error ? (
-              <p className="text-sm text-destructive">{emailState.error}</p>
-            ) : null}
-            <SandButton type="submit" disabled={emailPending || !!emailState.success}>
-              {emailPending ? "Wird gesendet …" : "E-Mail ändern"}
-            </SandButton>
-          </form>
+          <input
+            id="account-email"
+            name="email"
+            type="email"
+            readOnly
+            tabIndex={-1}
+            value={email}
+            className={`${editableInputClass} cursor-default select-none text-[#848484]`}
+          />
+          <p className="min-h-[4.5rem] text-xs leading-5 text-[#848484] sm:min-h-[4.75rem] xl:min-h-[5.5rem]">
+            Ihre Anmelde-E-Mail — für Änderungen wenden Sie sich an den Support.
+          </p>
         </FieldCard>
 
       </div>

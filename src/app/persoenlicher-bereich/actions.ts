@@ -38,44 +38,6 @@ export async function updateNameAction(
   return { success: true };
 }
 
-// ─── Change Email ────────────────────────────────────────────────────────────
-
-const emailSchema = z.object({
-  email: z.string().email("Bitte eine gültige E-Mail-Adresse angeben."),
-  currentEmail: z.string().email(),
-});
-
-export type ChangeEmailState = { success?: boolean; error?: string };
-
-export async function changeEmailAction(
-  _prev: ChangeEmailState,
-  formData: FormData,
-): Promise<ChangeEmailState> {
-  const parsed = emailSchema.safeParse({
-    email: formData.get("email"),
-    currentEmail: formData.get("currentEmail"),
-  });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message };
-  if (parsed.data.email === parsed.data.currentEmail) {
-    return { error: "Das ist bereits deine aktuelle E-Mail-Adresse." };
-  }
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Nicht angemeldet." };
-
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const { error } = await supabase.auth.updateUser(
-    { email: parsed.data.email },
-    { emailRedirectTo: `${origin}/auth/callback?next=/persoenlicher-bereich` },
-  );
-
-  if (error) return { error: "E-Mail konnte nicht geändert werden." };
-  return { success: true };
-}
-
 // ─── Reset Password ──────────────────────────────────────────────────────────
 
 export type ResetPasswordState = { success?: boolean; error?: string };
