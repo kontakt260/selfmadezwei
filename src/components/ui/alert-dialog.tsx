@@ -27,12 +27,20 @@ const AlertDialogOverlay = React.forwardRef<
 ))
 AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName
 
+type AlertDialogContentProps =
+  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content> & {
+    onOverlayClick?: React.MouseEventHandler<HTMLDivElement>;
+  }
+
 const AlertDialogContent = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content>
->(({ className, ...props }, ref) => (
+  AlertDialogContentProps
+>(({ className, onOverlayClick, ...props }, ref) => (
   <AlertDialogPortal>
-    <AlertDialogOverlay />
+    <AlertDialogOverlay
+      onClick={onOverlayClick}
+      className={onOverlayClick ? "cursor-pointer" : undefined}
+    />
     <AlertDialogPrimitive.Content
       ref={ref}
       className={cn(

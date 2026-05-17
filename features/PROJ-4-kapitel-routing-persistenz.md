@@ -280,6 +280,36 @@ Alle benötigten Packages sind bereits installiert:
 - React (Drag API, useState, useTransition)
 - next/navigation (redirect, notFound, revalidatePath)
 
+## Backend Implementation Notes (2026-05-17)
+
+### RLS Verification
+All required RLS policies confirmed present on stage branch (`kdjhxqitfxnsavhiafdn`):
+
+| Tabelle | Operation | Policy |
+|---------|-----------|--------|
+| `chapters` | SELECT | `project_id IN (get_my_project_ids())` ✓ |
+| `chapters` | INSERT | `project_id IN (get_my_project_ids())` ✓ |
+| `chapters` | UPDATE | `project_id IN (get_my_project_ids())` ✓ |
+| `chapters` | DELETE | `project_id IN (get_my_project_ids())` ✓ |
+| `projects` | SELECT | `id IN (get_my_project_ids())` ✓ |
+| `projects` | INSERT | `auth.role() = 'authenticated'` ✓ |
+| `projects` | UPDATE | `id IN (get_my_project_ids())` ✓ |
+| `projects` | DELETE | user has `role = 'projektleiter'` in `project_members` ✓ |
+| `project_members` | SELECT | `user_id = auth.uid()` ✓ |
+
+No new migrations required — PROJ-1 already applied all necessary policies.
+
+### Unit Tests
+32 tests in `src/app/projektuebersicht/[project_id]/actions.test.ts` — all passing.
+
+Coverage per action:
+- `deleteProjectAction` — 6 tests (invalid UUID, unauthenticated, non-member, co_author, DB error, success)
+- `addChapterAction` — 6 tests (empty title, >200 chars, bad UUID, unauthenticated, sort_order=0, sort_order=last+1)
+- `addImpulseChapterAction` — 2 tests (chapter_origin + source_impulse_id, unauthenticated)
+- `renameChapterAction` — 6 tests (empty title, >200 chars, bad UUID, unauthenticated, DB error, success)
+- `deleteChapterAction` — 4 tests (bad chapterId, bad projectId, unauthenticated, success)
+- `saveChapterOrderAction` — 8 tests (non-JSON, non-UUID items, bad projectId, unauthenticated, count mismatch, foreign ID, success)
+
 ## QA Test Results
 _To be added by /qa_
 

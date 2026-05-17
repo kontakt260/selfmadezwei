@@ -14,7 +14,7 @@ const nameSchema = z.object({
     .max(100, "Name darf maximal 100 Zeichen haben."),
 });
 
-export type UpdateNameState = { success?: boolean; error?: string };
+export type UpdateNameState = { success?: boolean; error?: string; fullName?: string };
 
 export async function updateNameAction(
   _prev: UpdateNameState,
@@ -29,13 +29,15 @@ export async function updateNameAction(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
 
+  const fullName = parsed.data.name.trim();
+
   const { error } = await supabase
     .from("profiles")
-    .update({ full_name: parsed.data.name })
+    .update({ full_name: fullName })
     .eq("id", user.id);
 
   if (error) return { error: "Name konnte nicht gespeichert werden." };
-  return { success: true };
+  return { success: true, fullName };
 }
 
 // ─── Reset Password ──────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { Navbar } from "@/components/Navbar";
@@ -134,14 +134,21 @@ function AccountSection({
   fullName: string;
   email: string;
 }) {
+  const [nameValue, setNameValue] = useState(fullName);
   const [nameState, nameFormAction, namePending] = useActionState<UpdateNameState, FormData>(
     updateNameAction,
     {},
   );
 
-  if (nameState.success) {
+  useEffect(() => {
+    setNameValue(fullName);
+  }, [fullName]);
+
+  useEffect(() => {
+    if (!nameState.success) return;
+    if (nameState.fullName) setNameValue(nameState.fullName);
     toast.success("Name gespeichert.");
-  }
+  }, [nameState.fullName, nameState.success]);
 
   return (
     <SectionShell>
@@ -175,7 +182,8 @@ function AccountSection({
               name="name"
               type="text"
               autoComplete="name"
-              defaultValue={fullName}
+              value={nameValue}
+              onChange={(event) => setNameValue(event.target.value)}
               className={`${editableInputClass} text-[#3E3831]`}
               aria-describedby="account-name-hint"
             />
@@ -358,9 +366,15 @@ function DeleteAccountSection() {
             </button>
           </AlertDialogTrigger>
 
-          <AlertDialogContent className="max-w-[calc(100vw-2rem)] p-5 sm:max-w-2xl sm:p-8">
+          <AlertDialogContent
+            className="max-w-[calc(100vw-2rem)] p-5 sm:max-w-2xl sm:p-8"
+            onOverlayClick={() => {
+              setOpen(false);
+              setConfirmation("");
+            }}
+          >
             <AlertDialogHeader>
-              <AlertDialogTitle className="text-2xl leading-8 text-[#3E3831] sm:text-3xl sm:leading-10">
+              <AlertDialogTitle className="text-2xl font-normal leading-8 text-[#3E3831] sm:text-3xl sm:leading-10">
                 Account wirklich löschen?
               </AlertDialogTitle>
               <AlertDialogDescription asChild>
