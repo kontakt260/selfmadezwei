@@ -1,8 +1,8 @@
 # PROJ-3: Persönlicher Bereich + Konto
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-15
-**Last Updated:** 2026-05-17 — QA abgeschlossen: 17/17 Tests bestanden; "Mitglied seit" und "Mein Zugang" bewusst nicht implementiert (aus Spec entfernt)
+**Last Updated:** 2026-05-17 — Deployed to stage; 17/17 E2E Tests bestanden
 
 ## Dependencies
 - Requires: PROJ-2 (Auth + SSR) — für Session, Supabase Auth E-Mail-Änderung, OAuth-Provider-Erkennung
@@ -152,4 +152,9 @@ Test-Infrastruktur:
 **✅ BEREIT** — Keine Critical oder High Bugs. BUG-1 (Medium, UX-only) blockiert nicht das Deployment.
 
 ## Deployment
-_To be added by /deploy_
+
+**Deployed:** 2026-05-17
+**Branch:** stage → Vercel Preview
+**Commits:** `e36fd38` (feat), `eca4809` (QA tests), `0269986` (UI polish + banner)
+**Build:** ✅ `next build` passed (TypeScript clean, all 13 routes generated)
+**Pre-flight:** 17/17 Playwright E2E tests green on stage
