@@ -1,8 +1,8 @@
 # PROJ-3: Persönlicher Bereich + Konto
 
-## Status: In Progress
+## Status: Approved
 **Created:** 2026-05-15
-**Last Updated:** 2026-05-17 — Frontend + Backend implementiert (Server Actions: updateName, changeEmail, resetPassword, deleteAccount; Testdaten in stage)
+**Last Updated:** 2026-05-17 — QA abgeschlossen: 17/17 Tests bestanden; "Mitglied seit" und "Mein Zugang" bewusst nicht implementiert (aus Spec entfernt)
 
 ## Dependencies
 - Requires: PROJ-2 (Auth + SSR) — für Session, Supabase Auth E-Mail-Änderung, OAuth-Provider-Erkennung
@@ -83,7 +83,73 @@
 _To be added by /architecture_
 
 ## QA Test Results
-_To be added by /qa_
+
+**Datum:** 2026-05-17
+**Tester:** QA Engineer (Claude)
+**Umgebung:** Stage (kdjhxqitfxnsavhiafdn), Chromium Desktop + Mobile Safari (iPhone 13)
+**Testnutzer:** qa-test@narravit.de / QA-Test-2026! (stage, portal_access_expires_at = 2027-05-17)
+
+> **Scope-Anpassung:** "Mitglied seit"-FieldCard und "Mein Zugang"-Sektion wurden vom Entwickler bewusst aus der Implementierung entfernt. Entsprechende AC-Punkte aus der Spec wurden gestrichen; E2E-Tests angepasst.
+
+### Ergebnis-Übersicht
+
+| ID | Acceptance Criterion | Ergebnis |
+|----|---------------------|----------|
+| AC-1 | /persoenlicher-bereich lädt für eingeloggten Nutzer mit aktivem Zugang | ✅ PASS |
+| AC-2 | Banner-Bild und Seitenüberschrift mit Untertitel sichtbar | ✅ PASS |
+| AC-3 | Alle 4 Sektionen in korrekter Reihenfolge vorhanden | ✅ PASS |
+| AC-4 | Name-Feld zeigt aktuellen Wert und ist editierbar | ✅ PASS |
+| AC-5 | E-Mail-Feld zeigt aktuelle E-Mail und ist editierbar | ✅ PASS |
+| AC-7 | Name speichern — zu kurzer Name zeigt Validierungsfehler | ✅ PASS |
+| AC-8 | E-Mail ändern — gleiche E-Mail zeigt Validierungsfehler | ✅ PASS |
+| AC-11 | Rechnungen-Sektion zeigt Platzhalter 'Noch keine Rechnungen vorhanden' | ✅ PASS |
+| AC-12 | Rechnungstabelle hat korrekte Spaltenheader | ✅ PASS |
+| AC-13 | E-Mail-Nutzer sieht 'Passwort zurücksetzen'-Button | ✅ PASS |
+| AC-14 | Passwort-zurücksetzen zeigt Bestätigungshinweis nach Klick | ✅ PASS |
+| AC-15 | Löschen-Button öffnet AlertDialog | ✅ PASS |
+| AC-16 | Löschen-Button im Dialog ist deaktiviert bis 'LÖSCHEN' eingetippt | ✅ PASS |
+| AC-17 | Abbrechen schließt Dialog und setzt Eingabe zurück | ✅ PASS |
+| AC-18 | Sole-Owner-Check — Nutzer mit eigenem Projekt sieht Fehlermeldung beim Löschen | ✅ PASS |
+| AC-19 | Unauthentifizierter Nutzer wird zu /anmelden umgeleitet | ✅ PASS |
+| AC-20 | Seite lädt auf 375px ohne Layout-Bruch | ✅ PASS |
+
+**Gesamt: 17/17 bestanden**
+
+### Bugs
+
+#### BUG-1 — Medium: Nach Sole-Owner-Fehler bleibt Löschen-Button aktiviert (UX)
+- **Betrifft:** AC-18 (Test besteht, aber UX-Problem dokumentiert)
+- **Beschreibung:** Nach dem Sole-Owner-Fehler bleibt `isConfirmed` `true` (Eingabe "LÖSCHEN" nicht zurückgesetzt). Der Löschen-Button bleibt enabled, obwohl die Aktion nicht erfolgreich war.
+- **Sicherheit:** Unkritisch — server-seitiger Check blockiert jeden weiteren Versuch zuverlässig.
+- **Schritte:** Dialog öffnen → "LÖSCHEN" eingeben → klicken → Sole-Owner-Fehler sichtbar → Button sollte disabled sein, ist es aber nicht.
+- **Workaround:** keiner nötig; Löschen bleibt server-seitig geblockt.
+
+### Security Audit
+
+| Prüfpunkt | Ergebnis |
+|-----------|----------|
+| Unauthentifizierter Zugriff → Redirect | ✅ OK (AC-19) |
+| Server Actions mit auth.uid() — kein Client-Write | ✅ OK |
+| OAuth-Provider-Erkennung serverseitig | ✅ OK |
+| Sole-Owner-Check vor Account-Delete | ✅ OK (server-seitig) |
+| Keine Secrets im Client-Bundle | ✅ OK |
+| XSS via Nameninput | ✅ OK — React escaped, Server Action validiert |
+| Passwort-Reset sendet Link, kein Passwort im Response | ✅ OK |
+
+### E2E Test Suite
+
+Datei: `tests/PROJ-3-persoenlicher-bereich.spec.ts`
+Ausgeführt: `npm run test:e2e -- --project=chromium --grep "PROJ-3"`
+Ergebnis: **17/17 bestanden** in 16.1s
+
+Test-Infrastruktur:
+- `tests/global-setup.ts` — einmaliger Login; speichert Session in `tests/.auth/user.json`
+- `playwright.config.ts` — `globalSetup` + kein globales `storageState` (opt-in per Datei)
+- `vitest.config.ts` — `include` auf `src/**/*.test.*` eingeschränkt (verhindert Playwright-Konflikte)
+
+### Produktionsreife-Entscheidung
+
+**✅ BEREIT** — Keine Critical oder High Bugs. BUG-1 (Medium, UX-only) blockiert nicht das Deployment.
 
 ## Deployment
 _To be added by /deploy_
