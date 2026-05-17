@@ -135,3 +135,331 @@
     @apply h-px w-full bg-border;
   }
 }
+
+/* ============================================================
+ * PROJ-5 Kapitel-Editor: A5-Seitenstapel & Print-First-Styles
+ * Konstanten teilen zwischen Bildschirm-Editor und Headless-Chromium-PDF.
+ * Werte: 148 × 210 mm (A5), Margins entsprechend Word-Template.
+ * ============================================================ */
+:root {
+  --a5-page-width: 148mm;
+  --a5-page-height: 210mm;
+  --a5-margin-top: 1cm;
+  --a5-margin-right: 1cm;
+  --a5-margin-bottom: 1cm;
+  --a5-margin-left: 1.5cm;
+  --a5-content-width: calc(var(--a5-page-width) - var(--a5-margin-left) - var(--a5-margin-right));
+  --a5-content-height: calc(var(--a5-page-height) - var(--a5-margin-top) - var(--a5-margin-bottom));
+  --a5-desk-color: #ece6df;
+  --a5-page-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 12px 32px -8px rgba(0, 0, 0, 0.12);
+  --a5-page-gap: 2.5rem;
+}
+
+/* Tisch-Hintergrund hinter den A5-Seiten */
+.a5-desk {
+  background: var(--a5-desk-color);
+}
+
+/* ============================================================
+ * Mehr-Seiten-A5-Stack
+ * Hintergrund-Layer: N fest-große A5-Frames (210 mm) gestapelt mit Gap.
+ * Vordergrund-Layer: Editor + Bild-Sektionen + erste-Seite-Header.
+ * Page-Break im Vordergrund hat Höhe = Gap → „springt" optisch von einem
+ * Frame zum nächsten. Inhalt, der einen Frame überschreitet, läuft sichtbar
+ * auf die Tischfläche → optisches Signal „Seitenumbruch einfügen".
+ * ============================================================ */
+.a5-stack {
+  position: relative;
+  width: var(--a5-page-width);
+  margin: 0 auto;
+  font-family: var(--font-pt-serif), serif;
+  color: #2b2620;
+  font-size: 11pt;
+  line-height: 1.55;
+}
+
+.a5-stack__bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--a5-page-gap);
+  pointer-events: none;
+}
+
+.a5-page-frame {
+  width: 100%;
+  height: var(--a5-page-height);
+  background: white;
+  box-shadow: var(--a5-page-shadow);
+}
+
+.a5-stack__fg {
+  position: relative;
+  z-index: 1;
+  padding: var(--a5-margin-top) var(--a5-margin-right) var(--a5-margin-bottom) var(--a5-margin-left);
+}
+
+/* Alte .a5-page-Klasse: bleibt fix A5, falls Single-Page-Routen sie verwenden */
+.a5-page {
+  position: relative;
+  width: var(--a5-page-width);
+  height: var(--a5-page-height); /* STRIKT — keine min-height */
+  margin: 0 auto;
+  padding: var(--a5-margin-top) var(--a5-margin-right) var(--a5-margin-bottom) var(--a5-margin-left);
+  background: white;
+  box-shadow: var(--a5-page-shadow);
+  font-family: var(--font-pt-serif), serif;
+  color: #2b2620;
+  font-size: 11pt;
+  line-height: 1.55;
+  overflow: visible;
+}
+
+.a5-page + .a5-page {
+  margin-top: var(--a5-page-gap);
+}
+
+.a5-stack h1,
+.a5-page h1 {
+  font-family: var(--font-merriweather), serif;
+  font-size: 22pt;
+  font-weight: 400;
+  line-height: 1.2;
+  color: #2f3b30;
+  margin: 0;
+}
+
+.a5-stack h2,
+.a5-page h2 {
+  font-family: var(--font-merriweather), serif;
+  font-size: 14pt;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.a5-stack p,
+.a5-page p {
+  margin: 0 0 0.6em 0;
+  text-align: justify;
+  hyphens: auto;
+}
+
+.a5-stack blockquote,
+.a5-page blockquote {
+  border-left: 3px solid var(--narravit-green);
+  padding-left: 0.8em;
+  margin: 0.8em 0;
+  font-style: italic;
+  color: #4a4540;
+}
+
+/* Aufzählungen: Tailwind-Preflight nullt list-style — explizit zurückholen */
+.a5-stack ul,
+.a5-page ul,
+.tiptap-editor ul {
+  list-style: disc outside;
+  padding-left: 1.6em;
+  margin: 0.4em 0 0.6em 0;
+}
+
+.a5-stack ol,
+.a5-page ol,
+.tiptap-editor ol {
+  list-style: decimal outside;
+  padding-left: 1.8em;
+  margin: 0.4em 0 0.6em 0;
+}
+
+.a5-stack li,
+.a5-page li,
+.tiptap-editor li {
+  margin: 0.15em 0;
+}
+
+.a5-stack li > p,
+.a5-page li > p,
+.tiptap-editor li > p {
+  margin: 0;
+}
+
+.a5-stack [data-text-align="left"],   .a5-page [data-text-align="left"]   { text-align: left;    }
+.a5-stack [data-text-align="center"], .a5-page [data-text-align="center"] { text-align: center;  }
+.a5-stack [data-text-align="right"],  .a5-page [data-text-align="right"]  { text-align: right;   }
+.a5-stack [data-text-align="justify"],.a5-page [data-text-align="justify"]{ text-align: justify; }
+
+.a5-stack [data-line-height="1"],   .a5-page [data-line-height="1"]   { line-height: 1;   }
+.a5-stack [data-line-height="1.5"], .a5-page [data-line-height="1.5"] { line-height: 1.5; }
+.a5-stack [data-line-height="2"],   .a5-page [data-line-height="2"]   { line-height: 2;   }
+
+/* Seitenumbruch: füllt im Vordergrund exakt den Gap zwischen zwei
+ * A5-Frames im Hintergrund. Transparent → Tisch-Farbe vom Hintergrund-Layer
+ * scheint durch. Im Druck → echter `break-after: page`.
+ */
+.a5-page-break {
+  display: block;
+  margin-left: calc(-1 * var(--a5-margin-left));
+  margin-right: calc(-1 * var(--a5-margin-right));
+  height: var(--a5-page-gap);
+  background: transparent;
+  border: 0;
+  position: relative;
+  overflow: visible;
+  break-after: page;
+  page-break-after: always;
+}
+
+.a5-page-break::after {
+  content: "Seitenumbruch";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 0.15rem 0.6rem;
+  background: white;
+  border: 1px solid #e0dcd5;
+  font-family: var(--font-lato), sans-serif;
+  font-size: 7.5pt;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #848484;
+  white-space: nowrap;
+}
+
+/* TipTap-Editor-Bereich innerhalb einer A5-Seite */
+.tiptap-editor:focus {
+  outline: none;
+}
+
+.tiptap-editor [data-placeholder]::before {
+  content: attr(data-placeholder);
+  color: #a8a39b;
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+/* Trennlinie unter der ersten H1 — Word-Template-Stil:
+ * dünne schwarze Linie über die volle Inhaltsbreite, an beiden Enden
+ * je ein kleiner schwarzer Diamant (Raute).
+ */
+.a5-heading-rule {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 1rem 0 1.5rem 0;
+}
+
+.a5-heading-rule__diamond {
+  width: 7px;
+  height: 7px;
+  background: #000;
+  transform: rotate(45deg);
+  flex-shrink: 0;
+}
+
+.a5-heading-rule__line {
+  flex: 1;
+  height: 1px;
+  background: #000;
+}
+
+/* Bild-Sektion: feste Slot-Größen, kein freies Layout
+ * 1-spaltig: ein Bild über volle Inhaltsbreite, 3:2
+ * 2-spaltig: zwei Bilder nebeneinander, je 3:2 mit 4mm Gap
+ */
+.image-section {
+  display: grid;
+  gap: 4mm;
+  margin: 4mm 0;
+}
+
+.image-section[data-layout="1-spaltig"] {
+  grid-template-columns: 1fr;
+}
+
+.image-section[data-layout="2-spaltig"] {
+  grid-template-columns: 1fr 1fr;
+}
+
+.image-slot {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  background: #f6f3ee;
+  overflow: hidden;
+}
+
+.image-slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Bild-Sektion: discreter leerer Platzhalter ohne Chrome */
+.image-section-empty {
+  position: relative;
+  aspect-ratio: 6 / 1;
+  background: transparent;
+  border: 1px dashed #d6d0c5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  color: #a8a39b;
+  font-family: var(--font-lato), sans-serif;
+  font-size: 9pt;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.image-section-empty:hover {
+  border-color: var(--narravit-green);
+  color: #3E3831;
+  background: rgba(150, 184, 151, 0.05);
+}
+
+/* ===== Druck-spezifische Regeln (PROJ-16 nutzt diese Klassen 1:1) ===== */
+@media print {
+  @page {
+    size: A5;
+    margin: var(--a5-margin-top) var(--a5-margin-right) var(--a5-margin-bottom) var(--a5-margin-left);
+  }
+
+  body {
+    background: white;
+  }
+
+  .a5-desk {
+    background: white;
+  }
+
+  .a5-page {
+    box-shadow: none;
+    margin: 0;
+    padding: 0;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .a5-page-break {
+    height: 0;
+    background: transparent;
+    box-shadow: none;
+    border: 0;
+    margin: 0;
+  }
+
+  .a5-page-break::after {
+    display: none;
+  }
+
+  /* Editor-Chrome ausblenden beim Druck */
+  .editor-chrome {
+    display: none !important;
+  }
+}
