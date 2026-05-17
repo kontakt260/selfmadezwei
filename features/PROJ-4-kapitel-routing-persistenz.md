@@ -310,8 +310,73 @@ Coverage per action:
 - `deleteChapterAction` — 4 tests (bad chapterId, bad projectId, unauthenticated, success)
 - `saveChapterOrderAction` — 8 tests (non-JSON, non-UUID items, bad projectId, unauthenticated, count mismatch, foreign ID, success)
 
-## QA Test Results
-_To be added by /qa_
+## QA Test Results (2026-05-17)
+
+### Automated Tests (Unit)
+- **49/49 unit tests passing** (`npm test`)
+  - 32 Server Action tests (`actions.test.ts`)
+  - 17 utility tests: `reorderChapters` (7) + `countWordsFromBody` (10) (`projektuebersicht-chapters.test.ts`)
+
+### E2E Tests
+Written in `tests/PROJ-4-kapitel-routing-persistenz.spec.ts` (52 tests across Chromium + Mobile Safari).
+
+**Results before bug fix:**
+- ✅ Home-Seite (/) — AC-Home-1 bis AC-Home-4: **PASS** (4/4)
+- ❌ Projektübersicht — AC-PÜ-1 bis AC-PÜ-6: **FAIL** (blocked by BUG-1)
+- ❌ Kapitel CRUD — AC-Ch-1 bis AC-Ch-11: **FAIL** (blocked by BUG-1)
+- ❌ Sicherheit — AC-Sec-1 bis AC-Sec-4: **FAIL** (AC-Sec-1/2 Test-Design-Issue; AC-Sec-3/4 blocked by BUG-1)
+- ❌ Responsive & Navigation — AC-Nav-1: **FAIL** (blocked by BUG-1)
+
+### Bugs Found
+
+#### BUG-1 — HIGH: Projektübersicht-Seite: Runtime Error durch render prop über Server/Client-Grenze
+
+**Schweregrad:** High  
+**Datei:** `src/components/projektuebersicht/ChapterListSection.tsx`  
+**Symptom:** Die Seite `/projektuebersicht/[project_id]` zeigt sofort den Next.js Dev Overlay mit einem Runtime Error. Kein Inhalt der Seite ist sichtbar oder interaktiv.
+
+**Fehler:**
+```
+Functions cannot be passed directly to Client Components unless you explicitly 
+expose it by marking it with "use server". Or maybe you meant to call this function 
+rather than return it.
+<... renderSectionHeader={function renderSectionHeader}>
+```
+
+**Ursache:** `ChapterListSection.tsx` übergibt `renderSectionHeader` (eine normale Funktion / Render Prop) als Prop an `ChapterSectionClient` ("use client"). In Next.js App Router dürfen über die Server/Client-Grenze nur serialisierbare Werte oder Server Actions übergeben werden. Eine einfache Funktion ist nicht serialisierbar.
+
+**Schritte zur Reproduktion:**
+1. Als angemeldeter Nutzer zu `/projektuebersicht/[project_id]` navigieren
+2. Seite zeigt sofort Next.js Runtime Error Overlay
+
+**Fix-Empfehlung:** Den `renderSectionHeader`-Render-Prop entfernen. Den SectionHeader-JSX (mit den Aktions-Buttons "Eigenes Kapitel", "Erzähl-Impuls", "Reihenfolge speichern") direkt INNERHALB von `ChapterSectionClient.tsx` rendern, da die Buttons ohnehin Client-Callbacks aufrufen (`openAddOwnChapterModal` etc.).
+
+---
+
+#### BUG-2 — Low: Security-Tests für unauthenticated Redirect (Test-Design)
+
+**Schweregrad:** Low (kein echter Sicherheitsfehler)  
+**Symptom:** Playwright-Tests `AC-Sec-1` und `AC-Sec-2` zeigen, dass unauthenticated User nicht zu `/anmelden` weitergeleitet werden.  
+**Befund:** `curl` bestätigt, dass der Server korrekt `307 → /anmelden` zurückgibt. Die Diskrepanz ist auf eine Playwright-spezifische Verhaltensweise bei `browser.newContext()` zurückzuführen. Kein echter Sicherheitsbefund.
+
+### Sicherheits-Audit
+
+- ✅ Server Actions: alle 6 Aktionen haben Auth-Check, Zod-Validierung, explizite UUID-Prüfung
+- ✅ `saveChapterOrderAction`: IDOR-Schutz gegen Mass-Update-Angriff (DB-seitiger ID-Abgleich)
+- ✅ Projekt-Löschen: explizite `projektleiter`-Rollenprüfung in der Server Action
+- ✅ Cross-Project-IDOR: `.eq("project_id", projectId)` Guard in renameChapter + deleteChapter
+- ✅ RLS als zweite Verteidigungslinie: alle Policies korrekt gesetzt (verifiziert)
+- ✅ Kein Secrets-Leak: Service Role Key nicht im Client-Bundle
+- ⚠️ BUG-1 verhindert vollständigen Browser-Security-Test der Chapter-Funktionen
+
+### Entscheidung
+**NICHT PRODUCTION-READY**
+
+**Grund:** BUG-1 (High) — die Kernseite `/projektuebersicht/[project_id]` ist durch einen Runtime Error komplett unzugänglich.
+
+**Nächste Schritte:**
+1. BUG-1 beheben: `renderSectionHeader`-Render-Prop aus `ChapterListSection.tsx` entfernen; SectionHeader in `ChapterSectionClient.tsx` integrieren
+2. Danach `/qa PROJ-4` erneut ausführen
 
 ## Deployment
 _To be added by /deploy_
