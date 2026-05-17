@@ -57,7 +57,7 @@ export default async function HomePage() {
   return (
     <>
       <Navbar />
-      <main className="[font-family:var(--font-lato)] box-border min-h-full w-full min-w-0 flex-1 bg-[#FAF8F6] px-4 pb-12 pt-[calc(7.348rem+2rem)] sm:px-6 sm:pb-16 sm:pt-[calc(7.348rem+2.5rem)] md:px-8 xl:pl-44 xl:pt-8">
+      <main className="[font-family:var(--font-lato)] box-border min-h-full w-full min-w-0 flex-1 bg-[#FAF8F6] px-4 pb-16 pt-[calc(7.348rem+2rem)] sm:px-6 sm:pt-[calc(7.348rem+2.5rem)] md:px-8 md:pt-[calc(7.348rem+3rem)] xl:pl-[calc(11rem+2rem)] xl:pr-8 xl:pt-12">
         <div className="mx-auto flex w-full max-w-[1213px] flex-col gap-8 sm:gap-10 md:gap-12">
           <div className="relative h-[min(31.5vh,285px)] w-full min-h-[105px] overflow-hidden sm:min-h-[135px]">
             <Image
@@ -71,22 +71,22 @@ export default async function HomePage() {
           </div>
 
           <header className="flex w-full flex-col items-center gap-2 text-center">
-            <h1 className="[font-family:var(--font-merriweather)] w-full text-[1.75rem] font-medium leading-9 text-[#3E3831] sm:text-[2rem] sm:leading-10 md:text-4xl md:leading-10">
+            <h1 className="[font-family:var(--font-merriweather)] w-full text-3xl font-medium leading-10 text-[#3E3831] sm:text-4xl sm:leading-[1.2] md:text-5xl">
               Willkommen zurück bei NARRAVIT
             </h1>
-            <p className="mx-auto max-w-3xl text-base leading-6 text-[#535252]">
+            <p className="mx-auto max-w-3xl text-lg leading-8 text-[#535252] sm:text-xl sm:leading-9">
               Schön, dass Sie sich die Zeit nehmen, um weitere Geschichten festzuhalten.
             </p>
           </header>
 
-          <section className="flex flex-col gap-6 md:gap-8">
+          <section className="flex flex-col gap-6 sm:gap-8">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-              <h2 className="[font-family:var(--font-pt-serif)] text-xl leading-8 text-[#3E3831] sm:text-2xl sm:leading-8">
+              <h2 className="[font-family:var(--font-pt-serif)] text-2xl leading-8 text-[#3E3831] sm:text-3xl sm:leading-10">
                 Ihre Projekte
               </h2>
               <Link
                 href="/onboarding"
-                className="inline-flex h-12 w-full shrink-0 items-center justify-center gap-3 bg-[rgba(10,9,9,0.05)] px-5 text-base font-bold leading-6 text-black transition-colors hover:bg-[rgba(10,9,9,0.08)] sm:w-auto sm:min-w-[250px] sm:justify-start sm:pl-6"
+                className="inline-flex h-12 w-full shrink-0 items-center justify-center gap-3 bg-[rgba(10,9,9,0.05)] px-5 text-lg font-bold leading-6 text-black transition-colors hover:bg-[rgba(10,9,9,0.08)] sm:w-auto sm:min-w-[300px] sm:justify-start sm:pl-6"
               >
                 <IconPlus className="shrink-0 text-black" />
                 Weiteren Projekt-Zugang kaufen
@@ -94,13 +94,13 @@ export default async function HomePage() {
             </div>
 
             {projects.length === 0 ? (
-              <div className="flex flex-col items-center gap-4 rounded bg-white px-6 py-12 text-center">
-                <p className="text-base leading-6 text-[#848484]">
+              <div className="flex flex-col items-center gap-5 bg-white px-6 py-12 text-center sm:px-8 sm:py-14">
+                <p className="max-w-2xl text-lg leading-8 text-[#848484] sm:text-xl sm:leading-9">
                   Sie haben noch kein Projekt. Kaufen Sie Ihren ersten Portal-Zugang, um loszulegen.
                 </p>
                 <Link
                   href="/onboarding"
-                  className="inline-flex h-12 items-center justify-center bg-[#D0BCA6] px-6 text-base font-bold text-white transition-colors hover:bg-[#c0ad98]"
+                  className="inline-flex h-12 items-center justify-center bg-[#D0BCA6] px-6 text-lg font-bold text-[#0a0909] transition-colors hover:bg-[#c0ad98]"
                 >
                   Jetzt starten
                 </Link>

@@ -290,7 +290,7 @@ export function ProjectCard({ project, deleteProjectAction }: Props) {
   return (
     <>
       {modal}
-      <article className="relative flex min-w-0 flex-col bg-white p-5 shadow-none transition-[box-shadow,transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-[#fcfcfb] hover:shadow-[0_10px_28px_rgba(0,0,0,0.09)] sm:p-6">
+      <article className="relative flex min-w-0 flex-col bg-white p-5 shadow-none transition-[box-shadow,transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-[#fcfcfb] hover:shadow-[0_10px_28px_rgba(0,0,0,0.09)] sm:p-8">
         <Link
           href={href}
           className="absolute inset-0 z-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#96B897]/50"
@@ -303,10 +303,10 @@ export function ProjectCard({ project, deleteProjectAction }: Props) {
                 <ProjectBookIcon />
               </div>
               <div className="flex min-w-0 flex-col">
-                <h3 className="[font-family:var(--font-pt-serif)] text-lg leading-7 text-[#3E3831]">
+                <h3 className="[font-family:var(--font-pt-serif)] text-xl leading-8 text-[#3E3831] sm:text-2xl sm:leading-9">
                   {project.title}
                 </h3>
-                <p className="mt-0.5 text-sm leading-5 text-[#848484]">
+                <p className="mt-1 text-base leading-6 text-[#848484]">
                   {project.formattedUpdatedAt}
                 </p>
               </div>
@@ -327,11 +327,11 @@ export function ProjectCard({ project, deleteProjectAction }: Props) {
             )}
           </div>
           <div className="mt-6 flex flex-row flex-wrap items-center justify-between gap-3 border-t border-transparent pt-4 sm:mt-8 sm:pt-4">
-            <p className="text-sm leading-5 text-[#848484]">{chapterLabel}</p>
+            <p className="text-base leading-6 text-[#848484] sm:text-lg">{chapterLabel}</p>
             <Link
               href={href}
               tabIndex={-1}
-              className="pointer-events-auto relative z-20 inline-flex min-h-10 min-w-[5.125rem] items-center justify-center bg-[#D0BCA6] px-4 py-2 text-base font-bold leading-6 text-white transition-colors hover:bg-[#c0ad98]"
+              className="pointer-events-auto relative z-20 inline-flex min-h-12 min-w-[6rem] items-center justify-center bg-[#D0BCA6] px-5 py-2 text-lg font-bold leading-6 text-[#0a0909] transition-colors hover:bg-[#c0ad98]"
             >
               Öffnen
             </Link>
