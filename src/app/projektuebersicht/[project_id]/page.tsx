@@ -77,7 +77,7 @@ function IconUsers() {
 
 function SectionShell({ children }: { children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-4 bg-white p-4 sm:gap-6 sm:p-6 md:p-7 lg:p-8">
+    <section className="flex flex-col gap-5 bg-white p-5 sm:gap-6 sm:p-8">
       {children}
     </section>
   );
@@ -95,8 +95,8 @@ function SectionHeader({
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
       <div className="flex min-w-0 flex-row items-center gap-2 sm:gap-3">
-        <span className="shrink-0 [&>svg]:h-6 [&>svg]:w-6">{icon}</span>
-        <h2 className="[font-family:var(--font-pt-serif)] min-w-0 text-xl leading-7 text-[#3E3831] sm:text-2xl sm:leading-8">
+        <span className="shrink-0 [&>svg]:h-7 [&>svg]:w-7">{icon}</span>
+        <h2 className="[font-family:var(--font-pt-serif)] min-w-0 text-2xl leading-8 text-[#3E3831] sm:text-3xl sm:leading-10">
           {title}
         </h2>
       </div>
@@ -121,15 +121,15 @@ function StatCard({
   hint: string;
 }) {
   return (
-    <div className="flex flex-col gap-2 bg-white p-4 sm:p-6">
+    <div className="flex flex-col gap-3 bg-white p-5 sm:p-8">
       <div className="flex flex-row items-center gap-2 sm:gap-3">
-        <span className="shrink-0 [&>svg]:h-5 [&>svg]:w-5 sm:[&>svg]:h-6 sm:[&>svg]:w-6">{icon}</span>
-        <h3 className="[font-family:var(--font-pt-serif)] min-w-0 text-base leading-6 text-[#3E3831] sm:text-lg sm:leading-7">
+        <span className="shrink-0 [&>svg]:h-6 [&>svg]:w-6 sm:[&>svg]:h-7 sm:[&>svg]:w-7">{icon}</span>
+        <h3 className="[font-family:var(--font-pt-serif)] min-w-0 text-xl leading-8 text-[#3E3831] sm:text-2xl sm:leading-9">
           {label}
         </h3>
       </div>
-      <p className="text-2xl leading-8 text-[#3E3831] sm:text-3xl sm:leading-9">{value}</p>
-      <p className="text-xs leading-5 text-[#848484] sm:text-sm">{hint}</p>
+      <p className="text-3xl leading-9 text-[#3E3831] sm:text-4xl sm:leading-10">{value}</p>
+      <p className="text-sm leading-6 text-[#848484] sm:text-base">{hint}</p>
     </div>
   );
 }
@@ -179,22 +179,22 @@ export default async function ProjektuebersichtPage({
   return (
     <>
       <Navbar />
-      <main className="[font-family:var(--font-lato)] box-border min-h-full w-full min-w-0 flex-1 bg-[#FAF8F6] px-3 pb-20 pt-[calc(7.348rem+1.5rem)] sm:px-6 sm:pb-16 sm:pt-[calc(7.348rem+2.5rem)] md:px-8 xl:pl-44 xl:pt-12">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 sm:gap-8 md:gap-10">
+      <main className="[font-family:var(--font-lato)] box-border min-h-full w-full min-w-0 flex-1 bg-[#FAF8F6] px-4 pb-20 pt-[calc(7.348rem+2rem)] sm:px-6 sm:pb-16 sm:pt-[calc(7.348rem+2.5rem)] md:px-8 md:pt-[calc(7.348rem+3rem)] xl:pl-[calc(11rem+2rem)] xl:pr-8 xl:pt-12">
+        <div className="mx-auto flex w-full max-w-[1213px] flex-col gap-8 sm:gap-10 md:gap-12">
 
           {/* Header */}
-          <header className="flex flex-col gap-1.5 sm:gap-2">
+          <header className="flex flex-col gap-2 sm:gap-3">
             <Link
               href="/"
-              className="inline-flex w-fit max-w-full flex-row items-center gap-2 text-sm leading-5 text-black hover:underline sm:text-base sm:leading-6"
+              className="inline-flex w-fit max-w-full flex-row items-center gap-2 text-base leading-6 text-black hover:underline sm:text-lg sm:leading-7"
             >
               <IconArrowLeft />
               Zurück zur Startseite
             </Link>
-            <h1 className="[font-family:var(--font-merriweather)] mt-1 text-2xl font-medium leading-8 text-[#3E3831] sm:mt-2 sm:text-3xl sm:leading-10 md:text-4xl">
+            <h1 className="[font-family:var(--font-merriweather)] mt-1 text-3xl font-medium leading-10 text-[#3E3831] sm:mt-2 sm:text-4xl sm:leading-[1.2] md:text-5xl">
               {project.title}
             </h1>
-            <p className="text-sm leading-5 text-[#535252] sm:text-base sm:leading-6">
+            <p className="text-lg leading-8 text-[#535252] sm:text-xl sm:leading-9">
               Projekt bearbeiten und verwalten
             </p>
           </header>
@@ -204,16 +204,16 @@ export default async function ProjektuebersichtPage({
             <div className="flex flex-col gap-10 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-10">
               <div className="flex min-w-0 flex-col gap-3 sm:gap-4">
                 <SectionHeader icon={<IconEye />} title="Cover bearbeiten" />
-                <div className="flex flex-col gap-4 bg-[#FAF8F6] p-4 sm:p-6 md:p-7">
-                  <p className="text-sm leading-6 text-[#848484] sm:text-base">
+                <div className="flex flex-col gap-4 bg-[#FAF8F6] p-5 sm:p-7">
+                  <p className="text-base leading-7 text-[#848484] sm:text-lg sm:leading-8">
                     Der Cover-Editor ist in Kürze verfügbar (PROJ-10).
                   </p>
                 </div>
               </div>
               <div className="flex min-w-0 flex-col gap-3 sm:gap-4">
                 <SectionHeader icon={<IconPhoneHandset />} title="Code für das Telefonieren" />
-                <div className="flex flex-col gap-4 bg-[#FAF8F6] p-4 sm:p-6 md:p-7">
-                  <p className="text-sm leading-6 text-[#848484] sm:text-base">
+                <div className="flex flex-col gap-4 bg-[#FAF8F6] p-5 sm:p-7">
+                  <p className="text-base leading-7 text-[#848484] sm:text-lg sm:leading-8">
                     Der Telefon-Code wird mit dem Vapi-Modul aktiviert (PROJ-12).
                   </p>
                 </div>
@@ -253,7 +253,7 @@ export default async function ProjektuebersichtPage({
           {/* Projektmitglieder placeholder */}
           <SectionShell>
             <SectionHeader icon={<IconUsers />} title="Projektmitglieder" />
-            <p className="text-sm leading-6 text-[#848484] sm:text-base">
+            <p className="text-base leading-7 text-[#848484] sm:text-lg sm:leading-8">
               Die Mitgliederverwaltung wird mit PROJ-9 aktiviert.
             </p>
           </SectionShell>

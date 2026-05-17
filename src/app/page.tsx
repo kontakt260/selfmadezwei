@@ -80,9 +80,9 @@ export default async function HomePage() {
           </header>
 
           <section className="flex flex-col gap-6 sm:gap-8">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+            <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
               <h2 className="[font-family:var(--font-pt-serif)] text-2xl leading-8 text-[#3E3831] sm:text-3xl sm:leading-10">
-                Ihre Projekte
+                {projects.length === 1 ? "Ihr Projekt" : "Ihre Projekte"}
               </h2>
               <Link
                 href="/onboarding"
@@ -106,7 +106,13 @@ export default async function HomePage() {
                 </Link>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-5 sm:gap-6 md:grid-cols-2 md:gap-6 xl:grid-cols-3 xl:gap-6">
+              <div
+                className={
+                  projects.length === 1
+                    ? "mx-auto grid w-full max-w-[1200px] grid-cols-[minmax(0,min(100%,36rem))] justify-center gap-5 sm:gap-6 md:-translate-x-8 md:gap-6 xl:-translate-x-10 xl:gap-6"
+                    : "mx-auto grid w-full max-w-[1200px] grid-cols-[minmax(0,min(100%,32rem))] justify-center gap-5 sm:gap-6 md:grid-cols-[repeat(auto-fit,minmax(22rem,24rem))] md:gap-6 xl:grid-cols-[repeat(auto-fit,minmax(22rem,24rem))] xl:gap-6"
+                }
+              >
                 {projects.map((p) => (
                   <ProjectCard key={p.id} project={p} deleteProjectAction={deleteProjectAction} />
                 ))}

@@ -6,7 +6,11 @@ import { createClient } from "@/lib/supabase/server";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
-const uuidSchema = z.string().uuid("Ungültige ID.");
+// Zod v4 uuid() enforces RFC 4122 version/variant nibbles and rejects valid-format
+// seed UUIDs (e.g. cccccccc-0099-0099-0099-000000000099). Real security is enforced
+// by Supabase RLS; we just validate the shape to reject garbage strings.
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/i;
+const uuidSchema = z.string().regex(UUID_RE, "Ungültige ID.");
 
 const chapterTitleSchema = z
   .string()

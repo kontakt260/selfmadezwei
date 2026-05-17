@@ -25,7 +25,9 @@ function RegistrierenContent() {
   return (
     <AuthLayout>
       <div className="mb-8 text-center md:mb-10">
-        <h1 className="heading-style-h2 mb-4">Konto erstellen</h1>
+        <h1 className="[font-family:var(--font-merriweather)] mb-4 text-[2.75rem] font-normal leading-[1.15] tracking-[-0.03rem] text-[#3E3831] sm:text-5xl sm:leading-[1.18] xl:whitespace-nowrap">
+          Konto erstellen
+        </h1>
         <p className="text-[#535252]">
           Starte dein Lebensbuch in wenigen Minuten.
         </p>
@@ -108,7 +110,7 @@ function RegistrierenContent() {
           </p>
         )}
 
-        <Button type="submit" className="h-12" disabled={pending}>
+        <Button type="submit" className="h-12 sm:whitespace-nowrap" disabled={pending}>
           {pending ? "Konto wird erstellt …" : "Konto erstellen"}
         </Button>
 

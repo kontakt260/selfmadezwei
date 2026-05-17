@@ -83,8 +83,8 @@ function SectionHeader({
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
       <div className="flex min-w-0 flex-row items-center gap-2 sm:gap-3">
-        <span className="shrink-0 [&>svg]:h-6 [&>svg]:w-6">{icon}</span>
-        <h2 className="[font-family:var(--font-pt-serif)] min-w-0 text-xl leading-7 text-[#3E3831] sm:text-2xl sm:leading-8">
+        <span className="shrink-0 [&>svg]:h-7 [&>svg]:w-7">{icon}</span>
+        <h2 className="[font-family:var(--font-pt-serif)] min-w-0 text-2xl leading-8 text-[#3E3831] sm:text-3xl sm:leading-10">
           {title}
         </h2>
       </div>
@@ -635,7 +635,7 @@ export function ChapterSectionClient({
               <button type="button" onClick={closeImpulseModal} disabled={impulseAddPending} className="min-h-12 w-full border border-[#e0dcd5] bg-white px-6 py-3.5 text-center text-lg font-semibold text-[#3E3831] transition-colors hover:bg-[#f5f3f0] disabled:opacity-50 sm:w-auto">
                 Abbrechen
               </button>
-              <button type="button" onClick={confirmErzaehlImpulse} disabled={!currentImpulseTitle.trim() || impulseAddPending} className="min-h-12 w-full bg-[#D0BCA6] px-6 py-3.5 text-center text-lg font-bold text-white transition-colors hover:bg-[#c0ad98] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto">
+              <button type="button" onClick={confirmErzaehlImpulse} disabled={!currentImpulseTitle.trim() || impulseAddPending} className="min-h-12 w-full bg-[#D0BCA6] px-6 py-3.5 text-center text-lg font-bold text-[#0a0909] transition-colors hover:bg-[#c0ad98] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto">
                 {impulseAddPending ? "Wird erstellt …" : "Impuls übernehmen"}
               </button>
             </div>
@@ -662,7 +662,7 @@ export function ChapterSectionClient({
                 type="button"
                 onClick={commitChapterOrder}
                 disabled={orderPending}
-                className="inline-flex h-10 w-full min-w-0 cursor-pointer items-center justify-center gap-2 border border-[#96B897] bg-[#EAF0EA] px-3 text-sm font-bold leading-6 text-[#3E5A40] transition-colors hover:bg-[#dfe9df] disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:w-auto sm:px-4 sm:text-base"
+                className="inline-flex h-12 w-full min-w-0 cursor-pointer items-center justify-center gap-2 border border-[#96B897] bg-[#EAF0EA] px-4 text-base font-bold leading-6 text-[#3E5A40] transition-colors hover:bg-[#dfe9df] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:text-lg"
               >
                 {orderPending ? "Wird gespeichert …" : "Reihenfolge speichern"}
               </button>
@@ -670,7 +670,7 @@ export function ChapterSectionClient({
             <button
               type="button"
               onClick={openAddModal}
-              className="inline-flex h-10 w-full min-w-0 cursor-pointer items-center justify-center gap-2 bg-[#0A0909]/5 px-3 text-sm font-bold leading-6 text-[#534B42] transition-colors hover:bg-[#0A0909]/10 sm:h-10 sm:w-auto sm:px-4 sm:text-base"
+              className="inline-flex h-12 w-full min-w-0 cursor-pointer items-center justify-center gap-2 bg-[#0A0909]/5 px-4 text-base font-bold leading-6 text-[#534B42] transition-colors hover:bg-[#0A0909]/10 sm:w-auto sm:text-lg"
             >
               <IconPlus color="#534B42" />
               Eigenes Kapitel
@@ -678,38 +678,40 @@ export function ChapterSectionClient({
             <button
               type="button"
               onClick={openErzaehlImpulsModal}
-              className="inline-flex h-10 w-full min-w-0 cursor-pointer items-center justify-center gap-2 bg-[#D0BCA6] px-3 text-sm font-bold leading-6 text-white transition-colors hover:bg-[#c0ad98] sm:h-10 sm:w-auto sm:px-4 sm:text-base"
+              className="inline-flex h-12 w-full min-w-0 cursor-pointer items-center justify-center gap-2 bg-[#D0BCA6] px-4 text-base font-bold leading-6 text-[#0a0909] transition-colors hover:bg-[#c0ad98] sm:w-auto sm:text-lg"
             >
-              <IconPlus color="#FFFFFF" />
+              <IconPlus color="#0a0909" />
               Erzähl-Impuls
             </button>
           </>
         }
       />
       {chapters.length === 0 ? (
-        <div className="flex flex-col items-center gap-4 py-10 text-center">
-          <p className="text-base leading-6 text-[#848484] sm:text-lg">
+        <div className="flex flex-col items-center gap-5 py-12 text-center sm:py-14">
+          <p className="text-lg leading-8 text-[#848484] sm:text-xl sm:leading-9">
             Noch keine Kapitel vorhanden.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
               onClick={openAddModal}
-              className="inline-flex h-10 min-w-0 cursor-pointer items-center justify-center gap-2 bg-[#0A0909]/5 px-4 text-sm font-bold leading-6 text-[#534B42] transition-colors hover:bg-[#0A0909]/10 sm:text-base"
+              className="inline-flex h-12 min-w-0 cursor-pointer items-center justify-center gap-2 bg-[#0A0909]/5 px-5 text-base font-bold leading-6 text-[#534B42] transition-colors hover:bg-[#0A0909]/10 sm:text-lg"
             >
+              <IconPlus color="#534B42" />
               Eigenes Kapitel
             </button>
             <button
               type="button"
               onClick={openErzaehlImpulsModal}
-              className="inline-flex h-10 min-w-0 cursor-pointer items-center justify-center gap-2 bg-[#D0BCA6] px-4 text-sm font-bold leading-6 text-white transition-colors hover:bg-[#c0ad98] sm:text-base"
+              className="inline-flex h-12 min-w-0 cursor-pointer items-center justify-center gap-2 bg-[#D0BCA6] px-5 text-base font-bold leading-6 text-[#0a0909] transition-colors hover:bg-[#c0ad98] sm:text-lg"
             >
+              <IconPlus color="#0a0909" />
               Erzähl-Impuls
             </button>
           </div>
         </div>
       ) : (
-        <div className="flex flex-col gap-3.5 sm:gap-4" role="list" aria-label="Kapitelreihenfolge">
+        <div className="flex flex-col gap-4 sm:gap-5" role="list" aria-label="Kapitelreihenfolge">
           {chapters.map((chapter, index) => (
             <div
               key={chapter.id}
@@ -717,7 +719,7 @@ export function ChapterSectionClient({
               onDragOver={onDragOver(index)}
               onDragLeave={onDragLeave}
               onDrop={onDrop(index)}
-              className={`flex flex-col gap-4 border border-transparent bg-[#FAF8F6] p-5 py-5 transition-[opacity,box-shadow] sm:min-h-[5.5rem] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-6 ${
+              className={`flex flex-col gap-4 border border-transparent bg-[#FAF8F6] p-5 py-5 transition-[opacity,box-shadow] sm:min-h-[6rem] sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:p-7 ${
                 dragIndex === index ? "opacity-60" : ""
               } ${
                 overIndex === index && dragIndex !== null && dragIndex !== index
@@ -736,14 +738,14 @@ export function ChapterSectionClient({
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center text-[#B5B5B5] sm:h-7 sm:w-7">
                   <IconDrag className="h-full w-full" />
                 </span>
-                <span className="w-7 shrink-0 text-base leading-7 text-[#B5B5B5] sm:w-8 sm:text-lg sm:leading-7">
+                <span className="w-8 shrink-0 text-lg leading-7 text-[#B5B5B5] sm:w-9 sm:text-xl sm:leading-8">
                   {index + 1}.
                 </span>
                 <div className="flex min-w-0 flex-col gap-0.5">
-                  <h4 className="[font-family:var(--font-pt-serif)] line-clamp-2 text-lg leading-7 text-[#3E3831] sm:text-xl sm:leading-8">
+                  <h4 className="[font-family:var(--font-pt-serif)] line-clamp-2 text-xl leading-8 text-[#3E3831] sm:text-2xl sm:leading-9">
                     {chapter.title}
                   </h4>
-                  <p className="text-xs leading-5 text-[#848484] sm:text-sm">
+                  <p className="text-sm leading-6 text-[#848484] sm:text-base">
                     {chapter.source} • {chapter.words} Wörter
                   </p>
                 </div>
@@ -773,7 +775,7 @@ export function ChapterSectionClient({
                   href={`/projektuebersicht/${projectId}/kapiteleditor/${chapter.id}`}
                   draggable={false}
                   onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                  className="relative z-20 inline-flex h-10 w-full min-w-0 cursor-pointer items-center justify-center bg-[#0A0909]/5 px-3 text-sm font-bold leading-6 text-[#534B42] transition-colors hover:bg-[#0A0909]/10 sm:h-10 sm:w-auto sm:px-4 sm:text-base"
+                  className="relative z-20 inline-flex h-12 w-full min-w-0 cursor-pointer items-center justify-center bg-[#0A0909]/5 px-4 text-base font-bold leading-6 text-[#534B42] transition-colors hover:bg-[#0A0909]/10 sm:w-auto sm:text-lg"
                 >
                   Bearbeiten
                 </Link>
