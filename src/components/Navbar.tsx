@@ -236,17 +236,17 @@ export function Navbar() {
             aria-modal="true"
             aria-labelledby={logoutTitleId}
             aria-describedby={logoutDescId}
-            className="relative z-10 w-full max-w-xl border border-[#e0dcd5] bg-[#FAF8F6] p-8 shadow-[0_16px_48px_rgba(0,0,0,0.18)] sm:max-w-2xl sm:p-10"
+            className="relative z-10 w-full max-w-[calc(100vw-2rem)] border border-[#e0dcd5] bg-[#FAF8F6] p-6 shadow-[0_16px_48px_rgba(0,0,0,0.18)] sm:max-w-2xl sm:p-10"
           >
             <h2
               id={logoutTitleId}
-              className="[font-family:var(--font-pt-serif)] text-2xl leading-9 text-[#3E3831] sm:text-3xl sm:leading-10"
+              className="[font-family:var(--font-pt-serif)] text-3xl leading-10 text-[#3E3831] sm:text-4xl sm:leading-[1.2]"
             >
               Abmelden?
             </h2>
             <div
               id={logoutDescId}
-              className="mt-5 space-y-3 text-base leading-relaxed text-[#535252] sm:text-lg sm:leading-relaxed"
+              className="mt-5 space-y-3 text-lg leading-8 text-[#535252] sm:text-xl sm:leading-9"
             >
               <p>
                 Möchten Sie sich wirklich abmelden? Sie werden zur Anmeldeseite
@@ -262,7 +262,7 @@ export function Navbar() {
                 type="button"
                 onClick={closeLogoutDialog}
                 disabled={logoutPending}
-                className="min-h-12 w-full border border-[#e0dcd5] bg-white px-6 py-3.5 text-center text-lg font-semibold text-[#3E3831] transition-colors hover:bg-[#f5f3f0] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                className="min-h-12 w-full border border-[#e0dcd5] bg-white px-6 py-3.5 text-center text-lg font-semibold text-[#3E3831] transition-colors hover:bg-[#f5f3f0] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:text-xl"
               >
                 Abbrechen
               </button>
@@ -270,7 +270,7 @@ export function Navbar() {
                 type="button"
                 onClick={confirmLogout}
                 disabled={logoutPending}
-                className="min-h-12 w-full bg-[#53444B] px-6 py-3.5 text-center text-lg font-bold text-white transition-colors hover:bg-[#45383e] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                className="min-h-12 w-full bg-[#53444B] px-6 py-3.5 text-center text-lg font-bold text-white transition-colors hover:bg-[#45383e] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:text-xl"
               >
                 {logoutPending ? "Wird abgemeldet ..." : "Abmelden"}
               </button>

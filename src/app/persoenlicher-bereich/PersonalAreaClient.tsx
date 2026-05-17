@@ -33,7 +33,7 @@ const narravitGreen = "#96B897";
 
 // ─── Shared input class (mirrors old app accountInputRowClass) ───────────────
 
-const inputClass = `[font-family:var(--font-lato)] box-border h-12 w-full shrink-0 border px-3 py-0 text-lg leading-[2.875rem] outline-none transition-colors`;
+const inputClass = `[font-family:var(--font-lato)] box-border h-12 w-full shrink-0 border px-3 py-0 text-lg leading-[2.875rem] outline-none transition-colors sm:text-xl`;
 const editableInputClass = `${inputClass} border-[${narravitBorder}] bg-white placeholder:text-[${narravitMuted}] focus:border-[${narravitGreen}]`;
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -47,7 +47,7 @@ function SectionShell({
 }) {
   return (
     <section
-      className={`flex w-full flex-col gap-4 bg-white px-5 py-6 sm:gap-5 sm:px-8 sm:py-8 ${className}`}
+      className={`flex w-full flex-col gap-5 bg-white px-5 py-6 sm:gap-6 sm:px-8 sm:py-8 ${className}`}
     >
       {children}
     </section>
@@ -57,7 +57,7 @@ function SectionShell({
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
     <h2
-      className="[font-family:var(--font-pt-serif)] text-xl leading-8 text-[#3E3831] sm:text-2xl sm:leading-8"
+      className="[font-family:var(--font-pt-serif)] text-2xl leading-8 text-[#3E3831] sm:text-3xl sm:leading-10"
     >
       {children}
     </h2>
@@ -80,10 +80,10 @@ function FieldCard({
       className="flex h-full min-w-0 flex-col gap-1 bg-[#FAF8F6] p-4 sm:p-5"
     >
       <div className="shrink-0">
-        <span className="[font-family:var(--font-lato)] text-sm leading-5 text-[#848484]">
+        <span className="[font-family:var(--font-lato)] text-base leading-6 text-[#848484]">
           {label}
         </span>
-        <p className="[font-family:var(--font-lato)] mt-1 min-h-[3.25rem] text-xs leading-relaxed text-[#848484]/90 sm:min-h-[3.75rem] xl:min-h-[5.25rem]">
+        <p className="[font-family:var(--font-lato)] mt-1 min-h-[3.75rem] text-sm leading-relaxed text-[#848484]/90 sm:min-h-[4.5rem] xl:min-h-[6rem]">
           {hint}
         </p>
       </div>
@@ -118,7 +118,7 @@ function SandButton({
       type={type}
       disabled={disabled}
       onClick={onClick}
-      className={`[font-family:var(--font-lato)] h-12 w-full shrink-0 bg-[#D0BCA6] px-6 text-base font-bold leading-6 text-[#0a0909] transition-colors hover:bg-[#c0ad98] disabled:opacity-50 sm:w-auto sm:min-w-[186px] ${className}`}
+      className={`[font-family:var(--font-lato)] h-12 w-full shrink-0 bg-[#D0BCA6] px-6 text-lg font-bold leading-6 text-[#0a0909] transition-colors hover:bg-[#c0ad98] disabled:opacity-50 sm:w-auto sm:min-w-[186px] ${className}`}
     >
       {children}
     </button>
@@ -157,7 +157,7 @@ function AccountSection({
         />
         <SectionHeading>Account Übersicht</SectionHeading>
       </div>
-      <p className="max-w-3xl text-sm leading-6 text-[#535252] sm:text-base">
+      <p className="max-w-3xl text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
         Diese Angaben nutzen wir für Anzeigen in der App, E-Mail-Versand und Ihre
         Mitgliedschaft. Passen Sie Ihren Namen bei Bedarf an.
       </p>
@@ -181,13 +181,13 @@ function AccountSection({
             />
             <p
               id="account-name-hint"
-              className="min-h-[4.5rem] text-xs leading-5 text-[#848484] sm:min-h-[4.75rem] xl:min-h-[5.5rem]"
+              className="min-h-[5rem] text-sm leading-6 text-[#848484] sm:min-h-[5.5rem] xl:min-h-[6.5rem]"
             >
               Tipp: Verwenden Sie den Namen, mit dem Sie angesprochen werden
               möchten.
             </p>
             {nameState.error && (
-              <p className="text-sm text-destructive">{nameState.error}</p>
+              <p className="text-base text-destructive">{nameState.error}</p>
             )}
             <SandButton type="submit" disabled={namePending}>
               {namePending ? "Wird gespeichert …" : "Name speichern"}
@@ -209,7 +209,7 @@ function AccountSection({
             value={email}
             className={`${editableInputClass} cursor-default select-none text-[#848484]`}
           />
-          <p className="min-h-[4.5rem] text-xs leading-5 text-[#848484] sm:min-h-[4.75rem] xl:min-h-[5.5rem]">
+          <p className="min-h-[5rem] text-sm leading-6 text-[#848484] sm:min-h-[5.5rem] xl:min-h-[6.5rem]">
             Ihre Anmelde-E-Mail — für Änderungen wenden Sie sich an den Support.
           </p>
         </FieldCard>
@@ -226,7 +226,7 @@ function InvoiceSection() {
     <SectionShell>
       <div className="flex flex-col gap-2">
         <SectionHeading>Rechnungen</SectionHeading>
-        <p className="max-w-3xl text-sm leading-6 text-[#535252] sm:text-base">
+        <p className="max-w-3xl text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
           Hier finden Sie alle bisherigen Belege und Zahlungsnachweise — ideal
           für die Buchhaltung oder wenn Sie eine Übersicht über Ihre Ausgaben bei
           uns brauchen.
@@ -237,12 +237,12 @@ function InvoiceSection() {
       <div className="border border-[#e0dcd5]">
         <div className="grid grid-cols-4 border-b border-[#e0dcd5] bg-[#FAF8F6] px-4 py-2">
           {["Datum", "Betrag", "Typ", "Rechnung"].map((h) => (
-            <span key={h} className="text-xs font-bold uppercase tracking-wide text-[#848484]">
+            <span key={h} className="text-sm font-bold uppercase tracking-wide text-[#848484]">
               {h}
             </span>
           ))}
         </div>
-        <div className="px-4 py-6 text-center text-sm text-[#848484]">
+        <div className="px-4 py-6 text-center text-base text-[#848484] sm:text-lg">
           Noch keine Rechnungen vorhanden.
         </div>
       </div>
@@ -267,19 +267,19 @@ function SecuritySection({ authProvider }: { authProvider: string }) {
         <SectionHeading>Sicherheit</SectionHeading>
         {isEmailProvider ? (
           <>
-            <p className="[font-family:var(--font-lato)] max-w-4xl text-base font-semibold leading-7 text-[#3E3831] sm:leading-8">
+            <p className="[font-family:var(--font-lato)] max-w-4xl text-lg font-semibold leading-8 text-[#3E3831] sm:text-xl sm:leading-9">
               Mit dem Klick auf „Passwort zurücksetzen" erhalten Sie eine E-Mail
               von uns mit einem sicheren Link, über den Sie ein neues Passwort
               vergeben können.
             </p>
-            <p className="max-w-3xl text-sm leading-6 text-[#535252]">
+            <p className="max-w-3xl text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
               Wir empfehlen ein starkes, einzigartiges Passwort und regelmäßige
               Aktualisierung, besonders wenn Sie sich auf einem gemeinsam
               genutzten Gerät angemeldet haben.
             </p>
           </>
         ) : (
-          <p className="max-w-3xl text-sm leading-6 text-[#535252]">
+          <p className="max-w-3xl text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
             Du meldest dich über {providerLabel} an — die Passwort-Verwaltung
             erfolgt dort.
           </p>
@@ -290,18 +290,18 @@ function SecuritySection({ authProvider }: { authProvider: string }) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col gap-1 max-w-xl">
             {state.success ? (
-              <p className="text-sm text-[#96B897]">
+              <p className="text-base leading-7 text-[#96B897]">
                 Wir haben dir einen Link zum Zurücksetzen geschickt. Bitte prüfe
                 auch deinen Spam-Ordner.
               </p>
             ) : (
-              <p className="text-sm text-[#848484]">
+              <p className="text-base leading-7 text-[#848484]">
                 Sie bleiben während des Vorgangs angemeldet; nach erfolgreicher
                 Änderung sollten Sie sich neu anmelden.
               </p>
             )}
             {state.error && (
-              <p className="text-sm text-destructive">{state.error}</p>
+              <p className="text-base text-destructive">{state.error}</p>
             )}
           </div>
           <form action={formAction}>
@@ -332,18 +332,18 @@ function DeleteAccountSection() {
     <SectionShell>
       <div className="flex flex-col gap-2">
         <SectionHeading>Account löschen</SectionHeading>
-        <p className="[font-family:var(--font-lato)] max-w-3xl text-base font-semibold leading-7 text-[#D00018] sm:leading-8">
+        <p className="[font-family:var(--font-lato)] max-w-3xl text-lg font-semibold leading-8 text-[#D00018] sm:text-xl sm:leading-9">
           Achtung: Das Löschen ist unwiderruflich — Sie verlieren den Zugang zu
           Ihrem Account und zu allen zugehörigen Inhalten.
         </p>
-        <p className="max-w-3xl text-sm leading-6 text-[#535252] sm:text-base">
+        <p className="max-w-3xl text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
           Exportieren Sie vorher ggf. wichtige Texte oder Bilder. Nach Abschluss
           können weder Projekte noch Rechnungen wiederhergestellt werden.
         </p>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <p className="max-w-xl text-sm leading-relaxed text-[#848484]">
+        <p className="max-w-xl text-base leading-7 text-[#848484] sm:text-lg sm:leading-8">
           Nutzen Sie diese Option nur, wenn Sie sicher sind. Bei Unsicherheiten
           wenden Sie sich vorher an den Support.
         </p>
@@ -352,26 +352,26 @@ function DeleteAccountSection() {
           <AlertDialogTrigger asChild>
             <button
               type="button"
-              className="[font-family:var(--font-lato)] h-12 w-full shrink-0 bg-[#53444B] px-4 text-center text-base font-bold leading-6 text-white transition-colors hover:bg-[#45383e] sm:w-auto sm:max-w-md sm:px-6"
+              className="[font-family:var(--font-lato)] h-12 w-full shrink-0 whitespace-nowrap bg-[#53444B] px-4 text-center text-lg font-bold leading-6 text-white transition-colors hover:bg-[#45383e] sm:w-auto sm:px-6"
             >
-              Ihren Account und Ihre Daten unwiderruflich löschen
+              Account löschen
             </button>
           </AlertDialogTrigger>
 
-          <AlertDialogContent className="max-w-md">
+          <AlertDialogContent className="max-w-[calc(100vw-2rem)] p-5 sm:max-w-2xl sm:p-8">
             <AlertDialogHeader>
-              <AlertDialogTitle className="text-[#3E3831]">
+              <AlertDialogTitle className="text-2xl leading-8 text-[#3E3831] sm:text-3xl sm:leading-10">
                 Account wirklich löschen?
               </AlertDialogTitle>
               <AlertDialogDescription asChild>
-                <div className="flex flex-col gap-3 text-[#535252]">
+                <div className="flex flex-col gap-4 text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
                   <p>
                     Diese Aktion ist <strong>unwiderruflich</strong>. Alle Ihre
                     Projekte, Kapitel und Daten werden dauerhaft entfernt.
                   </p>
 
                   {isSoleOwner && (
-                    <div className="border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                    <div className="border border-destructive/30 bg-destructive/5 p-4 text-base leading-7 text-destructive">
                       Du bist auf {state.soleOwnerCount}{" "}
                       {state.soleOwnerCount === 1 ? "Projekt" : "Projekten"} der
                       einzige Projektleiter. Übertrage die Projektleiterschaft oder
@@ -380,11 +380,11 @@ function DeleteAccountSection() {
                   )}
 
                   {state.error && !isSoleOwner && (
-                    <p className="text-sm text-destructive">{state.error}</p>
+                    <p className="text-base text-destructive">{state.error}</p>
                   )}
 
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="delete-confirm" className="text-xs font-bold text-[#3E3831]">
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="delete-confirm" className="text-sm font-bold text-[#3E3831] sm:text-base">
                       Tippe <strong>LÖSCHEN</strong> zur Bestätigung:
                     </Label>
                     <Input
@@ -392,7 +392,7 @@ function DeleteAccountSection() {
                       value={confirmation}
                       onChange={(e) => setConfirmation(e.target.value)}
                       placeholder="LÖSCHEN"
-                      className="h-10"
+                      className="h-12 text-base sm:text-lg"
                       autoComplete="off"
                     />
                   </div>
@@ -400,13 +400,13 @@ function DeleteAccountSection() {
               </AlertDialogDescription>
             </AlertDialogHeader>
 
-            <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
-              <AlertDialogCancel className="h-10">Abbrechen</AlertDialogCancel>
+            <AlertDialogFooter className="flex-col gap-3 sm:flex-row">
+              <AlertDialogCancel className="h-12 text-base sm:text-lg">Abbrechen</AlertDialogCancel>
               <form action={formAction}>
                 <button
                   type="submit"
                   disabled={!isConfirmed || pending}
-                  className="[font-family:var(--font-lato)] h-10 w-full bg-[#53444B] px-5 text-sm font-bold text-white transition-colors hover:bg-[#45383e] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+                  className="[font-family:var(--font-lato)] h-12 w-full bg-[#53444B] px-5 text-base font-bold text-white transition-colors hover:bg-[#45383e] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:text-lg"
                 >
                   {pending ? "Wird gelöscht …" : "Account endgültig löschen"}
                 </button>
@@ -453,10 +453,10 @@ export function PersonalAreaClient({
 
           {/* Header */}
           <header className="flex w-full flex-col items-center gap-2 text-center">
-            <h1 className="[font-family:var(--font-merriweather)] w-full text-[1.75rem] font-medium leading-9 text-[#3E3831] sm:text-[2rem] sm:leading-10 md:text-4xl md:leading-10">
+            <h1 className="[font-family:var(--font-merriweather)] w-full text-3xl font-medium leading-10 text-[#3E3831] sm:text-4xl sm:leading-[1.2] md:text-5xl">
               Persönlicher Bereich
             </h1>
-            <p className="mx-auto max-w-3xl text-base leading-6 text-[#535252]">
+            <p className="mx-auto max-w-3xl text-lg leading-8 text-[#535252] sm:text-xl sm:leading-9">
               Hier verwalten Sie die wichtigsten Angaben zu Ihrem NARRAVIT-Konto,
               Ihre Abrechnung und sicherheitsrelevante Aktionen — alles an einem
               Ort, übersichtlich gegliedert.
