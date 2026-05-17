@@ -1,8 +1,8 @@
 # PROJ-4: Kapitel-Routing & Persistenz
 
-## Status: Planned
+## Status: In Progress
 **Created:** 2026-05-15
-**Last Updated:** 2026-05-15
+**Last Updated:** 2026-05-17
 
 ## Dependencies
 - Requires: PROJ-1 (Supabase-Datenmodell & RLS) — `projects`, `chapters`, `project_members`
@@ -110,7 +110,175 @@
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### A) Komponentenstruktur (Übersicht)
+
+```
+Home-Seite (/)                                      ← Server Component
++-- Hero-Bild
++-- Header "Willkommen zurück bei NARRAVIT"
++-- Sektion "Ihre Projekte"
+|   +-- "Weiteren Projekt-Zugang kaufen"-Button     → /onboarding
+|   +-- ProjectGrid
+|       +-- ProjectCard × N                         ← Client Component (1:1 aus alter App)
+|           +-- Titel, Letzte Bearbeitung, Kapitelanzahl
+|           +-- "Öffnen"-Button                     → /projektuebersicht/[project_id]
+|           +-- Löschen-Button (nur projektleiter)
+|               +-- DeleteProjectModal (Portal, 2-stufig, 1:1 aus alter App)
+|   +-- Leerzustand (wenn 0 Projekte): Hinweistext + Link zu /onboarding
+
+Projektübersicht (/projektuebersicht/[project_id])  ← Server Component
++-- Header
+|   +-- "Zurück zur Startseite"-Link
+|   +-- Projekttitel (h1)
+|   +-- Beschreibungszeile "Projekt bearbeiten und verwalten"
++-- SectionShell "Cover bearbeiten + Code"          ← visueller Platzhalter (PROJ-10/12)
++-- SectionShell "Kapitel"                          ← ChapterSectionClient
+|   +-- SectionHeader + Aktions-Buttons
+|       +-- "Reihenfolge speichern" (erscheint nur wenn Reihenfolge dirty ist)
+|       +-- "Eigenes Kapitel"-Button
+|       +-- "Erzähl-Impuls"-Button
+|   +-- ChapterList (HTML5 Drag-and-Drop)
+|       +-- ChapterRow × N
+|           +-- DragHandle + Nummerierung
+|           +-- Kapiteltitel (PT Serif), Quelle, Wortanzahl
+|           +-- Umbenennen-Button (Bleistift-Icon) → RenameChapterModal
+|           +-- Löschen-Button (Trash-Icon)        → DeleteChapterModal (3s Countdown)
+|           +-- "Bearbeiten"-Link                  → /projektuebersicht/[id]/kapiteleditor/[chapter_id]
+|   +-- Leerzustand (wenn 0 Kapitel)
+|   +-- Modals (native Portale, 1:1 aus alter App):
+|       +-- AddChapterModal        (Titel-Input, Enter-Bestätigung)
+|       +-- ErzaehlImpulsModal     (Shuffle, Impuls-Box, Übernehmen)
+|       +-- RenameChapterModal     (vorausgefülltes Input, Enter-Bestätigung)
+|       +-- DeleteChapterModal     (3s Countdown, danach Button aktiv)
++-- StatCard-Raster (2 Spalten)                     ← Platzhalter ohne echte Werte
+|   +-- "Telefonzeit übrig"                         ← Platzhalter (PROJ-12)
+|   +-- "Projektzugang endet in"                    ← Platzhalter (PROJ-6)
++-- SectionShell "Projektmitglieder"                ← Platzhalter (PROJ-9)
+```
+
+**Navbar**: Bereits vollständig migriert und an Supabase Auth angebunden (`src/components/Navbar.tsx`).
+Die aktive-Seite-Erkennung für `/projektuebersicht/[project_id]` funktioniert bereits korrekt mit der bestehenden `pathMatchesRoute`-Logik.
+
+---
+
+### B) Datenmodell (bestehende Tabellen aus PROJ-1)
+
+**Was PROJ-4 liest:**
+
+| Seite | Tabellen | Filter |
+|-------|----------|--------|
+| Home `/` | `project_members` JOIN `projects` | `user_id = auth.uid()`, sortiert nach `updated_at DESC` |
+| Projektübersicht `/projektuebersicht/[project_id]` | `projects`, `project_members` (Rolle), `chapters` | `project_id = URL-Param`, `sort_order ASC` |
+
+**Was PROJ-4 schreibt (Server Actions):**
+
+| Aktion | Operation | Tabelle |
+|--------|-----------|---------|
+| Projekt löschen | DELETE (Cascade → chapters, members, cover) | `projects` |
+| Kapitel hinzufügen | INSERT (title, project_id, sort_order, chapter_origin, body=null) | `chapters` |
+| Kapitel umbenennen | UPDATE title WHERE id | `chapters` |
+| Kapitel löschen | DELETE WHERE id | `chapters` |
+| Reihenfolge speichern | UPDATE sort_order für jedes Kapitel | `chapters` |
+
+**Wortanzahl**: Wird client-seitig aus dem `body`-JSONB (TipTap/ProseMirror-Format) berechnet —
+kein DB-Write. Bei `body = null` ist die Wortanzahl 0.
+
+---
+
+### C) Tech-Entscheidungen (mit Begründung)
+
+| Entscheidung | Begründung |
+|-------------|------------|
+| Server Components für initialen Load | Kein Lade-Spinner, keine Client-Fetches, schnelle First-Contentful-Paint |
+| Server Actions statt API Routes | Type-safe, weniger Boilerplate, direkte `revalidatePath`-Integration |
+| Client Components nur für interaktive Teile | `ProjectCard` und `ChapterSectionClient` brauchen lokalen UI-State (Modals, Drag) |
+| HTML5 native Drag API | Spec schreibt es vor; keine externe Bibliothek nötig (`no-dnd-kit`) |
+| Custom Portale für Modals | 1:1-Übernahme aus alter App — bewährte UX, kein shadcn Dialog |
+| Optimistische UI-Updates | Kapitel-Aktionen aktualisieren sofort den lokalen State; Server Action läuft im Hintergrund; bei Fehler: Toast + State-Revert |
+| `revalidatePath` nach Mutation | Server Component refetcht aktualisierte Daten; kein manuelles State-Syncing nötig |
+| Keine redirect-Shims für alte URLs | Die alte `/projektuebersicht?project=...` URL war nie auf der neuen App live |
+
+---
+
+### D) Sicherheits-Architektur (kritisch)
+
+**Prinzip: Zwei unabhängige Verteidigungslinien**
+
+1. **RLS (Row Level Security)** — Supabase-Datenbankebene: verhindert, dass unauthorisierte Zugriffe überhaupt Daten zurückgeben oder schreiben können.
+2. **Server Action Guards** — Anwendungsebene: explizite Authentifizierungs- und Rollenprüfung vor jeder Mutation.
+
+**RLS-Anforderungen** (müssen in PROJ-1-Migration vorhanden sein — vor Implementierung prüfen):
+
+| Tabelle | Operation | Policy |
+|---------|-----------|--------|
+| `projects` | SELECT | user in `project_members` für dieses Projekt |
+| `projects` | DELETE | user hat `role = 'projektleiter'` in `project_members` |
+| `chapters` | SELECT | user in `project_members` für `chapters.project_id` |
+| `chapters` | INSERT | user in `project_members` für Ziel-`project_id` |
+| `chapters` | UPDATE | user in `project_members` für `chapters.project_id` |
+| `chapters` | DELETE | user in `project_members` für `chapters.project_id` |
+
+**Pflicht-Muster für jede Server Action:**
+1. `supabase.auth.getUser()` — schlägt fehl wenn keine gültige Session
+2. Zod-Validierung aller Eingaben (UUID-Format, Textlänge, Array-Länge)
+3. Datenbankoperation — RLS erzwingt Berechtigung automatisch
+4. Ergebnis prüfen (0 betroffene Zeilen = Zugriff verweigert → Fehler zurückgeben)
+
+**Spezifische Angriffsvektoren und Gegenmaßnahmen:**
+
+| Angriff | Gegenmaßnahme |
+|---------|--------------|
+| `co_author` sendet Projekt-Lösch-Request | Server Action prüft Rolle explizit; RLS-Policy blockt DELETE für Nicht-Projektleiter |
+| IDOR: Angreifer rät fremde `chapter_id` | RLS UPDATE/DELETE prüft Projektmitgliedschaft; 0 Zeilen betroffen |
+| `addChapter` mit fremder `project_id` | RLS INSERT Policy prüft Mitgliedschaft; INSERT schlägt fehl |
+| Massen-Update-Angriff via `saveChapterOrder` | Server Action validiert: ALLE übergebenen `chapter_id`s müssen zur übergebenen `project_id` gehören — bei Unstimmigkeit wird die gesamte Operation abgelehnt |
+| Überlange Titel | Zod-Schema: max. 200 Zeichen auf Server-Seite erzwungen |
+| Ungültige UUID-Formate | Zod `z.string().uuid()` vor jedem DB-Query |
+
+**Masse-Update-Schutz (`saveChapterOrderAction`) im Detail:**
+- Eingabe: `{ projectId: UUID, orderedIds: UUID[] }`
+- Schritt 1: Abfrage aller Kapitel-IDs dieses Projekts aus der DB
+- Schritt 2: Sicherheitsprüfung: `orderedIds.length === dbIds.length` und alle IDs stimmen überein
+- Schritt 3: Nur wenn Prüfung besteht → Bulk-Update von `sort_order`
+- Zweck: Verhindert, dass ein Angreifer Kapitel aus anderen Projekten in seine `sort_order`-Liste einschleust
+
+---
+
+### E) Dateistruktur (neue Dateien)
+
+```
+src/app/
+  page.tsx                                         ← Ersetzt mit Home-Page (alter App-UI + Supabase)
+  projektuebersicht/
+    [project_id]/
+      page.tsx                                     ← Server Component (validate + fetch)
+      ProjektuebersichtClient.tsx                  ← Client Component wrapper
+      actions.ts                                   ← Alle Server Actions für PROJ-4
+      kapiteleditor/
+        [chapter_id]/
+          page.tsx                                 ← Platzhalter-Route (Inhalt: PROJ-5)
+
+src/components/
+  ProjectCard.tsx                                  ← Client Component (1:1 aus alter App, angepasst)
+  projektuebersicht/
+    ChapterSectionClient.tsx                       ← Aus ChapterDragList migriert
+    ChapterListSection.tsx                         ← Thin wrapper (1:1 aus alter App)
+
+src/lib/
+  projektuebersicht-erzaehl-impulse.ts             ← 1:1 aus alter App (Mock-Titelliste)
+  projektuebersicht-chapters.ts                    ← Nur Typ-Definitionen (kein Mock-State)
+```
+
+---
+
+### F) Keine neuen Abhängigkeiten
+
+Alle benötigten Packages sind bereits installiert:
+- Zod (Input-Validierung)
+- Supabase (DB + Auth)
+- React (Drag API, useState, useTransition)
+- next/navigation (redirect, notFound, revalidatePath)
 
 ## QA Test Results
 _To be added by /qa_
