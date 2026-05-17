@@ -1,6 +1,6 @@
 # PROJ-18: Debug-Telemetrie-Cleanup
 
-## Status: In Progress
+## Status: Approved
 **Created:** 2026-05-16
 **Last Updated:** 2026-05-16
 **Priority:** P0 (Production-Build-Blocker)
@@ -95,7 +95,40 @@ Stellen:
 _Nicht erforderlich — reines Cleanup-Ticket; direkt nach `/frontend` oder im Rahmen von `/refine`-Sweeps ausführbar_
 
 ## QA Test Results
-_To be added by /qa — Grep-Checks + Build + bestehende E2E-Suite_
+
+**QA-Datum:** 2026-05-17
+**Tester:** Claude (QA-Skill)
+**Ergebnis:** APPROVED — keine Bugs gefunden
+
+### Acceptance Criteria Check
+
+| # | Kriterium | Status |
+|---|-----------|--------|
+| 1 | `grep -rn "127.0.0.1:7800" src/ next.config.ts` → 0 Treffer | ✅ PASS |
+| 2 | `grep -rn "ingest/fd631e72" src/ next.config.ts` → 0 Treffer | ✅ PASS |
+| 3 | `grep -rn "#region agent log" src/ next.config.ts` → 0 Treffer | ✅ PASS |
+| 4 | TypeScript-Check (`tsc --noEmit`) ohne Fehler | ✅ PASS |
+| 5 | Bestehende E2E-Tests unverändert grün (44/44) | ✅ PASS |
+| 6 | Entfernte Blöcke: 7 total (next.config.ts ×1, layout.tsx ×1, onboarding/page.tsx ×3, OnboardingWizard.tsx ×2) | ✅ PASS |
+| 7 | Ungenutzter `useEffect`-Import in OnboardingWizard.tsx mit-entfernt | ✅ PASS |
+
+### E2E-Regressionssuite
+
+- **Chromium:** 22/22 ✅
+- **Mobile Safari:** 22/22 ✅ (WebKit-Binary bei dieser QA-Runde installiert: `npx playwright install webkit`)
+- **Gesamt:** 44/44 — alle PROJ-2-Tests grün
+
+### Bugs gefunden
+
+Keine.
+
+### Security-Audit
+
+Die zu entfernenden Calls waren selbst das Security-Finding (BUG-12 aus PROJ-2-Re-QA). Nach Cleanup kein weiteres Finding.
+
+### Production-Ready
+
+**JA** — alle Acceptance Criteria erfüllt, keine Bugs, E2E-Suite grün.
 
 ## Deployment
 _To be added by /deploy_

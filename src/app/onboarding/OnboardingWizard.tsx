@@ -176,9 +176,9 @@ export function OnboardingWizard({
             </p>
           )}
 
-          <div className="mt-8 flex justify-between gap-4">
+          <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between sm:gap-4">
             {isFirst ? (
-              <Button asChild variant="outline" className="h-12 min-w-32">
+              <Button asChild variant="outline" className="h-12 w-full sm:w-auto sm:min-w-32">
                 <a href="https://www.narravit.de">Zurück</a>
               </Button>
             ) : (
@@ -186,18 +186,18 @@ export function OnboardingWizard({
                 type="button"
                 variant="outline"
                 onClick={back}
-                className="h-12 min-w-32"
+                className="h-12 w-full sm:w-auto sm:min-w-32"
               >
                 Zurück
               </Button>
             )}
 
             {isLast ? (
-              <Button type="button" onClick={handlePurchase} className="h-12 min-w-44">
+              <Button type="button" onClick={handlePurchase} className="h-12 w-full sm:w-auto sm:min-w-44">
                 Jetzt kaufen — 249 €
               </Button>
             ) : (
-              <Button type="button" onClick={next} className="h-12 min-w-32">
+              <Button type="button" onClick={next} className="h-12 w-full sm:w-auto sm:min-w-32">
                 Weiter
               </Button>
             )}
@@ -210,18 +210,18 @@ export function OnboardingWizard({
 
 function ProgressBar({ total, current }: { total: number; current: number }) {
   return (
-    <div className="relative mx-auto flex w-fit justify-center gap-8 before:absolute before:left-5 before:right-5 before:top-1/2 before:z-0 before:h-px before:-translate-y-1/2 before:bg-[#e0dcd5]">
+    <div className="relative mx-auto flex w-fit max-w-full justify-center gap-2 before:absolute before:left-4 before:right-4 before:top-1/2 before:z-0 before:h-px before:-translate-y-1/2 before:bg-[#e0dcd5] sm:gap-8 sm:before:left-5 sm:before:right-5">
       {Array.from({ length: total }, (_, index) => (
         <div
           key={index}
           className={cn(
-            "relative z-10 flex h-10 w-10 items-center justify-center border text-base font-bold",
+            "relative z-10 flex h-8 w-8 items-center justify-center border text-sm font-bold sm:h-10 sm:w-10 sm:text-base",
             current >= index
               ? "border-[#96B897] bg-[#96B897] text-white"
               : "border-[#e0dcd5] bg-white text-[#848484]",
           )}
         >
-          {current > index ? <Check className="h-5 w-5" /> : index + 1}
+          {current > index ? <Check className="h-4 w-4 sm:h-5 sm:w-5" /> : index + 1}
         </div>
       ))}
     </div>
@@ -451,16 +451,19 @@ function StepPurchase({ state }: { state: WizardState }) {
         Mit dem Kauf schalten wir dein Projekt frei und du kannst sofort loslegen.
       </p>
 
-      <dl className="mb-8 grid gap-3 border border-[#e0dcd5] bg-white p-6">
+      <dl className="mb-8 grid gap-4 border border-[#e0dcd5] bg-white p-4 sm:gap-3 sm:p-6">
         {summary.map(({ label, value }) => (
-          <div key={label} className="flex justify-between gap-5 text-base">
+          <div
+            key={label}
+            className="grid gap-1 text-base sm:flex sm:justify-between sm:gap-5"
+          >
             <dt className="text-[#848484]">{label}</dt>
-            <dd className="text-right font-medium">{value || "—"}</dd>
+            <dd className="min-w-0 break-words font-medium sm:text-right">{value || "—"}</dd>
           </div>
         ))}
       </dl>
 
-      <div className="border border-[#e0dcd5] bg-[#FAF8F6] p-7">
+      <div className="border border-[#e0dcd5] bg-[#FAF8F6] p-5 sm:p-7">
         <p className="text-base text-[#848484]">12 Monate Portal-Zugang</p>
         <p className="heading-style-h4 mt-1">249 €</p>
         <p className="mt-2 text-base text-[#535252]">

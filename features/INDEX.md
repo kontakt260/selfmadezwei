@@ -16,7 +16,7 @@
 | ID | Feature | Prio | Status | Abhängigkeiten | Spec | Erstellt |
 |----|---------|------|--------|----------------|------|---------|
 | PROJ-1 | Supabase-Datenmodell & RLS | P0 | Approved | — | [Spec](PROJ-1-supabase-datenmodell-rls.md) | 2026-05-15 |
-| PROJ-2 | Auth + SSR | P0 | In Review | PROJ-1 | [Spec](PROJ-2-auth-ssr.md) | 2026-05-15 |
+| PROJ-2 | Auth + SSR | P0 | Approved | PROJ-1 | [Spec](PROJ-2-auth-ssr.md) | 2026-05-15 |
 | PROJ-3 | Persönlicher Bereich + Konto | P0 | Planned | PROJ-2 | [Spec](PROJ-3-persoenlicher-bereich-konto.md) | 2026-05-15 |
 | PROJ-4 | Kapitel-Routing & Persistenz | P0 | Planned | PROJ-2 | [Spec](PROJ-4-kapitel-routing-persistenz.md) | 2026-05-15 |
 | PROJ-5 | Kapitel-Editor (A5, TipTap, Tablet) | P0 | Planned | PROJ-4 | [Spec](PROJ-5-kapitel-editor.md) | 2026-05-15 |
@@ -32,7 +32,7 @@
 | PROJ-15 | Mehrnutzer-Concurrency & Versioning | P2 | Roadmap | PROJ-5 | — | 2026-05-15 |
 | PROJ-16 | Print-on-Demand Adapter | P2 | Roadmap | PROJ-5, PROJ-6, PROJ-10, PROJ-11 | — | 2026-05-15 |
 | PROJ-17 | Rate-Limiting für Auth-Endpunkte | P0 | Planned | PROJ-2 | [Spec](PROJ-17-rate-limiting-auth.md) | 2026-05-16 |
-| PROJ-18 | Debug-Telemetrie-Cleanup | P0 | In Progress | — | [Spec](PROJ-18-debug-telemetrie-cleanup.md) | 2026-05-16 |
+| PROJ-18 | Debug-Telemetrie-Cleanup | P0 | Approved | — | [Spec](PROJ-18-debug-telemetrie-cleanup.md) | 2026-05-16 |
 | PROJ-19 | Production-Hardening (Headers, Middleware-Caching, Env-Failsafe) | P1 | Planned | PROJ-2 | [Spec](PROJ-19-production-hardening.md) | 2026-05-16 |
 
 <!-- Add features above this line -->
