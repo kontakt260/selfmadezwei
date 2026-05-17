@@ -16,7 +16,7 @@ export default function EmailBestaetigenPage() {
         </p>
         <p className="text-sm text-[#848484]">
           Keine E-Mail erhalten? Prüfe deinen Spam-Ordner oder{" "}
-          <Link href="/registrieren" className="underline underline-offset-4">
+          <Link href="/registrieren" className="underline underline-offset-4 transition-colors hover:text-[#96B897]">
             registriere dich erneut
           </Link>
           .

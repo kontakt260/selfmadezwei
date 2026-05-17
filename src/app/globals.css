@@ -103,7 +103,7 @@
   }
 
   .button {
-    @apply inline-flex cursor-pointer items-center justify-center gap-2 border border-border bg-primary px-6 py-3 text-center font-bold text-primary-foreground transition-colors duration-200 hover:bg-[#c0ad98] disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 border border-border bg-primary px-6 py-3 text-center font-bold text-[#0a0909] transition-colors duration-200 hover:bg-[#c0ad98] disabled:pointer-events-none disabled:opacity-50;
   }
 
   .button.is-secondary {

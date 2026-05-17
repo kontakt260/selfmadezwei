@@ -137,14 +137,14 @@ function AnmeldenContent() {
       </form>
 
       <div className="mt-6 text-center">
-        <Link href="/passwort-vergessen" className="text-sm underline underline-offset-4">
+        <Link href="/passwort-vergessen" className="text-sm underline underline-offset-4 transition-colors hover:text-[#96B897]">
           Passwort vergessen?
         </Link>
       </div>
 
       <div className="mt-3 flex justify-center gap-x-1 text-center text-sm">
         <p className="text-[#848484]">Noch kein Konto?</p>
-        <Link href="/registrieren" className="underline underline-offset-4">
+        <Link href="/registrieren" className="underline underline-offset-4 transition-colors hover:text-[#96B897]">
           Jetzt registrieren
         </Link>
       </div>

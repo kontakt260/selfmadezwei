@@ -22,7 +22,7 @@ export default function PasswortVergessenPage() {
           <p className="mb-8 text-[#535252]">
             Falls ein Konto mit dieser E-Mail existiert, hast du einen Reset-Link erhalten.
           </p>
-          <Link href="/anmelden" className="underline underline-offset-4">
+          <Link href="/anmelden" className="underline underline-offset-4 transition-colors hover:text-[#96B897]">
             Zurück zur Anmeldung
           </Link>
         </div>
@@ -67,7 +67,7 @@ export default function PasswortVergessenPage() {
       </form>
 
       <div className="mt-6 text-center text-sm">
-        <Link href="/anmelden" className="underline underline-offset-4">
+        <Link href="/anmelden" className="underline underline-offset-4 transition-colors hover:text-[#96B897]">
           Zurück zur Anmeldung
         </Link>
       </div>

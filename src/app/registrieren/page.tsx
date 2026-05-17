@@ -123,7 +123,7 @@ function RegistrierenContent() {
 
       <div className="mt-6 flex justify-center gap-x-1 text-center text-sm">
         <p className="text-[#848484]">Bereits ein Konto?</p>
-        <Link href="/anmelden" className="underline underline-offset-4">
+        <Link href="/anmelden" className="underline underline-offset-4 transition-colors hover:text-[#96B897]">
           Anmelden
         </Link>
       </div>

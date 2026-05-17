@@ -43,7 +43,6 @@ const narravitDarkBtnHover = "#45383e";
 
 const inputClass = `[font-family:var(--font-lato)] box-border h-12 w-full shrink-0 border px-3 py-0 text-lg leading-[2.875rem] outline-none transition-colors`;
 const editableInputClass = `${inputClass} border-[${narravitBorder}] bg-white placeholder:text-[${narravitMuted}] focus:border-[${narravitGreen}]`;
-const readonlyInputClass = `${inputClass} cursor-default border-transparent bg-transparent caret-transparent`;
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
@@ -127,7 +126,7 @@ function SandButton({
       type={type}
       disabled={disabled}
       onClick={onClick}
-      className={`[font-family:var(--font-lato)] h-12 w-full shrink-0 bg-[#D0BCA6] px-6 text-base font-bold leading-6 text-white transition-colors hover:bg-[#c0ad98] disabled:opacity-50 sm:w-auto sm:min-w-[186px] ${className}`}
+      className={`[font-family:var(--font-lato)] h-12 w-full shrink-0 bg-[#D0BCA6] px-6 text-base font-bold leading-6 text-[#0a0909] transition-colors hover:bg-[#c0ad98] disabled:opacity-50 sm:w-auto sm:min-w-[186px] ${className}`}
     >
       {children}
     </button>
@@ -139,11 +138,9 @@ function SandButton({
 function AccountSection({
   fullName,
   email,
-  memberSince,
 }: {
   fullName: string;
   email: string;
-  memberSince: string;
 }) {
   const [nameState, nameFormAction, namePending] = useActionState<UpdateNameState, FormData>(
     updateNameAction,
@@ -161,11 +158,6 @@ function AccountSection({
   if (emailState.success) {
     toast.success("Bestätigungs-E-Mail verschickt. Bitte bestätige deine neue Adresse.");
   }
-
-  const memberLabel = new Intl.DateTimeFormat("de-DE", {
-    month: "long",
-    year: "numeric",
-  }).format(new Date(memberSince));
 
   return (
     <SectionShell>
@@ -257,93 +249,7 @@ function AccountSection({
           </form>
         </FieldCard>
 
-        {/* Mitglied seit */}
-        <FieldCard
-          label="Mitglied seit"
-          hint="Ihr Startdatum bei NARRAVIT — hilfreich für Support-Anfragen oder bei Fragen zur Abrechnung."
-          pinContentToBottom
-        >
-          <input
-            id="account-member-since"
-            name="memberSince"
-            type="text"
-            readOnly
-            tabIndex={-1}
-            aria-readonly="true"
-            value={memberLabel}
-            onChange={() => {}}
-            className={`${readonlyInputClass} text-[#3E3831]`}
-            aria-describedby="account-member-hint"
-          />
-          <p
-            id="account-member-hint"
-            className="min-h-[4.5rem] text-xs leading-5 text-[#848484] sm:min-h-[4.75rem] xl:min-h-[5.5rem]"
-          >
-            Das Startdatum können Sie nicht selbst ändern; es wird bei der
-            Registrierung gesetzt.
-          </p>
-        </FieldCard>
       </div>
-    </SectionShell>
-  );
-}
-
-// ─── Mein Zugang ─────────────────────────────────────────────────────────────
-
-function AccessSection({ accessExpiresAt }: { accessExpiresAt: string | null }) {
-  if (!accessExpiresAt) return null;
-
-  const expiryDate = new Date(accessExpiresAt);
-  const now = new Date();
-  const daysLeft = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  const isWarning = daysLeft <= 30;
-
-  const formattedDate = new Intl.DateTimeFormat("de-DE", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(expiryDate);
-
-  return (
-    <SectionShell>
-      <div className="flex flex-col gap-2">
-        <SectionHeading>Mein Zugang</SectionHeading>
-        <p className="max-w-3xl text-sm leading-6 text-[#535252] sm:text-base">
-          Hier sehen Sie, wie lange Ihr NARRAVIT-Portalzugang noch aktiv ist.
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
-        <div className="flex flex-col gap-1">
-          <span className="[font-family:var(--font-lato)] text-sm text-[#848484]">
-            Zugang gültig bis
-          </span>
-          <span className="[font-family:var(--font-lato)] text-lg font-bold text-[#3E3831]">
-            {formattedDate}
-          </span>
-        </div>
-
-        <div
-          className={`inline-flex items-center gap-2 px-3 py-1.5 text-sm font-bold ${
-            isWarning
-              ? "bg-amber-50 text-amber-700"
-              : "bg-[#96B897]/10 text-[#5a8a5b]"
-          }`}
-        >
-          <span
-            className={`h-2 w-2 rounded-full ${isWarning ? "bg-amber-500" : "bg-[#96B897]"}`}
-          />
-          {daysLeft > 0
-            ? `Noch ${daysLeft} ${daysLeft === 1 ? "Tag" : "Tage"}`
-            : "Zugang abgelaufen"}
-        </div>
-      </div>
-
-      {isWarning && (
-        <p className="max-w-xl text-sm leading-relaxed text-amber-700">
-          Dein Zugang läuft bald ab — verlängere ihn in der Projektübersicht.
-        </p>
-      )}
     </SectionShell>
   );
 }
@@ -553,16 +459,12 @@ function DeleteAccountSection() {
 export interface PersonalAreaProps {
   fullName: string;
   email: string;
-  memberSince: string;
-  accessExpiresAt: string | null;
   authProvider: string;
 }
 
 export function PersonalAreaClient({
   fullName,
   email,
-  memberSince,
-  accessExpiresAt,
   authProvider,
 }: PersonalAreaProps) {
   return (
@@ -573,7 +475,7 @@ export function PersonalAreaClient({
         {/* Banner */}
         <div className="relative h-[min(31.5vh,285px)] w-full min-h-[105px] overflow-hidden sm:min-h-[135px]">
           <Image
-            src="/persoenlicher-bereich-banner.png"
+            src="/images/persoenlicher-bereich-banner.png"
             alt="Person mit Laptop auf einem Ledersofa — stimmungsvolles Bannerbild."
             fill
             className="object-cover blur-[2px]"
@@ -596,8 +498,7 @@ export function PersonalAreaClient({
 
         {/* Sections */}
         <div className="flex flex-col gap-6 sm:gap-8">
-          <AccountSection fullName={fullName} email={email} memberSince={memberSince} />
-          <AccessSection accessExpiresAt={accessExpiresAt} />
+          <AccountSection fullName={fullName} email={email} />
           <InvoiceSection />
           <SecuritySection authProvider={authProvider} />
           <DeleteAccountSection />
