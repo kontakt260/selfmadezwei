@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import * as React from "react";
 import { createPortal } from "react-dom";
 import {
   useCallback,
@@ -50,6 +50,53 @@ function IconTrash({ className }: { className?: string }) {
   );
 }
 
+function IconBook() {
+  return (
+    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x={4} y={5.5} width={3} height={3} fill="#96B897" />
+      <path d="M10 7h11" stroke="#96B897" strokeWidth={2} strokeLinecap="square" />
+      <rect x={4} y={10.5} width={3} height={3} fill="#96B897" />
+      <path d="M10 12h11" stroke="#96B897" strokeWidth={2} strokeLinecap="square" />
+      <rect x={4} y={15.5} width={3} height={3} fill="#96B897" />
+      <path d="M10 17h11" stroke="#96B897" strokeWidth={2} strokeLinecap="square" />
+    </svg>
+  );
+}
+
+function IconPlus({ color = "#534B42" }: { color?: string }) {
+  return (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M12 5v14M5 12h14" stroke={color} strokeWidth={2} strokeLinecap="square" />
+    </svg>
+  );
+}
+
+function SectionHeader({
+  icon,
+  title,
+  actions,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  actions?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+      <div className="flex min-w-0 flex-row items-center gap-2 sm:gap-3">
+        <span className="shrink-0 [&>svg]:h-6 [&>svg]:w-6">{icon}</span>
+        <h2 className="[font-family:var(--font-pt-serif)] min-w-0 text-xl leading-7 text-[#3E3831] sm:text-2xl sm:leading-8">
+          {title}
+        </h2>
+      </div>
+      {actions ? (
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3 lg:w-auto lg:justify-end">
+          {actions}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ShuffleIconAttached({ className }: { className?: string }) {
   return (
     <span
@@ -77,16 +124,6 @@ type DeleteChapterAction = (formData: FormData) => Promise<{ error?: string }>;
 type SaveChapterOrderAction = (formData: FormData) => Promise<{ error?: string }>;
 type AddImpulseChapterAction = (formData: FormData) => Promise<{ chapterId?: string; error?: string }>;
 
-// ─── Section Header API ───────────────────────────────────────────────────────
-
-export type ChapterSectionHeaderApi = {
-  openAddOwnChapterModal: () => void;
-  openErzaehlImpulsModal: () => void;
-  chapterOrderDirty: boolean;
-  commitChapterOrder: () => void;
-  savingOrder: boolean;
-};
-
 type Props = {
   projectId: string;
   initialChapters: Chapter[];
@@ -95,7 +132,6 @@ type Props = {
   renameChapterAction: RenameChapterAction;
   deleteChapterAction: DeleteChapterAction;
   saveChapterOrderAction: SaveChapterOrderAction;
-  renderSectionHeader: (api: ChapterSectionHeaderApi) => ReactNode;
 };
 
 export function ChapterSectionClient({
@@ -106,7 +142,6 @@ export function ChapterSectionClient({
   renameChapterAction,
   deleteChapterAction,
   saveChapterOrderAction,
-  renderSectionHeader,
 }: Props) {
   const router = useRouter();
 
@@ -435,7 +470,7 @@ export function ChapterSectionClient({
 
   // ─── Modals ───────────────────────────────────────────────────────────────
 
-  const modalShell = (content: ReactNode) =>
+  const modalShell = (content: React.ReactNode) =>
     typeof document !== "undefined"
       ? createPortal(
           <div className="fixed inset-0 z-[300] flex items-center justify-center p-5 sm:p-8" role="presentation">
@@ -617,13 +652,40 @@ export function ChapterSectionClient({
       {editModal}
       {addModal}
       {impulseModal}
-      {renderSectionHeader({
-        openAddOwnChapterModal: openAddModal,
-        openErzaehlImpulsModal,
-        chapterOrderDirty,
-        commitChapterOrder,
-        savingOrder: orderPending,
-      })}
+      <SectionHeader
+        icon={<IconBook />}
+        title="Kapitel"
+        actions={
+          <>
+            {chapterOrderDirty ? (
+              <button
+                type="button"
+                onClick={commitChapterOrder}
+                disabled={orderPending}
+                className="inline-flex h-10 w-full min-w-0 cursor-pointer items-center justify-center gap-2 border border-[#96B897] bg-[#EAF0EA] px-3 text-sm font-bold leading-6 text-[#3E5A40] transition-colors hover:bg-[#dfe9df] disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:w-auto sm:px-4 sm:text-base"
+              >
+                {orderPending ? "Wird gespeichert …" : "Reihenfolge speichern"}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={openAddModal}
+              className="inline-flex h-10 w-full min-w-0 cursor-pointer items-center justify-center gap-2 bg-[#0A0909]/5 px-3 text-sm font-bold leading-6 text-[#534B42] transition-colors hover:bg-[#0A0909]/10 sm:h-10 sm:w-auto sm:px-4 sm:text-base"
+            >
+              <IconPlus color="#534B42" />
+              Eigenes Kapitel
+            </button>
+            <button
+              type="button"
+              onClick={openErzaehlImpulsModal}
+              className="inline-flex h-10 w-full min-w-0 cursor-pointer items-center justify-center gap-2 bg-[#D0BCA6] px-3 text-sm font-bold leading-6 text-white transition-colors hover:bg-[#c0ad98] sm:h-10 sm:w-auto sm:px-4 sm:text-base"
+            >
+              <IconPlus color="#FFFFFF" />
+              Erzähl-Impuls
+            </button>
+          </>
+        }
+      />
       {chapters.length === 0 ? (
         <div className="flex flex-col items-center gap-4 py-10 text-center">
           <p className="text-base leading-6 text-[#848484] sm:text-lg">
