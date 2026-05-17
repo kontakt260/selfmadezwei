@@ -39,10 +39,12 @@ export function OnboardingWizard({
   defaultFullName,
   buyerEmail,
   initialForWhom,
+  backUrl = "https://www.narravit.de",
 }: {
   defaultFullName: string;
   buyerEmail: string;
   initialForWhom?: ForWhom | null;
+  backUrl?: string;
 }) {
   const [state, setState] = useState<WizardState>({
     ...INITIAL_STATE,
@@ -179,7 +181,7 @@ export function OnboardingWizard({
           <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between sm:gap-4">
             {isFirst ? (
               <Button asChild variant="outline" className="h-12 w-full sm:w-auto sm:min-w-32">
-                <a href="https://www.narravit.de">Zurück</a>
+                <a href={backUrl}>Zurück</a>
               </Button>
             ) : (
               <Button
