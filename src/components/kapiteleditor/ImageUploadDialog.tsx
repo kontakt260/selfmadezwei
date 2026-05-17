@@ -114,7 +114,7 @@ export function ImageUploadDialog({
     >
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Bild hinzufügen</DialogTitle>
+          <DialogTitle className="font-normal">Bild hinzufügen</DialogTitle>
           <DialogDescription>
             Wähle eine Datei und passe den Bildausschnitt an (festes Verhältnis 3:2 für den
             Buchdruck).
