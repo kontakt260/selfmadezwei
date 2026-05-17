@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Lato, Merriweather, PT_Serif } from "next/font/google";
+import { AuthHero } from "@/components/auth/AuthHero";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -43,6 +44,7 @@ export default function RootLayout({
       className={`${lato.variable} ${merriweather.variable} ${ptSerif.variable} h-full antialiased`}
     >
       <body className="flex min-h-[100dvh] flex-col overflow-x-hidden bg-background text-foreground">
+        <AuthHero />
         {children}
         <Toaster richColors position="top-center" />
       </body>

@@ -31,25 +31,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         </div>
       </div>
 
-      <div className="relative hidden border-l border-[#e0dcd5] bg-[#f1ede7] lg:flex lg:items-center lg:justify-center">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(150,184,151,0.30),transparent_32%),radial-gradient(circle_at_80%_75%,rgba(208,188,166,0.38),transparent_35%)]" />
-        <div className="relative mx-12 max-w-[39rem] border border-[#e0dcd5] bg-[#FAF8F6]/90 p-14 xl:p-16">
-          <Image
-            src="/logo.svg"
-            alt=""
-            width={176}
-            height={176}
-            className="mb-10 h-32 w-32 object-contain xl:h-40 xl:w-40"
-          />
-          <p className="mb-6 [font-family:var(--font-merriweather)] text-5xl leading-tight text-[#3E3831] xl:text-6xl">
-            Dein Lebensbuch beginnt mit einem guten ersten Satz.
-          </p>
-          <p className="text-lg leading-8 text-[#535252]">
-            Schreiben, erzählen und bewahren in einer ruhigen, warmen Oberfläche,
-            die den Fokus auf deine Geschichte legt.
-          </p>
-        </div>
-      </div>
+      <div className="relative hidden border-l border-[#e0dcd5] bg-[#f1ede7] lg:block" aria-hidden />
 
       <footer className="absolute bottom-0 left-0 right-0 z-20 flex h-14 items-center justify-center px-[5%] text-center md:justify-start">
         <p className="text-xs tracking-wide text-[#848484]">© {new Date().getFullYear()} NARRAVIT</p>
