@@ -377,4 +377,8 @@ Written in `tests/PROJ-4-kapitel-routing-persistenz.spec.ts` (26 tests, Chromium
 Keine Critical- oder High-Bugs offen. BUG-3 (Medium, Accessibility) ist dokumentiert und für ein Folge-Ticket vorgemerkt.
 
 ## Deployment
-_To be added by /deploy_
+
+**Stage Preview:** https://app-narravit-j90ue1nsh-narravit-s-projects.vercel.app  
+**Branch:** `stage` → Vercel Preview  
+**Deployed:** 2026-05-17  
+**Build:** ✅ Next.js 16.2.6, Turbopack, all 13 routes compiled
