@@ -1,8 +1,8 @@
 # PROJ-3: Persönlicher Bereich + Konto
 
-## Status: Planned
+## Status: In Progress
 **Created:** 2026-05-15
-**Last Updated:** 2026-05-15 (Refined: Renewal-Button in PROJ-6 zu Projektübersicht verschoben)
+**Last Updated:** 2026-05-17 — Frontend + Backend implementiert (Server Actions: updateName, changeEmail, resetPassword, deleteAccount; Testdaten in stage)
 
 ## Dependencies
 - Requires: PROJ-2 (Auth + SSR) — für Session, Supabase Auth E-Mail-Änderung, OAuth-Provider-Erkennung

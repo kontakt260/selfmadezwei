@@ -17,7 +17,7 @@
 |----|---------|------|--------|----------------|------|---------|
 | PROJ-1 | Supabase-Datenmodell & RLS | P0 | Approved | — | [Spec](PROJ-1-supabase-datenmodell-rls.md) | 2026-05-15 |
 | PROJ-2 | Auth + SSR | P0 | Approved | PROJ-1 | [Spec](PROJ-2-auth-ssr.md) | 2026-05-15 |
-| PROJ-3 | Persönlicher Bereich + Konto | P0 | Planned | PROJ-2 | [Spec](PROJ-3-persoenlicher-bereich-konto.md) | 2026-05-15 |
+| PROJ-3 | Persönlicher Bereich + Konto | P0 | In Progress | PROJ-2 | [Spec](PROJ-3-persoenlicher-bereich-konto.md) | 2026-05-15 |
 | PROJ-4 | Kapitel-Routing & Persistenz | P0 | Planned | PROJ-2 | [Spec](PROJ-4-kapitel-routing-persistenz.md) | 2026-05-15 |
 | PROJ-5 | Kapitel-Editor (A5, TipTap, Tablet) | P0 | Planned | PROJ-4 | [Spec](PROJ-5-kapitel-editor.md) | 2026-05-15 |
 | PROJ-6 | Stripe-Zahlungen (Portal + Vapi-Paket) | P0 | Planned | PROJ-2, PROJ-4 | [Spec](PROJ-6-stripe-zahlungen.md) | 2026-05-15 |
