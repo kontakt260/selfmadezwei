@@ -10,15 +10,35 @@ type OAuthButtonsProps = {
   redirectPath?: string;
 };
 
+type OAuthProvider = "google" | "facebook" | "apple";
+
 const labels = {
-  anmelden: { google: "Mit Google anmelden", apple: "Mit Apple anmelden" },
-  registrieren: { google: "Mit Google registrieren", apple: "Mit Apple registrieren" },
+  anmelden: {
+    google: "Mit Google anmelden",
+    facebook: "Mit Facebook anmelden",
+    apple: "Mit Apple anmelden",
+  },
+  registrieren: {
+    google: "Mit Google registrieren",
+    facebook: "Mit Facebook registrieren",
+    apple: "Mit Apple registrieren",
+  },
 } as const;
 
-export function OAuthButtons({ mode, redirectPath = "/" }: OAuthButtonsProps) {
-  const [loading, setLoading] = useState<"google" | "apple" | null>(null);
+const icons: Record<OAuthProvider, typeof GoogleIcon> = {
+  google: GoogleIcon,
+  facebook: FacebookIcon,
+  apple: AppleIcon,
+};
 
-  const handleOAuth = async (provider: "google" | "apple") => {
+// Apple Auth ist bewusst archiviert, bis die Provider-Konfiguration steht.
+// Zum Reaktivieren: "apple" wieder in diese Liste aufnehmen.
+const activeProviders: OAuthProvider[] = ["google", "facebook"];
+
+export function OAuthButtons({ mode, redirectPath = "/" }: OAuthButtonsProps) {
+  const [loading, setLoading] = useState<OAuthProvider | null>(null);
+
+  const handleOAuth = async (provider: OAuthProvider) => {
     setLoading(provider);
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOAuth({
@@ -36,26 +56,23 @@ export function OAuthButtons({ mode, redirectPath = "/" }: OAuthButtonsProps) {
 
   return (
     <div className="grid gap-3">
-      <Button
-        type="button"
-        variant="outline"
-        className="h-12 gap-3"
-        onClick={() => handleOAuth("google")}
-        disabled={loading !== null}
-      >
-        <GoogleIcon />
-        {loading === "google" ? "Weiterleitung …" : labels[mode].google}
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        className="h-12 gap-3"
-        onClick={() => handleOAuth("apple")}
-        disabled={loading !== null}
-      >
-        <AppleIcon />
-        {loading === "apple" ? "Weiterleitung …" : labels[mode].apple}
-      </Button>
+      {activeProviders.map((provider) => {
+        const Icon = icons[provider];
+
+        return (
+          <Button
+            key={provider}
+            type="button"
+            variant="outline"
+            className="h-12 gap-3"
+            onClick={() => handleOAuth(provider)}
+            disabled={loading !== null}
+          >
+            <Icon />
+            {loading === provider ? "Weiterleitung …" : labels[mode][provider]}
+          </Button>
+        );
+      })}
     </div>
   );
 }
@@ -66,6 +83,17 @@ function GoogleIcon() {
       <path
         fill="currentColor"
         d="M20.283 10.356h-8.327v3.451h4.792c-.446 2.193-2.313 3.453-4.792 3.453a5.27 5.27 0 0 1-5.279-5.28 5.27 5.27 0 0 1 5.279-5.279c1.259 0 2.397.447 3.29 1.178l2.6-2.599c-1.584-1.381-3.615-2.233-5.89-2.233a8.908 8.908 0 0 0-8.934 8.934 8.907 8.907 0 0 0 8.934 8.934c4.467 0 8.529-3.249 8.529-8.934 0-.528-.081-1.097-.202-1.625z"
+      />
+    </svg>
+  );
+}
+
+function FacebookIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M22 12.061C22 6.505 17.523 2 12 2S2 6.505 2 12.061c0 5.023 3.657 9.184 8.438 9.939v-7.03H7.898v-2.909h2.54V9.844c0-2.522 1.492-3.915 3.777-3.915 1.094 0 2.238.196 2.238.196v2.475h-1.26c-1.242 0-1.63.775-1.63 1.57v1.891h2.773l-.443 2.909h-2.33V22C18.343 21.245 22 17.084 22 12.061z"
       />
     </svg>
   );

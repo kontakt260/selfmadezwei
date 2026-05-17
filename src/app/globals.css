@@ -114,6 +114,15 @@
     @apply border-none bg-transparent p-0 text-foreground underline-offset-4 hover:underline;
   }
 
+  .nav-sidebar-icon-active {
+    filter: brightness(0) invert(1);
+  }
+
+  .nav-sidebar-icon-inactive {
+    filter: brightness(0) saturate(100%) invert(20%) sepia(8%) saturate(520%)
+      hue-rotate(12deg) brightness(94%) contrast(88%);
+  }
+
   .card {
     @apply rounded-none border border-border bg-card;
   }

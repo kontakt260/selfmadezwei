@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
+import { Navbar } from "@/components/Navbar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -432,42 +433,45 @@ export function PersonalAreaClient({
   authProvider,
 }: PersonalAreaProps) {
   return (
-    <main
-      className="[font-family:var(--font-lato)] box-border min-h-full w-full min-w-0 flex-1 bg-[#FAF8F6] px-4 pb-16 pt-8 sm:px-6 sm:pt-10 md:px-8 md:pt-12"
-    >
-      <div className="mx-auto flex w-full max-w-[1213px] flex-col gap-8 sm:gap-10 md:gap-12">
-        {/* Banner */}
-        <div className="relative h-[min(31.5vh,285px)] w-full min-h-[105px] overflow-hidden sm:min-h-[135px]">
-          <Image
-            src="/images/persoenlicher-bereich-banner.png"
-            alt="Person mit Laptop auf einem Ledersofa — stimmungsvolles Bannerbild."
-            fill
-            className="object-cover blur-[2px]"
-            sizes="(max-width: 768px) 100vw, 1213px"
-            priority
-          />
-        </div>
+    <>
+      <Navbar />
+      <main
+        className="[font-family:var(--font-lato)] box-border min-h-full w-full min-w-0 flex-1 bg-[#FAF8F6] px-4 pb-16 pt-[calc(7.348rem+2rem)] sm:px-6 sm:pt-[calc(7.348rem+2.5rem)] md:px-8 md:pt-[calc(7.348rem+3rem)] xl:pl-[calc(11rem+2rem)] xl:pr-8 xl:pt-12"
+      >
+        <div className="mx-auto flex w-full max-w-[1213px] flex-col gap-8 sm:gap-10 md:gap-12">
+          {/* Banner */}
+          <div className="relative h-[min(31.5vh,285px)] w-full min-h-[105px] overflow-hidden sm:min-h-[135px]">
+            <Image
+              src="/images/persoenlicher-bereich-banner.png"
+              alt="Person mit Laptop auf einem Ledersofa — stimmungsvolles Bannerbild."
+              fill
+              className="object-cover blur-[2px]"
+              sizes="(max-width: 768px) 100vw, 1213px"
+              priority
+            />
+          </div>
 
-        {/* Header */}
-        <header className="flex w-full flex-col items-center gap-2 text-center">
-          <h1 className="[font-family:var(--font-merriweather)] w-full text-[1.75rem] font-medium leading-9 text-[#3E3831] sm:text-[2rem] sm:leading-10 md:text-4xl md:leading-10">
-            Persönlicher Bereich
-          </h1>
-          <p className="mx-auto max-w-3xl text-base leading-6 text-[#535252]">
-            Hier verwalten Sie die wichtigsten Angaben zu Ihrem NARRAVIT-Konto,
-            Ihre Abrechnung und sicherheitsrelevante Aktionen — alles an einem
-            Ort, übersichtlich gegliedert.
-          </p>
-        </header>
+          {/* Header */}
+          <header className="flex w-full flex-col items-center gap-2 text-center">
+            <h1 className="[font-family:var(--font-merriweather)] w-full text-[1.75rem] font-medium leading-9 text-[#3E3831] sm:text-[2rem] sm:leading-10 md:text-4xl md:leading-10">
+              Persönlicher Bereich
+            </h1>
+            <p className="mx-auto max-w-3xl text-base leading-6 text-[#535252]">
+              Hier verwalten Sie die wichtigsten Angaben zu Ihrem NARRAVIT-Konto,
+              Ihre Abrechnung und sicherheitsrelevante Aktionen — alles an einem
+              Ort, übersichtlich gegliedert.
+            </p>
+          </header>
 
-        {/* Sections */}
-        <div className="flex flex-col gap-6 sm:gap-8">
-          <AccountSection fullName={fullName} email={email} />
-          <InvoiceSection />
-          <SecuritySection authProvider={authProvider} />
-          <DeleteAccountSection />
+          {/* Sections */}
+          <div className="flex flex-col gap-6 sm:gap-8">
+            <AccountSection fullName={fullName} email={email} />
+            <InvoiceSection />
+            <SecuritySection authProvider={authProvider} />
+            <DeleteAccountSection />
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </>
   );
 }
