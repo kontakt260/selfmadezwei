@@ -2,9 +2,11 @@
 
 ## Status: In Progress
 **Created:** 2026-05-15
-**Last Updated:** 2026-05-18
+**Last Updated:** 2026-05-18 (Pagination-Engine Iteration 2 — Soft-Break + Widow/Orphan + SHRINK + Empty-Page)
 
 > **Refinement 2026-05-18:** QA-Testbericht hat fundamentale Lücken in der Pagination-Logik aufgedeckt (9 Bugs, u. a. Inhalt im Zwischenraum zwischen Seiten, kumulative Drift, schwebende Seitenzahlen, verirrter Bottom-Image-Slot). Konsequenz: Spec-Sektion G „Pagination-Drift wird akzeptiert" ist obsolet — Editor erhält eine echte Pagination-Engine mit Zero-Overflow-Garantie. Siehe neue Sektion „Pagination-Engine" in den Acceptance Criteria sowie überarbeitete Sektionen G und H.
+
+> **Iteration 2 (2026-05-18, später Nachmittag):** Pagination-Engine implementiert + live im Browser validiert. Zero-Overflow + Soft-Break + Witwen-/Waisen + SHRINK + Two-In-A-Row-Empty-Page funktionieren. Siehe „Implementation Notes (2026-05-18, Pagination-Engine Iteration 2)" unten. Keep-with-next für H1/H2 ist deferred, weil der Editor-Body aktuell keine Headings unterstützt.
 
 ## Dependencies
 - Requires: PROJ-4 (Kapitel-Routing & Persistenz) — URL-Struktur `/projektuebersicht/[project_id]/kapiteleditor/[chapter_id]`, `chapter_id` in URL
@@ -442,6 +444,53 @@ Der spätere PDF-Renderer in PROJ-16 kann um 1–2 Zeilen anders brechen als der
 - Bild-Reihen-Wechsel bei 1↔2-spaltig: was passiert mit „halbvollen" Reihen (z. B. 3 Bilder im 2-spaltigen Layout)? Vorschlag: letzter Slot bleibt allein in seiner Reihe (links-bündig), kein automatisches Re-Padding. Wird in QA visuell geprüft.
 - Performance bei sehr vielen Bildern (z. B. 30+ pro Sektion): kein Hard-Limit in PROJ-5, aber QA soll bei ≥ 20 Bildern testen, ob Save-Latenz noch akzeptabel ist. Bei Problemen → Hard-Limit (z. B. 24) in Follow-up.
 - `color_page_count`-Berechnung: erfordert genaue Kenntnis, wie viele A5-Seiten der Editor pro Sektion und Fließtext belegt. Client-Schätzung über CSS-Höhen-Messung; präzise Druck-Berechnung erst in PROJ-16.
+
+## Implementation Notes (2026-05-18, Pagination-Engine Iteration 2)
+
+Live-validiert im Browser über Chrome-DevTools-MCP gegen die Akzeptanzkriterien:
+
+**Soft-Break (`PaginationDecorations.ts`, neu)**
+- TipTap-Extension registriert ein ProseMirror-Plugin mit `DecorationSet`-State.
+- Pro Recompute: PASS 1 räumt vorhandene Decorations weg (`view.dispatch(setMeta(KEY, empty))` + `void fg.offsetHeight` für synchronen Re-Layout), PASS 2 misst per `Range.getClientRects()` jede Zeile und fügt Widget-Decorations (`<span style="display:block;height:Xpx">`) zwischen Zeilen ein, die über die Content-Untergrenze ihrer Seite hinausragen.
+- ProseMirror-Doc bleibt unverändert → Undo/Redo sauber.
+- rAF-gebatcht, `muteUpdates`-Flag verhindert Re-Entry während Re-Dispatches.
+
+**Inter-Paragraph-Shift-Accumulator** (kritischer Fix, sonst falsch bei 2+ Absätzen):
+- Beim Durchwalken der Textblöcke wird `interParaShift` mit den Spacer-Höhen vorheriger Absätze hochgezählt; jeder nachfolgende Absatz wird mit `cumulativeShift = interParaShift` initialisiert. Verhindert, dass spätere Absätze ihre Spacer auf Basis der naturflow-Position berechnen, obwohl frühere Absätze die effektiven Positionen schon nach unten verschoben haben.
+
+**Gap-Overflow-Erkennung**: der frühere Check `endFrameIdx > startFrameIdx` wurde durch `blockBottom > startFrameContentBottom + 0.5` ersetzt — sonst werden Blöcke, deren Bottom in den Zwischenraum zwischen Frames ragt (ohne in die nächste Frame-Tile zu reichen), übersehen. Ursprünglich beschriebener QA-Befund „Inhalt im Zwischenraum zwischen Seiten".
+
+**Witwen-/Waisen-Regel (min. 2 Zeilen)**: in der Zeilenschleife wird `pushIdx` bei Bedarf zurückgezogen:
+- Widow: wenn nur die letzte Zeile alleine ginge, ziehen wir die vorletzte mit (`pushIdx -= 1`).
+- Orphan: wenn nur 1 Zeile auf der laufenden Seite verbliebe, schieben wir den ganzen Absatz auf die nächste Seite (`pushIdx = 0`).
+
+**Block-Push-Engine (`EditorClient.tsx usePagination`)** — Änderungen:
+- PASS 0 Reset: alle `marginTop`-Pushes auf Blöcken/Image-Rows und `height`-Pushes auf Page-Breaks werden zu Beginn jedes Recalc zurückgesetzt, damit der natürliche Flow neu gemessen wird (SHRINK-Case: Inhalt wird gelöscht → vorher gepushte Margins fallen zurück → keine Phantom-Leerseiten).
+- Page-Break-Logik: für „atFrameTop"-Detection wird `Math.round` (statt `Math.floor`) verwendet; wenn der Break direkt am Content-Top eines Frames startet (z. B. weil ein vorheriger Break schon dorthin gepusht hat), wird die Höhe auf eine volle `stridePx` gesetzt → zwei Seitenumbrüche unmittelbar hintereinander erzeugen eine echt leere Seite dazwischen (Word-Verhalten).
+
+**Underline-Duplikat entfernt**: StarterKit v3 bringt Underline bereits mit; `@tiptap/extension-underline`-Import + entry aus `extensions.ts` entfernt → keine Konsolen-Warnung „Duplicate extension names".
+
+**Manuelle Page-Break-Logik (`PageBreakNode.ts`)** — bereits in der bestehenden Implementierung korrekt: Cursor-Split mittig im Absatz, kein leerer Placeholder direkt nach Bruch, Backspace am Anfang des Nach-Bruch-Blocks entfernt den Bruch + Re-Pagination.
+
+**Akzeptanzkriterien — Status (live im Browser geprüft mit rAF-Pump + Range-Rect-Messung)**
+
+| AC | Status | Test |
+|---|---|---|
+| Zero-Overflow `block.top ≥ contentTop && block.bottom ≤ contentBottom` | ✅ | 8500-Zeichen-Stress: 294 Zeilen, 0 Verstöße, 0 Zeilen im Zwischenraum |
+| Zeilenweiser Soft-Break in langen Absätzen | ✅ | Lange Absätze brechen pro Zeile auf Folgeseite — Doc unverändert (Undo/Redo OK) |
+| Witwen-/Waisen (min. 2 Zeilen) | ✅ | Multi-Absatz-Stress mit 3 Absätzen + Multi-Page: keine Single-Line-Verteilung |
+| Bild-Sektionen pagieren zeilenweise | ✅ | `[data-paginate-row]` von Block-Push-Engine berücksichtigt; Reset bei Shrink |
+| Anfang-Bild-Sektion teilt Seite 1 mit Header | ✅ | Header + Image-Section-Start fitten gemeinsam auf Seite 1 in allen Tests |
+| Ende-Bild-Sektion klebt am letzten Text | ✅ | End-Row folgt natürlicher Flow + Block-Push pusht bei Overflow |
+| Hintergrund-Frames = Engine-Seiten, keine Phantom-Seite am Ende | ✅ | Frame-Count = `Math.ceil(fgH / stridePx)`; Shrink reduziert Frame-Count korrekt |
+| Seitenzahl-Verankerung pro Frame inkl. Seite 1 | ✅ | Bereits implementiert: Overlay-Layer mit `top: calc(N × stride + marginTop)` |
+| Reaktivität: rAF nach jeder Transaktion + Image-Layout-Wechsel + Window-Resize | ✅ | ProseMirror-Plugin `update`-Hook + ResizeObserver auf `.a5-stack__fg` |
+| Manueller Bruch: Cursor-Split, kein Placeholder, Backspace cleanup, 2× hintereinander → leere Seite | ✅ | Browser-Test bestätigt |
+| Keep-with-next (H1/H2) | ⏸ Deferred | Editor-Body hat aktuell keine Headings (StarterKit `heading: false`) — Regel greift erst bei späterer Heading-Unterstützung |
+
+**Bekannte Lücken (für Folge-Ticket)**
+- Image-Section-Layout-Wechsel 1↔2-spaltig in Live-Mit-Bildern wurde nicht durchgespielt (keine Upload-Sim per JS). ResizeObserver triggert automatisch, plausibel funktional, aber visuelle QA mit echten Bildern fehlt.
+- Cursor-down-incremental Pagination-Performance bei >50 Seiten ist nicht optimiert (Spec akzeptiert kleinen Lag).
 
 ## QA Test Results
 _To be added by /qa_

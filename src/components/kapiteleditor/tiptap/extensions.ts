@@ -1,9 +1,13 @@
 import StarterKit from "@tiptap/starter-kit";
 import Paragraph from "@tiptap/extension-paragraph";
 import TextAlign from "@tiptap/extension-text-align";
-import Underline from "@tiptap/extension-underline";
 import Placeholder from "@tiptap/extension-placeholder";
 import { PageBreakNode } from "./PageBreakNode";
+import { PaginationDecorations } from "./PaginationDecorations";
+
+// Hinweis: Underline ist seit StarterKit v3 bereits enthalten. Kein
+// separater Import nötig (würde sonst „Duplicate extension names"-Warning
+// werfen).
 
 // Paragraph mit zusätzlichen Druck-Attributen (Zeilenabstand, Einrückung)
 const ParagraphWithLayout = Paragraph.extend({
@@ -47,7 +51,6 @@ export const editorExtensions = [
     orderedList: { HTMLAttributes: { class: "a5-ol" } },
   }),
   ParagraphWithLayout,
-  Underline,
   TextAlign.configure({
     types: ["paragraph"],
     alignments: ["left", "center", "right", "justify"],
@@ -58,4 +61,5 @@ export const editorExtensions = [
     emptyEditorClass: "is-editor-empty",
   }),
   PageBreakNode,
+  PaginationDecorations,
 ];
