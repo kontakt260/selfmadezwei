@@ -47,6 +47,7 @@ export const PaginationDecorations = Extension.create({
         view(editorView) {
           let raf: number | null = null;
           let muteUpdates = false;
+          let followUpRaf: number | null = null;
 
           const schedule = () => {
             if (raf !== null) return;
@@ -59,6 +60,27 @@ export const PaginationDecorations = Extension.create({
               } finally {
                 muteUpdates = false;
               }
+              // Settling-Pass: ein zweiter Lauf nach drei rAFs, falls die
+              // parallele Block-Push-Engine (EditorClient.usePagination)
+              // erst nach unserem ersten Pass marginTop/break-Höhe gesetzt
+              // hat → Doc-Positionen verschieben sich nachträglich, ohne
+              // Doc-Transaktion. Der zweite Pass misst den endgültig
+              // gerenderten Stand und korrigiert Spacer-Längen/-Positionen.
+              if (followUpRaf !== null) cancelAnimationFrame(followUpRaf);
+              followUpRaf = requestAnimationFrame(() => {
+                followUpRaf = requestAnimationFrame(() => {
+                  followUpRaf = requestAnimationFrame(() => {
+                    followUpRaf = null;
+                    if (muteUpdates) return;
+                    muteUpdates = true;
+                    try {
+                      recompute(editorView);
+                    } finally {
+                      muteUpdates = false;
+                    }
+                  });
+                });
+              });
             });
           };
 
@@ -112,6 +134,7 @@ export const PaginationDecorations = Extension.create({
             },
             destroy() {
               if (raf !== null) cancelAnimationFrame(raf);
+              if (followUpRaf !== null) cancelAnimationFrame(followUpRaf);
               window.removeEventListener("resize", onResize);
               document.removeEventListener("narravit:pagination-recompute", onExternalTrigger);
               ro.disconnect();
