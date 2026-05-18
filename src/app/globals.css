@@ -285,6 +285,21 @@
   margin: 0 0 0.6em 0;
   text-align: justify;
   hyphens: auto;
+  /* lang="de" auf <html> aktiviert deutsche Silbentrennung. */
+}
+
+/* Absätze, die unsere Pagination-Engine per Soft-Break-Decoration
+ * aufgesplittet hat: die Zeile DIREKT vor dem Spacer (das ist visuell
+ * der „Seitenende"-Bruch mitten in einem fließenden Absatz) wird vom
+ * Browser standardmäßig als „letzte Zeile" behandelt und nicht
+ * justified — wir zwingen sie hier zur Justifizierung, damit der
+ * rechte Rand wie bei einem normalen Absatz bündig wirkt. Word verhält
+ * sich genauso bei Absätzen, die über mehrere Seiten gehen.
+ *
+ * Selektor via :has() (statt einer per JS gesetzten Klasse), weil
+ * ProseMirror DOM-Klassen-Mutationen aus User-Code wieder zurücksetzt. */
+.tiptap-editor p:has(.a5-soft-break-spacer) {
+  text-align-last: justify;
 }
 
 .a5-stack blockquote,

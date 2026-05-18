@@ -167,7 +167,7 @@ function recompute(view: EditorView) {
   }
 
   // PASS 2: messen + neue Decorations berechnen
-  const decorations = computeDecorations(view, fg, geom);
+  const { decorations } = computeDecorations(view, fg, geom);
 
   if (decorations.length === 0) return;
 
@@ -175,9 +175,14 @@ function recompute(view: EditorView) {
   view.dispatch(view.state.tr.setMeta(KEY, { decorations: set }));
 }
 
-function computeDecorations(view: EditorView, fg: HTMLElement, geom: Geometry): Decoration[] {
+function computeDecorations(
+  view: EditorView,
+  fg: HTMLElement,
+  geom: Geometry,
+): { decorations: Decoration[]; paragraphsWithSoftBreak: Set<HTMLElement> } {
   const fgTop = fg.getBoundingClientRect().top;
   const decorations: Decoration[] = [];
+  const paragraphsWithSoftBreak = new Set<HTMLElement>();
   // Akkumuliert die Spacer-Höhen aller VORHERIGEN Absätze. Wir messen
   // die Absatz-Positionen am natürlichen Flow (alle Decorations sind in
   // PASS 1 weggeräumt), aber nach dem finalen Dispatch werden alle
@@ -256,6 +261,7 @@ function computeDecorations(view: EditorView, fg: HTMLElement, geom: Geometry): 
           });
           if (coord) {
             decorations.push(buildSpacerDecoration(coord.pos, delta));
+            paragraphsWithSoftBreak.add(nodeDom);
             cumulativeShift += delta;
             thisParaSpacerHeight += delta;
             currentFrameIdx++;
@@ -276,7 +282,7 @@ function computeDecorations(view: EditorView, fg: HTMLElement, geom: Geometry): 
     return false;
   });
 
-  return decorations;
+  return { decorations, paragraphsWithSoftBreak };
 }
 
 function buildSpacerDecoration(pos: number, height: number): Decoration {
