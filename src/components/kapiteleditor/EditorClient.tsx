@@ -49,13 +49,17 @@ export function EditorClient({
       attributes: {
         class: "tiptap-editor focus:outline-none",
       },
-      // Verhindert ProseMirror's automatisches scrollIntoView nach jeder
-      // Transaktion. Sonst kämpfen PM-Scroll und Pagination-Engine
-      // gegeneinander → Scroll-Position springt sichtbar beim Tippen.
-      handleScrollToSelection: () => true,
+      // Word-/Docs-Verhalten: nach jeder Eingabe folgt der Viewport dem
+      // Cursor. Wir nutzen NICHT mehr `() => true` (das hatte ProseMirrors
+      // scrollIntoView komplett deaktiviert) — stattdessen lassen wir
+      // ProseMirror standardmäßig in den View scrollen UND glätten den
+      // Effekt nach der Pagination-Engine selbst per `keepCursorInView`
+      // unten (sonst kann ein nachträglich eingefügter Spacer den Cursor
+      // wieder aus dem Viewport schieben).
     },
     onUpdate: ({ editor }) => {
       setBody(editor.getJSON());
+      keepCursorInView(editor);
     },
     immediatelyRender: false,
   });
@@ -102,6 +106,42 @@ export function EditorClient({
     document.dispatchEvent(new Event("narravit:pagination-recompute"));
   }, [imageSections, title]);
 
+  // Dynamische Bild-Skalierung auf der Kapitel-Titelseite (Spec-Update
+  // 2026-05-18): wenn die Start-Sektion im 1-spaltig-Layout genau 2 Bilder
+  // enthält, sollen die Bilder zusammen mit dem Header auf Seite 1 passen.
+  // Bei Bedarf werden sie bis 50 % runter-skaliert. Wenn selbst bei 50 %
+  // kein Platz mehr ist (Kapitel-Titel füllt 6+ Zeilen), wird der Bruch
+  // der Pagination-Engine überlassen.
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      const stack = stackRef.current;
+      const fg = fgRef.current;
+      if (!stack || !fg) return;
+      const header = fg.querySelector(".a5-stack__fg > div:first-child") as HTMLElement | null;
+      const isCandidate =
+        imageSections.start.layout === "1-spaltig" &&
+        imageSections.start.images.length === 2;
+      if (!header || !isCandidate) {
+        stack.style.setProperty("--a5-image-scale", "1");
+        return;
+      }
+      const mmToPx = (mm: number) => (mm / 25.4) * 96;
+      const cmToPx = (cm: number) => (cm / 2.54) * 96;
+      const contentHeight = mmToPx(210) - 2 * cmToPx(2);
+      const headerH = header.getBoundingClientRect().height;
+      const contentWidth = mmToPx(148) - cmToPx(2) - cmToPx(2.5);
+      // 2 Bilder × (Breite × 2/3 für 3:2) + 4mm Gap zwischen Reihen
+      const oneImgHeight = (s: number) => contentWidth * s * (2 / 3);
+      const stackedHeight = (s: number) => 2 * oneImgHeight(s) + mmToPx(4) + 2 * mmToPx(4);
+      const available = contentHeight - headerH - 8; // 8px Sicherheitspuffer
+      let scale = 1;
+      if (stackedHeight(1) > available) {
+        scale = Math.max(0.5, available / stackedHeight(1));
+      }
+      stack.style.setProperty("--a5-image-scale", scale.toFixed(3));
+    });
+  }, [title, imageSections.start.layout, imageSections.start.images.length, stackRef, fgRef]);
+
   const updateSection = (key: "start" | "end") => (next: ImageSections["start"]) => {
     setImageSections((prev) => ({ ...prev, [key]: next }));
   };
@@ -114,7 +154,7 @@ export function EditorClient({
       <EditorToolbar editor={editor} />
 
       {/* Chrome unter der Toolbar — scrollt natürlich weg */}
-      <header className="flex flex-col gap-2 border-b border-[#e0dcd5] bg-[#ece6df]/95 px-4 py-3 sm:px-6 md:flex-row md:items-center md:justify-between">
+      <header className="flex flex-col gap-2 border-b border-[#e0dcd5] bg-[#ece6df] px-4 py-3 sm:px-6 md:flex-row md:items-center md:justify-between">
         <Link
           href={`/projektuebersicht/${projectId}`}
           className="inline-flex w-fit items-center gap-1.5 text-sm text-[#3E3831] hover:underline"
@@ -178,7 +218,7 @@ export function EditorClient({
         </div>
       </main>
 
-      <footer className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between border-t border-[#e0dcd5] bg-white/95 px-4 py-2 backdrop-blur sm:px-6">
+      <footer className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between border-t border-[#e0dcd5] bg-[#ece6df] px-4 py-2 sm:px-6">
         <WordCount words={wordCount} />
         <span className="text-xs text-[#a8a39b]">
           Auto-Speichern alle 2 Sekunden · A5-Format · Druck-Vorschau
@@ -382,6 +422,43 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
   }, []);
 
   return { pageCount };
+}
+
+// Word-/Docs-Verhalten: nach jeder Editor-Doc-Mutation schauen, ob der
+// Cursor noch sichtbar ist. Wenn nicht (z. B. weil die Pagination-Engine
+// einen Spacer eingefügt hat und den Cursor unter den Sticky-Toolbar/über
+// den Viewport-Boden geschoben hat), Viewport sanft so verschieben, dass
+// der Cursor wieder bequem im Lesebereich landet. Greift NICHT, wenn der
+// User in einer Bild-Sektion arbeitet — die hat keinen Editor-Cursor.
+function keepCursorInView(editor: Editor) {
+  // Auf dem nächsten Frame messen (warten bis Pagination-Spacer applied sind)
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      try {
+        const view = editor.view;
+        if (!view || !view.hasFocus()) return;
+        const coords = view.coordsAtPos(view.state.selection.head);
+        const toolbar = document.querySelector(".editor-chrome") as HTMLElement | null;
+        const toolbarBottom = toolbar ? toolbar.getBoundingClientRect().bottom : 0;
+        const margin = 80; // Komfortzone unter Toolbar / über Fußleiste
+        const viewportTop = toolbarBottom + margin;
+        const viewportBottom = window.innerHeight - margin;
+        if (coords.top < viewportTop) {
+          window.scrollBy({
+            top: coords.top - viewportTop,
+            behavior: "smooth",
+          });
+        } else if (coords.bottom > viewportBottom) {
+          window.scrollBy({
+            top: coords.bottom - viewportBottom,
+            behavior: "smooth",
+          });
+        }
+      } catch {
+        // ignore — coordsAtPos kann werfen, wenn DOM noch nicht synchronisiert
+      }
+    });
+  });
 }
 
 function cssLengthToPx(value: string, rootFontPx: number): number {

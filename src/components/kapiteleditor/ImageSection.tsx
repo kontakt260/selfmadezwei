@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { GripVertical, ImagePlus, Trash2, Plus } from "lucide-react";
 import {
   DndContext,
@@ -22,7 +22,12 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
-import type { ChapterImage, ImageLayout, ImageSectionData } from "@/lib/kapiteleditor/types";
+import {
+  imagesPerPage,
+  type ChapterImage,
+  type ImageLayout,
+  type ImageSectionData,
+} from "@/lib/kapiteleditor/types";
 import { ImageUploadDialog, type UploadedImage } from "./ImageUploadDialog";
 
 export function ImageSection({
@@ -37,6 +42,27 @@ export function ImageSection({
   onDelete: (image: ChapterImage) => Promise<void>;
 }) {
   const [uploadOpen, setUploadOpen] = useState(false);
+  const sectionRef = useRef<HTMLDivElement>(null);
+  // Word-/Docs-Verhalten: nach jeder Image-Mutation soll der bearbeitete
+  // Bereich im Viewport sichtbar sein (Spec 2026-05-18 vom Nutzer:
+  // „scroll to image section if updates / changes are made").
+  const scrollSectionIntoView = () => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = sectionRef.current;
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        const toolbar = document.querySelector(".editor-chrome") as HTMLElement | null;
+        const top = toolbar ? toolbar.getBoundingClientRect().bottom : 0;
+        const bottom = window.innerHeight - 80;
+        if (r.top < top + 16) {
+          window.scrollBy({ top: r.top - (top + 16), behavior: "smooth" });
+        } else if (r.bottom > bottom) {
+          window.scrollBy({ top: r.bottom - bottom, behavior: "smooth" });
+        }
+      });
+    });
+  };
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
@@ -46,6 +72,7 @@ export function ImageSection({
   const handleLayoutChange = (value: string) => {
     if (value === "1-spaltig" || value === "2-spaltig") {
       onChange({ ...data, layout: value as ImageLayout });
+      scrollSectionIntoView();
     }
   };
 
@@ -56,12 +83,14 @@ export function ImageSection({
     const newIdx = data.images.findIndex((i) => i.id === over.id);
     if (oldIdx < 0 || newIdx < 0) return;
     onChange({ ...data, images: arrayMove(data.images, oldIdx, newIdx) });
+    scrollSectionIntoView();
   };
 
   const handleUploaded = async (img: UploadedImage) => {
     try {
       const newImage = await onUpload(img);
       onChange({ ...data, images: [...data.images, newImage] });
+      scrollSectionIntoView();
     } catch {
       /* upstream already toasted */
     }
@@ -71,22 +100,29 @@ export function ImageSection({
     try {
       await onDelete(image);
       onChange({ ...data, images: data.images.filter((i) => i.id !== image.id) });
+      scrollSectionIntoView();
     } catch {
       /* upstream already toasted */
     }
   };
 
   const hasImages = data.images.length > 0;
+  // Reihen-Chunking: 1-spaltig = 1 Bild/Reihe, 2-spaltig = 2 Bilder/Reihe.
+  // Jede Reihe ist eine eigene paginierbare Einheit (data-paginate-row) und
+  // wird von der Pagination-Engine bei Überlauf auf die nächste Seite geschoben.
+  const perRow = data.layout === "2-spaltig" ? 2 : 1;
+  const rows: ChapterImage[][] = [];
+  for (let i = 0; i < data.images.length; i += perRow) {
+    rows.push(data.images.slice(i, i + perRow));
+  }
 
   return (
-    <div className="group/section relative">
+    <div ref={sectionRef} className="group/section relative">
       {/* Controls erscheinen nur wenn Bilder da sind UND auf Hover.
        * Hover-Bridge + Delay-on-Leave verhindert, dass das Menu beim
        * Cursor-Übergang vom Bild zu den Buttons zu früh verschwindet. */}
       {hasImages && (
         <>
-          {/* Unsichtbare Hover-Brücke über dem Bild-Grid, damit der Cursor
-           * den Gap zwischen Menu und Bildern überqueren kann ohne Hover-Verlust. */}
           <div
             className="absolute -top-8 left-0 right-0 h-8 z-[5]"
             aria-hidden
@@ -128,27 +164,39 @@ export function ImageSection({
           onClick={() => setUploadOpen(true)}
           aria-label="Bild hinzufügen"
           className="image-section-empty"
+          data-paginate-row
         >
           <ImagePlus className="h-3.5 w-3.5" />
           Bild hinzufügen
         </button>
       ) : (
-        <div className="image-section" data-layout={data.layout}>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={data.images.map((i) => i.id)}
+            strategy={rectSortingStrategy}
           >
-            <SortableContext
-              items={data.images.map((i) => i.id)}
-              strategy={rectSortingStrategy}
-            >
-              {data.images.map((img) => (
-                <SortableSlot key={img.id} image={img} onDelete={() => handleDelete(img)} />
-              ))}
-            </SortableContext>
-          </DndContext>
-        </div>
+            {rows.map((row, rowIdx) => (
+              <div
+                key={rowIdx}
+                className="image-section"
+                data-layout={data.layout}
+                data-paginate-row
+              >
+                {row.map((img) => (
+                  <SortableSlot
+                    key={img.id}
+                    image={img}
+                    onDelete={() => handleDelete(img)}
+                  />
+                ))}
+              </div>
+            ))}
+          </SortableContext>
+        </DndContext>
       )}
 
       <ImageUploadDialog
@@ -204,3 +252,6 @@ function SortableSlot({
     </div>
   );
 }
+
+// Re-exportiert für externe Konsumenten (Estimate-Schätzungen etc.)
+export { imagesPerPage };

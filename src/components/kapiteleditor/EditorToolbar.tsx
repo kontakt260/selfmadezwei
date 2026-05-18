@@ -51,7 +51,8 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
   };
 
   return (
-    <div className="editor-chrome sticky top-[5.5rem] z-30 mx-auto flex w-fit max-w-full flex-wrap items-center gap-1 rounded-none border border-[#e0dcd5] bg-white px-2 py-1.5 shadow-sm">
+    <div className="editor-chrome sticky top-0 z-[60] flex w-full justify-center border-b border-[#e0dcd5] bg-[#ece6df] py-1.5 shadow-sm">
+    <div className="flex w-fit max-w-full flex-wrap items-center gap-1 px-2">
       <Toggle
         size="sm"
         pressed={editor.isActive("bold")}
@@ -185,6 +186,12 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
         size="sm"
         variant="ghost"
         className="h-8 gap-1.5 px-2 text-xs"
+        onMouseDown={(e) => {
+          // preventDefault verhindert, dass der Klick den Editor-Fokus +
+          // die Selektion verliert — sonst würde insertPageBreak an einer
+          // falschen Position oder gar nicht einfügen.
+          e.preventDefault();
+        }}
         onClick={() => editor.chain().focus().insertPageBreak().run()}
         aria-label="Seitenumbruch einfügen"
       >
@@ -216,6 +223,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
       >
         <Redo2 className="h-4 w-4" />
       </Button>
+      </div>
     </div>
   );
 }
@@ -226,9 +234,11 @@ function Sep() {
 
 function ToolbarSkeleton() {
   return (
-    <div className="editor-chrome sticky top-[5.5rem] z-30 mx-auto flex h-11 w-fit items-center gap-2 rounded-none border border-[#e0dcd5] bg-white px-3 py-1.5 text-sm text-[#848484] shadow-sm">
-      <Minus className="h-4 w-4 animate-pulse" />
-      Editor wird geladen …
+    <div className="editor-chrome sticky top-0 z-[60] flex w-full justify-center border-b border-[#e0dcd5] bg-[#ece6df] py-1.5 shadow-sm">
+      <div className="flex h-8 items-center gap-2 px-3 text-sm text-[#848484]">
+        <Minus className="h-4 w-4 animate-pulse" />
+        Editor wird geladen …
+      </div>
     </div>
   );
 }

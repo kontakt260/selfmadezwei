@@ -43,7 +43,7 @@ export default function RootLayout({
       lang="de"
       className={`${lato.variable} ${merriweather.variable} ${ptSerif.variable} h-full antialiased`}
     >
-      <body className="flex min-h-[100dvh] flex-col overflow-x-hidden bg-background text-foreground">
+      <body className="flex min-h-[100dvh] flex-col bg-background text-foreground">
         <AuthHero />
         {children}
         <Toaster richColors position="top-center" />

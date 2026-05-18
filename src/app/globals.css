@@ -48,11 +48,16 @@
   }
 
   html {
-    overflow-x: hidden;
+    /* overflow-x: clip (statt hidden) verhindert horizontalen Overflow OHNE
+     * einen Scroll-Container auf <html> zu erzeugen — sonst kollabiert
+     * `position: sticky` für die Editor-Toolbar (sticky bezieht sich auf den
+     * nächsten Scroll-Ancestor; hidden macht <html> zu einem). */
+    overflow-x: clip;
   }
 
   body {
-    @apply overflow-x-hidden bg-background text-foreground antialiased;
+    @apply bg-background text-foreground antialiased;
+    overflow-x: clip;
     font-family: var(--font-lato), ui-sans-serif, system-ui, sans-serif;
   }
 
@@ -144,10 +149,10 @@
 :root {
   --a5-page-width: 148mm;
   --a5-page-height: 210mm;
-  --a5-margin-top: 1cm;
-  --a5-margin-right: 1cm;
-  --a5-margin-bottom: 1cm;
-  --a5-margin-left: 1.5cm;
+  --a5-margin-top: 2cm;
+  --a5-margin-right: 2cm;
+  --a5-margin-bottom: 2cm;
+  --a5-margin-left: 2.5cm;
   --a5-content-width: calc(var(--a5-page-width) - var(--a5-margin-left) - var(--a5-margin-right));
   --a5-content-height: calc(var(--a5-page-height) - var(--a5-margin-top) - var(--a5-margin-bottom));
   --a5-desk-color: #ece6df;
@@ -155,9 +160,21 @@
   --a5-page-gap: 2.5rem;
 }
 
-/* Tisch-Hintergrund hinter den A5-Seiten */
+/* Tisch-Hintergrund hinter den A5-Seiten.
+ * overflow-anchor: none verhindert, dass der Browser beim Recalc der
+ * Pagination-Engine Scroll-Anchoring auslöst — das würde sonst dazu führen,
+ * dass beim Tippen der sichtbare Seitenabschnitt unkontrolliert springt
+ * (Browser versucht eine ankernde DOM-Position relativ zum Viewport stabil
+ * zu halten, während die Engine gleichzeitig marginTops neu verteilt). */
 .a5-desk {
   background: var(--a5-desk-color);
+  overflow-anchor: none;
+}
+
+.a5-desk *,
+.a5-stack,
+.a5-stack * {
+  overflow-anchor: none;
 }
 
 /* ============================================================
@@ -176,6 +193,7 @@
   color: #2b2620;
   font-size: 11pt;
   line-height: 1.55;
+  --a5-image-scale: 1;
 }
 
 .a5-stack__bg {
@@ -195,12 +213,33 @@
   height: var(--a5-page-height);
   background: white;
   box-shadow: var(--a5-page-shadow);
+  position: relative;
 }
 
 .a5-stack__fg {
   position: relative;
   z-index: 1;
   padding: var(--a5-margin-top) var(--a5-margin-right) var(--a5-margin-bottom) var(--a5-margin-left);
+}
+
+/* Seitenzahl-Overlay: sitzt ÜBER FG (z-index 2), damit Zahlen oben rechts
+ * nicht von Bildern oder Text-Blöcken auf Seite 2+ verdeckt werden. Jede
+ * Zahl wird inline-positioniert (top = N*stride + topMargin) — keine
+ * Abhängigkeit von BG-Frame-Layout. */
+.a5-stack__numbers {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.a5-page-number {
+  position: absolute;
+  right: var(--a5-margin-right);
+  font-family: var(--font-pt-serif), serif;
+  font-size: 10pt;
+  color: #848484;
+  pointer-events: none;
 }
 
 /* Alte .a5-page-Klasse: bleibt fix A5, falls Single-Page-Routen sie verwenden */
@@ -250,7 +289,7 @@
 
 .a5-stack blockquote,
 .a5-page blockquote {
-  border-left: 3px solid var(--narravit-green);
+  border-left: 3px solid #222121;
   padding-left: 0.8em;
   margin: 0.8em 0;
   font-style: italic;
@@ -295,39 +334,27 @@
 .a5-stack [data-line-height="1.5"], .a5-page [data-line-height="1.5"] { line-height: 1.5; }
 .a5-stack [data-line-height="2"],   .a5-page [data-line-height="2"]   { line-height: 2;   }
 
-/* Seitenumbruch: füllt im Vordergrund exakt den Gap zwischen zwei
- * A5-Frames im Hintergrund. Transparent → Tisch-Farbe vom Hintergrund-Layer
- * scheint durch. Im Druck → echter `break-after: page`.
+/* Seitenumbruch: transparenter Block, der vom letzten Absatz bis zum Anfang
+ * der nächsten Seite reicht. Im oberen Teil (über dem Frame) scheint die
+ * WEISSE Seite durch → leerer, nicht interaktiver Bereich. Im unteren Teil
+ * (im Tisch-Gap zwischen zwei Frames) scheint die TISCH-Farbe durch.
+ * Höhe wird per JS dynamisch auf (Restplatz + Gap) gesetzt.
+ * Im Druck → echter `break-after: page`.
+ * Hinweis-Label entfernt 2026-05-18 auf Nutzerwunsch.
  */
 .a5-page-break {
   display: block;
   margin-left: calc(-1 * var(--a5-margin-left));
   margin-right: calc(-1 * var(--a5-margin-right));
-  height: var(--a5-page-gap);
+  height: var(--a5-page-gap); /* Default — wird von JS überschrieben */
   background: transparent;
   border: 0;
   position: relative;
   overflow: visible;
   break-after: page;
   page-break-after: always;
-}
-
-.a5-page-break::after {
-  content: "Seitenumbruch";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  padding: 0.15rem 0.6rem;
-  background: white;
-  border: 1px solid #e0dcd5;
-  font-family: var(--font-lato), sans-serif;
-  font-size: 7.5pt;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #848484;
-  white-space: nowrap;
+  cursor: default;
+  user-select: none;
 }
 
 /* TipTap-Editor-Bereich innerhalb einer A5-Seite */
@@ -341,6 +368,14 @@
   pointer-events: none;
   float: left;
   height: 0;
+}
+
+/* Placeholder unterdrücken direkt nach einem Seitenumbruch — der durch
+ * insertPageBreak erzeugte leere Folge-Absatz soll kein „Erzähle hier deine
+ * Geschichte …" zeigen, weil der Nutzer den Bruch bewusst gesetzt hat und
+ * der Folge-Absatz nicht „leer-fühlend" wirken darf. */
+.tiptap-editor .a5-page-break + p[data-placeholder]::before {
+  content: none;
 }
 
 /* Trennlinie unter der ersten H1 — Word-Template-Stil:
@@ -369,7 +404,9 @@
 }
 
 /* Bild-Sektion: feste Slot-Größen, kein freies Layout
- * 1-spaltig: ein Bild über volle Inhaltsbreite, 3:2
+ * 1-spaltig: ein Bild pro Reihe, 70% der Inhaltsbreite, zentriert, 3:2
+ *           → ermöglicht 2 Bilder auf der Kapitel-Titelseite (zusammen mit
+ *             dem Header) und mehrere pro Folgeseite
  * 2-spaltig: zwei Bilder nebeneinander, je 3:2 mit 4mm Gap
  */
 .image-section {
@@ -379,7 +416,12 @@
 }
 
 .image-section[data-layout="1-spaltig"] {
-  grid-template-columns: 1fr;
+  /* Volle Inhaltsbreite — vorher 70 %; Nutzer wünscht größere Darstellung
+   * (2026-05-18). Dynamisches Skalieren auf Kapitel-Titelseite passiert
+   * über die CSS-Variable --a5-image-scale, die EditorClient setzt, wenn
+   * 2 Bilder zusammen mit dem Header auf Seite 1 passen sollen. */
+  grid-template-columns: minmax(0, calc(100% * var(--a5-image-scale, 1)));
+  justify-content: center;
 }
 
 .image-section[data-layout="2-spaltig"] {
@@ -391,6 +433,7 @@
   aspect-ratio: 3 / 2;
   background: #f6f3ee;
   overflow: hidden;
+  width: 100%;
 }
 
 .image-slot img {
@@ -452,10 +495,6 @@
     box-shadow: none;
     border: 0;
     margin: 0;
-  }
-
-  .a5-page-break::after {
-    display: none;
   }
 
   /* Editor-Chrome ausblenden beim Druck */
