@@ -71,6 +71,40 @@ export const PaginationDecorations = Extension.create({
           const ro = new ResizeObserver(() => schedule());
           if (fg) ro.observe(fg);
 
+          // IMG-Lade-Listener: nach Image-Upload kann das ResizeObserver-Event
+          // feuern, BEVOR das Bild seine endgültige Pixel-Größe hat (Browser
+          // rendert ein noch nicht geladenes <img> mit 0×0). Wir hängen an
+          // jedes IMG einen `load`-Handler, der nach erfolgtem Laden noch
+          // einmal pagniert. Neue IMGs werden via MutationObserver erkannt.
+          const attached = new WeakSet<HTMLImageElement>();
+          const attachImageListener = (img: HTMLImageElement) => {
+            if (attached.has(img)) return;
+            attached.add(img);
+            if (!img.complete) {
+              img.addEventListener("load", schedule, { once: true });
+            }
+          };
+          if (fg) {
+            fg.querySelectorAll("img").forEach(attachImageListener);
+          }
+          const mo = new MutationObserver((records) => {
+            for (const rec of records) {
+              rec.addedNodes.forEach((n) => {
+                if (n instanceof HTMLImageElement) attachImageListener(n);
+                else if (n instanceof Element) {
+                  n.querySelectorAll("img").forEach(attachImageListener);
+                }
+              });
+            }
+          });
+          if (fg) mo.observe(fg, { childList: true, subtree: true });
+
+          // Externer Trigger für React-State-Änderungen (z. B. setImageSections,
+          // setTitle), die nicht über ProseMirror laufen. EditorClient feuert
+          // dieses Event in einem useEffect, das auf imageSections/title hört.
+          const onExternalTrigger = () => schedule();
+          document.addEventListener("narravit:pagination-recompute", onExternalTrigger);
+
           return {
             update(view, prevState) {
               if (muteUpdates) return;
@@ -79,7 +113,9 @@ export const PaginationDecorations = Extension.create({
             destroy() {
               if (raf !== null) cancelAnimationFrame(raf);
               window.removeEventListener("resize", onResize);
+              document.removeEventListener("narravit:pagination-recompute", onExternalTrigger);
               ro.disconnect();
+              mo.disconnect();
             },
           };
         },

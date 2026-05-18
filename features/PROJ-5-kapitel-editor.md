@@ -2,11 +2,13 @@
 
 ## Status: In Progress
 **Created:** 2026-05-15
-**Last Updated:** 2026-05-18 (Pagination-Engine Iteration 2 — Soft-Break + Widow/Orphan + SHRINK + Empty-Page)
+**Last Updated:** 2026-05-18 (Pagination-Engine Iteration 3 — Image-Section-Trigger + Frontend-Validierung)
 
 > **Refinement 2026-05-18:** QA-Testbericht hat fundamentale Lücken in der Pagination-Logik aufgedeckt (9 Bugs, u. a. Inhalt im Zwischenraum zwischen Seiten, kumulative Drift, schwebende Seitenzahlen, verirrter Bottom-Image-Slot). Konsequenz: Spec-Sektion G „Pagination-Drift wird akzeptiert" ist obsolet — Editor erhält eine echte Pagination-Engine mit Zero-Overflow-Garantie. Siehe neue Sektion „Pagination-Engine" in den Acceptance Criteria sowie überarbeitete Sektionen G und H.
 
 > **Iteration 2 (2026-05-18, später Nachmittag):** Pagination-Engine implementiert + live im Browser validiert. Zero-Overflow + Soft-Break + Witwen-/Waisen + SHRINK + Two-In-A-Row-Empty-Page funktionieren. Siehe „Implementation Notes (2026-05-18, Pagination-Engine Iteration 2)" unten. Keep-with-next für H1/H2 ist deferred, weil der Editor-Body aktuell keine Headings unterstützt.
+
+> **Iteration 3 (2026-05-18, Abend, im Rahmen von `/frontend PROJ-5`):** Frontend-Komponenten Ende-zu-Ende im Browser validiert (Phone-/Tablet-/Desktop-Viewports, Toolbar-Buttons + sticky/Selection-Erhaltung, Title-Sync, Image-Section 1↔2-spaltig + DnD-Reorder, Scroll-Stabilität beim Tippen, Wortanzahl + Speicher-Status, kombinierter Text-+-Bild-Flow). Bug behoben: PaginationDecorations re-paginierte nicht zuverlässig nach React-State-Änderungen (Image-Upload, Layout-Wechsel), weil der `update`-Hook nur auf Doc-Transaktionen reagiert und der ResizeObserver vor dem `load`-Event der neuen `<img>`-Tags feuern konnte. Fix: MutationObserver für neu hinzugefügte `<img>`-Elemente + `load`-Listener pro IMG + Custom Event `narravit:pagination-recompute`, das EditorClient in einem `useEffect([imageSections, title])` dispatcht.
 
 ## Dependencies
 - Requires: PROJ-4 (Kapitel-Routing & Persistenz) — URL-Struktur `/projektuebersicht/[project_id]/kapiteleditor/[chapter_id]`, `chapter_id` in URL

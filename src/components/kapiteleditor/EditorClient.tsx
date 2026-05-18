@@ -95,6 +95,13 @@ export function EditorClient({
     titleDep: title,
   });
 
+  // Trigger PaginationDecorations (ProseMirror plugin) bei React-State-
+  // Änderungen, die keine Doc-Transaktion auslösen — sonst zeigen Image-
+  // Section-Mutationen erst nach der nächsten Texteingabe Wirkung.
+  useEffect(() => {
+    document.dispatchEvent(new Event("narravit:pagination-recompute"));
+  }, [imageSections, title]);
+
   const updateSection = (key: "start" | "end") => (next: ImageSections["start"]) => {
     setImageSections((prev) => ({ ...prev, [key]: next }));
   };
