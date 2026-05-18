@@ -178,7 +178,19 @@ export function EditorClient({
       </header>
 
       <main className="flex flex-1 flex-col items-center gap-8 px-4 py-8 pb-16 sm:px-6 md:px-10">
-        <div className="a5-stack" data-chapter-id={chapterId} ref={stackRef}>
+        <div
+          className="a5-stack"
+          data-chapter-id={chapterId}
+          ref={stackRef}
+          style={{
+            // bg-Layer (absolute) stapelt N Frames + Gaps; ohne min-height
+            // ragt der bg-Layer unter den .a5-stack-Container und damit
+            // unter die desk-Wrapper hinaus. Wir machen den stack mindestens
+            // so groß wie der bg-Layer, damit die Desk-Farbe bis ans
+            // Editor-Ende reicht und der bg-background nicht durchschimmert.
+            minHeight: `calc(${pageCount} * (var(--a5-page-height) + var(--a5-page-gap)) - var(--a5-page-gap))`,
+          }}
+        >
           {/* Hintergrund-Layer: N fest-große A5-Frames als weißer Hintergrund. */}
           <div className="a5-stack__bg" aria-hidden>
             {Array.from({ length: pageCount }).map((_, i) => (
