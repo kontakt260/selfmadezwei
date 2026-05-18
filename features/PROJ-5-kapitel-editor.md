@@ -2,7 +2,9 @@
 
 ## Status: In Progress
 **Created:** 2026-05-15
-**Last Updated:** 2026-05-17
+**Last Updated:** 2026-05-18
+
+> **Refinement 2026-05-18:** QA-Testbericht hat fundamentale Lücken in der Pagination-Logik aufgedeckt (9 Bugs, u. a. Inhalt im Zwischenraum zwischen Seiten, kumulative Drift, schwebende Seitenzahlen, verirrter Bottom-Image-Slot). Konsequenz: Spec-Sektion G „Pagination-Drift wird akzeptiert" ist obsolet — Editor erhält eine echte Pagination-Engine mit Zero-Overflow-Garantie. Siehe neue Sektion „Pagination-Engine" in den Acceptance Criteria sowie überarbeitete Sektionen G und H.
 
 ## Dependencies
 - Requires: PROJ-4 (Kapitel-Routing & Persistenz) — URL-Struktur `/projektuebersicht/[project_id]/kapiteleditor/[chapter_id]`, `chapter_id` in URL
@@ -26,9 +28,22 @@
 - [ ] Desktop & Tablet (viewport ≥ 768 px): vollständiger Editor
 
 ### A5-Seiten-Layout
-- [ ] Editor simuliert A5-Seiten (148 mm × 210 mm, feste Breite) mit sichtbaren Seitenumbrüchen
-- [ ] Feste Seitenabstände entsprechend Word-Template: oben 1 cm, rechts 1 cm, unten 1 cm, links 1,25 cm (in Twips: top=1134, right=1134, bottom=1134, left=1418)
-- [ ] Erste Seite hat ein festes Template (s. u.); alle Folgeseiten zeigen nur Fließtext
+- [ ] Editor simuliert A5-Seiten (148 mm × 210 mm, feste Breite und feste Höhe) mit sichtbaren Seitenumbrüchen
+- [ ] Feste Seitenabstände entsprechend Word-Template: oben 1 cm, rechts 1 cm, unten 1 cm, links 1,25 cm (in Twips: top=1134, right=1134, bottom=1134, left=1418) — Hinweis: Frontend-Implementierung verwendet aktuell 2 cm/2 cm/2 cm/2,5 cm gemäß Nutzer-Korrektur 2026-05-17; Akzeptanzwert ist der zuletzt freigegebene Wert
+- [ ] Erste Seite hat ein festes Template (s. u.); alle Folgeseiten zeigen nur Fließtext + ggf. End-Bild-Sektion
+
+### Pagination-Engine (Zero-Overflow im Editor)
+- [ ] **Akzeptanzschwelle:** für jeden Block im Editor (Absatz, Überschrift, Bild-Reihe, Seitenumbruch, Schluss-Bild-Sektion) gilt `block.top >= page.contentTop && block.bottom <= page.contentBottom` für genau eine Seite. Inhalt erscheint niemals unter der 2-cm-Untergrenze oder im Zwischenraum zwischen zwei A5-Seiten
+- [ ] **Zeilenweiser Soft-Break in langen Absätzen** (Word-Standard): wenn ein Absatz nicht vollständig auf die laufende Seite passt, fließen einzelne Zeilen auf die nächste Seite, ohne das ProseMirror-Dokument zu mutieren (kein automatisch eingefügter Page-Break-Node — rein visuelle Decoration). Undo/Redo bleiben deshalb sauber
+- [ ] **Keep-with-next:** Überschriften (H1, H2) bleiben mit dem ersten Absatz darunter zusammen — eine Überschrift wandert niemals alleine ans Seitenende
+- [ ] **Witwen-/Waisen-Regelung (Word-Standard):** mindestens 2 Zeilen eines Absatzes stehen zusammen am Seitenanfang (keine Witwe) und am Seitenende (keine Waise). Wenn nur 1 Zeile übrigbliebe, wird die ganze Reststeue auf die nächste Seite gezogen
+- [ ] **Bild-Sektionen pagieren zeilenweise:** jede Bild-Reihe (1-spaltig = 1 Bild, 2-spaltig = 2 Bilder) ist eine eigene paginierbare Einheit. Reihen, die nicht mehr auf die laufende Seite passen, wandern als Reihe auf die nächste Seite — niemals einzelne halbe Bilder
+- [ ] **Anfang-Bild-Sektion teilt sich Seite 1 mit Header:** Engine berechnet den nach Logo + Titel + Linie verbleibenden Platz und schiebt überstehende Reihen automatisch auf Folgeseiten
+- [ ] **Ende-Bild-Sektion klebt direkt am letzten Fließtext-Block:** keine Lücke zwischen Text-Ende und Bildern; wenn der Text die Seite genau füllt, fließen die Bilder auf die Folgeseite
+- [ ] **Hintergrund-Frames werden an reale Brüche der Engine gekoppelt:** Anzahl der gerenderten `.a5-page-frame`-Rechtecke = Anzahl der Engine-Seiten, kein Gap, keine Phantom-Leerseite am Ende
+- [ ] **Seitenzahl-Verankerung:** jede sichtbare A5-Seite zeigt oben rechts ihre Seitenzahl (1-basiert je Kapitel) **inklusive Seite 1** mit Logo/Titel. Die Zahl ist Kind des jeweiligen Frames (`position: absolute` zum Frame, nicht zum Editor) und folgt nie dem Inhalt
+- [ ] **Reaktivität:** Engine läuft nach jeder ProseMirror-Transaktion (rAF-batched), bei Layout-Wechsel (Bild 1↔2-spaltig), bei Bild-Upload/Löschen/Reorder und bei Schriftgröße-/Zeilenabstand-Änderungen
+- [ ] **PDF-Drift erlaubt:** der spätere PDF-Renderer in PROJ-16 darf um 1–2 Zeilen anders brechen als der Editor (akzeptabel). Ästhetik-Feinschliff im Druck (z. B. Bund-Steg, Kolumnentitel) erfolgt in PROJ-16-Anforderungen, nicht in PROJ-5
 
 ### Erste Seite — Template
 - [ ] NARRAVIT-Logo (oben, fest, nicht editierbar)
@@ -57,7 +72,13 @@
 - [ ] Textausrichtung: links, zentriert, rechts, Blocksatz
 - [ ] Zeilenabstand: 1.0 / 1.5 / 2.0
 - [ ] Einrückung rein / raus
-- [ ] Seitenumbruch einfügen (sichtbar als Trennlinie im Editor)
+- [ ] Seitenumbruch einfügen (sichtbar als Trennlinie im Editor) — **Word-/Docs-konformes Verhalten:**
+  - Selektion bleibt beim Klick auf den Toolbar-Knopf erhalten (`onMouseDown` + `event.preventDefault()`, damit der Editor-Fokus nicht verloren geht)
+  - Cursor-Position splittet den Absatz an der Einfügemarke: Text links vom Cursor bleibt auf der aktuellen Seite, Text rechts startet auf der neuen Seite; Cursor landet am Anfang des rechten Teils
+  - Kein automatisch eingefügter leerer Placeholder-Absatz nach dem Bruch (Placeholder „Erzähle hier deine Geschichte…" wird unterdrückt, wenn der Block unmittelbar auf ein `<hr data-type="page-break">` folgt)
+  - Zwei Seitenumbrüche unmittelbar hintereinander erzeugen eine echt leere Seite dazwischen (wie Word)
+  - Backspace am Anfang des Nach-Bruch-Blocks entfernt den Bruch sauber (Engine pagiert sofort neu)
+  - Undo/Redo stellen den Vorher-Zustand exakt wieder her — die Engine reagiert auf den Transaktion und pagiert neu
 - [ ] Undo, Redo
 - [ ] Kein Link-Tool
 
@@ -84,6 +105,16 @@
 - Zwei Co-Autoren schreiben gleichzeitig → Last-Writer-Wins (kein Locking in PROJ-5; PROJ-15 behandelt Concurrency)
 - Keine Bilder in beiden Sektionen → `color_page_count = 0`; Platzhalter "Bild hinzufügen" in Sektionen sichtbar
 - Seitenumbruch gesetzt → visuell als Trennlinie im Editor dargestellt; im Druck echter Seitenumbruch
+- **Pagination-Engine — Edge Cases (neu 2026-05-18):**
+  - Absatz ist länger als eine ganze Seite → Engine setzt mehrere Soft-Break-Decorations und verteilt den Absatz über so viele Seiten wie nötig (theoretisch unbegrenzt). Akzeptanzcheck: keine einzelne Zeile überläuft die Marge
+  - Witwen-Fall: nur 1 Zeile eines Absatzes würde am neuen Seitenanfang stehen → Engine zieht zusätzlich die letzte Zeile der Vorherseite mit auf die neue Seite (mindestens 2 Zeilen oben)
+  - Waisen-Fall: nur 1 Zeile eines Absatzes würde am Seitenende stehen → Engine schiebt diese Zeile mit auf die nächste Seite (Folge: kleine Lücke am Seitenende ist akzeptabel)
+  - Überschrift wäre alleine am Seitenende → Engine schiebt sie zusammen mit dem ersten Absatz darunter auf die nächste Seite
+  - Bild-Reihe passt nicht mehr aufs Restseite (1-spaltig: kein Bild mehr Platz; 2-spaltig: 2 Bilder zu hoch) → ganze Reihe wandert auf die nächste Seite; keine halben Bilder, kein Single-Image-stehen-lassen aus einer 2er-Reihe
+  - Zwei manuelle Seitenumbrüche unmittelbar hintereinander → echt leere Seite dazwischen (Engine rendert einen leeren Frame mit Seitenzahl)
+  - Cursor mitten im Absatz, Klick auf „Seitenumbruch" → Absatz wird am Cursor gesplittet; linker Teil auf laufender Seite, rechter Teil auf neuer Seite, Cursor am Anfang des rechten Teils
+  - Backspace am Anfang des Nach-Bruch-Blocks → `<hr>` wird entfernt, Engine pagiert sofort neu (Inhalt rutscht ggf. auf die Vorherseite hoch)
+  - Engine läuft während laufender Eingabe → rAF-gebatcht, max 1 Re-Pagination pro Frame; bei sehr langen Kapiteln (>50 Seiten) ist leichter Lag akzeptabel (Optimierung Folge-Ticket)
 
 ## Technical Requirements
 - Sicherheit: `chapter_id` in allen Server Actions gegen RLS validiert — kein Client-Trust
@@ -92,6 +123,8 @@
 - `color_page_count`: Berechnung client-seitig beim Auto-Save; wird zusammen mit `body` in einer Server Action persistiert
 - Schema-Ergänzung zu PROJ-1: `chapters.color_page_count INTEGER NOT NULL DEFAULT 0` (via neue Migration)
 - Tablet: Touch-Events für alle Toolbar-Buttons und Bild-Upload-Flow getestet
+- **Pagination-Engine (Refinement 2026-05-18):** implementiert als ProseMirror-Plugin in `src/components/kapiteleditor/tiptap/PaginationPlugin.ts` (Name unverbindlich); reagiert auf jede Transaktion + Image-Section-Änderung + Layout-Wechsel; rAF-gebatcht; misst alle Block-Höhen per `getBoundingClientRect` und alle Zeilen langer Absätze per `Range.getClientRects`. Aktuelle JS-`useLayoutEffect`-Engine in `EditorClient.tsx` wird vollständig ersetzt
+- **Akzeptanzcheck automatisierbar:** Playwright-E2E-Test überprüft per `page.evaluate`, dass jeder Block im Editor innerhalb der Content-Grenzen genau eines `.a5-page-frame` liegt (siehe Sektion J)
 
 ---
 <!-- Sections below are added by subsequent skills -->
@@ -304,8 +337,14 @@ Cropped JPEGs liegen im `chapter-heroes`-Bucket in voller Print-Auflösung. Beim
 **`color_page_count` ist eine Schätzung.**
 Die client-seitige Berechnung in PROJ-5 ist eine Vorschau (für späteren Print-Preis-Vergleich im Editor). Die **autoritative** Zählung übernimmt der PDF-Renderer in PROJ-16 nach erfolgter Pagination. Konsequenz: keine Geschäftslogik darf in PROJ-5 (oder PROJ-6 Stripe) auf `color_page_count` als Wahrheit vertrauen — nur als Anzeige-Wert.
 
-**Pagination-Drift zwischen Editor und PDF.**
-Browser-Pagination im Editor (jede A5-Seite als fester Container) und Print-Pagination (Chromium `@page` mit Block-Break-Verhalten) können bei langen Absätzen oder Bildern leicht unterschiedlich brechen. Wir akzeptieren das bewusst — die Editor-Anzeige ist eine **Annäherung**, der PDF-Renderer ist die Wahrheit. Eine perfekte Pixel-Parität gehört nicht zu PROJ-5 (würde Re-Implementation des Chromium-Layout-Algorithmus erfordern).
+**Pagination-Verantwortung — Editor strikt, PDF leicht abweichend (revidiert 2026-05-18).**
+Bis 2026-05-17 war akzeptiert, dass Editor und PDF unterschiedlich brechen und der PDF-Renderer autoritativ ist. Das ist überholt: der Editor erhält eine eigene strikte Pagination-Engine (s. Acceptance-Criteria-Sektion „Pagination-Engine"), die für jeden Block die Zero-Overflow-Garantie sicherstellt. Inhalt erscheint im Editor nie unter dem unteren Seitenrand oder im Zwischenraum zwischen zwei A5-Seiten — egal ob Text, Bilder oder Seitenumbrüche.
+
+Der spätere PDF-Renderer in PROJ-16 kann um 1–2 Zeilen anders brechen als der Editor (z. B. wegen unterschiedlicher Silbentrennung, Kerning, Witwen-/Waisen-Bewertung in Chromium). Das ist akzeptiert. Pixel-Parität würde entweder den Chromium-Layout-Algorithmus in JS nachbilden oder den Editor selbst per Headless-Chromium rendern — beides ist nicht im Scope von PROJ-5. Konsequenz:
+
+- **Editor ist autoritativ für die UX-Promise** „Was du siehst, läuft nie über die Seite hinaus."
+- **PDF ist autoritativ für Druck-Ästhetik.** Anforderungen wie Bund-Steg, Kolumnentitel, Kerning-Feinjustierung, Initial-Buchstaben werden in PROJ-16 als separate Akzeptanzkriterien spezifiziert — nicht in PROJ-5 implementiert.
+- **Witwen-/Waisen-Regelung (min. 2 Zeilen)** wird bereits im Editor durchgesetzt, damit Druck-Layout und Editor-Layout in diesem typografischen Detail übereinstimmen.
 
 ### H) Frontend-Implementierung (Stand 2026-05-17)
 
@@ -355,10 +394,48 @@ Browser-Pagination im Editor (jede A5-Seite als fester Container) und Print-Pagi
 
 **Bekannte Lücken / Punkte für QA:**
 - Phone vs Editor wird per Responsive-CSS getoggelt (`md:hidden` / `hidden md:block`) — beide Bundles werden geladen, der Tipp aus der Spec „kein TipTap-Bundle wird auf Phone geladen" ist damit noch nicht eingehalten. Optimierung über Server-User-Agent-Sniffing oder dynamischen Import wäre Folge-Ticket
-- A5-Seitenstapel wird im Editor als **eine** lange A5-Box gerendert; visuelle Seitenumbrüche entstehen nur durch den Custom-`PageBreakNode`. Automatische Pagination (Editor zeigt mehrere A5-Seiten je nach Inhaltslänge) ist nicht enthalten — der PDF-Renderer in PROJ-16 ist autoritativ für die echte Seitenaufteilung
+- ~~A5-Seitenstapel wird im Editor als **eine** lange A5-Box gerendert; visuelle Seitenumbrüche entstehen nur durch den Custom-`PageBreakNode`. Automatische Pagination ist nicht enthalten.~~ **Obsolet seit Refinement 2026-05-18:** wird durch die neue Pagination-Engine (s. Sektion J) ersetzt
 - `color_page_count`-Berechnung im Client ist heuristisch (`estimateColorPages` in EditorClient.tsx); wird in PROJ-16 durch reale Print-Pagination ersetzt
 - `chapters.body` enthält nach Save TipTap-JSON; existierende Test-Chapter haben evtl. einen anderen Body-Shape — Editor lädt dann leer, ist akzeptabel
 - Auto-Save-Latenz und Fehlerverhalten sind UI-seitig fertig, aber bis Backend nicht echt prüfbar
+
+### J) Pagination-Engine (Architektur — Refinement 2026-05-18)
+
+**Auslöser:** QA-Bericht 2026-05-18 hat dokumentiert, dass die bestehende JS-basierte `useLayoutEffect`-Lösung in `EditorClient.tsx` Inhalt in den Zwischenraum zwischen Seiten fließen lässt, Seitenzahlen falsch verankert und kumulative Drift über mehrere Seiten erzeugt. Lösung: echte Pagination-Engine als ProseMirror-Plugin, gekoppelt an die Render-Pipeline der Frames und Bild-Sektionen.
+
+**Was die Engine macht (PM-Sicht):**
+1. Beobachtet jede ProseMirror-Transaktion und jede Layout-Änderung außerhalb des Editors (Bild-Upload/Löschen/Reorder, Layout-Wechsel 1↔2-spaltig, Schrift/Zeilenabstand-Wechsel).
+2. Misst nach jedem Update die kumulative Höhe aller Blöcke (Editor-Knoten + Bild-Reihen + manueller Seitenumbruch + Schluss-Bild-Sektion) gegen die Content-Höhe einer A5-Seite (Seitenhöhe minus oben/unten-Marge).
+3. Setzt **vor** jeden Block, der die laufende Seite überschreiten würde, einen Spacer-Decorator, der genau die Restlücke der laufenden Seite ausfüllt und den Block damit auf die nächste Seite drückt.
+4. Bei Absätzen, die länger als die Restlücke sind, fügt sie eine **Soft-Break-Decoration** zwischen die Zeilen ein (per Range-Messung der einzelnen Zeilen) — Absatz bleibt als ein ProseMirror-Knoten erhalten, fließt aber visuell auf zwei Seiten.
+5. Wendet Witwen-/Waisen-Regelung an: wenn ein Soft-Break nur 1 Zeile am Seitenende oder -anfang erzeugen würde, zieht die Engine zusätzlich eine Zeile mit über.
+6. Wendet Keep-with-next auf Überschriften an: H1/H2 + folgender erster Absatz werden als zusammengehörige Einheit behandelt.
+7. Liefert die berechneten Seiten-Brüche an die Frame-Render-Logik: pro Engine-Seite wird **genau ein** `.a5-page-frame` gerendert (Hintergrund + Seitenzahl), gekoppelt an die Spacer-Positionen — keine Phantom-Seiten am Ende, kein Gap zwischen Frames.
+
+**Was die Engine NICHT macht (Nicht-Ziele):**
+- Keine PDF-Parität: PDF-Renderer in PROJ-16 darf um 1–2 Zeilen anders brechen.
+- Keine inkrementelle Re-Berechnung in PROJ-5: bei jeder Transaktion misst die Engine alle Blöcke neu (rAF-gebatcht). Performance-Optimierung (Cursor-down-Incremental-Measurement) ist Folge-Ticket, falls bei >50-Seiten-Kapiteln spürbare Latenz auftritt.
+- Keine Spaltenumbrüche / Mehrspaltigkeit im Fließtext (Layout ist immer einspaltig im Fließtext; Bild-Sektionen sind eigene 1- oder 2-spaltige Container).
+
+**Auswirkungen auf bestehende Komponenten:**
+- `EditorClient.tsx`: die aktuelle JS-`useLayoutEffect`-Engine wird komplett entfernt und durch das neue ProseMirror-Plugin ersetzt. Bild-Sektionen werden nicht mehr per `marginTop` verschoben, sondern als „pseudo-Blöcke" in die Engine-Mess-Pipeline eingereiht.
+- `PageBreakNode.ts`: `insertPageBreak`-Command wird umgestellt auf Cursor-Split (statt Append-after-paragraph). Toolbar-Knopf bekommt `onMouseDown`-preventDefault.
+- `FirstPageTemplate.tsx`: bleibt strukturell, wird aber von der Engine als „fester Header-Block der ersten Seite" mitgemessen.
+- `ImageSection.tsx`: Bild-Reihen werden zu paginierbaren Einheiten — eigene Daten-Attribute (`data-paginate-row`) markieren sie für die Engine.
+- Seitenzahl-Komponente: wird neu als Kind jedes Frames gerendert (statt absolut zum Editor-Container).
+- CSS: `.a5-page-break` (manueller Bruch) verliert seine `height: calc(...)`-Streck-Logik — die Engine setzt stattdessen einen Spacer.
+
+**Implementierungs-Reihenfolge (für `/frontend`-Nachlauf):**
+1. ProseMirror-Plugin-Gerüst + Block-Höhen-Messung (Text only)
+2. Spacer-Decoration-Insertion + Frame-Kopplung (Anzahl Frames = Engine-Seiten)
+3. Soft-Break-Decoration für lange Absätze
+4. Witwen-/Waisen + Keep-with-next
+5. Bild-Sektionen in die Pipeline einreihen
+6. Seitenzahl pro Frame (auch Seite 1)
+7. Manueller Seitenumbruch: Cursor-Split + Selection-Preservation + Placeholder-Suppression
+8. Two-in-a-row leere Seite, Undo/Redo, Backspace-Cleanup
+
+**Akzeptanztest (automatisierbar):** für jeden Block im DOM gilt nach jedem Update `block.getBoundingClientRect().top >= currentPageFrame.contentTop && block.getBoundingClientRect().bottom <= currentPageFrame.contentBottom`. Playwright-Test kann das per `page.evaluate` für alle Blöcke prüfen.
 
 ### I) Offene Punkte für QA / Folge-Tickets
 
