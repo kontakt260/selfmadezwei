@@ -19,7 +19,7 @@
 | PROJ-2 | Auth + SSR | P0 | Approved | PROJ-1 | [Spec](PROJ-2-auth-ssr.md) | 2026-05-15 |
 | PROJ-3 | Persönlicher Bereich + Konto | P0 | Deployed | PROJ-2 | [Spec](PROJ-3-persoenlicher-bereich-konto.md) | 2026-05-15 |
 | PROJ-4 | Kapitel-Routing & Persistenz | P0 | Deployed | PROJ-2 | [Spec](PROJ-4-kapitel-routing-persistenz.md) | 2026-05-15 |
-| PROJ-5 | Kapitel-Editor (A5, TipTap, Tablet) | P0 | In Progress | PROJ-4 | [Spec](PROJ-5-kapitel-editor.md) | 2026-05-15 |
+| PROJ-5 | Kapitel-Editor (A5, TipTap, Tablet) | P0 | In Review | PROJ-4 | [Spec](PROJ-5-kapitel-editor.md) | 2026-05-15 |
 | PROJ-6 | Stripe-Zahlungen (Portal + Vapi-Paket) | P0 | Planned | PROJ-2, PROJ-4 | [Spec](PROJ-6-stripe-zahlungen.md) | 2026-05-15 |
 | PROJ-7 | Buchweite Seitenzahl – Live-Anzeige | P1 | Roadmap | PROJ-5 | — | 2026-05-15 |
 | PROJ-8 | Erzähl-Impulse (Katalog + API) | P1 | Roadmap | PROJ-4 | — | 2026-05-15 |

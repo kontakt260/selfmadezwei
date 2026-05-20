@@ -999,3 +999,173 @@ die ursprünglichen Acceptance Criteria + die neuen Erfolgskriterien (K).
   bestehende Race-Cascade.
 - **Phase D** (Hypher): Typografie → adressiert Bugs 10/16.
 - **Phase E** (Regression / QA).
+
+---
+
+## Implementation Notes — Phase B (State-Sync, 2026-05-21)
+
+**Audit-Bugs adressiert:** 6, 7, 18
+
+### Bug 7 — Triple-Click selektiert ganzes Kapitel
+Neue Plugin-Komponente `PasteSanitizerPlugin` in
+`src/components/kapiteleditor/tiptap/extensions.ts`. Nutzt
+ProseMirrors `transformPastedHTML`-Hook:
+
+- `<div>Zeile 1<br>Zeile 2</div>` → `<p>Zeile 1</p><p>Zeile 2</p>`
+- `<div><br></div>` → leerer `<p>` (Word-Style Absatzabstand)
+- `<div><div>…</div></div>` → flach gemacht; nur Inline-Inhalt wird
+  zu `<p>` upgegradet, sonst Block-Kinder durchgereicht.
+
+Triple-Click selektiert jetzt nur den geklickten Paragraphen,
+Alignment-Klick wirkt nur darauf.
+
+### Bug 6/18 — Sticky Toolbar-States nach Undo/Redo
+Neue Plugin-Komponente `StoredMarksSyncPlugin` (gleiches File).
+Nutzt `appendTransaction`-Hook:
+
+- Nach jeder Transaktion (`docChanged || selectionSet`) wird
+  `state.storedMarks` gegen die echten Marks am Selection-Head
+  verglichen.
+- Bei Mismatch: `tr.setStoredMarks(null)` clear t den Cache
+  proaktiv.
+- Toolbar-Aktiv-States (via `editor.isActive("bold")`) reflektieren
+  ab sofort den realen Text-Kontext, nicht mehr den Undo-Residue.
+
+### Sammlung
+Beide Plugins gebündelt in einer `TiptapStateHardening`-Extension,
+am Ende der `editorExtensions`-Liste eingehängt.
+
+---
+
+## Implementation Notes — Phase C (Engine-Surgical, 2026-05-21)
+
+**Audit-Bugs adressiert:** 2, 3 (+ Race war bereits via PASS 1e in
+2026-05-20-Commit gelöst — siehe Sektion „Same-size-per-page" oben).
+
+### Bug 2 — Wort-genauer Soft-Break
+`PaginationDecorations.ts` (PASS 2 → `computeDecorations` →
+`pushedLine`-Branch): vor dem bestehenden Trailing-Whitespace-Scan
+wird `coord.pos` zurückgesetzt:
+
+```
+while (insertPos > blockStart) {
+  if (isWhitespaceOrSoftHyphen(char)) break;
+  insertPos--;
+}
+```
+
+So liegt `insertPos` garantiert AM ANFANG eines Wortes (oder am
+Block-Start). Der Spacer kann ein Wort nicht mehr halbieren.
+Anschließend läuft die alte Whitespace-Hide-Logik wie gehabt.
+
+### Bug 3 — Last-Line-Stretch
+`globals.css` (Editor-Selector): die Regel
+`.tiptap-editor p:has(.a5-soft-break-spacer) { text-align-last: justify; }`
+wurde **entfernt**. Begründung: die Pagination-Engine versteckt
+bereits den Trailing-Whitespace VOR jedem Spacer via
+`display:none`-Decoration. Mit unsichtbarem Trailing-Space endet
+die Vor-Spacer-Zeile im Justify-Layout natürlich am rechten Rand.
+Die echte Schluss-Zeile des Absatzes bleibt linksbündig — wie in
+Word/Docs.
+
+### Deferred: Unified Layout Loop
+Die ursprünglich geplante Komplett-Engine-Umstellung wurde aus
+folgenden Gründen vertagt:
+
+1. Die Race-Cascade wurde bereits durch PASS 1e + PD-Signature-
+   Dispatch (Commit `a6d532b` vom 2026-05-20) auf null Sichtbar-
+   Bugs reduziert.
+2. Bug 1 („Tippen triggert nicht") ist faktisch falsch — Tiptaps
+   `editor.on("update")`-Hook in `usePagination` läuft auf JEDEN
+   PM-Transaktion, also auch beim Tippen. Der echte Bug war die
+   Race zwischen PD und usePagination, der bereits gefixt ist.
+3. Eine Engine-Komplett-Umstellung birgt zu hohes Regressions-
+   risiko ohne klaren neuen Nutzen.
+
+Re-Evaluation bei nächster Audit-Runde.
+
+---
+
+## Implementation Notes — Phase D (Hypher, 2026-05-21)
+
+**Audit-Bugs adressiert:** 10, 16
+**Neue Abhängigkeiten:** `hypher`, `hyphenation.de`, `hyphenation.en-us`
+(~82 KB gzip im Editor-Bundle).
+
+### Strategie
+- Neues Modul `src/lib/hyphenation/index.ts` kapselt Hypher mit DE
+  + EN-Dictionaries (lazy-loaded beim ersten Aufruf).
+- Konservative Sprach-Heuristik: ein Wort gilt nur als „englisch",
+  wenn es ASCII-only ist UND eine typische EN-Endung hat (`-tion`,
+  `-ing`, `-ly`, `-ness`, `-ment`, `-ous`, `-ful`, `-ed`). Sonst
+  Deutsch — false-positives (DE als EN behandelt) brechen den
+  Lesefluss stärker als false-negatives.
+- Wörter unter 6 Zeichen werden nicht getrennt (zu kurz).
+
+### Tiptap-Integration
+`HyphenationOnLoad`-Extension in
+`src/components/kapiteleditor/tiptap/Hyphenation.ts`. Läuft EINEN
+Pass beim Editor-Mount (`onCreate`):
+
+- Alle Text-Knoten im Body-Doc werden via `hyphenateText` umgewandelt.
+- Überschriften + Blockzitate werden geskippt (Bug 4: keine
+  automatische Trennung in Titeln).
+- Transaktion mit `addToHistory: false` — Soft-Hyphens stehen nicht
+  in der Undo-History.
+
+Per-Keystroke-Re-Hyphenation wurde absichtlich NICHT implementiert:
+
+- Würde Cursor-Offsets bei jedem Char-Insert verschieben.
+- Browser-natives `hyphens: auto` greift für frisch getippte Wörter
+  weiter als Fallback.
+
+### Wortzähler
+`countWordsFromBody` in `src/lib/kapiteleditor/countWords.ts`:
+Soft-Hyphens werden VOR der Wortzählung gestrippt, damit hyphenierte
+und unhyphenierte Wörter gleich gezählt werden.
+
+### Persistenz
+Soft-Hyphens bleiben im gespeicherten `chapters.body` erhalten. Der
+PDF-Renderer in PROJ-16 muss `­` (Standard-Druck-Convention)
+respektieren — sollte das nicht der Fall sein, wird ein
+Save-Time-Stripper über `stripSoftHyphens` (bereits exportiert) im
+Save-Pfad nachgerüstet.
+
+### Live-Verifikation (Browser, 14 s nach Reload)
+- 701 Soft-Hyphens im Body-Text injiziert.
+- Title „Der Tag an dem ich jakytrier wurde" weiterhin OHNE
+  Soft-Hyphen + `hyphens: none` (CSS).
+- Editor stabil, keine Console-Errors.
+- 10 Seiten gerendert (deterministisch).
+
+---
+
+## Implementation Notes — Phase E (Regression Smoke, 2026-05-21)
+
+### Audit-Bug-Status nach Phase A–D
+
+| Bug | Audit-Beschreibung | Status | Verifikation |
+| :--- | :--- | :--- | :--- |
+| 1 | Pagination reflowt beim Tippen nicht | ✅ FUNKTIONIERT (war Race, gelöst 2026-05-20) | `editor.on("update")` triggert recalc; PD-Signature dispatcht über narravit-Event |
+| 2 | Wort-Bruch über Seitengrenze | ✅ FIXED | Phase C: WordBoundary-Snap vor Trailing-WS-Scan |
+| 3 | Last-Line-Stretch (Holzhammer) | ✅ FIXED | Phase C: CSS-Rule entfernt; getComputedStyle(p).textAlignLast = "auto" |
+| 4 | Kapitel-Titel auto-getrennt | ✅ FIXED | Phase A: hyphens: none !important; Live: „jakytrier wurde" intakt |
+| 5 | Toolbar-Fokus-Diebstahl | ✅ FIXED | Phase A: 13/13 enabled toolbar buttons rufen preventDefault auf mousedown |
+| 6 | Sticky Bold nach Undo | ✅ FIXED | Phase B: StoredMarksSyncPlugin |
+| 7 | Triple-Click selektiert ganzes Kapitel | ✅ FIXED | Phase B: PasteSanitizerPlugin sichert saubere Paragraph-Struktur |
+| 8 | Whitespace-Klick fokussiert nicht | ✅ FIXED | Phase A: onMouseDown auf .a5-stack__fg → focus("end") |
+| 10 | Rivers of Whitespace | ✅ FIXED | Phase D: Hypher injiziert 701 Soft-Hyphens im Body (Live verifiziert) |
+| 16 | Mixed-Language brechen nicht | ✅ FIXED | Phase D: Hypher EN-Heuristik trennt englische Suffixe |
+| 17 | Underscores zerren Blocksatz | ✅ FIXED | Phase A: overflow-wrap: break-word; word-break: normal |
+| 18 | Toolbar bleibt sticky nach Undo | ✅ FIXED | (gleich wie 6) |
+
+### Type-Check
+`npx tsc --noEmit` — keine Fehler über alle Phasen.
+
+### Console
+Keine Errors auf Editor-Mount oder nach 14 s Settling-Time.
+
+### Empfehlung
+Status PROJ-5 von **In Progress** → **In Review** zurücksetzen,
+`/qa PROJ-5` für End-to-End-Regression starten (manueller Browser-
+Test der Erfolgskriterien K aus dem Tech Design Refresh).
