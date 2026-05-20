@@ -1,6 +1,6 @@
 # PROJ-5: Kapitel-Editor (A5, TipTap, Tablet)
 
-## Status: In Review
+## Status: Approved
 **Created:** 2026-05-15
 **Last Updated:** 2026-05-19 (Backend angeschlossen — Migration + Server Actions, End-to-End-Persistenz validiert)
 
@@ -521,7 +521,102 @@ Live-validiert im Browser über Chrome-DevTools-MCP gegen die Akzeptanzkriterien
 - 0 Console-Errors
 
 ## QA Test Results
-_To be added by /qa_
+
+**Date:** 2026-05-20
+**Tester:** QA Engineer (automated browser checks via Chrome DevTools MCP + manual interactions)
+**Build:** `24197b0` (stage) — head after today's fixes (Bugs #25–#33)
+
+### Acceptance Criteria — Pass/Fail
+
+#### Route & Zugriff
+- ✅ Route `/projektuebersicht/[project_id]/kapiteleditor/[chapter_id]` lädt korrekt
+- ✅ Ungültige IDs → 404 (verifiziert via `fetch` mit Zero-UUID → status 404)
+- ✅ Viewport < 768 px: Phone-Hinweis-Seite wird gerendert ("Editor auf dem Smartphone nicht verfügbar")
+- ✅ Viewport ≥ 768 px (Tablet 768 + Desktop 1440): Editor lädt vollständig
+
+#### A5-Seiten-Layout
+- ✅ A5-Format gerendert (148 × 210 mm)
+- ✅ Margins: 2 cm oben/rechts/unten + 2.5 cm links (per Nutzer-Korrektur 2026-05-17)
+- ✅ Erste Seite mit Logo + Titel + Trennlinie + Start-Bild-Sektion
+- ✅ Folgeseiten mit Fließtext
+
+#### Pagination-Engine (Zero-Overflow)
+- ✅ **0 line overflows** über alle 7 Test-Seiten gemessen (Range.getClientRects, klassifiziert via Line-Center)
+- ✅ **0 image overflows** — alle 6 Test-Bilder fully innerhalb Page-Frames
+- ✅ Frame-Count (`.a5-page-frame`) = Page-Number-Count = pageCount (7=7) ✓
+- ✅ Seitenzahlen 1–7 sichtbar oben rechts auf jeder Seite
+- ✅ Seitenzahl-Position: Diagonal-Midpoint zwischen oberer-rechter Page-Ecke und oberer-rechter Content-Ecke = (margin-right/2, margin-top/2) = (1 cm, 1 cm). Gemessen: `right: 37.8 px` (= 2 cm/2 = 1 cm) ✓
+
+#### Blockquote-Border (Mask, kein Overlay)
+- ✅ Blockquote hat `mask-image` mit transparent-Stops in allen Page-Gap-Bereichen
+- ✅ Soft-Break-Spacer in der Mask ✓
+- ✅ Block-Push-Spacer (leere Absätze nach Enter) ebenfalls in der Mask ✓ (Fix #32)
+- ✅ Visuell: kein Border-Stub im Seitenzwischenraum, kein Border-Stub auf Vorseite
+
+#### Bild-Sektionen
+- ✅ Anfang & Ende mit 1-spaltig + 2-spaltig Toggle
+- ✅ Layout-Switch 1×1 ↔ 2×1 stabil (8 Iter ohne Oszillation, Fix #28/#29)
+- ✅ Same-Size-Per-Page Regel: Skalen pro Sektion uniform (Fix #26)
+- ✅ Start-Section: erste K Reihen skaliert (Min 0.65) zur Page 1 Anpassung
+- ✅ End-Section: erste Reihe skaliert (~0.93) zur aktuellen Page-Anpassung; Folge-Reihen ungeskaliert
+- ✅ Drag-and-Drop Reorder (in Console-Log "Draggable item ... was dropped over droppable area")
+- ✅ Bild-Upload via Server Action mit MIME-Whitelist + 10 MB-Limit
+- ✅ Bild-Lösch mit Storage-Cleanup + JSONB-Update
+
+#### Toolbar
+- ✅ Listen in Blockquotes verboten (Fix #30):
+  - Toolbar-Buttons werden bei Cursor in BQ disabled
+  - Cmd/Ctrl+Shift+7/8 abgefangen
+  - `appendTransaction` rollback bei Liste-in-BQ via Paste/etc.
+- ✅ Übrige Toolbar-Aktionen (Bold/Italic/Underline/BQ/Lists/Alignment/LineHeight/Indent/PageBreak/Undo/Redo) funktionsfähig
+
+#### Auto-Save
+- ✅ Status-Anzeige "Gespeichert" sichtbar
+- ✅ Backend Server Actions (`chapterAutosaveAction`, `chapterImageUploadAction`, `chapterImageDeleteAction`)
+- ✅ Word-Count Live ("949 Wörter" im Footer)
+
+### Security Audit
+
+- ✅ UUID-Validation auf allen Server-Action Inputs (`uuidSchema`, Zod)
+- ✅ Auth-Check (`supabase.auth.getUser()`) in jeder Server-Action
+- ✅ Defense-in-depth: `.eq("project_id", projectId)` parallel zu RLS
+- ✅ Membership-Check (`project_members`) bei Image-Upload
+- ✅ File-Size-Limit serverseitig (10 MB hart)
+- ✅ MIME-Whitelist (`image/jpeg`, `image/png`, `image/webp`) — verhindert SVG-XSS
+- ✅ File-Extension aus MIME, nicht aus Filename → kein Path-Traversal
+- ✅ Storage-Rollback bei DB-Update-Fehler (verwaiste Files vermieden)
+- ✅ Signed URLs nur server-erzeugt, Client-Wert wird beim Speichern verworfen
+- ✅ Signed-URL TTL: 1 h
+- ✅ Error-Messages neutral ("Kapitel nicht gefunden" für RLS-blocked + tatsächlich absent — kein Info-Leak)
+
+### Bugs Found
+
+Keine Critical oder High Bugs. Alle heutigen Fixes (Tasks #25–#33) verifiziert.
+
+**Low (Test-Infrastruktur, nicht produktrelevant):**
+- `actions.test.ts > deleteProjectAction > returns {} and revalidates / on success` schlägt fehl mit `supabase.auth.updateUser is not a function` — Mock-Lücke in PROJ-3-Test, nicht in PROJ-5-Scope, blockiert Deploy nicht.
+
+### Regression Test gegen heutige Fixes
+
+| Bug | Fix Commit | Verifiziert |
+|-----|-----------|-------------|
+| #25 Mini-Border-Stub auf Vorseite | ae591e9 | ✓ Snap-to-0 wenn `localStart < 6` |
+| #26 Same image size per page | ae591e9 | ✓ PASS A uniforme Skala pro Sektion |
+| #27 Re-Enter Layout-Bug | ae591e9 | ✓ Stabile Position über mehrere Reloads |
+| #28 End-section 1×1 → 2×1 visueller Bug | ae591e9 | ✓ |
+| #29 Layout-Switch persistierender Bug | ae591e9 | ✓ 8 Iter stabil |
+| #30 Listen-Verbot in Blockquote | 704c885 | ✓ Toolbar disabled + Kbd-Shortcut + appendTransaction |
+| #31 Strikter 2-cm-Margin | ae591e9 | ✓ 0 line/img overflows in Tests |
+| #32 Block-Push-Spacer in Mask | 3ab93f5 | ✓ 3-Gap Mask (Soft + Block-Push + Soft) verifiziert |
+| #33 Page-Nummer Diagonal-Midpoint | 24197b0 | ✓ `right: 37.8 px` = `margin-right/2` |
+
+### Vitest
+
+- 48 von 49 Unit-Tests bestanden. Der 1 Fehler liegt in PROJ-3-Tests (Mock-Issue) und blockiert PROJ-5 nicht.
+
+### Production-Ready Decision: ✅ READY
+
+Keine Critical oder High Bugs in PROJ-5-Scope. Alle Acceptance Criteria erfüllt. Security Audit clean. Heutige Fixes regression-getestet und stabil. Ready für `/deploy`.
 
 ## Deployment
 _To be added by /deploy_
