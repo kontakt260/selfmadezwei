@@ -504,12 +504,17 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
           item.el.style.height = `${desiredHeight}px`;
         }
       } else {
-        // PASS A hat diese Reihe explizit so skaliert, dass sie auf die
-        // aktuelle Seite passt — Block-Push würde diese Entscheidung
-        // überschreiben. PASS A ist autoritativ für skalierte Reihen.
-        if (item.el.style.getPropertyValue("--row-image-scale")) continue;
         // Block: läuft er über die Content-Untergrenze seiner aktuellen Seite?
         const observedBottom = observedTop + observedHeight;
+        // Skalierte Reihen werden GRUNDSÄTZLICH vertraut, ABER nur wenn sie
+        // ihre Seite TATSÄCHLICH nicht verletzen. PASS A kann bei stalem
+        // Mess-Zeitpunkt (PD-Spacer noch nicht final) zu optimistisch
+        // skalieren — dann landet eine vermeintlich passende Reihe doch
+        // im Seitenzwischenraum (Bug 2026-05-20: Bild im Page-Gap nach
+        // Bild-Einfügen). Wenn die skalierte Reihe > 30 px über den
+        // Content-Bereich ragt, override PASS A's Entscheidung und push.
+        const hasScale = !!item.el.style.getPropertyValue("--row-image-scale");
+        if (hasScale && observedBottom <= frameContentBottom + 30) continue;
         // Strikter 2-cm-Margin-Schutz: jede Reihe, die über die Content-
         // Untergrenze ragt, wird gepusht. Stabilität gegen PD-Transient-
         // Schwankungen kommt aus dem Push-Delta-History-Check unten (delta
