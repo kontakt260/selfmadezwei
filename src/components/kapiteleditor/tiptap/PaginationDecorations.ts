@@ -177,11 +177,17 @@ function recompute(view: EditorView) {
   const geom = readGeometry(stack);
   if (!geom || geom.stride <= 0 || geom.contentHeight <= 0) return;
 
+  // Vorherigen Decoration-Stand FESTHALTEN, bevor wir ihn (für die
+  // nächste natürliche Messung) clearen. Wir vergleichen am Ende den
+  // neuen mit dem alten Set — gleich = Spacer-Konfiguration unverändert
+  // = kein Trigger für usePagination nötig (verhindert Endlos-Schleife).
+  const prevSetCaptured = KEY.getState(view.state);
+  const prevSpec = decorationSignature(prevSetCaptured);
+
   // PASS 1: alte Decorations löschen, damit die nächste Messung den
   // natürlichen Text-Fluss sieht (sonst messen wir die Positionen
   // INKLUSIVE der schon eingefügten Spacer = Daten-Schmutz).
-  const currentSet = KEY.getState(view.state);
-  if (currentSet && currentSet !== DecorationSet.empty) {
+  if (prevSetCaptured && prevSetCaptured !== DecorationSet.empty) {
     view.dispatch(view.state.tr.setMeta(KEY, { decorations: DecorationSet.empty }));
     // PM hat das DOM synchron aktualisiert; offsetHeight erzwingt Re-Layout
     void fg.offsetHeight;
@@ -194,6 +200,31 @@ function recompute(view: EditorView) {
 
   const set = DecorationSet.create(view.state.doc, decorations);
   view.dispatch(view.state.tr.setMeta(KEY, { decorations: set }));
+  const newSpec = decorationSignature(set);
+
+  // usePagination informieren wenn sich die Spacer-Konfiguration geändert
+  // hat: Spacer-Tausch (einer schrumpft, anderer wächst) kann die fg-Höhe
+  // unverändert lassen → ResizeObserver feuert nicht → PASS 1a misst HRs
+  // gegen veralteten observedTop. Folge: HR-Höhen zeigen nicht mehr auf
+  // den Frame-Top der Folgeseite (Bug 2026-05-20: Seite 5 beginnt 88 px
+  // tief). Vergleich gegen das ALTE Set (prevSetCaptured) bricht die
+  // Endlos-Schleife — nach Stabilisierung gibt es keinen weiteren Dispatch.
+  if (newSpec !== prevSpec && typeof document !== "undefined") {
+    document.dispatchEvent(new Event("narravit:pagination-recompute"));
+  }
+}
+
+function decorationSignature(set: DecorationSet | null | undefined): string {
+  if (!set || set === DecorationSet.empty) return "";
+  const decos = set.find();
+  return decos
+    .map((d) => {
+      // Spacer-Decorations kodieren die Höhe in ihrem unique `key`
+      // (siehe buildSpacerDecoration: `soft-break@pos@height@…`).
+      const spec = d.spec as { key?: string };
+      return `${d.from}:${d.to}:${spec?.key ?? ""}`;
+    })
+    .join(",");
 }
 
 function computeDecorations(

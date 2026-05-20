@@ -388,6 +388,47 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
     void fg.offsetHeight;
 
     const fgTop = fg.getBoundingClientRect().top;
+    // PASS 1a — Page-Break-HRs SETTLEN, BEVOR PASS A misst.
+    // Begründung (Bug 2026-05-20, Page 14 mixed scales): PASS A muss
+    // gegen STABILE Positionen entscheiden. Wenn wir HRs erst nach PASS A
+    // anpassen, schiebt das Wachstum der HR die End-Sektion nach unten,
+    // und die zuvor von PASS A geplante Page-Group-Zuordnung passt
+    // nicht mehr — Reihen rutschen auf andere Seiten als geplant und
+    // teilen sich dort mit anders skalierten Reihen die Seite.
+    const inFgContentRaw = (el: HTMLElement) =>
+      (el.getBoundingClientRect().top - fgTop) / zoom - topMarginPx;
+    const elHRaw = (el: HTMLElement) => el.getBoundingClientRect().height / zoom;
+    const breaksSorted = [...breaks].sort(
+      (a, b) => inFgContentRaw(a) - inFgContentRaw(b),
+    );
+    // Fixpoint-Iteration: jede HR-Höhen-Anpassung verschiebt nachfolgende
+    // HRs. Eine einzige Runde verfehlt diese Cascade. Max 5 Runden.
+    const settleHRs = () => {
+      let changed = false;
+      for (const br of breaksSorted) {
+        const observedTop = inFgContentRaw(br);
+        const observedHeight = elHRaw(br);
+        const frameIdx = Math.max(0, Math.floor(observedTop / stridePx));
+        const nextFrameContentTop = (frameIdx + 1) * stridePx;
+        const nearestFrameContentTop = Math.round(observedTop / stridePx) * stridePx;
+        const atFrameTop = Math.abs(observedTop - nearestFrameContentTop) < 1;
+        const desiredHeight = atFrameTop
+          ? stridePx
+          : nextFrameContentTop - observedTop;
+        if (desiredHeight > gapPx + 0.5 && Math.abs(desiredHeight - observedHeight) > 0.5) {
+          br.style.height = `${desiredHeight}px`;
+          changed = true;
+        }
+      }
+      return changed;
+    };
+    for (let iter = 0; iter < 5; iter++) {
+      if (!settleHRs()) break;
+      void fg.offsetHeight;
+    }
+    // Reflow nach HR-Adjustment — End-Sektion sitzt jetzt an ihrer
+    // endgültigen Position.
+    void fg.offsetHeight;
     // Alle Positions-Werte werden durch zoom geteilt, damit die Pagination
     // im LOGISCHEN A5-Koordinatensystem rechnet, selbst wenn die DOM-
     // Rects durch transform: scale visuell skaliert sind.
@@ -419,6 +460,10 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
     // Push auf Folgeseiten — sodass das 2-cm-BottomMargin respektiert
     // wird ohne dass eine ansonsten passende Reihe leer auf die nächste
     // Seite gepusht wird (kein wasted space).
+    // Iteratives Page-by-Page-Grouping: Wir packen N Reihen sequentiell auf
+    // Seiten. Jede Page-Group erhält EINE uniforme Skala (Same-Size-Per-Page-
+    // AC vom Nutzer 2026-05-20). Die erste Gruppe muss in den Restplatz der
+    // aktuellen Seite passen; jede Folge-Gruppe in pageContentHeight.
     for (const wrapper of sectionWrappers) {
       const rows1Col = Array.from(
         wrapper.querySelectorAll<HTMLElement>(
@@ -431,110 +476,235 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
       const startFrameContentBottom = startFrameIdx * stridePx + pageContentHeight;
       const availableOnCurrentPage = Math.max(0, startFrameContentBottom - firstRowTop);
 
-      let fittedCount = 0;
-      let fittedScale = 1;
-      for (let k = rows1Col.length; k >= 1; k--) {
-        const naturalH = k * naturalRowH1Col + (k - 1) * sectionRowGap;
-        if (naturalH <= availableOnCurrentPage + 0.5) {
-          fittedCount = k;
-          fittedScale = 1;
-          break;
+      let cursor = 0;
+      let avail = availableOnCurrentPage;
+      while (cursor < rows1Col.length) {
+        const remaining = rows1Col.length - cursor;
+        let groupCount = 0;
+        let groupScale = 1;
+        for (let k = remaining; k >= 1; k--) {
+          const naturalH = k * naturalRowH1Col + (k - 1) * sectionRowGap;
+          if (naturalH <= avail + 0.5) {
+            groupCount = k;
+            groupScale = 1;
+            break;
+          }
+          const scaleNeeded =
+            (avail - (k - 1) * sectionRowGap) / (k * naturalRowH1Col);
+          if (scaleNeeded >= MIN_SCALE) {
+            groupCount = k;
+            groupScale = scaleNeeded;
+            break;
+          }
         }
-        const scaleNeeded =
-          (availableOnCurrentPage - (k - 1) * sectionRowGap) / (k * naturalRowH1Col);
-        if (scaleNeeded >= MIN_SCALE) {
-          fittedCount = k;
-          fittedScale = scaleNeeded;
-          break;
+        // Sicherheits-Fallback: passt nicht einmal eine Reihe → packe 1 mit
+        // MIN_SCALE und gehe weiter (PASS 1 pusht ggf. zur nächsten Seite).
+        if (groupCount === 0) {
+          groupCount = 1;
+          groupScale = MIN_SCALE;
         }
-      }
-
-      if (fittedCount > 0 && fittedScale < 1) {
-        for (let i = 0; i < fittedCount; i++) {
-          rows1Col[i].style.setProperty("--row-image-scale", fittedScale.toFixed(4));
+        if (groupScale < 1) {
+          for (let i = cursor; i < cursor + groupCount; i++) {
+            rows1Col[i].style.setProperty("--row-image-scale", groupScale.toFixed(4));
+          }
         }
+        cursor += groupCount;
+        // Ab der zweiten Gruppe sitzt die Gruppe oben auf einer frischen
+        // Seite und hat volle pageContentHeight zur Verfügung.
+        avail = pageContentHeight;
       }
     }
     // Reflow nach Scale-Änderungen, damit die anschließenden
     // Block-Push-Messungen die neue Reihen-Höhe sehen.
     void fg.offsetHeight;
 
-    // Block-Push für TEXT-Absätze (Editor-Blöcke) ist obsolet — die Soft-
-    // Break-Engine in PaginationDecorations splittet Multi-Line-Absätze
-    // zeilenweise und pusht 1-Zeilen-Blöcke via Widget-Decoration. Wenn
-    // wir hier zusätzlich marginTop auf den Paragraph-DOM-Knoten setzen,
-    // schieben wir den ganzen Absatz nach unten — die Soft-Break-Spacer
-    // im Inneren verlieren ihre Wirkung, und die ersten Zeilen landen NICHT
-    // mehr auf der aktuellen Seite.
-    //
-    // Hier nur noch Image-Rows und Page-Breaks verarbeiten.
-    type Item = { el: HTMLElement; kind: "break" | "block" };
-    const items: Item[] = [
-      ...breaks.map<Item>((el) => ({ el, kind: "break" })),
-      ...imageRows.map<Item>((el) => ({ el, kind: "block" })),
-    ];
-    items.sort((a, b) => inFgContent(a.el) - inFgContent(b.el));
-
-    for (const item of items) {
-      const observedTop = inFgContent(item.el);
-      const observedHeight = elH(item.el);
-
-      // Welche Seite trägt diesen Item-Top aktuell?
+    // PASS 1b — Image-Row Block-Push.
+    // HRs wurden bereits in PASS 1a vor PASS A gesettlet. Text-Block-Push
+    // ist obsolet (Soft-Break-Engine in PaginationDecorations übernimmt das).
+    // Hier nur noch Bild-Reihen prüfen und ggf. auf die nächste Seite schieben.
+    const imageRowsSorted = [...imageRows].sort(
+      (a, b) => inFgContent(a) - inFgContent(b),
+    );
+    for (const row of imageRowsSorted) {
+      const observedTop = inFgContent(row);
+      const observedHeight = elH(row);
+      const observedBottom = observedTop + observedHeight;
       const frameIdx = Math.max(0, Math.floor(observedTop / stridePx));
       const frameContentBottom = frameIdx * stridePx + pageContentHeight;
       const nextFrameContentTop = (frameIdx + 1) * stridePx;
 
-      if (item.kind === "break") {
-        // Page-Break: Höhe so setzen, dass der nächste Block am Content-Top
-        // der Folgeseite ankommt.
-        const currentHeight = elH(item.el);
-        // Edge-Case: zwei Seitenumbrüche unmittelbar hintereinander
-        // (Word-Verhalten „echte leere Seite dazwischen"). Wenn der Break
-        // direkt am Frame-Content-Top startet, würde nextFrameContentTop -
-        // observedTop ≈ 0 ergeben → kein Push, keine leere Seite. Wir
-        // verlangen deshalb mindestens eine ganze Seitenlänge.
-        // Math.round (statt floor), um Boundary-Treffer wie 833.0 vs 833.7
-        // korrekt zu erkennen.
+      // Skalierte Reihen werden GRUNDSÄTZLICH vertraut, ABER nur wenn sie
+      // ihre Seite TATSÄCHLICH nicht verletzen. Wenn die skalierte Reihe
+      // > 30 px über den Content-Bereich ragt, override PASS A's
+      // Entscheidung und push.
+      const hasScale = !!row.style.getPropertyValue("--row-image-scale");
+      if (hasScale && observedBottom <= frameContentBottom + 30) continue;
+      if (observedBottom > frameContentBottom + 0.5) {
+        if (observedHeight > pageContentHeight + 0.5) continue;
+        const delta = nextFrameContentTop - observedTop;
+        if (delta > 0.5) {
+          const currentMargin = parseFloat(row.style.marginTop) ||
+            parseFloat(getComputedStyle(row).marginTop) || 0;
+          row.style.marginTop = `${currentMargin + delta}px`;
+        }
+      }
+    }
+
+    // PASS Z — Post-hoc Same-Size-Per-Page-Normalisierung.
+    // PASS A trifft optimale Group-Entscheidungen anhand der MESS-POSITIONEN
+    // zum Zeitpunkt von PASS A. PaginationDecorations (PD) kann jedoch
+    // ZEITGLEICH die Soft-Break-Spacer im Body anpassen → Body-Höhe wandert
+    // → HRs verschieben sich → End-Sektion landet auf anderer Seite als
+    // PASS A geplant hatte. Folge (Bug 2026-05-20 Page 14): Reihen mit
+    // unterschiedlichen Skalen teilen sich eine Seite.
+    // Fix: Nach PASS 1b sind die Positionen STABIL. Wir gruppieren erneut
+    // nach Render-Seite und normalisieren auf die kleinste Skala der Gruppe.
+    void fg.offsetHeight;
+    const rowsByPage = new Map<number, HTMLElement[]>();
+    for (const row of imageRows) {
+      // Gruppierung via CENTER (nicht Top) — sonst landet eine Reihe, die
+      // PASS 1b auf die nächste Seite gepusht hat, durch Fließkomma-
+      // Rundung (z.B. logical top 833.5 vs stride 833.7) auf der FALSCHEN
+      // Seite in PASS Z. Bug 2026-05-20: Row 2 pushed bei mt=191 zu
+      // top≈833.5 → floor(833.5/833.7)=0, aber visuell auf Seite 2.
+      const top = inFgContent(row);
+      const h = elH(row);
+      const center = top + h / 2;
+      const page = Math.max(0, Math.floor(center / stridePx));
+      if (!rowsByPage.has(page)) rowsByPage.set(page, []);
+      rowsByPage.get(page)!.push(row);
+    }
+    for (const [, pageRows] of rowsByPage) {
+      if (pageRows.length < 2) continue;
+      let minScale = 1;
+      for (const r of pageRows) {
+        const s = parseFloat(r.style.getPropertyValue("--row-image-scale")) || 1;
+        if (s < minScale) minScale = s;
+      }
+      if (minScale < 1) {
+        for (const r of pageRows) {
+          r.style.setProperty("--row-image-scale", minScale.toFixed(4));
+        }
+      }
+    }
+
+    // PASS 1d — Image-Row-Re-Push NACH allen Skalen-Änderungen.
+    // PASS 1b hatte die Reihen gegen die UNSCALED-Layout-Position gepusht
+    // (gleicher Race wie HRs). PASS A + PASS Z können danach Skalen ändern
+    // → Inhalte über der Bild-Reihe verschieben sich → mt aus PASS 1b
+    // passt nicht mehr (Bug 2026-05-21, Seite 8: End-Sektion-Bild ragt 88 px
+    // in den Page-Gap vor Seite 8). Wir messen Reihen ein zweites Mal
+    // gegen den endgültigen Layout-Stand und korrigieren mt ggf.
+    void fg.offsetHeight;
+    for (let iter = 0; iter < 5; iter++) {
+      let anyChange = false;
+      for (const row of imageRowsSorted) {
+        const observedTop = inFgContent(row);
+        const observedHeight = elH(row);
+        // Page-Zuordnung via CENTER (analog PASS Z): wenn eine Reihe per
+        // mt nahe an die Page-Boundary geschoben wurde, kann ihr Top
+        // 1–88 px VOR dem Frame-Content-Top sitzen (Float-Rundung +
+        // PD-Race). PASS 1b's Top-basierte Klassifizierung würde sie
+        // dann als „auf voriger Seite überlaufend" einstufen — der
+        // Push delta = (next_frame - top) wäre aber ~0, also kein Fix.
+        // Center-basiert: die Reihe gehört zur Seite, deren Mitte sie
+        // schneidet. Wenn ihr TOP < dieser Seiten-Content-Top liegt,
+        // pushen wir bis zum Content-Top.
+        const center = observedTop + observedHeight / 2;
+        const pageIdx = Math.max(0, Math.floor(center / stridePx));
+        const pageContentTop = pageIdx * stridePx;
+        const pageContentBottom = pageIdx * stridePx + pageContentHeight;
+        // Korrektur 1: Reihe ragt OBEN in den Page-Gap (Top < page-content-top)
+        if (observedTop < pageContentTop - 0.5) {
+          const delta = pageContentTop - observedTop;
+          const currentMargin = parseFloat(row.style.marginTop) ||
+            parseFloat(getComputedStyle(row).marginTop) || 0;
+          row.style.marginTop = `${currentMargin + delta}px`;
+          anyChange = true;
+          continue;
+        }
+        // Korrektur 2: Reihe ragt UNTEN in den Page-Gap (Bottom > page-content-bottom)
+        const observedBottom = observedTop + observedHeight;
+        const hasScale = !!row.style.getPropertyValue("--row-image-scale");
+        if (hasScale && observedBottom <= pageContentBottom + 30) continue;
+        if (observedBottom > pageContentBottom + 0.5) {
+          if (observedHeight > pageContentHeight + 0.5) continue;
+          const nextFrameContentTop = (pageIdx + 1) * stridePx;
+          const delta = nextFrameContentTop - observedTop;
+          if (delta > 0.5) {
+            const currentMargin = parseFloat(row.style.marginTop) ||
+              parseFloat(getComputedStyle(row).marginTop) || 0;
+            row.style.marginTop = `${currentMargin + delta}px`;
+            anyChange = true;
+          }
+        }
+      }
+      if (!anyChange) break;
+      void fg.offsetHeight;
+      for (let hri = 0; hri < 3; hri++) {
+        if (!settleHRs()) break;
+        void fg.offsetHeight;
+      }
+    }
+
+    // PASS 1c — HR-Re-Settling NACH allen Skalen-Änderungen.
+    // PASS 1a hatte die HRs gegen die UNSCALED-Layout-Position gemessen
+    // (PASS 0 hatte alle --row-image-scale gelöscht). PASS A + PASS Z
+    // haben anschließend Skalen wieder gesetzt — Start-Sektion schrumpft
+    // → Inhalte über HRs verschieben sich nach oben → die in PASS 1a
+    // gesetzten HR-Höhen passen nicht mehr zum aktuellen observedTop.
+    // Folge (Bug 2026-05-20, Seite 5 startet 88 px tief): die nächste
+    // Seite beginnt nicht am Frame-Top.
+    // Wir messen die HRs ein zweites Mal mit den ENDGÜLTIGEN Reihen-
+    // Positionen und korrigieren ihre Höhen ggf.
+    void fg.offsetHeight;
+    for (let iter = 0; iter < 5; iter++) {
+      let anyChange = false;
+      for (const br of breaksSorted) {
+        const observedTop = inFgContentRaw(br);
+        const observedHeight = elHRaw(br);
+        const frameIdx = Math.max(0, Math.floor(observedTop / stridePx));
+        const nextFrameContentTop = (frameIdx + 1) * stridePx;
         const nearestFrameContentTop = Math.round(observedTop / stridePx) * stridePx;
         const atFrameTop = Math.abs(observedTop - nearestFrameContentTop) < 1;
         const desiredHeight = atFrameTop
           ? stridePx
           : nextFrameContentTop - observedTop;
-        if (desiredHeight > gapPx + 0.5 && Math.abs(desiredHeight - currentHeight) > 0.5) {
-          item.el.style.height = `${desiredHeight}px`;
+        if (desiredHeight > gapPx + 0.5 && Math.abs(desiredHeight - observedHeight) > 0.5) {
+          br.style.height = `${desiredHeight}px`;
+          anyChange = true;
         }
-      } else {
-        // Block: läuft er über die Content-Untergrenze seiner aktuellen Seite?
-        const observedBottom = observedTop + observedHeight;
-        // Skalierte Reihen werden GRUNDSÄTZLICH vertraut, ABER nur wenn sie
-        // ihre Seite TATSÄCHLICH nicht verletzen. PASS A kann bei stalem
-        // Mess-Zeitpunkt (PD-Spacer noch nicht final) zu optimistisch
-        // skalieren — dann landet eine vermeintlich passende Reihe doch
-        // im Seitenzwischenraum (Bug 2026-05-20: Bild im Page-Gap nach
-        // Bild-Einfügen). Wenn die skalierte Reihe > 30 px über den
-        // Content-Bereich ragt, override PASS A's Entscheidung und push.
-        const hasScale = !!item.el.style.getPropertyValue("--row-image-scale");
-        if (hasScale && observedBottom <= frameContentBottom + 30) continue;
-        // Strikter 2-cm-Margin-Schutz: jede Reihe, die über die Content-
-        // Untergrenze ragt, wird gepusht. Stabilität gegen PD-Transient-
-        // Schwankungen kommt aus dem Push-Delta-History-Check unten (delta
-        // muss zwischen zwei aufeinanderfolgenden Recalcs konsistent sein,
-        // sonst wird der Push deferred — verhindert Flackern, hält aber
-        // den 2-cm-Margin streng ein).
-        if (observedBottom > frameContentBottom + 0.5) {
-          // Block größer als ganze Seite? Push würde nichts bringen, v2 macht Soft-Break.
-          if (observedHeight > pageContentHeight + 0.5) continue;
-          // Delta: wo soll der Block hin (nextFrameContentTop) vs wo ist er (observedTop)
-          const delta = nextFrameContentTop - observedTop;
-          if (delta > 0.5) {
-            const currentMargin = parseFloat(item.el.style.marginTop) ||
-              parseFloat(getComputedStyle(item.el).marginTop) || 0;
-            item.el.style.marginTop = `${currentMargin + delta}px`;
-          }
-        }
-        // KEIN else-Branch: wenn der Block fits, lassen wir ihn in Ruhe.
-        // Keine Style-Mutation = kein Layout-Shift = kein Scroll-Sprung.
       }
+      if (!anyChange) break;
+      void fg.offsetHeight;
+    }
+
+    // PASS 1e — Image-Row-Re-Push NACH PASS 1c's HR-Shrink.
+    // PASS 1c hat HR-Höhen ggf. verkleinert (HR füllt nicht mehr ganz bis
+    // zum nächsten Frame, weil Inhalt drüber durch PASS A/Z geschrumpft
+    // war). Das schiebt Inhalte UNTERHALB des HR um den Shrink-Betrag
+    // nach oben — End-Sektion-Bilder rutschen aus dem Page-Top hinaus,
+    // ihre Tops liegen ~88 px VOR dem Frame-Content-Top (Bug 2026-05-21).
+    // Wir korrigieren erneut center-basiert.
+    void fg.offsetHeight;
+    for (let iter = 0; iter < 5; iter++) {
+      let anyChange = false;
+      for (const row of imageRowsSorted) {
+        const observedTop = inFgContent(row);
+        const observedHeight = elH(row);
+        const center = observedTop + observedHeight / 2;
+        const pageIdx = Math.max(0, Math.floor(center / stridePx));
+        const pageContentTop = pageIdx * stridePx;
+        if (observedTop < pageContentTop - 0.5) {
+          const delta = pageContentTop - observedTop;
+          const currentMargin = parseFloat(row.style.marginTop) ||
+            parseFloat(getComputedStyle(row).marginTop) || 0;
+          row.style.marginTop = `${currentMargin + delta}px`;
+          anyChange = true;
+        }
+      }
+      if (!anyChange) break;
+      void fg.offsetHeight;
     }
 
     // Page-Count = ceil((fg-Höhe) / Stride).
@@ -576,6 +746,20 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
     obs.observe(fg);
     return () => obs.disconnect();
   }, [fgRef, schedule]);
+
+  // MutationObserver: PD-Spacer-Updates können fg-Höhe konstant lassen
+  // (Tausch zweier Spacer gleicher Gesamthöhe) → RO feuert nicht.
+  // Wir lauschen nur auf childList-Mutationen (Widget-Add/Remove) — NICHT
+  // auf style-attribute, sonst löst unser eigenes PASS-1b/1d setMarginTop
+  // einen Endlos-Loop aus (60 recalcs/s gemessen 2026-05-21).
+  useEffect(() => {
+    const fg = fgRef.current;
+    if (!fg) return;
+    const mo = new MutationObserver(() => schedule());
+    mo.observe(fg, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  }, [fgRef, schedule]);
+
 
   // Trigger bei Title- oder Image-Section-Änderung.
   useEffect(() => {

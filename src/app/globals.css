@@ -172,26 +172,28 @@
 }
 
 /* UI-Zoom (rein visuelle Anzeige): skaliert die A5-Stapel-Spalte + Bild-
- * Sektionen über `transform: scale`. Pagination-Engine teilt alle Rect-
- * Messungen wieder durch `--ui-zoom`, sodass die A5-Logik (Seiten-Höhe,
- * Content-Top, Soft-Break-Punkte) unverändert bei 1× rechnet. Toolbar,
- * Header und Footer skalieren NICHT mit — die Steuerelemente bleiben in
- * voller Bildschirm-Lesbarkeit erhalten. Beim Print/PDF-Export wird der
- * Zoom ignoriert (Override unten in @media print). */
+ * Sektionen über die CSS-`zoom`-Property. Im Gegensatz zu `transform:
+ * scale` skaliert `zoom` die LAYOUT-BOX mit — der Tisch-Hintergrund
+ * (.a5-desk) wächst dadurch automatisch mit dem visuell skalierten
+ * Stack, sodass kein Body-Hintergrund unter den Seiten durchscheint
+ * (Bug 2026-05-20: bei zoom > 100 % wurde unterhalb der Layout-Box
+ * der hellere body-bg sichtbar, weil .a5-desk nicht mitwuchs).
+ *
+ * getBoundingClientRect() reportet bei `zoom` die skalierten Werte —
+ * identisch zu `transform: scale`. Die Pagination-Engine teilt alle
+ * Mess-Werte wieder durch `--ui-zoom`, sodass die A5-Logik unverändert
+ * in logischen 1×-Koordinaten rechnet.
+ *
+ * Toolbar, Header und Footer skalieren NICHT mit — die Steuerelemente
+ * bleiben in voller Bildschirm-Lesbarkeit. Beim Print/PDF-Export wird
+ * der Zoom ignoriert (Override unten in @media print). */
 .a5-stack {
-  transform-origin: top center;
-  transform: scale(var(--ui-zoom, 1));
-}
-/* Container-Width-Anpassung: weil transform die Layout-Box nicht erweitert,
- * muss der Editor-Main-Container mehr Platz erhalten, sonst rutscht der
- * A5-Stapel bei Zoom > 1 in den horizontalen Rand. */
-.a5-desk main {
-  min-height: calc(var(--ui-zoom, 1) * 100%);
+  zoom: var(--ui-zoom, 1);
 }
 
 @media print {
   .a5-stack {
-    transform: none !important;
+    zoom: 1 !important;
   }
 }
 
