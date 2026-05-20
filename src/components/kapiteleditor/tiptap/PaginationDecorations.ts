@@ -405,9 +405,21 @@ function computeDecorations(
             // letzte sichtbare Wort der Vor-Zeile klebt bündig am rechten
             // Rand (kein Justify-Stretching des Trailing-Spaces), und die
             // Folgezeile startet ohne Leading-Space-Indent.
-            const insertPos = coord.pos;
-            const $pos = view.state.doc.resolve(insertPos);
+            // Wort-genaue Bruchstelle (Audit Bug 2, 2026-05-21): wenn
+            // posAtCoords mitten in einem Wort liegt (Blocksatz zieht
+            // Wörter rechts auseinander), würde der Spacer das Wort über
+            // zwei Seiten zerreißen. Wir snappen den Cursor erst nach links
+            // bis vor das aktuelle Wort, dann läuft die Whitespace-Sucht
+            // ihre normale Schleife.
+            const $pos = view.state.doc.resolve(coord.pos);
             const blockStart = $pos.start();
+            const WS_RE = /[\s ­]/;
+            let insertPos = coord.pos;
+            while (insertPos > blockStart) {
+              const ch = view.state.doc.textBetween(insertPos - 1, insertPos);
+              if (ch === "" || WS_RE.test(ch)) break;
+              insertPos--;
+            }
             let wsStart = insertPos;
             while (wsStart > blockStart) {
               const ch = view.state.doc.textBetween(wsStart - 1, wsStart);

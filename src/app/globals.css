@@ -366,24 +366,24 @@
   white-space: normal;
 }
 
-/* Word-konformer Blocksatz: jede WRAP-Zeile eines Absatzes (Zeilen, deren
- * Ende durch automatischen Browser-Wrap entsteht — NICHT durch User-Enter)
- * startet links bündig und endet rechts bündig. Die ECHTE letzte Zeile
- * eines Absatzes (User hat Enter gedrückt) wird NICHT gestretcht.
+/* Audit Bug 3 (2026-05-21): `text-align-last: justify` auf dem GANZEN
+ * Absatz ist ein Holzhammer. Der CSS-Selektor wendet die Regel auf den
+ * gesamten Paragraphen an — auch auf die WIRKLICH letzte Zeile (die laut
+ * Word-Typografie linksbündig bleiben muss). Folge: kurze Schluss-Zeilen
+ * werden mit ~30 px Wortabständen über die Seitenbreite gedehnt.
  *
- * Spezialfall: Absätze, die über mehrere A5-Seiten fließen (unsere
- * Pagination-Engine setzt dafür `.a5-soft-break-spacer`-Decorations
- * mitten in den Absatz). Die VISUELL letzte Zeile vor jedem Spacer
- * sitzt eigentlich mitten im Absatz, wird aber vom Browser als
- * „letzte Zeile" eines DOM-Sub-Blocks (display:block Spacer trennt) gewertet
- * und nicht justified. Wir zwingen sie hier zur Justifizierung, damit
- * der rechte Rand bündig wirkt — der Trailing-Space wird zusätzlich von
- * der display:none-Decoration in PaginationDecorations.ts versteckt,
- * sodass `text-align-last: justify` das LETZTE sichtbare Wort sauber an
- * den Rand zieht (ohne stretched whitespace gap). */
-.tiptap-editor p:has(.a5-soft-break-spacer) {
-  text-align-last: justify;
-}
+ * Korrekte Lösung: die Pagination-Engine (PaginationDecorations.ts)
+ * versteckt bereits den Trailing-Whitespace VOR jedem Spacer via
+ * display:none-Decoration. Mit unsichtbarem Trailing-Space endet die
+ * Vor-Spacer-Zeile im Justify-Layout natürlich am rechten Rand (das
+ * letzte sichtbare Wort sitzt bündig), ohne dass wir zusätzlich
+ * text-align-last erzwingen müssen. Die echte Schluss-Zeile bleibt
+ * linksbündig — wie in Word.
+ *
+ * Falls dadurch im Praxis-Layout doch noch sichtbar ragged-right-
+ * Zeilen vor Spacern entstehen, kann eine Inline-Decoration in PD die
+ * spezifische Zeile gezielt justifizieren (geplant für Phase C des
+ * Sanierungsplans). */
 
 .a5-stack blockquote,
 .a5-page blockquote {
