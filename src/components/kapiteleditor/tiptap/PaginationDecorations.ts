@@ -50,7 +50,13 @@ export const PaginationDecorations = Extension.create({
           let followUpRaf: number | null = null;
 
           const schedule = () => {
-            if (raf !== null) return;
+            // Cancel-and-requeue: ein etwaiger noch nicht gefeuerter rAF
+            // wird abgebrochen, dann frisch gequeued. Verhindert stuck-state
+            // (Bug 2026-05-20: nach Seitenumbruch-Einfügen blieben einige
+            // Zeilen im Seitenzwischenraum, weil ein vorheriger rAF nie
+            // feuerte und das raf-Handle non-null hängen blieb → alle
+            // nachfolgenden schedule()-Calls returnten früh).
+            if (raf !== null) cancelAnimationFrame(raf);
             raf = requestAnimationFrame(() => {
               raf = null;
               if (muteUpdates) return;
