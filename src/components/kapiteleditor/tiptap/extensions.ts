@@ -3,10 +3,115 @@ import { Extension } from "@tiptap/core";
 import Paragraph from "@tiptap/extension-paragraph";
 import TextAlign from "@tiptap/extension-text-align";
 import Placeholder from "@tiptap/extension-placeholder";
-import { Plugin } from "@tiptap/pm/state";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
 import type { ResolvedPos } from "@tiptap/pm/model";
 import { PageBreakNode } from "./PageBreakNode";
 import { PaginationDecorations } from "./PaginationDecorations";
+
+// HTML-Paste-Sanitizer (Audit Bug 7): Pastes aus Word, Google Docs oder
+// Webseiten enthalten häufig
+//   <div><br></div>  (Word-Absatz-Trenner)
+//   <p>Zeile 1<br>Zeile 2</p>  (Soft-Breaks innerhalb eines Absatzes)
+//   <div>…<div>…</div></div>  (verschachtelte Block-Elemente)
+// Daraus entsteht im Editor ein einziger riesiger Paragraph. Folge:
+// Dreifachklick selektiert das gesamte Kapitel; Alignment-Klick richtet
+// alles aus statt nur eines Absatzes. Wir normalisieren beim Einfügen:
+// jeder Block-Trenner (<div>, <p>, <br>, </h1–h6>) erzeugt einen echten
+// Paragraphen-Bruch.
+const sanitizePastedHTML = (html: string): string => {
+  if (typeof window === "undefined") return html;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  // Schritt 1: Block-<br> in <p>-Trenner umwandeln. Wir wickeln Geschwister
+  // ZWISCHEN <br>-Tags in eigene <p>-Hüllen.
+  doc.body.querySelectorAll("p, div").forEach((block) => {
+    if (!block.querySelector(":scope > br")) return;
+    const segments: Node[][] = [[]];
+    block.childNodes.forEach((n) => {
+      if (n.nodeType === Node.ELEMENT_NODE && (n as Element).tagName === "BR") {
+        segments.push([]);
+      } else {
+        segments[segments.length - 1].push(n);
+      }
+    });
+    if (segments.length <= 1) return;
+    const replacement = doc.createDocumentFragment();
+    for (const seg of segments) {
+      // Leere Segmente → leerer Absatz (Word-Style "Enter-Enter" für Abstand)
+      const p = doc.createElement("p");
+      for (const n of seg) p.appendChild(n.cloneNode(true));
+      replacement.appendChild(p);
+    }
+    block.replaceWith(replacement);
+  });
+  // Schritt 2: <div>-Wrapper aufbrechen (Word/Docs schachteln <div>s tief).
+  // Wir ziehen Inhalt aus <div>s nach oben; verschachtelte <div>s werden
+  // rekursiv flach gemacht. Ein <div>, das nur Text + Inlines enthält,
+  // wird zu <p>. Ein <div>, das Block-Kinder enthält, wird durchgereicht.
+  const flattenDivs = (root: Element) => {
+    let div = root.querySelector("div");
+    while (div) {
+      const hasBlockChild = Array.from(div.children).some((c) =>
+        /^(P|DIV|UL|OL|LI|H[1-6]|BLOCKQUOTE|PRE|TABLE)$/.test(c.tagName),
+      );
+      if (hasBlockChild) {
+        // Block-Inhalt: <div> einfach ersetzen mit seinen Kindern
+        const frag = doc.createDocumentFragment();
+        while (div.firstChild) frag.appendChild(div.firstChild);
+        div.replaceWith(frag);
+      } else {
+        // Nur Inline-Inhalt: zu <p> upgraden
+        const p = doc.createElement("p");
+        while (div.firstChild) p.appendChild(div.firstChild);
+        div.replaceWith(p);
+      }
+      div = root.querySelector("div");
+    }
+  };
+  flattenDivs(doc.body);
+  return doc.body.innerHTML;
+};
+
+const PasteSanitizerPlugin = new Plugin({
+  key: new PluginKey("paste-sanitizer"),
+  props: {
+    transformPastedHTML: (html) => sanitizePastedHTML(html),
+  },
+});
+
+// Stored-Mark-Sync (Audit Bugs 6, 18): Nach Undo/Redo zeigt der Editor
+// `state.storedMarks` an, die nicht mehr zum Cursor-Kontext passen. Die
+// Toolbar liest `editor.isActive("bold")`, das diese gespeicherten Marks
+// zuerst konsultiert — Button bleibt fälschlich aktiv. Wir prüfen nach
+// jeder Transaktion, ob die storedMarks mit den tatsächlichen Marks am
+// Selection-Head konsistent sind. Falls nicht, löschen wir storedMarks
+// proaktiv. Folge: Toolbar-Aktiv-States spiegeln den realen Text-Zustand.
+const StoredMarksSyncPlugin = new Plugin({
+  key: new PluginKey("stored-marks-sync"),
+  appendTransaction(transactions, _oldState, newState) {
+    if (!transactions.some((tr) => tr.docChanged || tr.selectionSet)) return null;
+    const stored = newState.storedMarks;
+    if (!stored || stored.length === 0) return null;
+    // Marks an der aktuellen Cursor-Position ermitteln. Bei einer
+    // Cursor-Selektion sind die "echten" Marks die des Zeichens LINKS
+    // vom Cursor (PM-Konvention: marks at $from.parent.maybeChild).
+    const { $head } = newState.selection;
+    const realMarks = $head.marks();
+    // Vergleich: für jeden Stored-Mark muss ein passender echter Mark
+    // mit identischem Type + Attrs existieren. Andernfalls clearen.
+    const allMatch = stored.every((sm) =>
+      realMarks.some((rm) => rm.type === sm.type && rm.eq(sm)),
+    );
+    if (allMatch) return null;
+    return newState.tr.setStoredMarks(null);
+  },
+});
+
+const TiptapStateHardening = Extension.create({
+  name: "tiptapStateHardening",
+  addProseMirrorPlugins() {
+    return [PasteSanitizerPlugin, StoredMarksSyncPlugin];
+  },
+});
 
 // Listen sind in Blockquotes nicht erlaubt (Stil-Konsistenz: Blockzitat
 // soll reiner Text bleiben, keine geschachtelten Aufzählungen). Wir
@@ -140,4 +245,5 @@ export const editorExtensions = [
   PageBreakNode,
   PaginationDecorations,
   NoListInBlockquote,
+  TiptapStateHardening,
 ];
