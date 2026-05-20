@@ -36,6 +36,10 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
 
   const currentLineHeight = (editor.getAttributes("paragraph").lineHeight as string) ?? "1.5";
   const currentIndent = (editor.getAttributes("paragraph").indent as number | undefined) ?? 0;
+  // Listen sind in Blockquotes nicht erlaubt (Stil-Konsistenz: Blockquote =
+  // Zitat-Text, keine geschachtelten Aufzählungen). Toolbar-Buttons werden
+  // deaktiviert, Tastenkombis blockiert (siehe extensions.ts).
+  const inBlockquote = editor.isActive("blockquote");
 
   const setLineHeight = (v: string) => {
     editor
@@ -91,16 +95,26 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
       <Toggle
         size="sm"
         pressed={editor.isActive("bulletList")}
-        onPressedChange={() => editor.chain().focus().toggleBulletList().run()}
-        aria-label="Aufzählung"
+        onPressedChange={() => {
+          if (inBlockquote) return;
+          editor.chain().focus().toggleBulletList().run();
+        }}
+        disabled={inBlockquote}
+        aria-label={inBlockquote ? "Aufzählung — in Blockzitat nicht erlaubt" : "Aufzählung"}
+        title={inBlockquote ? "In Blockzitaten sind Listen nicht erlaubt." : undefined}
       >
         <List className="h-4 w-4" />
       </Toggle>
       <Toggle
         size="sm"
         pressed={editor.isActive("orderedList")}
-        onPressedChange={() => editor.chain().focus().toggleOrderedList().run()}
-        aria-label="Nummerierte Liste"
+        onPressedChange={() => {
+          if (inBlockquote) return;
+          editor.chain().focus().toggleOrderedList().run();
+        }}
+        disabled={inBlockquote}
+        aria-label={inBlockquote ? "Nummerierte Liste — in Blockzitat nicht erlaubt" : "Nummerierte Liste"}
+        title={inBlockquote ? "In Blockzitaten sind Listen nicht erlaubt." : undefined}
       >
         <ListOrdered className="h-4 w-4" />
       </Toggle>
