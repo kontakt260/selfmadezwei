@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import type { Editor } from "@tiptap/react";
 import {
   AlignCenter,
@@ -31,6 +32,14 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
+// Verhindert, dass der Browser beim Klick auf ein Toolbar-Element den Fokus
+// vom Editor weg auf den Button zieht — sonst landen nachfolgende Tasten-
+// eingaben im Nichts (Audit Bug 5: „GEFETTET" wird beim Tippen geschluckt,
+// weil der Cursor aus ProseMirror verschwunden ist). Tiptaps `.focus()` im
+// Command-Chain reicht nicht aus, weil das Mouseup-Event den Fokus
+// nachträglich wieder auf den Button zieht.
+const keepEditorFocus = (e: React.MouseEvent) => e.preventDefault();
+
 export function EditorToolbar({ editor }: { editor: Editor | null }) {
   if (!editor) return <ToolbarSkeleton />;
 
@@ -60,6 +69,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
       <Toggle
         size="sm"
         pressed={editor.isActive("bold")}
+        onMouseDown={keepEditorFocus}
         onPressedChange={() => editor.chain().focus().toggleBold().run()}
         aria-label="Fett"
       >
@@ -68,6 +78,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
       <Toggle
         size="sm"
         pressed={editor.isActive("italic")}
+        onMouseDown={keepEditorFocus}
         onPressedChange={() => editor.chain().focus().toggleItalic().run()}
         aria-label="Kursiv"
       >
@@ -76,6 +87,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
       <Toggle
         size="sm"
         pressed={editor.isActive("underline")}
+        onMouseDown={keepEditorFocus}
         onPressedChange={() => editor.chain().focus().toggleUnderline().run()}
         aria-label="Unterstrichen"
       >
@@ -87,6 +99,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
       <Toggle
         size="sm"
         pressed={editor.isActive("blockquote")}
+        onMouseDown={keepEditorFocus}
         onPressedChange={() => editor.chain().focus().toggleBlockquote().run()}
         aria-label="Blockzitat"
       >
@@ -95,6 +108,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
       <Toggle
         size="sm"
         pressed={editor.isActive("bulletList")}
+        onMouseDown={keepEditorFocus}
         onPressedChange={() => {
           if (inBlockquote) return;
           editor.chain().focus().toggleBulletList().run();
@@ -108,6 +122,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
       <Toggle
         size="sm"
         pressed={editor.isActive("orderedList")}
+        onMouseDown={keepEditorFocus}
         onPressedChange={() => {
           if (inBlockquote) return;
           editor.chain().focus().toggleOrderedList().run();
@@ -124,6 +139,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
       <Toggle
         size="sm"
         pressed={editor.isActive({ textAlign: "left" })}
+        onMouseDown={keepEditorFocus}
         onPressedChange={() => editor.chain().focus().setTextAlign("left").run()}
         aria-label="Linksbündig"
       >
@@ -132,6 +148,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
       <Toggle
         size="sm"
         pressed={editor.isActive({ textAlign: "center" })}
+        onMouseDown={keepEditorFocus}
         onPressedChange={() => editor.chain().focus().setTextAlign("center").run()}
         aria-label="Zentriert"
       >
@@ -140,6 +157,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
       <Toggle
         size="sm"
         pressed={editor.isActive({ textAlign: "right" })}
+        onMouseDown={keepEditorFocus}
         onPressedChange={() => editor.chain().focus().setTextAlign("right").run()}
         aria-label="Rechtsbündig"
       >
@@ -148,6 +166,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
       <Toggle
         size="sm"
         pressed={editor.isActive({ textAlign: "justify" })}
+        onMouseDown={keepEditorFocus}
         onPressedChange={() => editor.chain().focus().setTextAlign("justify").run()}
         aria-label="Blocksatz"
       >
@@ -159,6 +178,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
       <Select value={currentLineHeight} onValueChange={setLineHeight}>
         <SelectTrigger
           className="h-8 w-[88px] gap-1 border-transparent text-xs hover:bg-accent/40"
+          onMouseDown={keepEditorFocus}
           aria-label="Zeilenabstand"
         >
           <SelectValue placeholder="Abstand" />
@@ -175,6 +195,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
         size="icon"
         variant="ghost"
         className={cn("h-8 w-8", currentIndent === 0 && "text-[#a8a39b]")}
+        onMouseDown={keepEditorFocus}
         onClick={() => changeIndent(-1)}
         aria-label="Einrückung verringern"
         disabled={currentIndent === 0}
@@ -186,6 +207,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
         size="icon"
         variant="ghost"
         className="h-8 w-8"
+        onMouseDown={keepEditorFocus}
         onClick={() => changeIndent(1)}
         aria-label="Einrückung erhöhen"
         disabled={currentIndent >= 5}
@@ -200,12 +222,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
         size="sm"
         variant="ghost"
         className="h-8 gap-1.5 px-2 text-xs"
-        onMouseDown={(e) => {
-          // preventDefault verhindert, dass der Klick den Editor-Fokus +
-          // die Selektion verliert — sonst würde insertPageBreak an einer
-          // falschen Position oder gar nicht einfügen.
-          e.preventDefault();
-        }}
+        onMouseDown={keepEditorFocus}
         onClick={() => editor.chain().focus().insertPageBreak().run()}
         aria-label="Seitenumbruch einfügen"
       >
@@ -220,6 +237,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
         size="icon"
         variant="ghost"
         className="h-8 w-8"
+        onMouseDown={keepEditorFocus}
         onClick={() => editor.chain().focus().undo().run()}
         disabled={!editor.can().undo()}
         aria-label="Rückgängig"
@@ -231,6 +249,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
         size="icon"
         variant="ghost"
         className="h-8 w-8"
+        onMouseDown={keepEditorFocus}
         onClick={() => editor.chain().focus().redo().run()}
         disabled={!editor.can().redo()}
         aria-label="Wiederherstellen"

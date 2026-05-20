@@ -620,3 +620,382 @@ Keine Critical oder High Bugs in PROJ-5-Scope. Alle Acceptance Criteria erfüllt
 
 ## Deployment
 _To be added by /deploy_
+
+---
+
+## Tech Design Refresh — Sanierung 2026-05-21 (Solution Architect)
+
+> Basis: externes Audit `chapter_editor_audit.md` (v5). Spec-Status bleibt
+> **Approved**, aber die heutige Pagination-Kaskade (PASS 0/1a/1b/1c/1d/1e/A/Z)
+> ist symptomatisch geworden — wir behandeln immer wieder neue Folgefehler
+> derselben Race-Condition. Dieser Refresh definiert eine strukturelle
+> Sanierung als Hybrid: Tippen + Pagination werden architektonisch neu
+> gefasst, alles andere chirurgisch gefixt.
+
+### Sanierungs-Themen (Bug-Mapping)
+
+Vier Themen-Cluster, alle 10 Audit-Bugs zugeordnet:
+
+| Cluster | Audit-Bugs | Lösungsweg |
+| :--- | :--- | :--- |
+| **Unified Layout Loop** | 1 (kein Reflow beim Tippen), 2 (Word-Bruch an Seitengrenze), 3 (Blocksatz-Dehnung), Heutige Race-Cascade | Strukturell — eine einzige, deterministische Layout-Pipeline |
+| **Typographie-Engine** | 4 (Titel-Silbentrennung), 10 (Rivers), 16 (Mixed-Language), 17 (Underscores) | Hypher + CSS-Overhaul |
+| **Editor-Lifecycle** | 5 (Fokus-Diebstahl), 6/18 (Sticky Toolbar), 7 (Triple-Click), 8 (Whitespace-Klick) | Chirurgisch — Event-Handling + ProseMirror-State-Sync |
+| **Backend / Migration** | — | Bestehende `chapters.body` bleibt unverändert kompatibel |
+
+### A) Unified Layout Loop (Pagination-Engine v3)
+
+#### Heutige Architektur (warum sie scheitert)
+
+Zwei Engines konkurrieren um dieselbe Wahrheit:
+
+```
+PaginationDecorations (PD)          usePagination (recalc)
+  - rAF-Schedule                       - rAF-Schedule
+  - PASS 1: clear, measure             - PASS 0: clear margins/scales
+  - PASS 2: build decorations          - PASS 1a: settle HRs
+  - dispatch transaction               - PASS A: image-row scaling
+                                       - PASS 1b: image-row push
+                                       - PASS Z: same-size-per-page
+                                       - PASS 1d: re-push image rows
+                                       - PASS 1c: re-settle HRs
+                                       - PASS 1e: final re-push
+```
+
+Beide messen das **DOM nach den Mutationen der jeweils anderen Engine**.
+Daraus folgt: jeder Fix in einer Engine erzeugt ein neues Symptom in der
+anderen. Das ist die Wurzel aller Bugs 1–3.
+
+#### Neue Architektur — ein Lauf, eine Wahrheit
+
+```
+Unified Layout Loop (Owner: usePagination)
++-- 1. Mutation-Sammler (alle Trigger landen hier)
+|    +-- Tippen (characterData + childList Observer)
+|    +-- ProseMirror-Transaktion (Tiptap update-Hook)
+|    +-- Image-Upload, Layout-Wechsel, Bild-Reorder
+|    +-- Image-Load (lazy-loaded Bilder)
+|    +-- ResizeObserver auf fg (Window-Resize, Schriftgröße)
++-- 2. Single rAF (alle Trigger werden coalesced)
++-- 3. Synchronisierter Pass im Editor-DOM
+     +-- (a) Clear: alle Push-Margins + Spacer + Skalen synchron entfernen
+     +-- (b) Reflow: ein einziges void fg.offsetHeight
+     +-- (c) Measure: alle Block-Positionen + Reihen-Höhen + Bild-Höhen
+                       in EINEM Schritt einlesen, im logischen A5-Koordinaten-
+                       system (zoom-divisiert)
+     +-- (d) Compute: pro Seite ermitteln
+              - welche Blöcke / Zeilen / Reihen darauf liegen
+              - Witwen/Waisen-Regelung (≥ 2 Zeilen am Seitenanfang/-ende)
+              - Keep-with-next für H1/H2
+              - Image-Row-Skalierung (Page-Group, uniforme Skala)
+              - Wort-genaue Soft-Break-Position
+     +-- (e) Apply: alle Mutationen in EINER Transaktion auf das DOM
+              - Soft-Break-Spacer als ProseMirror Widget-Decorations
+              - HR-Höhen für manuelle Seitenumbrüche
+              - Image-Row Skalen + Margins
+     +-- (f) Verify: void fg.offsetHeight + ein Mess-Lauf zur Bestätigung
+              - findet die Engine eine Abweichung > Toleranz, läuft Schritt
+                (d)+(e) ein zweites Mal — danach abbruch
+```
+
+PD wird zur **passiven Decoration-Schicht** degradiert: PD baut auf Anweisung
+von usePagination Spacer-Decorations, misst aber selbst nicht mehr. Damit
+verschwindet die Race-Condition by design.
+
+#### Wort-genauer Soft-Break (Audit Bug 2)
+
+Wenn die Engine eine Seitenüberlauf-Stelle gefunden hat, darf der Spacer
+niemals **mitten in einem Wort** sitzen. Der Algorithmus rückt die
+Bruchstelle nach links bis zum nächsten Trennzeichen:
+
+```
+gefundene Bruchstelle (geometrisch via posAtCoords)
+      |
+   ...Tag an dem ich jakytrier wurde...
+                  ↑
+            nach links scannen, bis Whitespace
+            oder Soft-Hyphen (von Hypher injiziert)
+            erreicht ist → Spacer dort einsetzen
+```
+
+Edge-Case: liegt das Wort allein in der Zeile (passt nicht), wird die
+gesamte Zeile auf die Folgeseite geschoben (Witwe-Regel deckt das ab).
+
+#### Blocksatz-Dehnung der letzten Zeile (Audit Bug 3)
+
+`text-align-last: justify` wird **vollständig entfernt** vom Editor-CSS.
+Stattdessen markiert die Engine in (d) die Zeile **vor** einem Spacer mit
+einer ProseMirror-Inline-Decoration (z. B. CSS-Klasse `a5-justified-line`).
+Nur diese Zeile bekommt selektiv Blocksatz; die echte letzte Zeile eines
+Absatzes bleibt linksbündig — wie in Word.
+
+### B) Typographie-Engine
+
+#### Hypher-Integration (Audit Bugs 10, 16)
+
+- Hypher läuft client-seitig vor jeder Engine-Messung und injiziert
+  weiche Trennzeichen (`­`) in alle Textknoten des Editor-Bodys.
+- Dictionaries: DE (primär) + EN (für englische Fragmente).
+- Spracherkennung pro Absatz: Heuristik über das `lang`-Attribut + Wort-
+  Häufigkeits-Check. Phantasiewörter wie *jakytrier* werden mit dem
+  Default-Dictionary verarbeitet (eher zurückhaltende Trennung als
+  willkürlicher Bruch).
+- Hypher läuft **nicht im PM-Dokument** — die weichen Trennzeichen sind
+  rein visuell und werden bei Save herausgefiltert.
+
+#### CSS-Overhaul (Audit Bugs 4, 17)
+
+| Selektor | Heutige Regel | Neue Regel | Begründung |
+| :--- | :--- | :--- | :--- |
+| `h1`, `h2` | `hyphens: auto` | `hyphens: none !important` | Überschriften niemals automatisch trennen (Bug 4) |
+| `.tiptap-editor p:has(.a5-soft-break-spacer)` | `text-align-last: justify` | entfällt | Bug 3 — wird durch Inline-Decoration ersetzt |
+| `.tiptap-editor p` | (Default) | `overflow-wrap: break-word; word-break: normal; text-justify: inter-word` | Bug 17 (Underscores) + Blocksatz-Qualität |
+| Body-Text | `hyphens: auto` | bleibt, ergänzt um Hypher-Soft-Hyphens | Doppelte Sicherheit |
+
+### C) Editor-Lifecycle (chirurgisch)
+
+#### Fokus-Diebstahl (Audit Bug 5)
+
+Jeder interaktive Toolbar-Slot (Button, Toggle, Select-Trigger) bekommt
+das **gleiche** Pattern, das heute nur am "Seitenumbruch"-Button existiert:
+`mousedown` wird **vor** dem `focus`-Event abgefangen, der Default
+unterbunden, der Editor behält den Cursor. Betrifft: B/I/U, Quote, Listen,
+Alignment, Zeilenabstand, Einrückung, Page-Number-Select, Undo/Redo,
+Bullet/Ordered-List, Zoom-Buttons.
+
+#### Sticky Toolbar-States (Audit Bugs 6, 18)
+
+Tiptap behält nach Undo/Redo **`storedMarks`** auf dem Selection-Head.
+Die Toolbar zeigt fälschlich Aktiv-Zustände. Fix:
+
+- Toolbar abonniert das `transaction`-Event des Editors zusätzlich zum
+  `selectionUpdate`-Event.
+- Nach jeder Transaktion vergleicht die Toolbar `editor.state.storedMarks`
+  mit den tatsächlichen Marks an `selection.$head`. Stimmen sie nicht
+  überein, werden `storedMarks` proaktiv gelöscht.
+- Die Aktiv-Zustände werden **ausschließlich** aus dem post-Sync-Zustand
+  gelesen.
+
+#### Triple-Click-Selektion (Audit Bug 7)
+
+Zwei Schutzschichten:
+
+1. **Enter-Rule**: Tiptap-Plugin verhindert, dass im Editor jemals nur
+   `<br>`-Tags zwischen Absätzen entstehen. Jeder Enter erzeugt eine
+   neue Paragraph-Node.
+2. **Paste-Sanitizer**: HTML-Pastes aus Word/Docs/Web werden durch einen
+   Custom-Schema-Parser geleitet, der `<div><br></div>`-Konstrukte und
+   verschachtelte `<p>`-Strukturen in saubere, separierte
+   Paragraph-Nodes auflöst.
+
+#### Whitespace-Klick (Audit Bug 8)
+
+Der A5-Foreground-Container (`.a5-stack__fg`) erhält einen `mousedown`-
+Listener: wenn der Klick **außerhalb** des PM-Editors landet, wird
+`editor.commands.focus("end")` aufgerufen. So springt der Cursor immer
+zum sinnvollsten Ende.
+
+### D) Komponenten-Struktur (PM-Sicht der Sanierung)
+
+```
+KapitelEditor
++-- EditorClient (Owner: Unified Layout Loop)
+|   +-- Toolbar
+|   |   +-- ToolbarButton-Wrapper  (NEU — kapselt mousedown-Schutz)
+|   |   +-- ToolbarStateSync       (NEU — storedMarks-Watcher)
+|   +-- TiptapEditor
+|   |   +-- Extensions
+|   |   |   +-- PaginationDecorations  (passiv, Decoration-Renderer)
+|   |   |   +-- EnterRule              (NEU — Paragraph-Garantie)
+|   |   |   +-- PasteSanitizer         (NEU — HTML-Normalisierung)
+|   |   +-- HyphenationPlugin          (NEU — Hypher-Bridge)
+|   +-- UnifiedLayoutEngine            (NEU — kerneller Pagination-Lauf)
+|   |   +-- MutationSource             (collects all triggers, incl. characterData)
+|   |   +-- LayoutPass                 (single-pass: clear → measure → compute → apply → verify)
+|   |   +-- WordBoundarySplit          (Soft-Break an Wortgrenzen)
+|   |   +-- WidowOrphanGuard           (≥ 2-Zeilen-Regel)
+|   |   +-- ImageRowPlanner            (Same-Size-Per-Page-Gruppierung)
+|   +-- A5Frames + PageNumbers          (gekoppelt an Engine-Page-Count)
++-- ImageSection (Anfang + Ende, unverändert)
++-- ZoomControl (unverändert)
+```
+
+### E) Datenmodell
+
+Keine neuen Felder. `chapters.body` enthält weiterhin TipTap-JSON. Die
+folgenden Daten werden **nicht** persistiert (rein clientseitig):
+
+- Hypher-injizierte Soft-Hyphens
+- Soft-Break-Spacer-Decorations
+- Per-Row Image-Scales
+- HR-Höhen für manuelle Seitenumbrüche
+
+Beim Save werden Soft-Hyphens und Decoration-Marker konsequent entfernt
+(Sanitizer-Schritt im `body`-Serializer).
+
+### F) Tech-Entscheidungen (Begründungen)
+
+1. **Unified Loop statt zweier Engines** — Rom-Cause-Fix für Bug 1 + alle
+   Race-Symptome. Komplexitätsreduktion: ein Codepfad, eine Wahrheit,
+   ein rAF-Tick.
+2. **PaginationDecorations bleibt erhalten als Renderer** — wir wollen die
+   Vorteile der ProseMirror-Widget-Decorations (Undo-sicher,
+   Re-Render-stabil) behalten. PD wird nur zur Render-Bibliothek
+   degradiert, ohne eigene Mess-Logik.
+3. **characterData-Observation** — zwingend nötig, damit Tippen ein
+   Pagination-Recalc auslöst. Heute fehlt das vollständig.
+4. **Hypher (DE+EN) statt nur CSS-`hyphens`** — Browser-`hyphens: auto`
+   ist nicht deterministisch, kennt nur eine Sprache pro `lang`-Attribut
+   und versagt bei Phantasiewörtern + Sonderzeichen. Hypher ist
+   deterministisch und multi-language.
+5. **mousedown-preventDefault auf allen Toolbar-Slots** — das Pattern
+   existiert bereits funktionierend an einem Button; wir replizieren es.
+6. **Enter-Rule + Paste-Sanitizer statt Triple-Click-Workaround** — die
+   Wurzel ist eine kaputte Absatz-Struktur. Wir reparieren das Schema,
+   nicht die Selektions-Logik.
+
+### G) Neue Abhängigkeiten
+
+| Paket | Zweck | Gewicht (gzip) |
+| :--- | :--- | :--- |
+| `hyphen` (Hypher-Fork) | Clientseitige Silbentrennung | ~14 KB |
+| `hyphenation.de` | Deutsches Trennmuster | ~38 KB |
+| `hyphenation.en-us` | Englisches Trennmuster | ~30 KB |
+
+Gesamt: ~82 KB gzip im Editor-Bundle (vertretbar — der Editor lädt
+ohnehin Tiptap + Extensions in derselben Größenordnung).
+
+### H) Migration / Rückwärtskompatibilität
+
+- `chapters.body` bleibt schema-identisch (kein DB-Migration nötig).
+- Bestehende Kapitel werden beim ersten Öffnen einmalig durch den
+  Paste-Sanitizer geleitet (idempotent — nur falls inkonsistente
+  Strukturen wie `<div><br></div>` gefunden werden). Wird beim
+  nächsten Save persistiert.
+- Visuelle Reflows: bestehende Kapitel können um 1–3 Zeilen anders
+  brechen. Akzeptiert — die alten Brüche waren ohnehin nicht
+  deterministisch (PD/usePagination-Race).
+
+### I) Implementierungs-Roadmap (Phasen)
+
+Empfohlene Reihenfolge — jede Phase ist eigenständig deploy-fähig:
+
+1. **Phase A — Chirurgische Fixes** (kein Engine-Eingriff)
+   - Bug 4: Hyphens off für H1/H2.
+   - Bug 5: mousedown-preventDefault auf allen Toolbar-Slots.
+   - Bug 8: Whitespace-Click auf `.a5-stack__fg`.
+   - Bug 17: `overflow-wrap` + `word-break` CSS.
+
+2. **Phase B — State-Sync** (lokal in Toolbar/Extensions)
+   - Bug 6/18: storedMarks-Sync nach Transaktionen.
+   - Bug 7: EnterRule + PasteSanitizer.
+
+3. **Phase C — Unified Layout Loop** (Engine-Refactor)
+   - Mutation-Sammler inkl. characterData (Bug 1).
+   - Single-Pass-Pipeline (löst Race + bisherige PASS-Kaskade ab).
+   - WordBoundarySplit (Bug 2).
+   - Inline-Justify-Decoration (Bug 3).
+
+4. **Phase D — Hypher** (Typografie)
+   - Hypher-Bridge.
+   - Dictionaries DE + EN.
+   - Save-Sanitizer für Soft-Hyphens.
+
+5. **Phase E — Regression / QA**
+   - Cross-Browser auf Chrome/Firefox/Safari + Tablet-Viewports.
+   - Visual-Diff aller existierenden Test-Kapitel.
+   - Performance-Profiling: ein Pagination-Lauf muss < 16 ms bleiben.
+
+### J) Risiken & Gegenmaßnahmen
+
+| Risiko | Wahrscheinlichkeit | Gegenmaßnahme |
+| :--- | :--- | :--- |
+| Unified Loop einführt neue Regressionen | Hoch | Phase C läuft hinter Feature-Flag; alter Code-Pfad bleibt 1 Sprint parallel verfügbar |
+| Hypher verlangsamt das Tippen | Mittel | Hypher läuft nur auf geänderten Absätzen (Diff-Cache), nicht auf jedem Keystroke das gesamte Dokument |
+| Phase C verschiebt sichtbare Bruchpositionen bei Bestandsdokumenten | Mittel | Vorab Visual-Diff gegen 10 reale Kapitel; nutzerseitig kommunizieren („verbessertes Layout") |
+| Performance-Budget < 16 ms wird gerissen | Mittel | Profiling-Run in Phase E; Pagination-Trigger bei langen Eingaben coalescen (max 30 Hz) |
+| Toolbar-mousedown-Patch bricht versteckt Klickverhalten anderer Buttons | Niedrig | Phase A wird sofort durch QA-Smoke laufen, ein-Tag-Rollback-Pfad steht |
+
+### K) Erfolgskriterien (Akzeptanz nach Sanierung)
+
+- [ ] Tippen am Seitenende reflowt sichtbar auf die Folgeseite (Bug 1)
+- [ ] Kein Wort wird über einen Seitenumbruch hinweg geteilt (Bug 2)
+- [ ] Die letzte Zeile eines Absatzes bleibt linksbündig (Bug 3)
+- [ ] Kapitel-Titel werden niemals automatisch getrennt (Bug 4)
+- [ ] Toolbar-Klicks halten den Cursor im Editor (Bug 5)
+- [ ] Bold-/Italic-Buttons spiegeln nach Undo/Redo den realen Cursor-Zustand (Bug 6/18)
+- [ ] Dreifachklick + Alignment-Klick wirkt nur auf den Klick-Absatz (Bug 7)
+- [ ] Klick in leeren Whitespace fokussiert den Editor am Dokument-Ende (Bug 8)
+- [ ] Keine sichtbaren "Rivers of Whitespace" im Blocksatz (Bug 10)
+- [ ] Englische Langwörter werden korrekt getrennt (Bug 16)
+- [ ] Underscores zerren den Blocksatz nicht mehr auseinander (Bug 17)
+- [ ] Single-Pass-Pagination konvergiert ohne PASS 1c/1d/1e-Kaskade
+- [ ] Pagination-Lauf bleibt unter 16 ms auf Median-Hardware
+
+### L) Status-Sprung
+
+Nach Implementierung aller Phasen wird PROJ-5 von **Approved** → **In Review**
+zurückgesetzt und durchläuft einen vollständigen `/qa`-Regression-Run gegen
+die ursprünglichen Acceptance Criteria + die neuen Erfolgskriterien (K).
+
+---
+
+## Implementation Notes — Phase A (chirurgische Fixes, 2026-05-21)
+
+**Status:** In Progress (Phase A komplett, Phase B–E ausstehend)
+
+**Audit-Bugs adressiert:** 4, 5, 8, 17
+
+### Bug 4 — Hyphens off für H1/H2
+- `src/app/globals.css` (`.a5-stack h1`, `.a5-stack h2`): `hyphens: auto`
+  → `hyphens: none !important; -webkit-hyphens: none !important;`
+- Behält `overflow-wrap: anywhere` für extrem lange Überschriften
+  (Notbruch bleibt verfügbar, aber keine automatische Silbentrennung
+  mehr).
+- Live verifiziert: „Der Tag an dem ich jakytrier wurde" wird nicht
+  mehr in „jaky-trier" zerlegt.
+
+### Bug 5 — Toolbar-Fokus-Diebstahl
+- Eigene `keepEditorFocus`-Helferfunktion in
+  `src/components/kapiteleditor/EditorToolbar.tsx` (Modul-scope, einmal
+  definiert, an alle 14 interaktiven Elemente weitergereicht).
+- `onMouseDown={keepEditorFocus}` ergänzt auf: Bold/Italic/Underline,
+  Blockquote, BulletList/OrderedList, 4 Alignment-Toggles,
+  Zeilenabstand-Select-Trigger, beide Einrückungs-Buttons,
+  Seitenumbruch-Button (war bereits gefixt), Undo/Redo.
+- Auch `ZoomControl.tsx`: −/+-Buttons bekommen `onMouseDown=preventDefault`.
+- Verhindert, dass Mouseup nach dem Klick den Fokus auf den Button
+  zieht — Cursor bleibt im Editor, nachfolgende Tastatureingabe landet
+  im Text.
+
+### Bug 8 — Whitespace-Klick fokussiert Editor
+- `src/components/kapiteleditor/EditorClient.tsx`: `onMouseDown`-Handler
+  auf dem `.a5-stack__fg`-Wrapper.
+- Filter: `e.target === e.currentTarget` — nur direkte Klicks auf das
+  FG-Element, keine bubble-Klicks von Kindern (Header, Image-Section,
+  Editor behalten ihr eigenes Verhalten).
+- Aktion: `editor.commands.focus("end")` — Cursor springt ans
+  Dokument-Ende, analog zu Google Docs / Word.
+
+### Bug 17 — Underscore-Wörter im Blocksatz
+- `src/app/globals.css` (`.a5-stack p`, `.a5-page p`):
+  - `overflow-wrap: break-word` (Notbruch bei Token ohne natürliche
+    Bruchstelle — „TEST_EDIT_CHECK" darf jetzt umbrochen werden).
+  - `word-break: normal` (kein aggressives CJK-Wrap).
+  - `text-justify: inter-word` (nur Wortabstände werden gedehnt,
+    keine Buchstabenabstände).
+  - `text-rendering: optimizeLegibility` +
+    `font-feature-settings: "kern" 1, "liga" 1, "clig" 1, "calt" 1`
+    (Kerning + Standard-Ligaturen).
+
+### Type-Check
+`npx tsc --noEmit` ohne Fehler.
+
+### Folge-Phasen
+- **Phase B** (State-Sync): EnterRule + PasteSanitizer + storedMarks-Sync
+  → addressiert Bugs 6/7/18.
+- **Phase C** (Unified Layout Loop): Engine-Refactor, characterData-
+  Observation, Single-Pass-Pipeline → addressiert Bugs 1/2/3 + die
+  bestehende Race-Cascade.
+- **Phase D** (Hypher): Typografie → adressiert Bugs 10/16.
+- **Phase E** (Regression / QA).

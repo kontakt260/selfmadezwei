@@ -237,7 +237,25 @@ export function EditorClient({
             ))}
           </div>
           {/* Vordergrund-Layer: Editor + Bild-Sektionen */}
-          <div className="a5-stack__fg" ref={fgRef}>
+          <div
+            className="a5-stack__fg"
+            ref={fgRef}
+            onMouseDown={(e) => {
+              // Klick auf leere Weiß-Fläche (Padding der FG, Bereich
+              // unterhalb des letzten Absatzes, Klick zwischen Bild-Sektion
+              // und nächstem Element) soll den Cursor auf das Dokument-Ende
+              // setzen — wie in Word/Docs. Audit Bug 8: Heute reagiert der
+              // Editor an dieser Stelle gar nicht, weil ProseMirror den
+              // weißen Bereich physisch nicht ausfüllt.
+              // `e.target === e.currentTarget` filtert Bubble-Klicks von
+              // Kindern aus (Editor, Image-Section, Header behalten ihre
+              // eigene Klick-Logik).
+              if (e.target === e.currentTarget && editor) {
+                e.preventDefault();
+                editor.commands.focus("end");
+              }
+            }}
+          >
             <FirstPageHeader title={title} />
             <ImageSection
               data={imageSections.start}

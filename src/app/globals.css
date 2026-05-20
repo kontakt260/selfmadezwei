@@ -302,12 +302,15 @@
   color: #2f3b30;
   margin: 0;
   /* Lange Wörter im Kapitel-Titel müssen umbrechen, sonst überlaufen sie
-   * den A5-Inhalt nach rechts. `overflow-wrap: anywhere` greift auch ohne
-   * Silbentrennung; `hyphens: auto` + `lang="de"` versucht zuerst sauber
-   * an Silbenstellen zu trennen. */
+   * den A5-Inhalt nach rechts. `overflow-wrap: anywhere` greift ohne
+   * automatische Silbentrennung — wir verlassen uns NICHT auf
+   * `hyphens: auto`, weil Überschriften in Buchtypografie niemals
+   * automatisch getrennt werden (Audit Bug 4: Phantasiewörter wie
+   * „jakytrier" werden vom Browser heuristisch in „jaky-trier" zerlegt). */
   overflow-wrap: anywhere;
   word-break: normal;
-  hyphens: auto;
+  hyphens: none !important;
+  -webkit-hyphens: none !important;
 }
 
 .a5-stack h2,
@@ -317,7 +320,8 @@
   font-weight: 400;
   line-height: 1.3;
   overflow-wrap: anywhere;
-  hyphens: auto;
+  hyphens: none !important;
+  -webkit-hyphens: none !important;
 }
 
 .a5-stack p,
@@ -332,6 +336,25 @@
   -webkit-hyphenate-limit-chars: 8 4 4;
   hyphenate-limit-chars: 8 4 4;
   /* lang="de" auf <html> aktiviert deutsche Silbentrennung. */
+
+  /* Wortumbruch an Sonderzeichen + Notbruch für überlange Tokens
+   * (Audit Bug 17): Wörter wie „TEST_EDIT_CHECK" gelten ohne diese
+   * Regel als ein einzelnes unzertrennbares Token. Im Blocksatz reißt
+   * der Browser dann die übrige Zeile mit grotesken Wort-Lücken
+   * auseinander. `overflow-wrap: break-word` erlaubt einen Notbruch
+   * mitten im Wort, falls keine sinnvollere Bruchstelle vorhanden ist.
+   * `word-break: normal` hält am normalen Wort-Wrap-Verhalten fest
+   * (keine aggressive CJK-artige Inter-Character-Trennung). */
+  overflow-wrap: break-word;
+  word-break: normal;
+  /* Typografie-Feintuning für Blocksatz auf schmalen A5-Spalten:
+   * - inter-word: Browser dehnt Wort-Abstände, NICHT Buchstaben-Abstände
+   *   (verhindert „Stretch"-Buchstaben).
+   * - optimizeLegibility + Ligatur-Features: aktiviert Kerning, Standard-
+   *   Ligaturen + kontextuelle Alternativen für sauberen Druck-Look. */
+  text-justify: inter-word;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1, "liga" 1, "clig" 1, "calt" 1;
 
   /* ProseMirror setzt per Default `white-space: break-spaces` für Editing-
    * Fidelity (jeder Space wird sichtbar gerendert). Das produziert in

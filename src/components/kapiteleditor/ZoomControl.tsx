@@ -29,6 +29,7 @@ export function ZoomControl({
     <div className="flex items-center gap-0.5 border border-[#e0dcd5] bg-white">
       <button
         type="button"
+        onMouseDown={(e) => e.preventDefault()}
         onClick={decrease}
         disabled={!canDecrease}
         aria-label="Verkleinern"
@@ -44,6 +45,7 @@ export function ZoomControl({
       </span>
       <button
         type="button"
+        onMouseDown={(e) => e.preventDefault()}
         onClick={increase}
         disabled={!canIncrease}
         aria-label="Vergrößern"
