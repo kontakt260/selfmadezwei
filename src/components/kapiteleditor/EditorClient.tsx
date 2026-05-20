@@ -515,10 +515,14 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
     setPageCount((prev) => (prev !== needed ? needed : prev));
   }, [fgRef, stackRef]);
 
-  // rAF-gebatcht: Single-Pass — der inkrementelle Algorithmus konvergiert
-  // in einer Runde, weil wir Live-Werte lesen und nur Diffs anwenden.
+  // rAF-gebatcht: bei jedem Schedule den vorigen rAF abbrechen und einen
+  // neuen queuen. Der frühere „skip if rafRef.current !== null"-Guard
+  // hat nach Next.js-Link-Re-Mount für stuck-state gesorgt: das ref blieb
+  // nicht-null hängen (möglicherweise weil der vorherige rAF nie feuerte),
+  // und alle nachfolgenden Schedule-Calls returnten früh → recalc lief
+  // NIE wieder → pageFrames blieb auf 1 stehen (Bug 2026-05-20).
   const schedule = useCallback(() => {
-    if (rafRef.current !== null) return;
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(() => {
       rafRef.current = null;
       recalc();
@@ -561,23 +565,22 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
     return () => document.removeEventListener("narravit:pagination-recompute", handler);
   }, [schedule]);
 
-  // Initialer Pass + Settling-Passes nach 100ms, 300ms, 800ms.
-  // Hintergrund: nach Login/Reload werden Signed-URLs serverseitig generiert
-  // und Bilder erst nach dem ersten React-Mount geladen. Der ResizeObserver
-  // sollte zwar feuern wenn die <img>-Elemente ihre finale Größe annehmen,
-  // aber Browser-Timing kann variieren. Mehrere Settling-Passes garantieren
-  // dass pageCount nach allen Late-Loads korrekt aktualisiert wird —
-  // verhindert das transiente „pageCount=1 trotz mehrseitigem Content"-
-  // Bild, das User-seitig direkt nach Page-Load sichtbar war.
+  // Initialer Pass + Settling-Passes nach 100/300/800/1500/3000 ms.
+  // Hintergrund: nach Login/Reload + bei Client-side-Navigation (Next.js
+  // Link, also OHNE Hard-Reload) hydriert React den Editor erst nach
+  // mehreren rAFs; TipTap's `immediatelyRender: false` verzögert den
+  // ersten Doc-Render zusätzlich. Bilder laden ihre finale Pixel-Größe
+  // erst nach Signed-URL-Fetch. Wenn KEINE dieser späteren Mutations
+  // den ResizeObserver triggert, bleibt pageCount auf dem Initial-State
+  // (1) hängen → User sieht nur Seite-1-Frame, Inhalt überläuft (Bug
+  // 2026-05-20: „nach Re-Enter zum Editor werden weiße Seiten nach
+  // Seite 1 nicht geladen"). Längere Settling-Kette deckt langsame
+  // Mount-Sequenzen ab.
   useEffect(() => {
     schedule();
-    const t1 = setTimeout(schedule, 100);
-    const t2 = setTimeout(schedule, 300);
-    const t3 = setTimeout(schedule, 800);
+    const timers = [100, 300, 800, 1500, 3000].map((d) => setTimeout(schedule, d));
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
+      for (const t of timers) clearTimeout(t);
     };
   }, [schedule]);
 
