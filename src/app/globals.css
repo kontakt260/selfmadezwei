@@ -234,14 +234,17 @@
 
 .a5-page-number {
   position: absolute;
-  /* Seitenzahl in die Marge schieben, NICHT in den Inhaltsbereich. Word/Docs
-   * positioniert Kolumnentitel üblicherweise mittig in den Außenmargen.
-   * Wir setzen sie auf ~ 40 % des rechten Außenrands. */
-  right: calc(var(--a5-margin-right) * 0.35);
+  /* Seitenzahl auf dem Mittelpunkt der Diagonale zwischen oberer rechter
+   * Seiten-Ecke und oberer rechter Innen-Ecke des Inhalts-Bereichs.
+   * Diagonale läuft von (0, 0) zur Seiten-Innen-Ecke (margin-right,
+   * margin-top); Mittelpunkt = (margin-right / 2, margin-top / 2) — also
+   * jeweils auf der halben Marge in beiden Richtungen. */
+  right: calc(var(--a5-margin-right) / 2);
   font-family: var(--font-pt-serif), serif;
   font-size: 10pt;
   color: #848484;
   pointer-events: none;
+  transform: translate(50%, -50%);
 }
 
 /* Alte .a5-page-Klasse: bleibt fix A5, falls Single-Page-Routen sie verwenden */

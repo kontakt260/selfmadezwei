@@ -250,10 +250,11 @@ export function EditorClient({
               <span
                 key={i}
                 className="a5-page-number"
-                // Position in der OBEREN Marge (nicht im Inhaltsbereich),
-                // damit die Seitenzahl niemals mit dem ersten Text-Block
-                // oder einer in den rechten Rand laufenden Zeile kollidiert.
-                style={{ top: `calc(${i} * (var(--a5-page-height) + var(--a5-page-gap)) + var(--a5-margin-top) * 0.55)` }}
+                // Position: Mittelpunkt der Diagonale zwischen oberer rechter
+                // Seiten-Ecke und oberer rechter Inhalts-Ecke. Top-Offset =
+                // margin-top / 2 (vertikale Hälfte der Marge). Translate
+                // (-50%) im CSS zentriert die Zahl auf diesem Punkt.
+                style={{ top: `calc(${i} * (var(--a5-page-height) + var(--a5-page-gap)) + var(--a5-margin-top) / 2)` }}
               >
                 {i + 1}
               </span>
