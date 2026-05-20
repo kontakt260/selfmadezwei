@@ -6,7 +6,10 @@ type TipTapNode = {
 
 export function countWordsFromBody(body: unknown): number {
   if (!body || typeof body !== "object") return 0;
-  const text = extractText(body as TipTapNode);
+  // Soft-Hyphens (U+00AD) entfernen, bevor wir zählen: sie sind rein
+  // typografische Bruchstellen-Marker (Audit Bug 10/16 — Hypher-Integration
+  // 2026-05-21) und dürfen die Wortanzahl nicht beeinflussen.
+  const text = extractText(body as TipTapNode).replace(/­/g, "");
   if (!text.trim()) return 0;
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
