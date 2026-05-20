@@ -285,6 +285,18 @@ function computeDecorations(
         const delta = nextContentTop - blockTop;
         if (delta > 0.5) {
           decorations.push(buildBlockPushDecoration(pos, delta));
+          // Bei Blockquote: Block-Push-Spacer (für leere Absätze) auch
+          // in die Mask-Gaps aufnehmen, sonst zeigt die Border weiter
+          // im Page-Gap (Bug 2026-05-20: Enter-Drücken in Blockquote
+          // schmuggelt die Border zurück in den Seitenzwischenraum).
+          if (parentIsBlockquote && currentBqStart >= 0) {
+            const info = bqInfo.get(currentBqStart);
+            if (info) {
+              let localStart = blockTop - info.renderedTop;
+              if (localStart < 6) localStart = 0;
+              info.gaps.push({ start: localStart, end: localStart + delta });
+            }
+          }
           interParaShift += delta;
         }
       }
