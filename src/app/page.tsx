@@ -36,7 +36,7 @@ export default async function HomePage() {
 
   const { data: memberships } = await supabase
     .from("project_members")
-    .select("role, projects(id, title, updated_at, chapters(id))")
+    .select("role, projects(id, title, updated_at, chapters(id, updated_at))")
     .eq("user_id", user.id)
     .order("updated_at", { referencedTable: "projects", ascending: false });
 
@@ -45,14 +45,27 @@ export default async function HomePage() {
     .map((m) => {
       const p = m.projects!;
       const chapters = Array.isArray(p.chapters) ? p.chapters : [];
+      // „Zuletzt bearbeitet" ist das jüngste Update über Projekt UND alle
+      // Kapitel — sonst bleibt die Anzeige stehen, sobald nur Kapitel-
+      // Inhalt (Body, Title, Bilder) geändert wurde, denn dort wird
+      // chapters.updated_at gebumpt, projects.updated_at hingegen nicht.
+      let lastEdited = p.updated_at;
+      for (const c of chapters) {
+        if (c.updated_at && c.updated_at > lastEdited) lastEdited = c.updated_at;
+      }
       return {
         id: p.id,
         title: p.title,
-        formattedUpdatedAt: formatRelativeDate(p.updated_at),
+        formattedUpdatedAt: formatRelativeDate(lastEdited),
+        lastEditedAt: lastEdited,
         chapterCount: chapters.length,
         userRole: m.role as "projektleiter" | "co_author",
       };
-    });
+    })
+    // Sort by effective last-edited (Projekt + Kapitel kombiniert), nicht
+    // nur projects.updated_at — sonst rückt ein Projekt nicht nach oben,
+    // wenn nur Kapitel-Inhalt geändert wurde.
+    .sort((a, b) => (b.lastEditedAt > a.lastEditedAt ? 1 : -1));
 
   return (
     <>
