@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GripVertical, ImagePlus, Trash2, Plus } from "lucide-react";
 import {
   DndContext,
@@ -21,6 +21,16 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import {
   imagesPerPage,
@@ -42,6 +52,14 @@ export function ImageSection({
   onDelete: (image: ChapterImage) => Promise<void>;
 }) {
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<ChapterImage | null>(null);
+  // Hydration-Gate: @dnd-kit verwendet einen Modul-globalen Counter für
+  // `aria-describedby="DndDescribedBy-N"`. Zwischen SSR und Client-Hydration
+  // kann der Counter differieren → React Hydration-Mismatch. Lösung: DnD-
+  // Sortable-Slots erst NACH Mount rendern; pre-mount ist die Sektion leer
+  // (kurzer SSR-Frame, danach client-side hydrated mit DnD).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const sectionRef = useRef<HTMLDivElement>(null);
   // Word-/Docs-Verhalten: nach jeder Image-Mutation soll der bearbeitete
   // Bereich im Viewport sichtbar sein (Spec 2026-05-18 vom Nutzer:
@@ -117,7 +135,11 @@ export function ImageSection({
   }
 
   return (
-    <div ref={sectionRef} className="group/section relative">
+    <div
+      ref={sectionRef}
+      className="group/section relative"
+      data-image-section-wrapper
+    >
       {/* Controls erscheinen nur wenn Bilder da sind UND auf Hover.
        * Hover-Bridge + Delay-on-Leave verhindert, dass das Menu beim
        * Cursor-Übergang vom Bild zu den Buttons zu früh verschwindet. */}
@@ -169,6 +191,27 @@ export function ImageSection({
           <ImagePlus className="h-3.5 w-3.5" />
           Bild hinzufügen
         </button>
+      ) : !mounted ? (
+        // Pre-Hydration: Static-Render der Image-Slots ohne DnD-Attribute.
+        // Verhindert Hydration-Mismatch durch @dnd-kit's globalen
+        // aria-describedby-Counter, der SSR ↔ Client divergieren kann.
+        <>
+          {rows.map((row, rowIdx) => (
+            <div
+              key={rowIdx}
+              className="image-section"
+              data-layout={data.layout}
+              data-paginate-row
+            >
+              {row.map((img) => (
+                <div key={img.id} className="image-slot">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.signed_url} alt={img.alt} />
+                </div>
+              ))}
+            </div>
+          ))}
+        </>
       ) : (
         <DndContext
           sensors={sensors}
@@ -190,7 +233,7 @@ export function ImageSection({
                   <SortableSlot
                     key={img.id}
                     image={img}
-                    onDelete={() => handleDelete(img)}
+                    onDelete={() => setConfirmDelete(img)}
                   />
                 ))}
               </div>
@@ -204,6 +247,32 @@ export function ImageSection({
         onOpenChange={setUploadOpen}
         onUploaded={handleUploaded}
       />
+
+      <AlertDialog
+        open={confirmDelete !== null}
+        onOpenChange={(open) => { if (!open) setConfirmDelete(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bild entfernen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Das Bild wird aus dieser Bild-Sektion gelöscht. Du kannst es danach neu hochladen.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const img = confirmDelete;
+                setConfirmDelete(null);
+                if (img) handleDelete(img);
+              }}
+            >
+              Bild entfernen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -219,7 +288,7 @@ function SortableSlot({
     id: image.id,
   });
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 10 : undefined,

@@ -39,12 +39,27 @@ export default async function OnboardingPage({
   const defaultFullName =
     (user?.user_metadata?.full_name as string | undefined) ?? "";
 
+  // Konto-Löschen-Link nur zeigen wenn der User schon mal ein Projekt hatte
+  // (Flag wird in deleteProjectAction gesetzt) UND aktuell keines mehr besitzt.
+  let showAccountDeleteLink = false;
+  if (user) {
+    const hadProject = (user.user_metadata?.had_project as boolean | undefined) === true;
+    if (hadProject) {
+      const { count } = await supabase
+        .from("project_members")
+        .select("project_id", { count: "exact", head: true })
+        .eq("user_id", user.id);
+      showAccountDeleteLink = (count ?? 0) === 0;
+    }
+  }
+
   return (
     <OnboardingWizard
       defaultFullName={defaultFullName}
       buyerEmail={user?.email ?? ""}
       initialForWhom={initialForWhom}
       backUrl={user ? "/" : "https://www.narravit.de"}
+      showAccountDeleteLink={showAccountDeleteLink}
     />
   );
 }

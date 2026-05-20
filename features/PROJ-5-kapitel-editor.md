@@ -1,14 +1,16 @@
 # PROJ-5: Kapitel-Editor (A5, TipTap, Tablet)
 
-## Status: In Progress
+## Status: In Review
 **Created:** 2026-05-15
-**Last Updated:** 2026-05-18 (Pagination-Engine Iteration 3 — Image-Section-Trigger + Frontend-Validierung)
+**Last Updated:** 2026-05-19 (Backend angeschlossen — Migration + Server Actions, End-to-End-Persistenz validiert)
 
 > **Refinement 2026-05-18:** QA-Testbericht hat fundamentale Lücken in der Pagination-Logik aufgedeckt (9 Bugs, u. a. Inhalt im Zwischenraum zwischen Seiten, kumulative Drift, schwebende Seitenzahlen, verirrter Bottom-Image-Slot). Konsequenz: Spec-Sektion G „Pagination-Drift wird akzeptiert" ist obsolet — Editor erhält eine echte Pagination-Engine mit Zero-Overflow-Garantie. Siehe neue Sektion „Pagination-Engine" in den Acceptance Criteria sowie überarbeitete Sektionen G und H.
 
 > **Iteration 2 (2026-05-18, später Nachmittag):** Pagination-Engine implementiert + live im Browser validiert. Zero-Overflow + Soft-Break + Witwen-/Waisen + SHRINK + Two-In-A-Row-Empty-Page funktionieren. Siehe „Implementation Notes (2026-05-18, Pagination-Engine Iteration 2)" unten. Keep-with-next für H1/H2 ist deferred, weil der Editor-Body aktuell keine Headings unterstützt.
 
 > **Iteration 3 (2026-05-18, Abend, im Rahmen von `/frontend PROJ-5`):** Frontend-Komponenten Ende-zu-Ende im Browser validiert (Phone-/Tablet-/Desktop-Viewports, Toolbar-Buttons + sticky/Selection-Erhaltung, Title-Sync, Image-Section 1↔2-spaltig + DnD-Reorder, Scroll-Stabilität beim Tippen, Wortanzahl + Speicher-Status, kombinierter Text-+-Bild-Flow). Bug behoben: PaginationDecorations re-paginierte nicht zuverlässig nach React-State-Änderungen (Image-Upload, Layout-Wechsel), weil der `update`-Hook nur auf Doc-Transaktionen reagiert und der ResizeObserver vor dem `load`-Event der neuen `<img>`-Tags feuern konnte. Fix: MutationObserver für neu hinzugefügte `<img>`-Elemente + `load`-Listener pro IMG + Custom Event `narravit:pagination-recompute`, das EditorClient in einem `useEffect([imageSections, title])` dispatcht.
+
+> **Iteration 4 (2026-05-19, Edge-Case-Fix für Text + Bild + Page-Break-Kombination):** Systematische Browser-Tests (30+ Szenarien, Text-only + Bild-only + Text+Bild gemischt + dynamische Mutationen) haben einen kritischen Bug aufgedeckt: der Block-Push-Engine in `EditorClient.usePagination` setzte `style.marginTop` direkt auf Editor-Block-DOM-Knoten (`<p>` Kinder von `.tiptap-editor`), aber ProseMirror ersetzt diese Knoten beim DOM-Re-Render (z. B. nach Decoration-Transaktionen), wodurch der Push verloren ging. Symptom: bei 2 Start-Bildern (1-spaltig) auf leerem Kapitel landeten der leere Editor-Absatz und die End-Bild-Sektion in der GAP-Zone zwischen Seite 1 und Seite 2 statt auf Seite 2 oben. Fix: Block-Level-Pushes für Editor-Blöcke werden jetzt von `PaginationDecorations` als BLOCK-Widget-Decorations VOR dem überlaufenden Block eingefügt — Decorations überleben PM-Re-Renders. Image-Rows nutzen weiterhin `marginTop` (sind React-managed, kein Issue). Außerdem: Block-Push- und Soft-Break-Spacer werden aus der `usePagination`-Editor-Block-Query ausgeschlossen, um kumulativen Overshoot zu vermeiden.
 
 ## Dependencies
 - Requires: PROJ-4 (Kapitel-Routing & Persistenz) — URL-Struktur `/projektuebersicht/[project_id]/kapiteleditor/[chapter_id]`, `chapter_id` in URL
@@ -493,6 +495,30 @@ Live-validiert im Browser über Chrome-DevTools-MCP gegen die Akzeptanzkriterien
 **Bekannte Lücken (für Folge-Ticket)**
 - Image-Section-Layout-Wechsel 1↔2-spaltig in Live-Mit-Bildern wurde nicht durchgespielt (keine Upload-Sim per JS). ResizeObserver triggert automatisch, plausibel funktional, aber visuelle QA mit echten Bildern fehlt.
 - Cursor-down-incremental Pagination-Performance bei >50 Seiten ist nicht optimiert (Spec akzeptiert kleinen Lag).
+
+## Implementation Notes (2026-05-19, Backend)
+
+**Migration** `supabase/migrations/20260519151000_chapter_image_sections.sql` (stage):
+- `chapters.image_sections JSONB NOT NULL DEFAULT '{"start":{...},"end":{...}}'`
+- `chapters.color_page_count INTEGER NOT NULL DEFAULT 0`
+- CHECK-Constraint auf `image_sections`-Form (start/end Objekte mit erlaubten Layouts und Image-Arrays)
+- CHECK-Constraint `color_page_count >= 0`
+
+**Server Actions** in `src/app/projektuebersicht/[project_id]/kapiteleditor/[chapter_id]/actions.ts`:
+- `chapterAutosaveAction`: Zod-validiert title/body/imageSections/colorPageCount; `signed_url` wird vor dem Persist gestrippt (server-erzeugt zur Laufzeit); RLS + Defense-in-depth `.eq("project_id")`.
+- `chapterImageUploadAction`: prüft File-Größe (≤10 MB) + MIME (jpg/png/webp); Membership-Check; lädt nach `chapter-heroes/{project_id}/{chapter_id}/{uuid}.{ext}`; appended in `image_sections`; gibt fresh Signed-URL zurück; bei DB-Fehler Storage-Rollback (remove).
+- `chapterImageDeleteAction`: entfernt aus JSONB zuerst (autoritativ), dann aus Storage (verwaiste Storage-Objekte sind tolerierbar; Daten-Inkonsistenz wird vermieden).
+
+**Page-Loader** (`page.tsx`): liest `image_sections` aus DB, parst defensiv (unbekannte/garbage Felder → leerer Default), generiert Signed-URLs (1 h TTL) batched via `createSignedUrls` für alle gespeicherten Bilder.
+
+**EditorClient**: Stubs `saveDraftStub`/`uploadImageStub`/`deleteImageStub` entfernt; Auto-Save und Section-Mutationen rufen direkt die Server Actions. Blob-URL-Cleanup nach erfolgreichem Upload (Server liefert Signed-URL).
+
+**Live-Validation** (Chrome DevTools MCP, stage Supabase):
+- Text-Persistenz nach Reload ✓
+- Bild-Upload erzeugt Storage-Objekt + Signed-URL ✓
+- Bild bleibt nach Reload + lädt mit fresh Signed-URL ✓
+- Bild-Lösch: Modal-Confirm + Storage-Remove + JSONB-Update ✓
+- 0 Console-Errors
 
 ## QA Test Results
 _To be added by /qa_

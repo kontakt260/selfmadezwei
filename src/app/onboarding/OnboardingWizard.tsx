@@ -40,11 +40,13 @@ export function OnboardingWizard({
   buyerEmail,
   initialForWhom,
   backUrl = "https://www.narravit.de",
+  showAccountDeleteLink = false,
 }: {
   defaultFullName: string;
   buyerEmail: string;
   initialForWhom?: ForWhom | null;
   backUrl?: string;
+  showAccountDeleteLink?: boolean;
 }) {
   const [state, setState] = useState<WizardState>({
     ...INITIAL_STATE,
@@ -130,8 +132,20 @@ export function OnboardingWizard({
   };
 
   return (
-    <section className="flex min-h-screen flex-col bg-[#FAF8F6] text-[#3E3831]">
-      <header className="border-b border-[#e0dcd5] px-[5%] py-4">
+    <section className="relative flex min-h-screen flex-col overflow-hidden bg-[#FAF8F6] text-[#3E3831]">
+      <div className="absolute inset-0" aria-hidden>
+        <Image
+          src="/images/onboarding-background-book.png"
+          alt=""
+          fill
+          className="scale-[1.02] object-cover blur-[3px]"
+          sizes="100vw"
+          priority
+        />
+        <div className="absolute inset-0 bg-[#FAF8F6]/60" />
+      </div>
+
+      <header className="relative z-10 border-b border-[#e0dcd5]/80 bg-[#FAF8F6]/75 px-[5%] py-4 backdrop-blur-sm">
         <div className="flex items-center gap-4">
           <Image src="/logo.svg" alt="" width={72} height={64} className="h-14 w-auto" priority />
           <span className="[font-family:var(--font-merriweather)] text-3xl font-normal leading-none tracking-[0.02em] text-[#2f3b30]">
@@ -140,8 +154,8 @@ export function OnboardingWizard({
         </div>
       </header>
 
-      <div className="flex flex-1 items-center justify-center px-[5%] py-12 md:py-20">
-        <div className="w-full max-w-3xl border border-[#e0dcd5] bg-white p-7 sm:p-10 md:p-12">
+      <div className="relative z-10 flex flex-1 items-center justify-center px-[5%] py-12 md:py-20">
+        <div className="w-full max-w-3xl border border-[#e0dcd5] bg-white/95 p-7 shadow-[0_18px_48px_rgba(62,56,49,0.12)] backdrop-blur-sm sm:p-10 md:p-12">
           <ProgressBar total={steps.length} current={stepIndex} />
 
           <div className="mt-8">
@@ -204,6 +218,18 @@ export function OnboardingWizard({
               </Button>
             )}
           </div>
+
+          {showAccountDeleteLink && (
+            <p className="mt-8 border-t border-[#e0dcd5] pt-6 text-center text-sm text-[#848484]">
+              Du möchtest stattdessen dein NARRAVIT-Konto endgültig löschen?{" "}
+              <a
+                href="/persoenlicher-bereich"
+                className="text-[#3E3831] underline underline-offset-4 hover:no-underline"
+              >
+                Zum persönlichen Bereich
+              </a>
+            </p>
+          )}
         </div>
       </div>
     </section>

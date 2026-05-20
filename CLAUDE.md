@@ -122,6 +122,7 @@ docs/
 - **Read-before-edit:** Dateien immer erst lesen, nie aus dem Gedächtnis raten
 - **Tests neben Source:** `useHook.test.ts` neben `useHook.ts`; E2E in `tests/`
 - **Server-side first:** `project_id` / `chapter_id` und Auth immer serverseitig validieren; keine Secrets im Client; Stripe/Vapi-Webhooks signieren
+- **Keine visuellen Overlay-Hacks:** Wenn ein Element falsch rendert (z. B. Border läuft durch Seitenzwischenraum), das Element ECHT im Code anpassen — niemals ein farbiges Pseudo-Element / weißes Div darüber legen, das den Bug optisch verdeckt. Overlays brechen bei Skalierung, Theme-Wechsel, Print-Export und sind Pixel-genau abhängig von Font-Metriken. Stattdessen: DOM strukturell ändern, CSS-`mask-image`/`clip-path` direkt auf dem fehlerhaften Element, oder Rendering-Logik in der Engine korrigieren.
 
 ## Build- & Test-Commands
 

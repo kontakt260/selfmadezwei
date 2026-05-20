@@ -90,7 +90,24 @@ export const PaginationDecorations = Extension.create({
           window.addEventListener("resize", onResize);
 
           const fg = editorView.dom.closest(".a5-stack__fg") as HTMLElement | null;
-          const ro = new ResizeObserver(() => schedule());
+          // RO triggert PD-Recompute nur, wenn fg's HÖHE sich um >5 px ändert
+          // UND die Änderung mind. 250 ms stabil bleibt (Debounce). Verhindert
+          // dass jede Mikro-Schwankung durch Image-Row-Mutation einen PD-
+          // Recompute auslöst, der wiederum usePagination's PASS 1 Push-
+          // Entscheidung verschiebt (Bug 2026-05-20: Layout-Switch Oszillation).
+          let lastFgH = fg ? fg.getBoundingClientRect().height : 0;
+          let roTimer: ReturnType<typeof setTimeout> | null = null;
+          const ro = new ResizeObserver(() => {
+            if (!fg) return;
+            const h = fg.getBoundingClientRect().height;
+            if (Math.abs(h - lastFgH) < 5) return;
+            if (roTimer) clearTimeout(roTimer);
+            roTimer = setTimeout(() => {
+              roTimer = null;
+              lastFgH = fg.getBoundingClientRect().height;
+              schedule();
+            }, 250);
+          });
           if (fg) ro.observe(fg);
 
           // IMG-Lade-Listener: nach Image-Upload kann das ResizeObserver-Event
@@ -190,16 +207,59 @@ function computeDecorations(
   // entsprechend nach unten. Ohne diesen Accumulator würden die Spacer
   // späterer Absätze zu klein berechnet (s. QA-Befund 2026-05-18).
   let interParaShift = 0;
+  // Pro Blockquote: gesammelte Spacer-Y-Bereiche in Blockquote-lokalen,
+  // POST-Render-Koordinaten. Nach der Traversierung wird daraus eine
+  // `mask-image`-Decoration auf der Blockquote gebaut, die die Border
+  // genau in diesen Y-Bereichen ausblendet — ohne visuelles Overlay
+  // (siehe CLAUDE.md „Keine visuellen Overlay-Hacks").
+  type BqInfo = {
+    bqStart: number;
+    bqEnd: number;
+    // Top der Blockquote im fg-Koord-System nach Außen-Shifts (= naturalTop
+    // + interParaShift beim BQ-Eintritt). Spacer-Y in fg minus diesem Wert
+    // ergibt die Blockquote-lokale Y-Koordinate für die Mask.
+    renderedTop: number;
+    gaps: Array<{ start: number; end: number }>;
+  };
+  const bqInfo = new Map<number, BqInfo>();
 
   view.state.doc.descendants((node, pos) => {
-    if (!node.isTextblock || node.content.size === 0) return true;
+    if (!node.isTextblock) return true;
     const nodeDom = view.nodeDOM(pos);
     if (!(nodeDom instanceof HTMLElement)) return true;
+
+    // Prüfen ob dieser Textblock in einer Blockquote sitzt — wenn ja,
+    // sammeln wir die Y-Bereiche aller Spacer pro Blockquote, um nach der
+    // Traversierung eine `mask-image`-Decoration auf der Blockquote zu
+    // setzen (Border wird in diesen Bereichen sauber ausgeblendet).
+    const $pos = view.state.doc.resolve(pos);
+    const parentIsBlockquote =
+      $pos.depth > 0 && $pos.parent.type.name === "blockquote";
+    let currentBqStart = -1;
+    if (parentIsBlockquote) {
+      currentBqStart = $pos.before($pos.depth);
+      if (!bqInfo.has(currentBqStart)) {
+        const bqDom = view.nodeDOM(currentBqStart);
+        if (bqDom instanceof HTMLElement) {
+          const naturalTop = bqDom.getBoundingClientRect().top - fgTop;
+          bqInfo.set(currentBqStart, {
+            bqStart: currentBqStart,
+            bqEnd: $pos.after($pos.depth),
+            // Außen-Shifts (= Spacer in Absätzen VOR der BQ) sind in
+            // interParaShift schon akkumuliert. Wir fixieren sie hier
+            // bei BQ-Eintritt, sodass spätere Spacer INNERHALB der BQ
+            // den Außen-Shift nicht doppelt einrechnen.
+            renderedTop: naturalTop + interParaShift,
+            gaps: [],
+          });
+        }
+      }
+    }
 
     const blockRect = nodeDom.getBoundingClientRect();
     const blockTopNatural = blockRect.top - fgTop;
     const blockBottomNatural = blockRect.bottom - fgTop;
-    if (blockBottomNatural <= blockTopNatural) return false;
+    if (blockBottomNatural <= blockTopNatural && node.content.size > 0) return false;
 
     const blockTop = blockTopNatural + interParaShift;
     const blockBottom = blockBottomNatural + interParaShift;
@@ -207,6 +267,30 @@ function computeDecorations(
     const startFrameIdx = Math.max(0, Math.floor(blockTop / geom.stride));
     const startFrameContentBottom =
       startFrameIdx * geom.stride + geom.marginTop + geom.contentHeight;
+
+    // BLOCK-LEVEL PUSH NUR für „atomare" Blöcke (Fix 2026-05-20):
+    //   - leere Absätze (Placeholder, einzelne Enter-Zeilen)
+    //   - 1-Zeilen-Absätze die nicht soft-breakable sind
+    // Für MULTI-LINE-Absätze wäre Block-Push falsch — der Soft-Break-Code
+    // unten splittet sie zeilenweise, sodass die ersten Zeilen auf der
+    // aktuellen Seite bleiben und nur die überlaufenden Zeilen auf die
+    // nächste Seite wandern (Word-Standard).
+    if (node.content.size === 0) {
+      // Empty paragraphs: block-push if they overflow.
+      if (
+        blockBottom > startFrameContentBottom + 0.5 &&
+        blockRect.height <= geom.contentHeight + 0.5
+      ) {
+        const nextContentTop = (startFrameIdx + 1) * geom.stride + geom.marginTop;
+        const delta = nextContentTop - blockTop;
+        if (delta > 0.5) {
+          decorations.push(buildBlockPushDecoration(pos, delta));
+          interParaShift += delta;
+        }
+      }
+      return true;
+    }
+
     // Schnellcheck: passt der Block komplett in den Content-Bereich seiner
     // Start-Seite, brauchen wir gar nichts zu tun. Wir vergleichen mit der
     // CONTENT-Untergrenze (nicht mit der Frame-Grenze), damit auch Blöcke
@@ -260,7 +344,62 @@ function computeDecorations(
             top: pushedLine.top + pushedLine.height / 2,
           });
           if (coord) {
-            decorations.push(buildSpacerDecoration(coord.pos, delta));
+            // Trailing-Whitespace-Hide (2026-05-19): die zusammenhängende
+            // Whitespace-Sequenz unmittelbar VOR coord.pos wird per Inline-
+            // Decoration mit `display:none` ausgeblendet. Resultat: das
+            // letzte sichtbare Wort der Vor-Zeile klebt bündig am rechten
+            // Rand (kein Justify-Stretching des Trailing-Spaces), und die
+            // Folgezeile startet ohne Leading-Space-Indent.
+            const insertPos = coord.pos;
+            const $pos = view.state.doc.resolve(insertPos);
+            const blockStart = $pos.start();
+            let wsStart = insertPos;
+            while (wsStart > blockStart) {
+              const ch = view.state.doc.textBetween(wsStart - 1, wsStart);
+              if (ch === " " || ch === " " || ch === "\t") {
+                wsStart--;
+              } else {
+                break;
+              }
+            }
+            if (wsStart < insertPos) {
+              decorations.push(
+                Decoration.inline(
+                  wsStart,
+                  insertPos,
+                  { style: "display:none" },
+                  { key: `soft-break-ws@${wsStart}@${insertPos}` },
+                ),
+              );
+            }
+            decorations.push(
+              buildSpacerDecoration(insertPos, delta, {
+                inBlockquote: parentIsBlockquote,
+              }),
+            );
+            // Per-Blockquote Gap-Range tracking für die Mask-Decoration.
+            // Der Spacer nimmt im POST-Render-DOM den Y-Bereich
+            //   [pushedEffectiveTop, pushedEffectiveTop + delta]
+            // im fg-Koord-System ein. Übersetzt in Blockquote-lokale
+            // POST-Render-Y-Koords: subtrahieren wir den Top der BQ.
+            // Da die BQ-Spacer-Shifts die BQ-Höhe nach UNTEN erweitern,
+            // verschiebt sich der BQ-Top NICHT (er bleibt bei naturalTop +
+            // shifts AUSSERHALB der BQ). Den Außen-Shift bekommen wir
+            // automatisch, weil pushedEffectiveTop ihn schon enthält und
+            // naturalTop ihn nicht — Differenz = Inner-Local-Y.
+            if (parentIsBlockquote && currentBqStart >= 0) {
+              const info = bqInfo.get(currentBqStart);
+              if (info) {
+                let localStart = pushedEffectiveTop - info.renderedTop;
+                // Wenn der Spacer praktisch am BQ-Top sitzt (kleiner
+                // Baseline-Offset zur ersten Zeile, < 6 px), Range bis
+                // Y=0 ziehen — sonst bleibt ein winziger Border-Stub auf
+                // der Vorseite über der BQ-Top sichtbar (Bug 2026-05-20:
+                // „mini blockquote auf seite 1 obwohl kein text dort ist").
+                if (localStart < 6) localStart = 0;
+                info.gaps.push({ start: localStart, end: localStart + delta });
+              }
+            }
             paragraphsWithSoftBreak.add(nodeDom);
             cumulativeShift += delta;
             thisParaSpacerHeight += delta;
@@ -282,10 +421,45 @@ function computeDecorations(
     return false;
   });
 
+  // Nach der Traversierung: Pro Blockquote mit Spacer-Bereichen eine
+  // Node-Decoration mit `mask-image` emittieren, die die Border in
+  // diesen Y-Bereichen sauber ausblendet — KEIN visueller Overlay
+  // (CLAUDE.md „Keine visuellen Overlay-Hacks"). Die Mask reicht von
+  // schwarz (sichtbar) → transparent (ausgeblendet) → schwarz, mit
+  // hartem Übergang an den Spacer-Grenzen.
+  for (const info of bqInfo.values()) {
+    if (info.gaps.length === 0) continue;
+    info.gaps.sort((a, b) => a.start - b.start);
+    const stops: string[] = ["#000 0px"];
+    for (const g of info.gaps) {
+      const a = g.start.toFixed(2);
+      const b = g.end.toFixed(2);
+      stops.push(`#000 ${a}px`);
+      stops.push(`transparent ${a}px`);
+      stops.push(`transparent ${b}px`);
+      stops.push(`#000 ${b}px`);
+    }
+    stops.push("#000 100%");
+    const grad = `linear-gradient(to bottom, ${stops.join(", ")})`;
+    const style = `-webkit-mask-image:${grad};mask-image:${grad};-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-size:100% 100%;mask-size:100% 100%;`;
+    decorations.push(
+      Decoration.node(
+        info.bqStart,
+        info.bqEnd,
+        { style },
+        { key: `bq-mask@${info.bqStart}@${info.gaps.length}` },
+      ),
+    );
+  }
+
   return { decorations, paragraphsWithSoftBreak };
 }
 
-function buildSpacerDecoration(pos: number, height: number): Decoration {
+type SpacerOpts = {
+  inBlockquote: boolean;
+};
+
+function buildSpacerDecoration(pos: number, height: number, opts: SpacerOpts): Decoration {
   return Decoration.widget(
     pos,
     () => {
@@ -293,13 +467,46 @@ function buildSpacerDecoration(pos: number, height: number): Decoration {
       span.className = "a5-soft-break-spacer";
       span.setAttribute("data-soft-break", "1");
       span.setAttribute("aria-hidden", "true");
-      span.style.cssText = `display:block;height:${height}px;line-height:0;user-select:none;pointer-events:none;`;
+      // Spacer rendert nichts Sichtbares — er nimmt nur Platz ein, damit die
+      // Folgezeilen optisch auf der nächsten Seite landen. Die Blockquote-
+      // Border in seinem Y-Bereich wird per `mask-image` auf der Blockquote
+      // selbst entfernt (siehe Decoration.node-Block in computeDecorations),
+      // KEIN visueller Overlay mehr.
+      const css = `display:block;height:${height}px;line-height:0;user-select:none;pointer-events:none;`;
+      if (opts.inBlockquote) {
+        span.setAttribute("data-in-blockquote", "1");
+      }
+      span.style.cssText = css;
       return span;
     },
     {
       side: -1,
       ignoreSelection: true,
-      key: `soft-break@${pos}@${Math.round(height)}`,
+      key: `soft-break@${pos}@${Math.round(height)}@${opts.inBlockquote ? "bq" : ""}`,
+    },
+  );
+}
+
+// Block-Push-Spacer (Fix 2026-05-19): wird VOR einem Block eingesetzt, dessen
+// natürlicher Flow auf Seite N startet, aber komplett (oder zu großen Teilen)
+// in der Page-Gap oder auf Folgeseite überläuft. Wir schieben den GANZEN Block
+// auf die nächste Seite. Wird als Block-Widget gerendert (display:block, eigene
+// Höhe), das vor dem Block einfügt und nicht editierbar ist.
+function buildBlockPushDecoration(pos: number, height: number): Decoration {
+  return Decoration.widget(
+    pos,
+    () => {
+      const div = document.createElement("div");
+      div.className = "a5-block-push-spacer";
+      div.setAttribute("data-block-push", "1");
+      div.setAttribute("aria-hidden", "true");
+      div.style.cssText = `display:block;height:${height}px;line-height:0;margin:0;padding:0;user-select:none;pointer-events:none;`;
+      return div;
+    },
+    {
+      side: -1,
+      ignoreSelection: true,
+      key: `block-push@${pos}@${Math.round(height)}`,
     },
   );
 }

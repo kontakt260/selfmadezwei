@@ -10,6 +10,10 @@ const PUBLIC_ROUTES = [
   "/email-bestaetigen",
   "/onboarding",
   "/zugang-abgelaufen",
+  // Konto-Bereich umgeht die „kein-Projekt → Onboarding"-Weiterleitung,
+  // damit Nutzer ihr Konto auch nach Projekt-Löschung erreichen können.
+  // Die Seite selbst (page.tsx) erzwingt weiterhin Login.
+  "/persoenlicher-bereich",
 ];
 
 const AUTH_ONLY_ROUTES = ["/anmelden", "/registrieren"];

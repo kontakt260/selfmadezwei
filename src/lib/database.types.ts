@@ -19,10 +19,12 @@ export type Database = {
         Row: {
           body: Json | null
           chapter_origin: Database["public"]["Enums"]["chapter_origin"]
+          color_page_count: number
           content_version: number
           created_at: string
           hero_image_url: string | null
           id: string
+          image_sections: Json
           project_id: string
           sort_order: number
           source_impulse_id: string | null
@@ -32,10 +34,12 @@ export type Database = {
         Insert: {
           body?: Json | null
           chapter_origin?: Database["public"]["Enums"]["chapter_origin"]
+          color_page_count?: number
           content_version?: number
           created_at?: string
           hero_image_url?: string | null
           id?: string
+          image_sections?: Json
           project_id: string
           sort_order: number
           source_impulse_id?: string | null
@@ -45,10 +49,12 @@ export type Database = {
         Update: {
           body?: Json | null
           chapter_origin?: Database["public"]["Enums"]["chapter_origin"]
+          color_page_count?: number
           content_version?: number
           created_at?: string
           hero_image_url?: string | null
           id?: string
+          image_sections?: Json
           project_id?: string
           sort_order?: number
           source_impulse_id?: string | null
@@ -189,6 +195,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          email: string | null
           full_name: string | null
           id: string
           updated_at: string
@@ -196,6 +203,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          email?: string | null
           full_name?: string | null
           id: string
           updated_at?: string
@@ -203,6 +211,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          email?: string | null
           full_name?: string | null
           id?: string
           updated_at?: string

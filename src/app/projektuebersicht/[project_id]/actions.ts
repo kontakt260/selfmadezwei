@@ -45,6 +45,11 @@ export async function deleteProjectAction(
   const { error } = await supabase.from("projects").delete().eq("id", projectId);
   if (error) return { error: "Projekt konnte nicht gelöscht werden." };
 
+  // Markiert User als „hatte schonmal ein Projekt" — Onboarding zeigt
+  // basierend darauf den Konto-Löschen-Link, falls keine aktiven Projekte
+  // mehr existieren. Fehler hier ignorieren, der Projekt-Delete ist wichtiger.
+  await supabase.auth.updateUser({ data: { had_project: true } });
+
   revalidatePath("/");
   return {};
 }

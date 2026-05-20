@@ -105,14 +105,46 @@ export async function deleteAccountAction(
   }
 
   // Delete via admin client (service role key — never leaves server)
-  const adminClient = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!serviceRoleKey || !supabaseUrl) {
+    console.error(
+      "[deleteAccountAction] SUPABASE_SERVICE_ROLE_KEY oder NEXT_PUBLIC_SUPABASE_URL fehlt in den Environment-Variablen",
+    );
+    return {
+      error:
+        "Account-Löschung ist serverseitig nicht konfiguriert. Bitte wende dich an den Support.",
+    };
+  }
 
-  const { error } = await adminClient.auth.admin.deleteUser(user.id);
-  if (error) return { error: "Account konnte nicht gelöscht werden. Bitte wende dich an den Support." };
+  const adminClient = createAdminClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  // 1) public.profiles explizit löschen — CASCADE räumt automatisch auch
+  //    project_members und projects (owner_id) mit auf. payments + voice_sessions
+  //    behalten ihre Records (user_id wird NULL gesetzt) für Audit-Trail.
+  const { error: profileError } = await adminClient
+    .from("profiles")
+    .delete()
+    .eq("id", user.id);
+  if (profileError) {
+    console.error("[deleteAccountAction] profile delete failed:", profileError);
+    return {
+      error: "Account konnte nicht gelöscht werden. Bitte wende dich an den Support.",
+    };
+  }
+
+  // 2) auth.users löschen — CASCADE räumt zusätzlich die auth.*-Tabellen auf
+  //    (sessions, identities, mfa_factors, oauth_*, one_time_tokens, webauthn_*).
+  const { error: authError } = await adminClient.auth.admin.deleteUser(user.id);
+  if (authError) {
+    console.error("[deleteAccountAction] auth delete failed:", authError);
+    return {
+      error:
+        "Profil-Daten wurden gelöscht, aber der Auth-Account konnte nicht entfernt werden. Bitte wende dich an den Support.",
+    };
+  }
 
   redirect("/anmelden");
 }

@@ -19,6 +19,11 @@ import {
   type ImageSections,
 } from "@/lib/kapiteleditor/types";
 import type { UploadedImage } from "./ImageUploadDialog";
+import {
+  chapterAutosaveAction,
+  chapterImageUploadAction,
+  chapterImageDeleteAction,
+} from "@/app/projektuebersicht/[project_id]/kapiteleditor/[chapter_id]/actions";
 import { toast } from "sonner";
 
 type Props = {
@@ -84,7 +89,22 @@ export function EditorClient({
     [title, body, imageSections],
   );
 
-  const { state, retry } = useAutoSave(draft, saveDraftStub, 2_000);
+  const saveDraft = useCallback(
+    async (d: ChapterDraft): Promise<void> => {
+      const res = await chapterAutosaveAction({
+        projectId,
+        chapterId,
+        title: d.title,
+        body: d.body,
+        imageSections: d.imageSections,
+        colorPageCount: d.colorPageCount,
+      });
+      if (res.error) throw new Error(res.error);
+    },
+    [projectId, chapterId],
+  );
+
+  const { state, retry } = useAutoSave(draft, saveDraft, 2_000);
 
   const wordCount = useMemo(() => countWordsFromBody(body), [body]);
 
@@ -106,45 +126,54 @@ export function EditorClient({
     document.dispatchEvent(new Event("narravit:pagination-recompute"));
   }, [imageSections, title]);
 
-  // Dynamische Bild-Skalierung auf der Kapitel-Titelseite (Spec-Update
-  // 2026-05-18): wenn die Start-Sektion im 1-spaltig-Layout genau 2 Bilder
-  // enthält, sollen die Bilder zusammen mit dem Header auf Seite 1 passen.
-  // Bei Bedarf werden sie bis 50 % runter-skaliert. Wenn selbst bei 50 %
-  // kein Platz mehr ist (Kapitel-Titel füllt 6+ Zeilen), wird der Bruch
-  // der Pagination-Engine überlassen.
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      const stack = stackRef.current;
-      const fg = fgRef.current;
-      if (!stack || !fg) return;
-      const header = fg.querySelector(".a5-stack__fg > div:first-child") as HTMLElement | null;
-      const isCandidate =
-        imageSections.start.layout === "1-spaltig" &&
-        imageSections.start.images.length === 2;
-      if (!header || !isCandidate) {
-        stack.style.setProperty("--a5-image-scale", "1");
-        return;
-      }
-      const mmToPx = (mm: number) => (mm / 25.4) * 96;
-      const cmToPx = (cm: number) => (cm / 2.54) * 96;
-      const contentHeight = mmToPx(210) - 2 * cmToPx(2);
-      const headerH = header.getBoundingClientRect().height;
-      const contentWidth = mmToPx(148) - cmToPx(2) - cmToPx(2.5);
-      // 2 Bilder × (Breite × 2/3 für 3:2) + 4mm Gap zwischen Reihen
-      const oneImgHeight = (s: number) => contentWidth * s * (2 / 3);
-      const stackedHeight = (s: number) => 2 * oneImgHeight(s) + mmToPx(4) + 2 * mmToPx(4);
-      const available = contentHeight - headerH - 8; // 8px Sicherheitspuffer
-      let scale = 1;
-      if (stackedHeight(1) > available) {
-        scale = Math.max(0.5, available / stackedHeight(1));
-      }
-      stack.style.setProperty("--a5-image-scale", scale.toFixed(3));
-    });
-  }, [title, imageSections.start.layout, imageSections.start.images.length, stackRef, fgRef]);
+  // Bild-Skalierung: Per-Row, eingebettet in usePagination → recalc().
+  // Spec 2026-05-20: jede 1-spaltig-Sektion füllt zuerst den Restplatz der
+  // aktuellen Seite mit so vielen Reihen wie passen (Min-Scale 0.65); die
+  // übrigen Reihen rutschen via Block-Push ungeskaliert auf Folgeseiten.
+  // Implementation siehe usePagination unten.
 
   const updateSection = (key: "start" | "end") => (next: ImageSections["start"]) => {
     setImageSections((prev) => ({ ...prev, [key]: next }));
   };
+
+  const uploadImage = useCallback(
+    (section: "start" | "end") =>
+      async (img: UploadedImage): Promise<ChapterImage> => {
+        const fd = new FormData();
+        fd.set("projectId", projectId);
+        fd.set("chapterId", chapterId);
+        fd.set("section", section);
+        fd.set("file", img.blob, img.fileName);
+        const res = await chapterImageUploadAction(fd);
+        if (res.error || !res.image) {
+          toast.error(res.error ?? "Bild-Upload fehlgeschlagen.");
+          throw new Error(res.error ?? "upload-failed");
+        }
+        // Lokales Blob-Preview-URL freigeben — die Server-Antwort liefert
+        // die Signed-URL aus dem Bucket.
+        if (img.previewUrl.startsWith("blob:")) URL.revokeObjectURL(img.previewUrl);
+        return res.image;
+      },
+    [projectId, chapterId],
+  );
+
+  const deleteImage = useCallback(
+    (section: "start" | "end") =>
+      async (image: ChapterImage): Promise<void> => {
+        const res = await chapterImageDeleteAction({
+          projectId,
+          chapterId,
+          section,
+          imageId: image.id,
+        });
+        if (res.error) {
+          toast.error(res.error);
+          throw new Error(res.error);
+        }
+        if (image.signed_url.startsWith("blob:")) URL.revokeObjectURL(image.signed_url);
+      },
+    [projectId, chapterId],
+  );
 
   return (
     <div className="a5-desk [font-family:var(--font-lato)] flex min-h-[100dvh] flex-col">
@@ -203,15 +232,15 @@ export function EditorClient({
             <ImageSection
               data={imageSections.start}
               onChange={updateSection("start")}
-              onUpload={uploadImageStub}
-              onDelete={deleteImageStub}
+              onUpload={uploadImage("start")}
+              onDelete={deleteImage("start")}
             />
             <EditorContent editor={editor} />
             <ImageSection
               data={imageSections.end}
               onChange={updateSection("end")}
-              onUpload={uploadImageStub}
-              onDelete={deleteImageStub}
+              onUpload={uploadImage("end")}
+              onDelete={deleteImage("end")}
             />
           </div>
           {/* Seitenzahl-Overlay: über FG, damit Zahlen nicht von Bildern
@@ -221,7 +250,10 @@ export function EditorClient({
               <span
                 key={i}
                 className="a5-page-number"
-                style={{ top: `calc(${i} * (var(--a5-page-height) + var(--a5-page-gap)) + var(--a5-margin-top))` }}
+                // Position in der OBEREN Marge (nicht im Inhaltsbereich),
+                // damit die Seitenzahl niemals mit dem ersten Text-Block
+                // oder einer in den rechten Rand laufenden Zeile kollidiert.
+                style={{ top: `calc(${i} * (var(--a5-page-height) + var(--a5-page-gap)) + var(--a5-margin-top) * 0.55)` }}
               >
                 {i + 1}
               </span>
@@ -230,10 +262,10 @@ export function EditorClient({
         </div>
       </main>
 
-      <footer className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between border-t border-[#e0dcd5] bg-[#ece6df] px-4 py-2 sm:px-6">
+      <footer className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-[#e0dcd5] bg-[#ece6df] px-4 py-2 sm:px-6">
         <WordCount words={wordCount} />
-        <span className="text-xs text-[#a8a39b]">
-          Auto-Speichern alle 2 Sekunden · A5-Format · Druck-Vorschau
+        <span className="hidden text-xs text-[#a8a39b] sm:inline">
+          {pageCount === 1 ? "Seite 1" : `${pageCount} Seiten`} · A5-Format · Druck-Vorschau
         </span>
       </footer>
     </div>
@@ -300,8 +332,13 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
 
     // Items in DOM-Reihenfolge sammeln.
     const breaks = Array.from(fg.querySelectorAll<HTMLElement>(".a5-page-break"));
+    // Wir IGNORIEREN Block-Push- und Soft-Break-Spacer (PaginationDecorations
+    // hat sie als Widgets gesetzt). Sonst würde der Block-Push-Engine sie als
+    // eigene "Blöcke" erkennen und nochmal pushen → kumulativer Overshoot.
     const editorBlocks = Array.from(
-      fg.querySelectorAll<HTMLElement>(".tiptap-editor > *:not(.a5-page-break)"),
+      fg.querySelectorAll<HTMLElement>(
+        ".tiptap-editor > *:not(.a5-page-break):not(.a5-block-push-spacer):not(.a5-soft-break-spacer)",
+      ),
     );
     const imageRows = Array.from(fg.querySelectorAll<HTMLElement>("[data-paginate-row]"));
 
@@ -315,10 +352,18 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
     }
     for (const el of imageRows) {
       if (el.style.marginTop) el.style.marginTop = "";
+      // Row-Image-Scale ebenfalls zurücksetzen, damit PASS A unten gegen
+      // die natürliche (ungeskalierte) Reihen-Höhe entscheidet.
+      if (el.style.getPropertyValue("--row-image-scale")) {
+        el.style.removeProperty("--row-image-scale");
+      }
     }
-    for (const el of breaks) {
-      if (el.style.height) el.style.height = "";
-    }
+    // Break-Höhen NICHT in PASS 0 löschen: PASS A misst End-Sektion-Position,
+    // die durch HR-Page-Break-Höhen mitbestimmt wird. Wenn wir HR-Höhen hier
+    // auf den natürlichen ~40px zurücksetzen, schiebt das End-Sektion um die
+    // gesammelte Push-Differenz nach oben → PASS A scalet falsch.
+    // PASS 1 unten aktualisiert die Höhen ohnehin korrekt (kann auch
+    // schrumpfen), also kein Bedarf für vorheriges Clear.
     // Layout nach Reset einmal erzwingen, damit die anschließenden
     // getBoundingClientRect-Aufrufe die natürlichen Positionen liefern.
     void fg.offsetHeight;
@@ -326,10 +371,82 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
     const fgTop = fg.getBoundingClientRect().top;
     const inFgContent = (el: HTMLElement) => el.getBoundingClientRect().top - fgTop - topMarginPx;
 
+    // PASS A — Per-Row-Image-Scaling für 1-spaltig-Bild-Sektionen
+    // (Spec 2026-05-20 vom Nutzer):
+    //   "wenn zwei bilder im 1x1 eingefügt sind, sollen sie auch auf die
+    //    kapitel startseite passen; das dritte bild beginnt dann auf einer
+    //    neuen seite und kann die ursprüngliche größe beibehalten."
+    //   Gilt analog für die End-Sektion: erste K Reihen werden runter-
+    //   skaliert, um auf die aktuelle Seite zu passen — aber nur solange
+    //   Skala ≥ MIN_SCALE bleibt. Restliche Reihen fließen ungeskaliert
+    //   via Block-Push auf die Folgeseite.
+    const MIN_SCALE = 0.65;
+    const mmToPxLocal = (mm: number) => (mm / 25.4) * 96;
+    const cmToPxLocal = (cm: number) => (cm / 2.54) * 96;
+    const sectionContentWidth = mmToPxLocal(148) - cmToPxLocal(2) - cmToPxLocal(2.5);
+    const naturalRowH1Col = sectionContentWidth * (2 / 3); // 3:2 bei voller Inhaltsbreite
+    const sectionRowGap = mmToPxLocal(4);
+    const sectionWrappers = Array.from(
+      fg.querySelectorAll<HTMLElement>("[data-image-section-wrapper]"),
+    );
+    // Skalierung für START- UND END-Sektion: die ersten K Reihen werden
+    // soweit verkleinert, dass sie auf die aktuelle Seite passen (Min-
+    // Skala 0.65). Reihen darüber hinaus rutschen ungeskaliert via Block-
+    // Push auf Folgeseiten — sodass das 2-cm-BottomMargin respektiert
+    // wird ohne dass eine ansonsten passende Reihe leer auf die nächste
+    // Seite gepusht wird (kein wasted space).
+    for (const wrapper of sectionWrappers) {
+      const rows1Col = Array.from(
+        wrapper.querySelectorAll<HTMLElement>(
+          ":scope > [data-paginate-row][data-layout='1-spaltig']",
+        ),
+      );
+      if (rows1Col.length === 0) continue;
+      const firstRowTop = inFgContent(rows1Col[0]);
+      const startFrameIdx = Math.max(0, Math.floor(firstRowTop / stridePx));
+      const startFrameContentBottom = startFrameIdx * stridePx + pageContentHeight;
+      const availableOnCurrentPage = Math.max(0, startFrameContentBottom - firstRowTop);
+
+      let fittedCount = 0;
+      let fittedScale = 1;
+      for (let k = rows1Col.length; k >= 1; k--) {
+        const naturalH = k * naturalRowH1Col + (k - 1) * sectionRowGap;
+        if (naturalH <= availableOnCurrentPage + 0.5) {
+          fittedCount = k;
+          fittedScale = 1;
+          break;
+        }
+        const scaleNeeded =
+          (availableOnCurrentPage - (k - 1) * sectionRowGap) / (k * naturalRowH1Col);
+        if (scaleNeeded >= MIN_SCALE) {
+          fittedCount = k;
+          fittedScale = scaleNeeded;
+          break;
+        }
+      }
+
+      if (fittedCount > 0 && fittedScale < 1) {
+        for (let i = 0; i < fittedCount; i++) {
+          rows1Col[i].style.setProperty("--row-image-scale", fittedScale.toFixed(4));
+        }
+      }
+    }
+    // Reflow nach Scale-Änderungen, damit die anschließenden
+    // Block-Push-Messungen die neue Reihen-Höhe sehen.
+    void fg.offsetHeight;
+
+    // Block-Push für TEXT-Absätze (Editor-Blöcke) ist obsolet — die Soft-
+    // Break-Engine in PaginationDecorations splittet Multi-Line-Absätze
+    // zeilenweise und pusht 1-Zeilen-Blöcke via Widget-Decoration. Wenn
+    // wir hier zusätzlich marginTop auf den Paragraph-DOM-Knoten setzen,
+    // schieben wir den ganzen Absatz nach unten — die Soft-Break-Spacer
+    // im Inneren verlieren ihre Wirkung, und die ersten Zeilen landen NICHT
+    // mehr auf der aktuellen Seite.
+    //
+    // Hier nur noch Image-Rows und Page-Breaks verarbeiten.
     type Item = { el: HTMLElement; kind: "break" | "block" };
     const items: Item[] = [
       ...breaks.map<Item>((el) => ({ el, kind: "break" })),
-      ...editorBlocks.map<Item>((el) => ({ el, kind: "block" })),
       ...imageRows.map<Item>((el) => ({ el, kind: "block" })),
     ];
     items.sort((a, b) => inFgContent(a.el) - inFgContent(b.el));
@@ -363,8 +480,18 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
           item.el.style.height = `${desiredHeight}px`;
         }
       } else {
+        // PASS A hat diese Reihe explizit so skaliert, dass sie auf die
+        // aktuelle Seite passt — Block-Push würde diese Entscheidung
+        // überschreiben. PASS A ist autoritativ für skalierte Reihen.
+        if (item.el.style.getPropertyValue("--row-image-scale")) continue;
         // Block: läuft er über die Content-Untergrenze seiner aktuellen Seite?
         const observedBottom = observedTop + observedHeight;
+        // Strikter 2-cm-Margin-Schutz: jede Reihe, die über die Content-
+        // Untergrenze ragt, wird gepusht. Stabilität gegen PD-Transient-
+        // Schwankungen kommt aus dem Push-Delta-History-Check unten (delta
+        // muss zwischen zwei aufeinanderfolgenden Recalcs konsistent sein,
+        // sonst wird der Push deferred — verhindert Flackern, hält aber
+        // den 2-cm-Margin streng ein).
         if (observedBottom > frameContentBottom + 0.5) {
           // Block größer als ganze Seite? Push würde nichts bringen, v2 macht Soft-Break.
           if (observedHeight > pageContentHeight + 0.5) continue;
@@ -417,15 +544,68 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
     return () => obs.disconnect();
   }, [fgRef, schedule]);
 
-  // Trigger bei Title- oder Image-Section-Änderung
+  // Trigger bei Title- oder Image-Section-Änderung.
   useEffect(() => {
     schedule();
   }, [imageSectionsDeps, titleDep, schedule]);
 
-  // Initialer Pass
+  // Re-run nach PaginationDecorations-Recompute. PD setzt Soft-Break-
+  // Spacer im Text um, die die Text-Höhe verändern → End-Sektion rutscht
+  // auf eine andere Seite → PASS A (Per-Row-Bild-Skalierung) muss neu
+  // berechnen, sonst landen Bilder mit unterschiedlichen Skalen auf
+  // derselben Seite (Bug 2026-05-20 vom Nutzer).
+  useEffect(() => {
+    const handler = () => schedule();
+    document.addEventListener("narravit:pagination-recompute", handler);
+    return () => document.removeEventListener("narravit:pagination-recompute", handler);
+  }, [schedule]);
+
+  // Initialer Pass + Settling-Passes nach 100ms, 300ms, 800ms.
+  // Hintergrund: nach Login/Reload werden Signed-URLs serverseitig generiert
+  // und Bilder erst nach dem ersten React-Mount geladen. Der ResizeObserver
+  // sollte zwar feuern wenn die <img>-Elemente ihre finale Größe annehmen,
+  // aber Browser-Timing kann variieren. Mehrere Settling-Passes garantieren
+  // dass pageCount nach allen Late-Loads korrekt aktualisiert wird —
+  // verhindert das transiente „pageCount=1 trotz mehrseitigem Content"-
+  // Bild, das User-seitig direkt nach Page-Load sichtbar war.
   useEffect(() => {
     schedule();
+    const t1 = setTimeout(schedule, 100);
+    const t2 = setTimeout(schedule, 300);
+    const t3 = setTimeout(schedule, 800);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
   }, [schedule]);
+
+  // Re-Schedule sobald irgendein <img> im FG fertig lädt (z. B. nach Signed-
+  // URL-Fetch beim ersten Page-Load). MutationObserver + Load-Listener
+  // fängt sowohl bestehende als auch neu hinzugefügte Bilder ab.
+  useEffect(() => {
+    const fg = fgRef.current;
+    if (!fg) return;
+    const attached = new WeakSet<HTMLImageElement>();
+    const attach = (img: HTMLImageElement) => {
+      if (attached.has(img)) return;
+      attached.add(img);
+      if (img.complete) return;
+      img.addEventListener("load", schedule, { once: true });
+      img.addEventListener("error", schedule, { once: true });
+    };
+    fg.querySelectorAll("img").forEach(attach);
+    const mo = new MutationObserver((records) => {
+      for (const rec of records) {
+        rec.addedNodes.forEach((n) => {
+          if (n instanceof HTMLImageElement) attach(n);
+          else if (n instanceof Element) n.querySelectorAll("img").forEach(attach);
+        });
+      }
+    });
+    mo.observe(fg, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  }, [fgRef, schedule]);
 
   useEffect(() => {
     return () => {
@@ -483,34 +663,6 @@ function cssLengthToPx(value: string, rootFontPx: number): number {
   if (v.endsWith("rem")) return num * rootFontPx;
   if (v.endsWith("em")) return num * rootFontPx;
   return num;
-}
-
-// ---------------------------------------------------------------------------
-// Stubs — werden in /backend (PROJ-5) durch echte Server Actions ersetzt
-// ---------------------------------------------------------------------------
-
-async function saveDraftStub(_draft: ChapterDraft): Promise<void> {
-  await new Promise((r) => setTimeout(r, 600));
-}
-
-async function uploadImageStub(img: UploadedImage): Promise<ChapterImage> {
-  await new Promise((r) => setTimeout(r, 400));
-  const id =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  toast.success("Bild hinzugefügt (lokal — Backend folgt in /backend).");
-  return {
-    id,
-    storage_path: `local://${img.fileName}`,
-    signed_url: img.previewUrl,
-    alt: "",
-  };
-}
-
-async function deleteImageStub(image: ChapterImage): Promise<void> {
-  await new Promise((r) => setTimeout(r, 200));
-  if (image.signed_url.startsWith("blob:")) URL.revokeObjectURL(image.signed_url);
 }
 
 function estimateColorPages(s: ImageSections): number {
