@@ -50,12 +50,10 @@ export const PaginationDecorations = Extension.create({
           let followUpRaf: number | null = null;
 
           const schedule = () => {
-            // Cancel-and-requeue: ein etwaiger noch nicht gefeuerter rAF
-            // wird abgebrochen, dann frisch gequeued. Verhindert stuck-state
-            // (Bug 2026-05-20: nach Seitenumbruch-Einfügen blieben einige
-            // Zeilen im Seitenzwischenraum, weil ein vorheriger rAF nie
-            // feuerte und das raf-Handle non-null hängen blieb → alle
-            // nachfolgenden schedule()-Calls returnten früh).
+            // Cancel-and-requeue rAF: verhindert stuck-state (Bug 2026-05-20).
+            // Throttle auf 10 Hz war zu langsam für die Konvergenz zwischen
+            // PD und usePagination — bei rAF (60 Hz) konvergiert das System
+            // in ~50 ms statt 10+ s.
             if (raf !== null) cancelAnimationFrame(raf);
             raf = requestAnimationFrame(() => {
               raf = null;
@@ -204,6 +202,14 @@ function computeDecorations(
   geom: Geometry,
 ): { decorations: Decoration[]; paragraphsWithSoftBreak: Set<HTMLElement> } {
   const fgTop = fg.getBoundingClientRect().top;
+  // UI-Zoom: wenn `.a5-stack` per transform: scale skaliert ist, sind
+  // alle getBoundingClientRect-Werte mit dem Zoom-Faktor multipliziert.
+  // Wir teilen Positionen und Höhen durch zoom, damit die Engine wieder
+  // im LOGISCHEN A5-Koordinatensystem rechnet.
+  const stackEl = fg.closest(".a5-stack") as HTMLElement | null;
+  const zoom = stackEl
+    ? parseFloat(getComputedStyle(stackEl).getPropertyValue("--ui-zoom") || "1") || 1
+    : 1;
   const decorations: Decoration[] = [];
   const paragraphsWithSoftBreak = new Set<HTMLElement>();
   // Akkumuliert die Spacer-Höhen aller VORHERIGEN Absätze. Wir messen
@@ -247,7 +253,7 @@ function computeDecorations(
       if (!bqInfo.has(currentBqStart)) {
         const bqDom = view.nodeDOM(currentBqStart);
         if (bqDom instanceof HTMLElement) {
-          const naturalTop = bqDom.getBoundingClientRect().top - fgTop;
+          const naturalTop = (bqDom.getBoundingClientRect().top - fgTop) / zoom;
           bqInfo.set(currentBqStart, {
             bqStart: currentBqStart,
             bqEnd: $pos.after($pos.depth),
@@ -263,8 +269,8 @@ function computeDecorations(
     }
 
     const blockRect = nodeDom.getBoundingClientRect();
-    const blockTopNatural = blockRect.top - fgTop;
-    const blockBottomNatural = blockRect.bottom - fgTop;
+    const blockTopNatural = (blockRect.top - fgTop) / zoom;
+    const blockBottomNatural = (blockRect.bottom - fgTop) / zoom;
     if (blockBottomNatural <= blockTopNatural && node.content.size > 0) return false;
 
     const blockTop = blockTopNatural + interParaShift;
@@ -285,7 +291,7 @@ function computeDecorations(
       // Empty paragraphs: block-push if they overflow.
       if (
         blockBottom > startFrameContentBottom + 0.5 &&
-        blockRect.height <= geom.contentHeight + 0.5
+        blockRect.height / zoom <= geom.contentHeight + 0.5
       ) {
         const nextContentTop = (startFrameIdx + 1) * geom.stride + geom.marginTop;
         const delta = nextContentTop - blockTop;
@@ -336,7 +342,7 @@ function computeDecorations(
 
     while (i < lineRects.length) {
       const lr = lineRects[i];
-      const effectiveBottom = lr.bottom - fgTop + cumulativeShift;
+      const effectiveBottom = (lr.bottom - fgTop) / zoom + cumulativeShift;
       const currentContentBottom =
         currentFrameIdx * geom.stride + geom.marginTop + geom.contentHeight;
 
@@ -352,7 +358,7 @@ function computeDecorations(
         if (pushIdx === 1) pushIdx = 0;
 
         const pushedLine = lineRects[pushIdx];
-        const pushedEffectiveTop = pushedLine.top - fgTop + cumulativeShift;
+        const pushedEffectiveTop = (pushedLine.top - fgTop) / zoom + cumulativeShift;
         const nextContentTop = (currentFrameIdx + 1) * geom.stride + geom.marginTop;
         const delta = nextContentTop - pushedEffectiveTop;
 

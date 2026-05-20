@@ -171,6 +171,30 @@
   overflow-anchor: none;
 }
 
+/* UI-Zoom (rein visuelle Anzeige): skaliert die A5-Stapel-Spalte + Bild-
+ * Sektionen über `transform: scale`. Pagination-Engine teilt alle Rect-
+ * Messungen wieder durch `--ui-zoom`, sodass die A5-Logik (Seiten-Höhe,
+ * Content-Top, Soft-Break-Punkte) unverändert bei 1× rechnet. Toolbar,
+ * Header und Footer skalieren NICHT mit — die Steuerelemente bleiben in
+ * voller Bildschirm-Lesbarkeit erhalten. Beim Print/PDF-Export wird der
+ * Zoom ignoriert (Override unten in @media print). */
+.a5-stack {
+  transform-origin: top center;
+  transform: scale(var(--ui-zoom, 1));
+}
+/* Container-Width-Anpassung: weil transform die Layout-Box nicht erweitert,
+ * muss der Editor-Main-Container mehr Platz erhalten, sonst rutscht der
+ * A5-Stapel bei Zoom > 1 in den horizontalen Rand. */
+.a5-desk main {
+  min-height: calc(var(--ui-zoom, 1) * 100%);
+}
+
+@media print {
+  .a5-stack {
+    transform: none !important;
+  }
+}
+
 .a5-desk *,
 .a5-stack,
 .a5-stack * {

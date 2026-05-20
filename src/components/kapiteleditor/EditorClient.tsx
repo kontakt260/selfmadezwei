@@ -10,6 +10,7 @@ import { FirstPageHeader } from "./FirstPageTemplate";
 import { ImageSection } from "./ImageSection";
 import { SaveStatus } from "./SaveStatus";
 import { WordCount } from "./WordCount";
+import { ZoomControl, DEFAULT_ZOOM, type ZoomLevel } from "./ZoomControl";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { countWordsFromBody } from "@/lib/kapiteleditor/countWords";
 import {
@@ -46,6 +47,7 @@ export function EditorClient({
   const [imageSections, setImageSections] = useState<ImageSections>(
     initialImageSections ?? EMPTY_IMAGE_SECTIONS,
   );
+  const [zoom, setZoom] = useState<ZoomLevel>(DEFAULT_ZOOM);
 
   const editor = useEditor({
     extensions: editorExtensions,
@@ -176,7 +178,15 @@ export function EditorClient({
   );
 
   return (
-    <div className="a5-desk [font-family:var(--font-lato)] flex min-h-[100dvh] flex-col">
+    <div
+      className="a5-desk [font-family:var(--font-lato)] flex min-h-[100dvh] flex-col"
+      style={{ ["--ui-zoom" as string]: String(zoom) }}
+    >
+      {/* UI-Zoom-Wrapper: skaliert Toolbar, Header, Editor-Seiten und Bild-
+          Sektionen rein VISUELL (transform: scale via CSS-Variable
+          --ui-zoom). Pagination-Engine und Layout-Berechnungen rechnen
+          weiterhin mit 1×-Werten — A5-Logik bleibt unverändert, sodass
+          der spätere PDF-Export (PROJ-16) konsistent bleibt. */}
       {/* Toolbar an top:0 — direkt im Document-Flow, kein verschachtelter
           Parent. Sticky funktioniert immer, weil document.scrollingElement
           die nächste scroll-Ancestor ist. */}
@@ -264,7 +274,10 @@ export function EditorClient({
       </main>
 
       <footer className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-[#e0dcd5] bg-[#ece6df] px-4 py-2 sm:px-6">
-        <WordCount words={wordCount} />
+        <div className="flex items-center gap-3">
+          <WordCount words={wordCount} />
+          <ZoomControl zoom={zoom} onChange={setZoom} />
+        </div>
         <span className="hidden text-xs text-[#a8a39b] sm:inline">
           {pageCount === 1 ? "Seite 1" : `${pageCount} Seiten`} · A5-Format · Druck-Vorschau
         </span>
@@ -325,6 +338,11 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
     const gapStr = stackStyle.getPropertyValue("--a5-page-gap").trim() || "2.5rem";
     const frameH = cssLengthToPx(pageHeightStr, rootFont);
     const gapPx = cssLengthToPx(gapStr, rootFont);
+    // UI-Zoom faktorieren: transform: scale auf .a5-stack skaliert visuell
+    // alle Kind-Elemente, getBoundingClientRect reportet die skalierten
+    // Werte. Wir teilen alle Mess-Rects durch zoom, damit die Pagination
+    // weiterhin gegen die LOGISCHEN A5-Werte (CSS-Vars, 1×) rechnet.
+    const zoom = parseFloat(stackStyle.getPropertyValue("--ui-zoom") || "1") || 1;
 
     if (frameH <= 0 || topMarginPx + bottomMarginPx >= frameH) return;
 
@@ -370,7 +388,12 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
     void fg.offsetHeight;
 
     const fgTop = fg.getBoundingClientRect().top;
-    const inFgContent = (el: HTMLElement) => el.getBoundingClientRect().top - fgTop - topMarginPx;
+    // Alle Positions-Werte werden durch zoom geteilt, damit die Pagination
+    // im LOGISCHEN A5-Koordinatensystem rechnet, selbst wenn die DOM-
+    // Rects durch transform: scale visuell skaliert sind.
+    const inFgContent = (el: HTMLElement) =>
+      (el.getBoundingClientRect().top - fgTop) / zoom - topMarginPx;
+    const elH = (el: HTMLElement) => el.getBoundingClientRect().height / zoom;
 
     // PASS A — Per-Row-Image-Scaling für 1-spaltig-Bild-Sektionen
     // (Spec 2026-05-20 vom Nutzer):
@@ -454,7 +477,7 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
 
     for (const item of items) {
       const observedTop = inFgContent(item.el);
-      const observedHeight = item.el.getBoundingClientRect().height;
+      const observedHeight = elH(item.el);
 
       // Welche Seite trägt diesen Item-Top aktuell?
       const frameIdx = Math.max(0, Math.floor(observedTop / stridePx));
@@ -464,7 +487,7 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
       if (item.kind === "break") {
         // Page-Break: Höhe so setzen, dass der nächste Block am Content-Top
         // der Folgeseite ankommt.
-        const currentHeight = item.el.getBoundingClientRect().height;
+        const currentHeight = elH(item.el);
         // Edge-Case: zwei Seitenumbrüche unmittelbar hintereinander
         // (Word-Verhalten „echte leere Seite dazwischen"). Wenn der Break
         // direkt am Frame-Content-Top startet, würde nextFrameContentTop -
@@ -510,17 +533,17 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
     }
 
     // Page-Count = ceil((fg-Höhe) / Stride).
-    const fgH = fg.getBoundingClientRect().height;
+    const fgH = fg.getBoundingClientRect().height / zoom;
     const needed = Math.max(1, Math.ceil(fgH / stridePx));
     setPageCount((prev) => (prev !== needed ? needed : prev));
   }, [fgRef, stackRef]);
 
-  // rAF-gebatcht: bei jedem Schedule den vorigen rAF abbrechen und einen
-  // neuen queuen. Der frühere „skip if rafRef.current !== null"-Guard
-  // hat nach Next.js-Link-Re-Mount für stuck-state gesorgt: das ref blieb
-  // nicht-null hängen (möglicherweise weil der vorherige rAF nie feuerte),
-  // und alle nachfolgenden Schedule-Calls returnten früh → recalc lief
-  // NIE wieder → pageFrames blieb auf 1 stehen (Bug 2026-05-20).
+  // rAF-gebatcht mit cancel-and-requeue (Bug 2026-05-20: ohne cancel blieb
+  // rafRef nach Next.js-Link-Re-Mount non-null hängen → recalc lief nie).
+  // 10 Hz Throttle wurde getestet, bremst aber die Konvergenz zwischen
+  // PD und usePagination zu stark, sodass Initial-Mount + Settling-Passes
+  // nicht in unter 10 s zum Equilibrium kommen. Mit rAF (60 Hz max) ist
+  // jede Eingabe nach ~50 ms stabil paginiert.
   const schedule = useCallback(() => {
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(() => {
@@ -565,20 +588,19 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
     return () => document.removeEventListener("narravit:pagination-recompute", handler);
   }, [schedule]);
 
-  // Initialer Pass + Settling-Passes nach 100/300/800/1500/3000 ms.
-  // Hintergrund: nach Login/Reload + bei Client-side-Navigation (Next.js
-  // Link, also OHNE Hard-Reload) hydriert React den Editor erst nach
-  // mehreren rAFs; TipTap's `immediatelyRender: false` verzögert den
-  // ersten Doc-Render zusätzlich. Bilder laden ihre finale Pixel-Größe
-  // erst nach Signed-URL-Fetch. Wenn KEINE dieser späteren Mutations
-  // den ResizeObserver triggert, bleibt pageCount auf dem Initial-State
-  // (1) hängen → User sieht nur Seite-1-Frame, Inhalt überläuft (Bug
-  // 2026-05-20: „nach Re-Enter zum Editor werden weiße Seiten nach
-  // Seite 1 nicht geladen"). Längere Settling-Kette deckt langsame
-  // Mount-Sequenzen ab.
+  // Initialer Pass + Settling-Passes nach 100/300/800/1500/3000/5000 ms +
+  // ein letzter Safety-Pass alle paar Sekunden zur Konvergenz, auch wenn
+  // PD/Image-Loads asynchron später feuern. Dispatcht zusätzlich das
+  // narravit:pagination-recompute-Event, damit PD und usePagination
+  // gemeinsam neu rechnen (PD-only-Schedule erzeugt keine usePagination-
+  // Triggering, wenn fg-Höhe innerhalb der 5-px-Toleranz bleibt).
   useEffect(() => {
-    schedule();
-    const timers = [100, 300, 800, 1500, 3000].map((d) => setTimeout(schedule, d));
+    const trigger = () => {
+      schedule();
+      document.dispatchEvent(new Event("narravit:pagination-recompute"));
+    };
+    trigger();
+    const timers = [100, 300, 800, 1500, 3000, 5000].map((d) => setTimeout(trigger, d));
     return () => {
       for (const t of timers) clearTimeout(t);
     };
