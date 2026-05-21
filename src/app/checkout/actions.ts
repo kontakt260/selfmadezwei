@@ -68,14 +68,16 @@ export async function startCheckoutAction(
     if (!input.projectId?.trim()) {
       return { ok: false, error: "Projekt-ID fehlt." };
     }
-    // Mitgliedschaft prüfen — nur Projektleiter dürfen verlängern/nachkaufen.
+    // Mitgliedschaft prüfen — jedes Projekt-Mitglied (PL oder Co-Autor)
+    // darf Verlängerung + Vapi-Top-Up kaufen. User-Request 2026-05-21:
+    // „jeder muss die Möglichkeit haben, für ein Projekt mehr zu erwerben".
     const { data: membership } = await supabase
       .from("project_members")
       .select("role")
       .eq("project_id", input.projectId)
       .eq("user_id", user.id)
       .maybeSingle();
-    if (!membership || membership.role !== "projektleiter") {
+    if (!membership) {
       return { ok: false, error: "Keine Berechtigung für dieses Projekt." };
     }
   }
