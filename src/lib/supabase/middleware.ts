@@ -8,7 +8,11 @@ const PUBLIC_ROUTES = [
   "/passwort-vergessen",
   "/passwort-zuruecksetzen",
   "/email-bestaetigen",
-  "/onboarding",
+  // /onboarding ist NICHT mehr public (PROJ-6 Frontend-Phase, Vibe-
+  // Security-Audit 2026-05-16 Medium-Finding #5): anonyme Aufrufe
+  // werden auf /registrieren?next=/onboarding umgeleitet, sonst
+  // könnte ein nicht-authentifizierter User einen Stripe-Checkout
+  // starten und der Webhook hätte keine `user_id`-Zuordnung.
   "/zugang-abgelaufen",
   // Konto-Bereich umgeht die „kein-Projekt → Onboarding"-Weiterleitung,
   // damit Nutzer ihr Konto auch nach Projekt-Löschung erreichen können.
@@ -18,6 +22,13 @@ const PUBLIC_ROUTES = [
 
 const AUTH_ONLY_ROUTES = ["/anmelden", "/registrieren"];
 
+// Routen, die für eingeloggte User immer erreichbar sind, OHNE die
+// „kein-Projekt → /onboarding"-Weiterleitung auszulösen. Sonst entsteht
+// ein Loop: /onboarding selbst löst die Weiterleitung auf /onboarding
+// aus, und /kauf-erfolgreich kann zwischen Stripe-Redirect und Webhook-
+// Eintreffen kurz „kein Projekt" sein.
+const NO_PAYMENT_BYPASS = ["/onboarding", "/kauf-erfolgreich"];
+
 function isPublic(pathname: string): boolean {
   if (pathname === "/") return false;
   if (pathname.startsWith("/auth/")) return true;
@@ -26,6 +37,12 @@ function isPublic(pathname: string): boolean {
 
 function isAuthOnly(pathname: string): boolean {
   return AUTH_ONLY_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+}
+
+function bypassesPaymentCheck(pathname: string): boolean {
+  return NO_PAYMENT_BYPASS.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  );
 }
 
 export async function updateSession(request: NextRequest) {
@@ -64,11 +81,19 @@ export async function updateSession(request: NextRequest) {
 
   if (!user && !isPublic(pathname)) {
     const url = request.nextUrl.clone();
-    url.pathname = "/anmelden";
+    // /onboarding-Spezialfall: anonyme Nutzer landen auf der Registrieren-
+    // Seite (nicht Anmelden), mit `next=/onboarding` für den Redirect
+    // nach erfolgreicher Registrierung. PROJ-6 AC.
+    if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) {
+      url.pathname = "/registrieren";
+      url.searchParams.set("next", "/onboarding");
+    } else {
+      url.pathname = "/anmelden";
+    }
     return NextResponse.redirect(url);
   }
 
-  if (user && !isPublic(pathname)) {
+  if (user && !isPublic(pathname) && !bypassesPaymentCheck(pathname)) {
     const { data: projects } = await supabase
       .from("projects")
       .select("portal_access_expires_at")

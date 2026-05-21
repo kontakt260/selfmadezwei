@@ -464,6 +464,70 @@ direkt aufruft (Pattern wird in PROJ-11-Spec festgelegt).
 - [ ] Sprache/Locale der Stripe-Checkout-Page: standardmäßig DE,
   Fallback EN?
 
+## Implementation Notes — Phase Frontend (2026-05-21)
+
+Frontend-UI für PROJ-6 ist live (Phase `/frontend`). Stripe-Backend
+(Webhook, Migration, echte Checkout-Sessions) folgt in `/backend PROJ-6`.
+
+### Neue Dateien
+
+- `src/app/checkout/actions.ts` — Server-Action `startCheckoutAction`,
+  3 Produkt-Pfade (initial / renewal / vapi), Auth- und Eingabe-
+  Validierung. Stub-Antwort `{ stubbed: true }` bis Stripe in /backend
+  angebunden wird.
+- `src/app/kauf-erfolgreich/page.tsx` — ServerComponent für die
+  Erfolgsseite. Verifiziert `session_id` (PROJ-6 Frontend-Phase via
+  Stub: `stub_<URL-encoded JSON>`; in /backend ersetzt durch echten
+  `stripe.checkout.sessions.retrieve`). 4 Bestätigungs-Varianten
+  (initial-self, initial-gift, renewal, vapi).
+- `src/components/projektuebersicht/PaywallStats.tsx` — Client-
+  Komponente mit den zwei Stat-Karten + Buy-Buttons.
+- `src/components/CheckoutCancelToast.tsx` — Liest
+  `?checkout=cancelled` aus der URL und zeigt einen Sonner-Toast.
+
+### Geänderte Dateien
+
+- `src/app/onboarding/OnboardingWizard.tsx` — `handlePurchase` ruft
+  jetzt `startCheckoutAction` mit dem vollständigen Wizard-State auf.
+  Loading-State (`useTransition` + Loader2), Success-/Error-Feedback.
+- `src/app/onboarding/page.tsx` — `<CheckoutCancelToast>` eingebunden.
+- `src/app/projektuebersicht/[project_id]/page.tsx` — Stat-Card-
+  Placeholder durch `<PaywallStats>` ersetzt; Daten-Berechnung für
+  Vapi-Verfügbarkeit (`36 000 + Σ top-ups × 3 600 − Σ voice-sessions`)
+  und Portal-Ablaufdatum eingebaut. `<CheckoutCancelToast>` eingebunden.
+- `src/lib/supabase/middleware.ts` — `/onboarding` aus PUBLIC_ROUTES
+  entfernt; anonyme Aufrufe von `/onboarding` redirecten auf
+  `/registrieren?next=/onboarding`. Neue `NO_PAYMENT_BYPASS`-Liste
+  (`/onboarding`, `/kauf-erfolgreich`) verhindert Loop in der
+  „kein-Projekt → onboarding"-Weiterleitung.
+
+### Verbleibende Backend-Arbeit (`/backend PROJ-6`)
+
+- Migration `project_access`-Tabelle anlegen (Paywall-Lockdown).
+- Stripe-Produkte + Price-IDs konfigurieren, Env-Vars setzen.
+- `startCheckoutAction` durch echte Stripe-Checkout-Session-Erstellung
+  ersetzen (inkl. `success_url`/`cancel_url`, Metadata).
+- `/api/stripe/webhook`-Route (Node-Runtime) mit Signatur-Verify +
+  Idempotenz + 3 Aktionspfaden.
+- `/kauf-erfolgreich`'s `verifyStripeSessionStub` durch echten
+  Stripe-API-Call ersetzen.
+- Webhook im Middleware-Matcher ausnehmen.
+- 7 Pflicht-Tests in `tests/PROJ-6-stripe-zahlungen.spec.ts`.
+
+### Live-Verifikation (Browser, 2026-05-21)
+
+- `/onboarding` lädt für eingeloggte Nutzer, Wizard rendert mit dem
+  letzten Schritt „Jetzt kaufen — 249 €". Klick zeigt grüne Bestätigung
+  „Checkout-Daten validiert ✓ — Stripe-Hosted-Checkout wird in /backend
+  PROJ-6 angebunden."
+- `/projektuebersicht/[pid]` zeigt beide neuen Stat-Karten mit den
+  Kauf-Buttons. „Um 12 Monate verlängern" ist disabled solange kein
+  `portal_access_expires_at` gesetzt ist; „60 Minuten nachkaufen" ist
+  disabled solange kein initial-Payment vorliegt.
+- Anonyme Aufrufe von `/onboarding` werden auf
+  `/registrieren?next=/onboarding` umgeleitet.
+- TypeScript-Check (`npx tsc --noEmit`) ohne Fehler.
+
 ## QA Test Results
 _To be added by /qa_
 

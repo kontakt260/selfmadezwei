@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { OnboardingWizard } from "./OnboardingWizard";
+import { CheckoutCancelToast } from "@/components/CheckoutCancelToast";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 type InitialForWhom = "self" | "gift" | null;
@@ -54,12 +56,17 @@ export default async function OnboardingPage({
   }
 
   return (
-    <OnboardingWizard
-      defaultFullName={defaultFullName}
-      buyerEmail={user?.email ?? ""}
-      initialForWhom={initialForWhom}
-      backUrl={user ? "/" : "https://www.narravit.de"}
-      showAccountDeleteLink={showAccountDeleteLink}
-    />
+    <>
+      <Suspense fallback={null}>
+        <CheckoutCancelToast />
+      </Suspense>
+      <OnboardingWizard
+        defaultFullName={defaultFullName}
+        buyerEmail={user?.email ?? ""}
+        initialForWhom={initialForWhom}
+        backUrl={user ? "/" : "https://www.narravit.de"}
+        showAccountDeleteLink={showAccountDeleteLink}
+      />
+    </>
   );
 }

@@ -1,9 +1,11 @@
 import { notFound, redirect } from "next/navigation";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Navbar } from "@/components/Navbar";
 import { ChapterListSection } from "@/components/projektuebersicht/ChapterListSection";
+import { PaywallStats } from "@/components/projektuebersicht/PaywallStats";
+import { CheckoutCancelToast } from "@/components/CheckoutCancelToast";
 import { type Chapter, countWordsFromBody } from "@/lib/projektuebersicht-chapters";
 import {
   addChapterAction,
@@ -19,24 +21,6 @@ function IconArrowLeft() {
   return (
     <svg width={16} height={16} viewBox="0 0 24 24" fill="none" aria-hidden>
       <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" strokeWidth={2} strokeLinecap="square" strokeLinejoin="miter" />
-    </svg>
-  );
-}
-
-function IconClock() {
-  return (
-    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx={12} cy={12} r={9} stroke="#96B897" strokeWidth={2} />
-      <path d="M12 7v5l3 2" stroke="#96B897" strokeWidth={2} strokeLinecap="square" />
-    </svg>
-  );
-}
-
-function IconCalendar() {
-  return (
-    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x={3} y={5} width={18} height={16} stroke="#96B897" strokeWidth={2} />
-      <path d="M3 9h18M8 3v4M16 3v4" stroke="#96B897" strokeWidth={2} strokeLinecap="square" />
     </svg>
   );
 }
@@ -109,30 +93,9 @@ function SectionHeader({
   );
 }
 
-function StatCard({
-  icon,
-  label,
-  value,
-  hint,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  hint: string;
-}) {
-  return (
-    <div className="flex flex-col gap-3 bg-white p-5 sm:p-8">
-      <div className="flex flex-row items-center gap-2 sm:gap-3">
-        <span className="shrink-0 [&>svg]:h-6 [&>svg]:w-6 sm:[&>svg]:h-7 sm:[&>svg]:w-7">{icon}</span>
-        <h3 className="[font-family:var(--font-pt-serif)] min-w-0 text-xl leading-8 text-[#3E3831] sm:text-2xl sm:leading-9">
-          {label}
-        </h3>
-      </div>
-      <p className="text-3xl leading-9 text-[#3E3831] sm:text-4xl sm:leading-10">{value}</p>
-      <p className="text-sm leading-6 text-[#848484] sm:text-base">{hint}</p>
-    </div>
-  );
-}
+// StatCard ist in src/components/projektuebersicht/PaywallStats.tsx
+// gekapselt — die ursprüngliche Inline-Variante wurde durch das neue
+// `<PaywallStats>`-Compound ersetzt (PROJ-6 Frontend-Phase).
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -151,7 +114,11 @@ export default async function ProjektuebersichtPage({
 
   // Fetch project + user membership in one go
   const [{ data: project }, { data: membership }] = await Promise.all([
-    supabase.from("projects").select("id, title").eq("id", project_id).single(),
+    supabase
+      .from("projects")
+      .select("id, title, portal_access_expires_at")
+      .eq("id", project_id)
+      .single(),
     supabase
       .from("project_members")
       .select("role")
@@ -162,6 +129,38 @@ export default async function ProjektuebersichtPage({
 
   // project not found OR user is not a member → 404 (avoids leaking project existence)
   if (!project || !membership) notFound();
+
+  // Vapi-Sprechzeit-Berechnung (PROJ-6):
+  //   36 000 s (10 h Inklusiv) + Σ vapi-Top-Ups × 3 600 − Σ voice-sessions.duration
+  // Sichtbarkeit: nur wenn Projekt einen erfolgreich abgeschlossenen
+  // initial_portal_access-Payment hat (= Zugang aktiviert).
+  const [{ data: payments }, { data: voiceSessions }] = await Promise.all([
+    supabase
+      .from("payments")
+      .select("type, status")
+      .eq("project_id", project_id)
+      .eq("status", "completed"),
+    supabase
+      .from("voice_sessions")
+      .select("duration_seconds")
+      .eq("project_id", project_id),
+  ]);
+  const hasInitialPayment = (payments ?? []).some(
+    (p) => p.type === "initial_portal_access",
+  );
+  const vapiTopUps = (payments ?? []).filter(
+    (p) => p.type === "vapi_voice_minutes_60",
+  ).length;
+  const consumedSeconds = (voiceSessions ?? []).reduce(
+    (sum, s) => sum + (s.duration_seconds ?? 0),
+    0,
+  );
+  const vapiSecondsAvailable = hasInitialPayment
+    ? Math.max(0, 36_000 + vapiTopUps * 3_600 - consumedSeconds)
+    : null;
+  const portalExpiresAt = hasInitialPayment
+    ? project.portal_access_expires_at ?? null
+    : null;
 
   const { data: rawChapters } = await supabase
     .from("chapters")
@@ -179,6 +178,9 @@ export default async function ProjektuebersichtPage({
   return (
     <>
       <Navbar />
+      <Suspense fallback={null}>
+        <CheckoutCancelToast />
+      </Suspense>
       <main className="[font-family:var(--font-lato)] box-border min-h-full w-full min-w-0 flex-1 bg-[#FAF8F6] px-4 pb-20 pt-[calc(7.348rem+2rem)] sm:px-6 sm:pb-16 sm:pt-[calc(7.348rem+2.5rem)] md:px-8 md:pt-[calc(7.348rem+3rem)] xl:pl-[calc(11rem+2rem)] xl:pr-8 xl:pt-12">
         <div className="mx-auto flex w-full max-w-[1213px] flex-col gap-8 sm:gap-10 md:gap-12">
 
@@ -234,21 +236,12 @@ export default async function ProjektuebersichtPage({
             />
           </SectionShell>
 
-          {/* Stat cards (placeholders) */}
-          <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
-            <StatCard
-              icon={<IconClock />}
-              label="Telefonzeit übrig"
-              value="—"
-              hint="Verfügbar nach Aktivierung des Telefon-Assistenten (PROJ-12)"
-            />
-            <StatCard
-              icon={<IconCalendar />}
-              label="NARRAVIT-Projektzugang endet in"
-              value="—"
-              hint="Wird nach abgeschlossener Zahlung angezeigt (PROJ-6)"
-            />
-          </div>
+          {/* Stat cards mit Verlängerungs- und Vapi-Nachkauf-Buttons (PROJ-6) */}
+          <PaywallStats
+            projectId={project_id}
+            portalExpiresAt={portalExpiresAt}
+            vapiSecondsAvailable={vapiSecondsAvailable}
+          />
 
           {/* Projektmitglieder placeholder */}
           <SectionShell>

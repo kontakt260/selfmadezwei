@@ -1,13 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
-import { Check } from "lucide-react";
+import { useMemo, useState, useTransition } from "react";
+import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { startCheckoutAction } from "@/app/checkout/actions";
 
 type ForWhom = "self" | "gift";
 type GiftMode = "phone-only" | "phone-plus-computer";
@@ -127,8 +128,34 @@ export function OnboardingWizard({
     setError(null);
   };
 
+  const [isPending, startTransition] = useTransition();
+  const [purchaseInfo, setPurchaseInfo] = useState<string | null>(null);
   const handlePurchase = () => {
-    setError("Stripe-Checkout wird in PROJ-6 implementiert.");
+    setError(null);
+    setPurchaseInfo(null);
+    startTransition(async () => {
+      const res = await startCheckoutAction({
+        productType: "initial",
+        metadata: {
+          fullName: state.fullName,
+          isGift: state.forWhom === "gift",
+          giftRecipientName: state.giftRecipientName || undefined,
+          giftRecipientEmail: state.giftRecipientEmail || undefined,
+          giftMode: state.giftMode ?? undefined,
+          giftRecipientRole: state.giftRecipientRole,
+          buyerRetainsAccess: state.buyerWantsAccess,
+        },
+      });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      // PROJ-6 Frontend-Phase: keine echte Stripe-Weiterleitung. Wir zeigen
+      // einen Hinweis, dass der Backend-Schritt folgt.
+      setPurchaseInfo(
+        "Checkout-Daten validiert ✓ — Stripe-Hosted-Checkout wird in /backend PROJ-6 angebunden.",
+      );
+    });
   };
 
   return (
@@ -192,6 +219,15 @@ export function OnboardingWizard({
             </p>
           )}
 
+          {purchaseInfo && (
+            <p
+              className="mt-4 rounded border border-[#96B897]/40 bg-[#96B897]/10 p-3 text-sm text-[#3E3831]"
+              role="status"
+            >
+              {purchaseInfo}
+            </p>
+          )}
+
           <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between sm:gap-4">
             {isFirst ? (
               <Button asChild variant="outline" className="h-12 w-full sm:w-auto sm:min-w-32">
@@ -209,8 +245,20 @@ export function OnboardingWizard({
             )}
 
             {isLast ? (
-              <Button type="button" onClick={handlePurchase} className="h-12 w-full sm:w-auto sm:min-w-44">
-                Jetzt kaufen — 249 €
+              <Button
+                type="button"
+                onClick={handlePurchase}
+                disabled={isPending}
+                className="h-12 w-full sm:w-auto sm:min-w-44"
+              >
+                {isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Wird vorbereitet …
+                  </>
+                ) : (
+                  "Jetzt kaufen — 249 €"
+                )}
               </Button>
             ) : (
               <Button type="button" onClick={next} className="h-12 w-full sm:w-auto sm:min-w-32">
