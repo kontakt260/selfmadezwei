@@ -725,6 +725,62 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
       void fg.offsetHeight;
     }
 
+    // PASS G — Grow-Pass für untergröße Reihen (Audit-Folge 2026-05-21).
+    // PASS A skaliert anfangs auf Basis einer Mess-Position, die später
+    // durch HR-Settling + PD-Race + PASS 1e wandert. Wenn sich heraus-
+    // stellt, dass eine Reihe auf einer Seite mit VIEL ungenutztem Platz
+    // landet (Bug: Seite 4 zeigt End-Sektion-Bild bei Skala 0.65, obwohl
+    // 369 px Restplatz übrig sind), soll die Skala zurückgewachsen werden
+    // bis zum Maximum, das auf dieser Seite passt — capped bei 1.
+    //
+    // Same-Size-Per-Page bleibt erhalten: pro Seite wird die MAX zulässige
+    // Skala aller Reihen auf dieser Seite ermittelt und einheitlich
+    // angewendet.
+    void fg.offsetHeight;
+    {
+      // Natürliche Reihen-Höhe (= scale 1) berechnen wir aus naturalRowH1Col
+      // (bereits aus CSS-Vars ermittelt) — für 2-spaltig wäre der Wert
+      // halbiert, aber PASS A skaliert nur 1-spaltig, also stimmt's hier.
+      const rowsByPageGrow = new Map<number, HTMLElement[]>();
+      for (const row of imageRows) {
+        const top = inFgContent(row);
+        const h = elH(row);
+        const page = Math.max(0, Math.floor((top + h / 2) / stridePx));
+        if (!rowsByPageGrow.has(page)) rowsByPageGrow.set(page, []);
+        rowsByPageGrow.get(page)!.push(row);
+      }
+      for (const [pageIdx, pageRows] of rowsByPageGrow) {
+        // Nur 1-spaltig-Reihen scale-uppen — 2-spaltig hat fixe Breite.
+        const oneCol = pageRows.filter(
+          (r) => r.getAttribute("data-layout") === "1-spaltig",
+        );
+        if (oneCol.length === 0) continue;
+        // Max-Skala = (page_content_bottom - first_row_top) / total_natural_h
+        // wobei total_natural_h = N * naturalRowH1Col + (N-1) * sectionRowGap
+        const firstTop = inFgContent(oneCol[0]);
+        const pageContentBottom = pageIdx * stridePx + pageContentHeight;
+        const available = pageContentBottom - firstTop;
+        const naturalTotalH =
+          oneCol.length * naturalRowH1Col + (oneCol.length - 1) * sectionRowGap;
+        if (naturalTotalH <= 0) continue;
+        const maxScale = Math.min(1, available / naturalTotalH);
+        // Aktuelle Skala der Gruppe (alle Reihen auf einer Seite haben
+        // nach PASS Z dieselbe). Wenn Max > aktuell + 1 %, hochskalieren.
+        const currentScale =
+          parseFloat(oneCol[0].style.getPropertyValue("--row-image-scale")) || 1;
+        if (maxScale > currentScale + 0.01) {
+          const newScale = Math.max(currentScale, Math.min(1, maxScale));
+          for (const r of oneCol) {
+            if (newScale >= 0.9999) {
+              r.style.removeProperty("--row-image-scale");
+            } else {
+              r.style.setProperty("--row-image-scale", newScale.toFixed(4));
+            }
+          }
+        }
+      }
+    }
+
     // Page-Count = ceil((fg-Höhe) / Stride).
     const fgH = fg.getBoundingClientRect().height / zoom;
     const needed = Math.max(1, Math.ceil(fgH / stridePx));

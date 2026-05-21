@@ -366,24 +366,23 @@
   white-space: normal;
 }
 
-/* Audit Bug 3 (2026-05-21): `text-align-last: justify` auf dem GANZEN
- * Absatz ist ein Holzhammer. Der CSS-Selektor wendet die Regel auf den
- * gesamten Paragraphen an — auch auf die WIRKLICH letzte Zeile (die laut
- * Word-Typografie linksbündig bleiben muss). Folge: kurze Schluss-Zeilen
- * werden mit ~30 px Wortabständen über die Seitenbreite gedehnt.
+/* User-Anforderungen 2026-05-21:
+ *   1. Die letzte Zeile auf einer Seite (durch automatisches Page-Wrap
+ *      via soft-break-spacer) SOLL bündig zur rechten Marge stehen.
+ *   2. Die wirklich letzte Zeile des Dokuments (oder eines Absatzes,
+ *      den der User mit Enter beendet hat) DARF kürzer/linksbündig
+ *      bleiben.
  *
- * Korrekte Lösung: die Pagination-Engine (PaginationDecorations.ts)
- * versteckt bereits den Trailing-Whitespace VOR jedem Spacer via
- * display:none-Decoration. Mit unsichtbarem Trailing-Space endet die
- * Vor-Spacer-Zeile im Justify-Layout natürlich am rechten Rand (das
- * letzte sichtbare Wort sitzt bündig), ohne dass wir zusätzlich
- * text-align-last erzwingen müssen. Die echte Schluss-Zeile bleibt
- * linksbündig — wie in Word.
+ * CSS allein kann beide Anforderungen NICHT trennen — `text-align-last`
+ * gilt entweder für ALLE „letzten Zeilen" oder für KEINE. Wir liefern
+ * deshalb das konservativere Verhalten (Anforderung 2):
+ *   - KEIN `text-align-last: justify` Override.
+ *   - Truly-letzte Zeile aller Absätze bleibt linksbündig (CSS-Default).
  *
- * Falls dadurch im Praxis-Layout doch noch sichtbar ragged-right-
- * Zeilen vor Spacern entstehen, kann eine Inline-Decoration in PD die
- * spezifische Zeile gezielt justifizieren (geplant für Phase C des
- * Sanierungsplans). */
+ * Anforderung 1 (Pre-Spacer-Line bündig zur Marge) wäre nur über eine
+ * PD-seitige Inline-Decoration auf der spezifischen Wrap-Zeile lösbar
+ * — für die nächste Iteration vorgemerkt (siehe PROJ-5-Spec Tech
+ * Design Refresh, Sektion A „Inline-Justify-Decoration"). */
 
 .a5-stack blockquote,
 .a5-page blockquote {
