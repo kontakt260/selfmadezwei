@@ -256,7 +256,7 @@ export function ImageSection({
           <AlertDialogHeader>
             <AlertDialogTitle className="font-normal">Bild entfernen?</AlertDialogTitle>
             <AlertDialogDescription>
-              Das Bild wird aus dieser Bild-Sektion gelöscht. Du kannst es danach neu hochladen.
+              Das Bild wird aus dieser Bild-Sektion gelöscht. Sie können es danach neu hochladen.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

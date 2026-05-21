@@ -50,7 +50,10 @@ function makeBuilder(result: { data?: unknown; error?: unknown } = {}) {
 
 function makeMockClient(user: { id: string } | null = { id: USER_ID }) {
   return {
-    auth: { getUser: vi.fn().mockResolvedValue({ data: { user } }) },
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user } }),
+      updateUser: vi.fn().mockResolvedValue({ data: { user } }),
+    },
     from: vi.fn(),
   };
 }

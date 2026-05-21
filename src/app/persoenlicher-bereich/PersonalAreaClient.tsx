@@ -386,10 +386,10 @@ function DeleteAccountSection() {
 
                   {isSoleOwner && (
                     <div className="border border-destructive/30 bg-destructive/5 p-4 text-base leading-7 text-destructive">
-                      Du bist auf {state.soleOwnerCount}{" "}
+                      Sie sind auf {state.soleOwnerCount}{" "}
                       {state.soleOwnerCount === 1 ? "Projekt" : "Projekten"} der
-                      einzige Projektleiter. Übertrage die Projektleiterschaft oder
-                      lösche die Projekte zuerst.
+                      einzige Projektleiter. Übertragen Sie die Projektleiterschaft oder
+                      löschen Sie die Projekte zuerst.
                     </div>
                   )}
 
@@ -399,7 +399,7 @@ function DeleteAccountSection() {
 
                   <div className="flex flex-col gap-2">
                     <Label htmlFor="delete-confirm" className="text-sm font-bold text-[#3E3831] sm:text-base">
-                      Tippe <strong>LÖSCHEN</strong> zur Bestätigung:
+                      Tippen Sie <strong>LÖSCHEN</strong> zur Bestätigung:
                     </Label>
                     <Input
                       id="delete-confirm"

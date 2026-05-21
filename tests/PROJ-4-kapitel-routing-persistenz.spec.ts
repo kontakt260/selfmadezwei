@@ -7,6 +7,31 @@ test.use({ storageState: "tests/.auth/user.json" });
 const QA_PROJECT_ID = "cccccccc-0099-0099-0099-000000000099";
 const PROJECT_URL = `/projektuebersicht/${QA_PROJECT_ID}`;
 
+// Clean up any chapters left over from previous (failed) test runs so all tests start with a clean project state.
+test.beforeAll(async ({ browser }) => {
+  // Set hook timeout to 120 seconds to allow deleting many leftover chapters
+  test.setTimeout(120000);
+  const ctx = await browser.newContext({ storageState: "tests/.auth/user.json" });
+  const p = await ctx.newPage();
+  await p.goto(PROJECT_URL);
+  await p.waitForLoadState("networkidle");
+  const deleteButtons = p.getByRole("button", { name: /Kapitel „.*" löschen/ });
+  let count = await deleteButtons.count();
+  console.log(`Starting PROJ-4 cleanup: found ${count} leftover chapters.`);
+  let deletedCount = 0;
+  while (count > 0) {
+    await deleteButtons.first().click();
+    await p.waitForTimeout(3500);
+    await p.getByRole("button", { name: /Endgültig löschen/ }).click();
+    await p.waitForTimeout(1000);
+    deletedCount++;
+    console.log(`Deleted chapter #${deletedCount}`);
+    count = await deleteButtons.count();
+  }
+  console.log(`PROJ-4 cleanup finished. Deleted ${deletedCount} chapters.`);
+  await ctx.close();
+});
+
 // NOTE: Chapter modals use role="presentation" (accessibility BUG-3, Medium).
 // Tests avoid getByRole("dialog") for chapter modals and use direct locators instead.
 
@@ -78,7 +103,7 @@ test.describe("PROJ-4 — Projektübersicht", () => {
 
   test("AC-PÜ-5: Kapitelsektion mit Leerzustand und beiden Aktions-Buttons", async ({ page }) => {
     await page.goto(PROJECT_URL);
-    await expect(page.getByRole("heading", { name: "Kapitel" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Kapitel", exact: true })).toBeVisible();
     await expect(page.getByText("Noch keine Kapitel vorhanden.")).toBeVisible();
     // Both action buttons visible in empty state (header + empty-state = 2 each; use first())
     const buttons = page.getByRole("button");
@@ -98,24 +123,6 @@ test.describe("PROJ-4 — Projektübersicht", () => {
 
 test.describe("PROJ-4 — Kapitel CRUD", () => {
   test.describe.configure({ mode: "serial" });
-
-  // Clean up any chapters left over from previous (failed) test runs so CRUD tests are idempotent.
-  test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: "tests/.auth/user.json" });
-    const p = await ctx.newPage();
-    await p.goto(PROJECT_URL);
-    await p.waitForLoadState("networkidle");
-    const deleteButtons = p.getByRole("button", { name: /Kapitel „.*" löschen/ });
-    let count = await deleteButtons.count();
-    while (count > 0) {
-      await deleteButtons.first().click();
-      await p.waitForTimeout(3_500);
-      await p.getByRole("button", { name: /Endgültig löschen/ }).click();
-      await p.waitForTimeout(1_000);
-      count = await deleteButtons.count();
-    }
-    await ctx.close();
-  });
 
   // NOTE: Chapter modals use role="presentation" not role="dialog" (BUG-3).
   // Input in "Eigenes Kapitel" modal: placeholder "z. B. Reisen und Begegnungen"
@@ -151,7 +158,7 @@ test.describe("PROJ-4 — Kapitel CRUD", () => {
     await page.goto(PROJECT_URL);
     await page.getByRole("link", { name: "Bearbeiten" }).first().click();
     await page.waitForURL(/kapiteleditor/);
-    await expect(page.getByText(/PROJ-5/)).toBeVisible();
+    await expect(page.getByPlaceholder("Kapitel-Titel")).toBeVisible();
     const backLink = page.getByRole("link", { name: /Zurück zur Projektübersicht/ });
     await expect(backLink).toBeVisible();
   });
@@ -294,7 +301,7 @@ test.describe("PROJ-4 — Responsive & Navigation", () => {
     if (hasChapters) {
       await editLink.click();
       await page.waitForURL(/kapiteleditor/);
-      await expect(page.getByText(/PROJ-5/)).toBeVisible();
+      await expect(page.getByPlaceholder("Kapitel-Titel")).toBeVisible();
       const backLink = page.getByRole("link", { name: /Zurück zur Projektübersicht/ });
       await expect(backLink).toBeVisible();
     } else {

@@ -1,0 +1,88 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - complementary [ref=e2]:
+    - generic [ref=e3]:
+      - link "Logo" [ref=e4] [cursor=pointer]:
+        - /url: /
+        - img "Logo" [ref=e5]
+      - navigation "Hauptnavigation" [ref=e6]:
+        - link "Startseite" [ref=e7] [cursor=pointer]:
+          - /url: /
+          - img [ref=e8]
+        - link "Persönlicher Bereich" [ref=e9] [cursor=pointer]:
+          - /url: /persoenlicher-bereich
+          - img [ref=e10]
+      - button "Abmelden" [ref=e12] [cursor=pointer]:
+        - img [ref=e13]
+  - main [ref=e14]:
+    - generic [ref=e15]:
+      - generic [ref=e16]:
+        - link "Zurück zur Startseite" [ref=e17] [cursor=pointer]:
+          - /url: /
+          - img [ref=e18]
+          - text: Zurück zur Startseite
+        - heading "QA-Testprojekt" [level=1] [ref=e20]
+        - paragraph [ref=e21]: Projekt bearbeiten und verwalten
+      - generic [ref=e23]:
+        - generic [ref=e24]:
+          - generic [ref=e26]:
+            - img [ref=e28]
+            - heading "Cover bearbeiten" [level=2] [ref=e31]
+          - paragraph [ref=e33]: Der Cover-Editor ist in Kürze verfügbar (PROJ-10).
+        - generic [ref=e34]:
+          - generic [ref=e36]:
+            - img [ref=e38]
+            - heading "Code für das Telefonieren" [level=2] [ref=e40]
+          - paragraph [ref=e42]: Der Telefon-Code wird mit dem Vapi-Modul aktiviert (PROJ-12).
+      - generic [ref=e43]:
+        - generic [ref=e44]:
+          - generic [ref=e45]:
+            - img [ref=e47]
+            - heading "Kapitel" [level=2] [ref=e51]
+          - generic [ref=e52]:
+            - button "Eigenes Kapitel" [ref=e53] [cursor=pointer]:
+              - img [ref=e54]
+              - text: Eigenes Kapitel
+            - button "Erzähl-Impuls" [ref=e56] [cursor=pointer]:
+              - img [ref=e57]
+              - text: Erzähl-Impuls
+        - list "Kapitelreihenfolge" [ref=e59]:
+          - listitem [ref=e60]:
+            - 'generic "Kapitel 1: QA-Testkapitel — zum Umsortieren ziehen" [ref=e61]':
+              - img [ref=e63]
+              - generic [ref=e70]: "1."
+              - generic [ref=e71]:
+                - heading "QA-Testkapitel" [level=4] [ref=e72]
+                - paragraph [ref=e73]: Eigenes Kapitel • 0 Wörter
+            - generic [ref=e74]:
+              - button "Kapitel „QA-Testkapitel\" umbenennen" [ref=e75] [cursor=pointer]:
+                - img
+              - button "Kapitel „QA-Testkapitel\" löschen" [ref=e76] [cursor=pointer]:
+                - img
+              - link "Bearbeiten" [ref=e77] [cursor=pointer]:
+                - /url: /projektuebersicht/cccccccc-0099-0099-0099-000000000099/kapiteleditor/7a10cf36-286d-49a5-afc7-c1da6b52fd5c
+      - generic [ref=e78]:
+        - generic [ref=e79]:
+          - generic [ref=e80]:
+            - img [ref=e82]
+            - heading "Telefonzeit übrig" [level=3] [ref=e85]
+          - paragraph [ref=e86]: —
+          - paragraph [ref=e87]: Verfügbar nach Aktivierung des Telefon-Assistenten (PROJ-12)
+        - generic [ref=e88]:
+          - generic [ref=e89]:
+            - img [ref=e91]
+            - heading "NARRAVIT-Projektzugang endet in" [level=3] [ref=e94]
+          - paragraph [ref=e95]: —
+          - paragraph [ref=e96]: Wird nach abgeschlossener Zahlung angezeigt (PROJ-6)
+      - generic [ref=e97]:
+        - generic [ref=e99]:
+          - img [ref=e101]
+          - heading "Projektmitglieder" [level=2] [ref=e104]
+        - paragraph [ref=e105]: Die Mitgliederverwaltung wird mit PROJ-9 aktiviert.
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e111] [cursor=pointer]:
+    - img [ref=e112]
+  - alert [ref=e115]
+```

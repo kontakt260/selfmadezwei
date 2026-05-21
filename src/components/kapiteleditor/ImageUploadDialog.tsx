@@ -116,7 +116,7 @@ export function ImageUploadDialog({
         <DialogHeader>
           <DialogTitle className="font-normal">Bild hinzufügen</DialogTitle>
           <DialogDescription>
-            Wähle eine Datei und passe den Bildausschnitt an (festes Verhältnis 3:2 für den
+            Wählen Sie eine Datei und passen Sie den Bildausschnitt an (festes Verhältnis 3:2 für den
             Buchdruck).
           </DialogDescription>
         </DialogHeader>
@@ -189,7 +189,7 @@ export function ImageUploadDialog({
           {imgSrc && (
             <>
               <Button type="button" variant="outline" onClick={reset}>
-                Andere Datei wählen
+                Weitere Datei wählen
               </Button>
               <Button type="button" onClick={confirmCrop} disabled={busy || !completedCrop}>
                 {busy ? "Wird übernommen…" : "Übernehmen"}

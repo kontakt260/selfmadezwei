@@ -131,9 +131,7 @@ export async function startCheckoutAction(
       // Buyer-Email vorbelegen für UX (Stripe akzeptiert auch ohne, aber
       // dann muss der User sie erneut eintippen).
       customer_email: user.email ?? undefined,
-      // Allow_promotion_codes kann später aktiviert werden falls Coupons
-      // gewünscht. Default: aus.
-      allow_promotion_codes: false,
+      allow_promotion_codes: true,
       // Metadata wird vom Webhook gelesen, um die richtige DB-Aktion
       // auszuführen (Projekt anlegen / Renewal / Vapi-Top-Up).
       metadata,

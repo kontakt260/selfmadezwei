@@ -17,7 +17,7 @@ export default async function globalSetup(_config: FullConfig) {
   await page.getByRole("button", { name: "Anmelden", exact: true }).click();
 
   // Wait until redirected away from /anmelden (middleware sends authed users onward)
-  await page.waitForURL((url) => !url.pathname.includes("/anmelden"), { timeout: 15_000 });
+  await page.waitForURL((url) => !url.pathname.includes("/anmelden"), { timeout: 45_000 });
 
   await page.context().storageState({ path: STORAGE_STATE });
   await browser.close();

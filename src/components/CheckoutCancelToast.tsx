@@ -15,7 +15,7 @@ import { toast } from "sonner";
 // Query-Parameter).
 
 export function CheckoutCancelToast({
-  message = "Kauf nicht abgeschlossen — du kannst es erneut versuchen.",
+  message = "Kauf nicht abgeschlossen — Sie können es erneut versuchen.",
 }: {
   message?: string;
 }) {
