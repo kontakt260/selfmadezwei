@@ -21,7 +21,7 @@
             - paragraph [ref=e24]: Ich schenke jemand anderem ein Lebensbuch.
       - generic [ref=e25]:
         - link "Zurück" [ref=e26] [cursor=pointer]:
-          - /url: https://www.narravit.de
+          - /url: /
         - button "Weiter" [active] [ref=e27] [cursor=pointer]
   - region "Notifications alt+T"
   - button "Open Next.js Dev Tools" [ref=e33] [cursor=pointer]:

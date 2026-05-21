@@ -11,10 +11,12 @@ test.describe("PROJ-2 — Public auth pages render", () => {
     await expect(page.locator('input[name="email"]')).toBeVisible();
     await expect(page.locator('input[name="password"]')).toBeVisible();
     await expect(page.getByRole("link", { name: "Passwort vergessen?" })).toBeVisible();
+    // Aktive OAuth-Provider: Google + Facebook. Apple ist archiviert
+    // (siehe src/components/auth/OAuthButtons.tsx), bis die Apple-Developer-
+    // Konfiguration steht — Spec PROJ-3 Refine 2026-05-21.
     await expect(page.getByRole("button", { name: /Mit Google anmelden/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Mit Apple anmelden/ })).toBeVisible();
-    // Spec: no Facebook button
-    await expect(page.getByRole("button", { name: /Facebook/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Mit Facebook anmelden/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Mit Apple anmelden/ })).toHaveCount(0);
   });
 
   test("/registrieren shows register form with all required fields", async ({ page }) => {
@@ -25,7 +27,8 @@ test.describe("PROJ-2 — Public auth pages render", () => {
     await expect(page.locator('input[name="password"]')).toBeVisible();
     await expect(page.locator('input[name="confirmPassword"]')).toBeVisible();
     await expect(page.getByRole("button", { name: /Mit Google registrieren/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Mit Apple registrieren/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Mit Facebook registrieren/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Mit Apple registrieren/ })).toHaveCount(0);
   });
 
   test("/email-bestaetigen shows confirmation hint", async ({ page }) => {
@@ -130,6 +133,11 @@ test.describe("PROJ-2 — Form validation (Zod, server actions)", () => {
 });
 
 test.describe("PROJ-2 — Onboarding wizard", () => {
+  // Seit PROJ-6 ist /onboarding auth-gated — anonyme Aufrufe werden auf
+  // /registrieren?next=/onboarding umgeleitet. Wir laden hier den
+  // qa-test-User-State, damit der Wizard tatsächlich rendert.
+  test.use({ storageState: "tests/.auth/user.json" });
+
   // Serial: /onboarding makes a Supabase auth call on every request; concurrent hits
   // against the dev server's Turbopack compiler exceed the 30s timeout.
   test.describe.configure({ mode: "serial" });

@@ -12,15 +12,14 @@ Unterstützt durch Leitfragen, Erzähl-Impulse, Lektorat und Print-on-Demand. K�
 
 ## Pflichtlektüre (immer zuerst lesen)
 
-1. **[docs/ROADMAP.md](docs/ROADMAP.md)** — vollständige Produkt- & Technik-Roadmap (Phasen 1–10, Architektur-Querschnitt, kritische Prüfung, YAML-Todos). **Source of Truth** für Prioritäten und Nicht-Ziele.
-2. **[docs/PRD.md](docs/PRD.md)** — Produkt-Briefing (wird durch `/init` aus der Roadmap abgeleitet).
-3. **[features/INDEX.md](features/INDEX.md)** — Feature-Status.
+1. **[docs/PRD.md](docs/PRD.md)** — Produkt-Briefing, Vision, Zielgruppen, Constraints, Nicht-Ziele. **Source of Truth** für Prioritäten.
+2. **[features/INDEX.md](features/INDEX.md)** — Feature-Status pro PROJ-X.
 
 ## Frontend-Übernahme (verbindlich)
 
 Das **gesamte bestehende Frontend** der alten App soll **1:1 übernommen** werden — Look, Layout, Komponentenstruktur, deutsche Bezeichner. Angepasst werden nur:
 - **Styling-Layer:** Roh-Tailwind v4 → **Tailwind v3 + shadcn/ui** (vorinstallierte UI-Primitives unter `src/components/ui/` wiederverwenden, niemals neu bauen).
-- **Datenzugriff:** Mock-Daten (`lib/mock-*.ts`) → **Supabase** Server Actions/Routes mit RLS (Roadmap Phase 1).
+- **Datenzugriff:** Mock-Daten (`lib/mock-*.ts`) → **Supabase** Server Actions/Routes mit RLS.
 - **Routing/Validierung:** Projekt/Kapitel-IDs künftig **in der URL + serverseitig geprüft**, nicht nur sessionStorage.
 
 ### Quell-Inventar (alt → neu)
@@ -59,9 +58,9 @@ Quelle: `/Users/jakobtrierweiler/Desktop/GitHub/selfmade/my-app/`
 2. AppShell + Navbar — Layout-Skelett.
 3. Statische Pages: anmelden, registrieren, onboarding, kaufuebersicht.
 4. Projektübersicht inkl. ChapterDragList / Impulse (zuerst mit migrierten Mocks, dann Supabase).
-5. Kapitel-Editor (A5, TipTap — Achtung: Roadmap Phase 3, Tablet-tauglich, kein Phone-Editor).
+5. Kapitel-Editor (A5, TipTap — Tablet-tauglich, kein Phone-Editor).
 6. Cover-Editor.
-7. Persönlicher Bereich + Konto an echte Auth/RLS koppeln (Roadmap Phase 2).
+7. Persönlicher Bereich + Konto an echte Auth/RLS koppeln.
 
 ## Feste Produktentscheidungen (nicht neu verhandeln)
 
@@ -77,7 +76,7 @@ Quelle: `/Users/jakobtrierweiler/Desktop/GitHub/selfmade/my-app/`
 
 - **Framework:** Next.js 16 (App Router), TypeScript, React 19
 - **Styling:** Tailwind CSS v3 + **shadcn/ui** (copy-paste components, niemals neu bauen)
-- **Backend:** Supabase (PostgreSQL + Auth + Storage + RLS) — Ziel laut Roadmap
+- **Backend:** Supabase (PostgreSQL + Auth + Storage + RLS)
 - **Editor:** TipTap (aus alter App weiterverwenden)
 - **Validierung:** Zod + react-hook-form
 - **State:** React useState / Context API
@@ -96,15 +95,14 @@ src/
 features/           Feature-Specs (PROJ-X-name.md)
   INDEX.md          Status-Übersicht
 docs/
-  ROADMAP.md        Source of Truth (Produkt + Technik, alle Phasen)
-  PRD.md            Aus Roadmap abgeleitete Produktbeschreibung
+  PRD.md            Produkt-Briefing, Vision, Constraints, Nicht-Ziele
   production/       Sentry / Security / Performance / Rate Limits
 ```
 
 ## Development Workflow
 
-1. `/init` — PRD und Feature-Map aus der ROADMAP ableiten (einmalig)
-2. `/write-spec` — Feature-Spec pro Roadmap-Phase / Roadmap-Todo
+1. `/init` — PRD und Feature-Map initial anlegen (einmalig)
+2. `/write-spec` — Feature-Spec pro PROJ-X
 3. `/architecture` — Tech-Design (PM-tauglich, kein Code)
 4. `/frontend` — UI bauen (shadcn/ui zuerst!) — **Quelle: alte App-Komponenten**
 5. `/backend` — APIs, Schemas, RLS-Policies in Supabase
@@ -136,9 +134,9 @@ npm run test:e2e     # Playwright
 npm run test:all     # beide Suites
 ```
 
-## Roadmap-Bezug für Agents
+## Nicht-Ziele (nicht neu erfinden)
 
-Bei größeren Änderungen vor der Arbeit das passende Roadmap-Kapitel lesen (Phasen 1–10). **Nicht-Ziele neu erfinden ist verboten**: kein Live-Co-Editing, kein Abo, kein Phone-Editor, kein anderes Buchformat als A5.
+Vor größeren Änderungen [docs/PRD.md](docs/PRD.md) und [features/INDEX.md](features/INDEX.md) lesen. **Diese Nicht-Ziele sind gesetzt:** kein Live-Co-Editing, kein Abo, kein Phone-Editor, kein anderes Buchformat als A5.
 
 ## Produkt-Kontext
 

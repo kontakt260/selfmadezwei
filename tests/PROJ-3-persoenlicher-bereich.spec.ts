@@ -44,12 +44,18 @@ test.describe("PROJ-3 — Account-Übersicht", () => {
     await expect(nameInput).not.toHaveAttribute("readonly");
   });
 
-  test("AC-5: E-Mail-Feld zeigt aktuelle E-Mail und ist editierbar", async ({ page }) => {
+  test("AC-5: E-Mail-Feld zeigt aktuelle E-Mail und ist read-only mit Support-Hinweis", async ({ page }) => {
+    // Refine 2026-05-21: E-Mail-Self-Service-Edit wurde via revert
+    // 02cf7d8 zurückgenommen — bis ein sauberer Recovery-Flow steht,
+    // läuft Mail-Wechsel über Support.
     await page.goto("/persoenlicher-bereich");
     const emailInput = page.locator('input[name="email"]');
     await expect(emailInput).toBeVisible();
     await expect(emailInput).toHaveValue("qa-test@narravit.de");
-    await expect(emailInput).not.toHaveAttribute("readonly");
+    await expect(emailInput).toHaveAttribute("readonly", "");
+    await expect(
+      page.getByText(/wenden Sie sich bitte an den Support/i).first(),
+    ).toBeVisible();
   });
 
   test("AC-7: Name speichern — zu kurzer Name zeigt Validierungsfehler", async ({ page }) => {
@@ -58,15 +64,6 @@ test.describe("PROJ-3 — Account-Übersicht", () => {
     await nameInput.fill("A");
     await page.getByRole("button", { name: "Name speichern" }).click();
     await expect(page.getByText(/mindestens 2 Zeichen/)).toBeVisible();
-  });
-
-  test("AC-8: E-Mail ändern — gleiche E-Mail zeigt Validierungsfehler", async ({ page }) => {
-    await page.goto("/persoenlicher-bereich");
-    const emailInput = page.locator('input[name="email"]');
-    // Ensure it still shows the current address, then submit unchanged
-    await expect(emailInput).toHaveValue("qa-test@narravit.de");
-    await page.getByRole("button", { name: "E-Mail ändern" }).click();
-    await expect(page.getByText(/bereits deine aktuelle E-Mail/)).toBeVisible();
   });
 });
 
@@ -108,16 +105,23 @@ test.describe("PROJ-3 — Sicherheit", () => {
 // ─── Account löschen ───────────────────────────────────────────────────────────
 
 test.describe("PROJ-3 — Account löschen", () => {
+  // Delete-Trigger-Button heißt seit Refine 2026-05-21 schlicht
+  // „Account löschen" (das ausführliche „unwiderruflich" steht im
+  // Sektions-Text + Dialog-Body, nicht im Button-Label). Exact-Match
+  // verhindert Verwechslung mit dem Section-Heading gleichen Namens.
+  const triggerSelector = (page: import("@playwright/test").Page) =>
+    page.getByRole("button", { name: "Account löschen", exact: true });
+
   test("AC-15: Löschen-Button öffnet AlertDialog", async ({ page }) => {
     await page.goto("/persoenlicher-bereich");
-    await page.getByRole("button", { name: /unwiderruflich löschen/ }).click();
+    await triggerSelector(page).click();
     await expect(page.getByRole("alertdialog")).toBeVisible();
     await expect(page.getByText("Account wirklich löschen?")).toBeVisible();
   });
 
   test("AC-16: Löschen-Button im Dialog ist deaktiviert bis 'LÖSCHEN' eingetippt", async ({ page }) => {
     await page.goto("/persoenlicher-bereich");
-    await page.getByRole("button", { name: /unwiderruflich löschen/ }).click();
+    await triggerSelector(page).click();
 
     const submitBtn = page.getByRole("button", { name: "Account endgültig löschen" });
     await expect(submitBtn).toBeDisabled();
@@ -133,20 +137,20 @@ test.describe("PROJ-3 — Account löschen", () => {
 
   test("AC-17: Abbrechen schließt Dialog und setzt Eingabe zurück", async ({ page }) => {
     await page.goto("/persoenlicher-bereich");
-    await page.getByRole("button", { name: /unwiderruflich löschen/ }).click();
+    await triggerSelector(page).click();
     await page.locator('input#delete-confirm').fill("LÖSCHEN");
     await page.getByRole("button", { name: "Abbrechen" }).click();
 
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
     // Re-open: input should be cleared
-    await page.getByRole("button", { name: /unwiderruflich löschen/ }).click();
+    await triggerSelector(page).click();
     await expect(page.locator('input#delete-confirm')).toHaveValue("");
   });
 
   test("AC-18: Sole-Owner-Check — Nutzer mit eigenem Projekt sieht Fehlermeldung beim Löschen", async ({ page }) => {
     await page.goto("/persoenlicher-bereich");
-    await page.getByRole("button", { name: /unwiderruflich löschen/ }).click();
+    await triggerSelector(page).click();
     await page.locator('input#delete-confirm').fill("LÖSCHEN");
     await page.getByRole("button", { name: "Account endgültig löschen" }).click();
 

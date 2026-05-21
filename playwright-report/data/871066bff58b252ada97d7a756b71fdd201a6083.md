@@ -62,7 +62,7 @@
               - button "Kapitel „QA-Testkapitel\" löschen" [ref=e76] [cursor=pointer]:
                 - img
               - link "Bearbeiten" [ref=e77] [cursor=pointer]:
-                - /url: /projektuebersicht/cccccccc-0099-0099-0099-000000000099/kapiteleditor/7a10cf36-286d-49a5-afc7-c1da6b52fd5c
+                - /url: /projektuebersicht/cccccccc-0099-0099-0099-000000000099/kapiteleditor/95066b7d-af3a-45e4-a53c-58f6fe7772ed
       - generic [ref=e78]:
         - generic [ref=e79]:
           - generic [ref=e80]:
@@ -70,19 +70,20 @@
             - heading "Telefonzeit übrig" [level=3] [ref=e85]
           - paragraph [ref=e86]: —
           - paragraph [ref=e87]: Verfügbar nach Aktivierung des Telefon-Assistenten (PROJ-12)
-        - generic [ref=e88]:
-          - generic [ref=e89]:
-            - img [ref=e91]
-            - heading "NARRAVIT-Projektzugang endet in" [level=3] [ref=e94]
-          - paragraph [ref=e95]: —
-          - paragraph [ref=e96]: Wird nach abgeschlossener Zahlung angezeigt (PROJ-6)
-      - generic [ref=e97]:
-        - generic [ref=e99]:
-          - img [ref=e101]
-          - heading "Projektmitglieder" [level=2] [ref=e104]
-        - paragraph [ref=e105]: Die Mitgliederverwaltung wird mit PROJ-9 aktiviert.
+          - button "60 Minuten nachkaufen — 19 €" [disabled] [ref=e90]
+        - generic [ref=e91]:
+          - generic [ref=e92]:
+            - img [ref=e94]
+            - heading "NARRAVIT-Projektzugang endet in" [level=3] [ref=e97]
+          - paragraph [ref=e98]: —
+          - paragraph [ref=e99]: Wird nach abgeschlossener Zahlung angezeigt (PROJ-6)
+          - button "Um 12 Monate verlängern — 99 €" [disabled] [ref=e102]
+      - generic [ref=e103]:
+        - generic [ref=e105]:
+          - img [ref=e107]
+          - heading "Projektmitglieder" [level=2] [ref=e110]
+        - paragraph [ref=e111]: Die Mitgliederverwaltung wird mit PROJ-9 aktiviert.
   - region "Notifications alt+T"
-  - button "Open Next.js Dev Tools" [ref=e111] [cursor=pointer]:
-    - img [ref=e112]
-  - alert [ref=e115]
+  - button "Open Next.js Dev Tools" [ref=e117] [cursor=pointer]:
+    - img [ref=e118]
 ```

@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from "react";
 import { Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { startCheckoutAction } from "@/app/checkout/actions";
 
 // Client-Komponente für die zwei zahlungsbezogenen Stat-Karten der
@@ -71,11 +70,6 @@ function VapiStat({
           label="60 Minuten nachkaufen — 19 €"
           loadingLabel="Wird vorbereitet …"
           input={{ productType: "vapi", projectId }}
-          variant={
-            secondsAvailable !== null && secondsAvailable < 60 * 60
-              ? "primary"
-              : "secondary"
-          }
           disabled={secondsAvailable === null}
         />
       }
@@ -121,9 +115,6 @@ function PortalAccessStat({
           label="Um 12 Monate verlängern — 99 €"
           loadingLabel="Wird vorbereitet …"
           input={{ productType: "renewal", projectId }}
-          variant={
-            daysLeft !== null && daysLeft < 30 ? "primary" : "secondary"
-          }
           disabled={daysLeft === null}
         />
       }
@@ -167,13 +158,11 @@ function CheckoutButton({
   label,
   loadingLabel,
   input,
-  variant,
   disabled,
 }: {
   label: string;
   loadingLabel: string;
   input: Parameters<typeof startCheckoutAction>[0];
-  variant: "primary" | "secondary";
   disabled?: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -192,25 +181,21 @@ function CheckoutButton({
   };
   return (
     <div className="flex flex-col gap-2">
-      <Button
+      <button
         type="button"
         onClick={handleClick}
         disabled={isPending || disabled}
-        className={
-          variant === "primary"
-            ? "h-11 w-full bg-[#3E3831] text-white hover:bg-[#2a261f] sm:w-auto sm:min-w-56"
-            : "h-11 w-full bg-[rgba(10,9,9,0.05)] text-[#3E3831] hover:bg-[rgba(10,9,9,0.08)] sm:w-auto sm:min-w-56"
-        }
+        className="inline-flex h-12 w-full min-w-0 cursor-pointer items-center justify-center gap-2 bg-[#0A0909]/5 px-4 text-base font-bold leading-6 text-[#534B42] transition-colors hover:bg-[#0A0909]/10 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-56 sm:text-lg"
       >
         {isPending ? (
           <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden />
             {loadingLabel}
           </>
         ) : (
           label
         )}
-      </Button>
+      </button>
       {error && (
         <p
           className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
