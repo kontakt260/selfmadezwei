@@ -938,10 +938,30 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
   // Wir lauschen nur auf childList-Mutationen (Widget-Add/Remove) — NICHT
   // auf style-attribute, sonst löst unser eigenes PASS-1b/1d setMarginTop
   // einen Endlos-Loop aus (60 recalcs/s gemessen 2026-05-21).
+  //
+  // BugFix 2026-05-21 (Cursor-Spin nach Leeren-Absatz-Lösch): PD
+  // (PaginationDecorations) entfernt+setzt bei jedem `recompute` alle
+  // Spacer-Widgets neu (clear + re-add für saubere Messung). Das löst
+  // childList-Mutationen aus, die hier einen schedule() triggern → recalc()
+  // → ggf. weitere DOM-Mutation → MO feuert wieder → Loop. Wir filtern
+  // Spacer-only-Mutationen raus; PD informiert uns selbst via
+  // `narravit:pagination-recompute`-Event, wenn die Spacer-Konfiguration
+  // semantisch geändert hat (Signature-Compare in PD).
   useEffect(() => {
     const fg = fgRef.current;
     if (!fg) return;
-    const mo = new MutationObserver(() => schedule());
+    const isSpacerOnly = (n: Node): boolean =>
+      n instanceof HTMLElement &&
+      (n.classList.contains("a5-soft-break-spacer") ||
+        n.classList.contains("a5-block-push-spacer"));
+    const mo = new MutationObserver((records) => {
+      const meaningful = records.some((rec) => {
+        for (const n of rec.addedNodes) if (!isSpacerOnly(n)) return true;
+        for (const n of rec.removedNodes) if (!isSpacerOnly(n)) return true;
+        return false;
+      });
+      if (meaningful) schedule();
+    });
     mo.observe(fg, { childList: true, subtree: true });
     return () => mo.disconnect();
   }, [fgRef, schedule]);
