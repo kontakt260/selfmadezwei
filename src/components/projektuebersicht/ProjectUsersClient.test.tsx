@@ -54,7 +54,7 @@ describe("ProjectUsersClient — Sichtbarkeit nach Rolle", () => {
     expect(screen.getByRole("button", { name: /Nutzer hinzufügen/ })).toBeInTheDocument();
   });
 
-  it("Co-Autor sieht KEINE Verwaltungs-Buttons (Add, Trash, Rollen-Toggle)", () => {
+  it("Co-Autor sieht KEINE Verwaltungs-Buttons (Add, Trash)", () => {
     render(
       <ProjectUsersClient
         projectId={PROJECT_ID}
@@ -80,13 +80,14 @@ describe("ProjectUsersClient — Last-PL-Schutz", () => {
     );
   });
 
-  it("Rollen-Toggle ist disabled für den einzigen PL", () => {
+  it("Rolle wird als Label angezeigt (nicht editierbar)", () => {
     render(
       <ProjectUsersClient projectId={PROJECT_ID} members={[SOLO_PL]} myRole="projektleiter" />,
     );
-    // Es gibt nur einen Rollen-Toggle in einem Team mit einem Mitglied
-    const toggles = screen.getAllByRole("combobox");
-    expect(toggles[0]).toBeDisabled();
+    // Refine 2026-05-21: Rollen sind fest. Es darf kein Select/Combobox
+    // mehr für die Rolle existieren — nur ein statisches Label.
+    expect(screen.queryAllByRole("combobox")).toHaveLength(0);
+    expect(screen.getByText("Projektleiter:in")).toBeInTheDocument();
   });
 
   it("'Projekt verlassen' ist disabled für den einzigen PL", () => {
@@ -97,7 +98,7 @@ describe("ProjectUsersClient — Last-PL-Schutz", () => {
     expect(leave).toBeDisabled();
   });
 
-  it("Mit 2 PLs sind beide Trash-Buttons enabled", () => {
+  it("Mit 2 PLs: Trash auf dem ANDEREN PL ist enabled; Trash auf sich selbst bleibt disabled (Self-Remove geht via 'Projekt verlassen')", () => {
     const twoPls: MemberDisplay[] = [
       SOLO_PL,
       {
@@ -114,7 +115,7 @@ describe("ProjectUsersClient — Last-PL-Schutz", () => {
     );
     const trashAnna = screen.getByRole("button", { name: /Anna Test.*entfernen/ });
     const trashBob = screen.getByRole("button", { name: /Bob.*entfernen/ });
-    expect(trashAnna).toBeEnabled();
+    expect(trashAnna).toBeDisabled(); // me-Trash: per Refine 2026-05-21 disabled
     expect(trashBob).toBeEnabled();
   });
 });

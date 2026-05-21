@@ -15,7 +15,11 @@
 - Als **Initiator/Projektleiter** möchte ich einen Einladungs-Link erzeugen, den ich z. B. per WhatsApp oder Mail an die einzuladende Person schicken kann — auch wenn sie noch keinen Account hat.
 - Als **eingeladene Person** möchte ich über den Link auf einer klaren Seite den Beitritt bestätigen können, mit Anzeige von Projekt, Rolle und Einladendem — damit ich weiß, worauf ich klicke.
 - Als **eingeladene Person ohne Account** möchte ich beim Öffnen des Links unkompliziert ein Konto anlegen können, ohne die Einladung zu verlieren.
-- Als **Projektleiter** möchte ich die Rolle eines bestehenden Mitglieds nachträglich ändern können (Co-Autor ↔ Projektleiter), damit ich Verantwortung teilen oder zurückziehen kann.
+<!-- Refine 2026-05-21: Rollen sind nach Einladungs-Annahme fest. Wer eine
+     andere Rolle braucht, wird entfernt und mit neuer Rolle erneut eingeladen.
+     Frühere User-Story „Rolle eines bestehenden Mitglieds nachträglich ändern"
+     gestrichen. -->
+
 - Als **Projektleiter** möchte ich Mitglieder wieder entfernen können, wenn sie nicht mehr am Projekt mitarbeiten sollen.
 - Als **Mitglied** (Projektleiter oder Co-Autor) möchte ich das Projekt selbst verlassen können, wenn ich nicht mehr mitwirken will — solange dadurch nicht der letzte Projektleiter wegfällt.
 - Als **Co-Autor** möchte ich sehen, wer sonst noch im Projekt ist (Transparenz), aber ich erwarte keine Management-Funktionen.
@@ -26,7 +30,7 @@
 - [ ] Auf jeder Projektübersichts-Seite gibt es eine Sektion „Nutzerübersicht" mit allen Mitgliedern des Projekts.
 - [ ] Jede Mitglieder-Zeile zeigt: Avatar mit Initiale (Farbe aus stabilem Hash der user-id, gemäß `projektuebersicht-palette.ts`), Anzeigename, E-Mail, Rolle als Klartext-Label („Projektleiter" oder „Co-Autor").
 - [ ] Anzeigename = `full_name` aus `profiles` falls vorhanden, sonst aus dem Email-Local-Part abgeleitet (Title-Case wie in der alten App).
-- [ ] **Projektleiter** sieht pro Mitglied: Rollen-Wechsel-Control (Dropdown oder Toggle) + Entfernen-Button (Trash-Icon).
+- [ ] **Projektleiter** sieht pro Mitglied: Rollen-Label (statische Anzeige) + Entfernen-Button (Trash-Icon). Rollen sind fest (Refine 2026-05-21) — kein Wechsel-Control.
 - [ ] **Co-Autor** sieht die Liste, aber keine Management-Buttons; lediglich ein eigener „Projekt verlassen"-Button am Ende der Sektion.
 - [ ] Bei nur 1 Mitglied (nur Projektleiter selbst): Sektion zeigt diesen Eintrag plus den prominenten „Nutzer hinzufügen"-Button.
 
@@ -62,11 +66,13 @@
 - [ ] „Endgültig entfernen" löscht die `project_members`-Zeile.
 - [ ] **Constraint:** das letzte Mitglied mit Rolle „Projektleiter" kann nicht entfernt werden — Trash-Button ist in diesem Fall deaktiviert mit Tooltip „Mindestens ein Projektleiter muss verbleiben."
 
-### Rolle ändern (Projektleiter)
-- [ ] Inline-Control pro Mitglied erlaubt Umschalten zwischen „Projektleiter" und „Co-Autor".
-- [ ] Änderung wird sofort persistiert; UI zeigt unmittelbar die neue Rolle.
-- [ ] **Constraint:** der letzte verbliebene Projektleiter kann sich (oder einen anderen letzten PL) nicht degradieren — Versuch zeigt Fehlerhinweis „Befördere zuerst eine andere Person zum Projektleiter, bevor du deine Rolle wechselst."
-- [ ] Projektleiter kann den eigenen Status ändern (sich selbst degradieren), solange ein anderer PL existiert.
+<!-- Refine 2026-05-21: Rolle-Wechsel komplett entfernt. Begründung:
+     Produktentscheidung des Users — einmal vergebene Rollen bleiben fest.
+     Soll eine Person eine andere Rolle bekommen, wird sie entfernt und
+     mit neuer Rolle erneut eingeladen. Die zugehörige UPDATE-RLS-Policy
+     und der Last-PL-UPDATE-Trigger wurden in der Migration
+     `20260521235000_proj9_lock_member_roles.sql` entfernt. Die
+     `changeRoleAction`-Server-Action wurde gelöscht. -->
 
 ### Projekt verlassen (beide Rollen)
 - [ ] Am Ende der Mitglieder-Sektion ist ein eigener „Projekt verlassen"-Button für das aktuell eingeloggte Mitglied sichtbar.

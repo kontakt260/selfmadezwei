@@ -36,12 +36,6 @@ const removeMemberSchema = z.object({
   memberId: uuidSchema,
 });
 
-const changeRoleSchema = z.object({
-  projectId: uuidSchema,
-  memberId: uuidSchema,
-  newRole: roleSchema,
-});
-
 const leaveProjectSchema = z.object({
   projectId: uuidSchema,
 });
@@ -196,47 +190,12 @@ export async function removeMemberAction(formData: FormData): Promise<{
   return { ok: true };
 }
 
-// ─── changeRoleAction ────────────────────────────────────────────────────────
-
-export async function changeRoleAction(formData: FormData): Promise<{
-  ok?: true;
-  error?: string;
-}> {
-  const parsed = changeRoleSchema.safeParse({
-    projectId: formData.get("projectId"),
-    memberId: formData.get("memberId"),
-    newRole: formData.get("newRole"),
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
-  }
-  const { projectId, memberId, newRole } = parsed.data;
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Nicht angemeldet." };
-
-  const { error: updErr } = await supabase
-    .from("project_members")
-    .update({ role: newRole })
-    .eq("id", memberId)
-    .eq("project_id", projectId);
-
-  if (updErr) {
-    if (updErr.code === "23514") {
-      return {
-        error:
-          "Befördere zuerst eine andere Person zum Projektleiter, bevor du diese Rolle wechselst.",
-      };
-    }
-    return { error: "Rolle konnte nicht geändert werden." };
-  }
-
-  revalidatePath(`/projektuebersicht/${projectId}`);
-  return { ok: true };
-}
+// Anmerkung: changeRoleAction wurde am 2026-05-21 entfernt. Rollen sind
+// nach Einladungs-Annahme fest — soll jemand eine andere Rolle bekommen,
+// entferne ihn aus dem Projekt und sende eine neue Einladung mit der
+// gewünschten Rolle. Die zugehörige RLS-UPDATE-Policy und der Last-PL-
+// UPDATE-Trigger wurden in der Migration `20260521235000_proj9_lock_member_roles.sql`
+// entfernt.
 
 // ─── leaveProjectAction ──────────────────────────────────────────────────────
 

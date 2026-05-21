@@ -10,15 +10,15 @@ import {
 import {
   createInvitationAction,
   removeMemberAction,
-  changeRoleAction,
   leaveProjectAction,
 } from "@/app/projektuebersicht/[project_id]/members-actions";
 
 // PROJ-9 — Mitgliederliste + Verwaltungs-Interaktionen.
 //
-// Eigene Rolle bestimmt, welche Controls sichtbar sind:
-//   - "projektleiter": Rollen-Wechsel-Control + Trash pro Mitglied,
-//                      Last-PL-Konstellationen disablen die Buttons.
+// Rollen sind einmal vergeben fest (Refine 2026-05-21). Eigene Rolle
+// bestimmt, welche Controls sichtbar sind:
+//   - "projektleiter": Trash-Button pro Mitglied (außer eigenes),
+//                      Last-PL-Konstellation disabled den Trash.
 //   - "co_author":     reine Anzeige, kein Modal-Trigger.
 //
 // Alle Schreibvorgänge gehen über Server-Actions (s. members-actions.ts).
@@ -122,23 +122,6 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
     }
   };
 
-  const handleRoleChange = (member: MemberDisplay, newRole: MemberDisplay["role"]) => {
-    if (member.role === newRole) return;
-    const fd = new FormData();
-    fd.set("projectId", projectId);
-    fd.set("memberId", member.memberId);
-    fd.set("newRole", newRole);
-    startActionTransition(async () => {
-      const res = await changeRoleAction(fd);
-      if (res.error) {
-        toast.error(res.error);
-        return;
-      }
-      toast.success(`Rolle von ${displayName(member)} wurde geändert.`);
-      router.refresh();
-    });
-  };
-
   const handleRemoveConfirmed = () => {
     if (!confirmRemove) return;
     const target = confirmRemove;
@@ -233,29 +216,21 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
               </div>
 
               <div className="flex flex-row items-center gap-2 sm:gap-3">
-                {isPL ? (
+                <span className="text-sm text-[#535252] sm:text-base">
+                  {ROLE_LABEL[m.role]}
+                </span>
+                {isPL && (
                   <>
-                    <RoleToggle
-                      currentRole={m.role}
-                      disabled={
-                        actionPending ||
-                        (isLastPL && m.role === "projektleiter") // Last-PL kann nicht degradiert werden
-                      }
-                      title={
-                        isLastPL && m.role === "projektleiter"
-                          ? "Befördere zuerst eine andere Person zum Projektleiter."
-                          : undefined
-                      }
-                      onChange={(next) => handleRoleChange(m, next)}
-                    />
                     <button
                       type="button"
                       onClick={() => setConfirmRemove(m)}
-                      disabled={actionPending || isLastPL}
+                      disabled={actionPending || isLastPL || m.isMe}
                       title={
                         isLastPL
                           ? "Mindestens ein Projektleiter muss verbleiben."
-                          : "Mitglied entfernen"
+                          : m.isMe
+                            ? "Nutze die Projekt-verlassen-Schaltfläche, um dich selbst zu entfernen."
+                            : "Mitglied entfernen"
                       }
                       aria-label={`Mitglied „${name}" entfernen`}
                       className="flex h-10 w-10 shrink-0 items-center justify-center border border-[#e0dcd5] bg-white text-[#3E3831] transition-colors hover:bg-[#f5f3f0] disabled:cursor-not-allowed disabled:opacity-40"
@@ -263,10 +238,6 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
                       <TrashIcon />
                     </button>
                   </>
-                ) : (
-                  <span className="text-sm text-[#535252] sm:text-base">
-                    {ROLE_LABEL[m.role]}
-                  </span>
                 )}
               </div>
             </li>
@@ -456,33 +427,10 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
 }
 
 // ─── Sub-Komponenten ───────────────────────────────────────────────────────
-
-function RoleToggle({
-  currentRole,
-  disabled,
-  title,
-  onChange,
-}: {
-  currentRole: MemberDisplay["role"];
-  disabled: boolean;
-  title?: string;
-  onChange: (next: MemberDisplay["role"]) => void;
-}) {
-  return (
-    <select
-      value={currentRole}
-      disabled={disabled}
-      title={title}
-      onChange={(e) =>
-        onChange(e.target.value as MemberDisplay["role"])
-      }
-      className="h-10 border border-[#e0dcd5] bg-white px-2 text-sm text-[#3E3831] focus:outline-none focus:ring-2 focus:ring-[#3E3831]/30 disabled:cursor-not-allowed disabled:opacity-40 sm:text-base"
-    >
-      <option value="projektleiter">Projektleiter:in</option>
-      <option value="co_author">Co-Autor:in</option>
-    </select>
-  );
-}
+//
+// RoleToggle wurde am 2026-05-21 entfernt — Rollen sind nach Einladung
+// fest. Soll jemand eine andere Rolle bekommen, entferne ihn und sende
+// eine neue Einladung mit der gewünschten Rolle.
 
 function ModalShell({
   onClose,

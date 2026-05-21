@@ -9,7 +9,6 @@ import { createClient } from "@/lib/supabase/server";
 import {
   createInvitationAction,
   removeMemberAction,
-  changeRoleAction,
   leaveProjectAction,
   acceptInvitationAction,
 } from "./members-actions";
@@ -222,38 +221,8 @@ describe("removeMemberAction", () => {
   });
 });
 
-// ─── changeRoleAction ────────────────────────────────────────────────────────
-
-describe("changeRoleAction", () => {
-  function fd(o: Record<string, string> = {}) {
-    const f = new FormData();
-    f.set("projectId", o.projectId ?? PROJECT_ID);
-    f.set("memberId", o.memberId ?? MEMBER_ROW_ID);
-    f.set("newRole", o.newRole ?? "projektleiter");
-    return f;
-  }
-
-  it("rejects invalid newRole", async () => {
-    expect((await changeRoleAction(fd({ newRole: "admin" }))).error).toBeTruthy();
-  });
-
-  it("translates trigger 23514 into Last-PL-Degrade-Fehlermeldung", async () => {
-    const client = makeMockClient();
-    client.from.mockReturnValueOnce(
-      makeBuilder({ error: { code: "23514", message: "Letzter PL" } }),
-    );
-    vi.mocked(createClient).mockResolvedValue(client as never);
-    const result = await changeRoleAction(fd({ newRole: "co_author" }));
-    expect(result.error).toMatch(/zuerst eine andere Person zum Projektleiter/);
-  });
-
-  it("happy path returns ok:true", async () => {
-    const client = makeMockClient();
-    client.from.mockReturnValueOnce(makeBuilder());
-    vi.mocked(createClient).mockResolvedValue(client as never);
-    expect(await changeRoleAction(fd())).toEqual({ ok: true });
-  });
-});
+// changeRoleAction wurde am 2026-05-21 entfernt (Refine PROJ-9):
+// Rollen sind nach Einladungs-Annahme fest. Tests gestrichen.
 
 // ─── leaveProjectAction ──────────────────────────────────────────────────────
 
