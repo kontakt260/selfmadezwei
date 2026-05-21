@@ -1,8 +1,9 @@
 # PROJ-10: Cover-Editor
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-21
 **Last Updated:** 2026-05-22
+**Deployed:** 2026-05-22 (stage-app.narravit.de)
 
 ## Dependencies
 - Requires **PROJ-1** (Supabase-Datenmodell & RLS) — `project_covers`-Tabelle existiert (1:1 zu projects, mit `image_url`, `theme`, `metadata`-JSONB)
@@ -548,4 +549,28 @@ Statisches Code-Review + automatisierte Tests:
 **Production-Ready Decision (Update):** **READY** — alle Critical/High/Medium-Bugs behoben. BUG-4 (Low) bleibt als Follow-up. Status → Approved.
 
 ## Deployment
-_To be added by /deploy_
+
+**Datum:** 2026-05-22
+**Branch:** stage → stage-app.narravit.de (Vercel Auto-Deploy)
+**Commit:** `7c41d20 feat(PROJ-10): Cover-Editor — Live-Vorschau, Auto-Save, Mini-Cover auf Cards`
+
+**Pre-Deployment-Checks:**
+- `npx tsc --noEmit` — sauber
+- `npx next build` — sauber, Route `/projektuebersicht/[project_id]/cover-bearbeiten` registriert
+- Vitest 124/124 grün
+- Playwright PROJ-10 chromium 12/12 grün
+- Playwright PROJ-4 AC-PÜ-3 grün (Regression behoben)
+- Keine neuen Env-Variablen — keine `.env.local.example`-Änderung
+- Keine neue Supabase-Migration nötig (Bucket + RLS aus PROJ-1)
+
+**Manuelle Verifikation (auf Stage):**
+- Stage-Domain: https://stage-app.narravit.de
+- Smoke-Test offen: Cover-Editor öffnen, Felder editieren, Auto-Save „Gespeichert HH:MM" verifizieren, Mini-Cover auf Startseite + Projektübersicht prüfen
+
+**Production-Rollout (durch User):**
+- `git checkout main && git merge stage` (manuell)
+- Supabase: kein Branch-Merge nötig
+- Vercel main-Deploy startet automatisch nach Push
+
+**Folge-Tickets:**
+- BUG-4 (Low) — Redirect bei Projekt-Löschung/Member-Revoke mid-edit, kein Blocker
