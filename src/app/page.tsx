@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { Navbar } from "@/components/Navbar";
 import { ProjectCard, type ProjectCardData } from "@/components/ProjectCard";
 import { deleteProjectAction } from "@/app/projektuebersicht/[project_id]/actions";
+import { DEFAULT_COLOR_ID } from "@/lib/cover-colors";
+import { DEFAULT_THEME_ID } from "@/lib/cover-themes";
+import type { CoverData, CoverRowRaw } from "@/lib/cover-types";
 
 function IconPlus({ className }: { className?: string }) {
   return (
@@ -40,6 +43,44 @@ export default async function HomePage() {
     .eq("user_id", user.id)
     .order("updated_at", { referencedTable: "projects", ascending: false });
 
+  // PROJ-10: Cover-Daten als Batch (kein N+1). Wir lesen project_covers
+  // für alle Projekte des Users in einer Query und mappen sie pro ID.
+  const projectIds = (memberships ?? [])
+    .map((m) => m.projects?.id)
+    .filter((id): id is string => typeof id === "string");
+
+  const { data: coverRows } =
+    projectIds.length > 0
+      ? await supabase
+          .from("project_covers")
+          .select("project_id, image_url, theme, metadata")
+          .in("project_id", projectIds)
+      : { data: [] as { project_id: string; image_url: string | null; theme: string | null; metadata: CoverRowRaw["metadata"] | null }[] };
+
+  const coverMap = new Map<string, CoverRowRaw>();
+  for (const r of coverRows ?? []) {
+    coverMap.set(r.project_id, {
+      image_url: r.image_url,
+      theme: r.theme,
+      metadata: (r.metadata as CoverRowRaw["metadata"]) ?? null,
+    });
+  }
+
+  // Signed URLs für Cover-Fotos parallel erzeugen — eine Promise pro
+  // Projekt mit Foto, danach in eine Map<projectId, signedUrl>.
+  const photoEntries = Array.from(coverMap.entries()).filter(
+    ([, r]) => r.image_url,
+  );
+  const signedUrlPairs = await Promise.all(
+    photoEntries.map(async ([pid, r]) => {
+      const { data: signed } = await supabase.storage
+        .from("project-covers")
+        .createSignedUrl(r.image_url as string, 60 * 60);
+      return [pid, signed?.signedUrl ?? null] as const;
+    }),
+  );
+  const signedUrlMap = new Map<string, string | null>(signedUrlPairs);
+
   const projects: ProjectCardData[] = (memberships ?? [])
     .filter((m) => m.projects !== null)
     .map((m) => {
@@ -53,6 +94,15 @@ export default async function HomePage() {
       for (const c of chapters) {
         if (c.updated_at && c.updated_at > lastEdited) lastEdited = c.updated_at;
       }
+      const cover = coverMap.get(p.id) ?? null;
+      const coverData: CoverData = {
+        title: p.title,
+        subtitle: cover?.metadata?.subtitle ?? "",
+        authorLine: cover?.metadata?.author_line ?? "",
+        themeId: cover?.theme ?? DEFAULT_THEME_ID,
+        colorId: cover?.metadata?.background_color ?? DEFAULT_COLOR_ID,
+        imageUrl: signedUrlMap.get(p.id) ?? null,
+      };
       return {
         id: p.id,
         title: p.title,
@@ -60,6 +110,7 @@ export default async function HomePage() {
         lastEditedAt: lastEdited,
         chapterCount: chapters.length,
         userRole: m.role as "projektleiter" | "co_author",
+        coverData,
       };
     })
     // Sort by effective last-edited (Projekt + Kapitel kombiniert), nicht

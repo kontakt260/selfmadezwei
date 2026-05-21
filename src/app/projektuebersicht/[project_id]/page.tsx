@@ -8,6 +8,10 @@ import { PaywallStats } from "@/components/projektuebersicht/PaywallStats";
 import { ProjectUsersSection } from "@/components/projektuebersicht/ProjectUsersSection";
 import type { MemberDisplay } from "@/components/projektuebersicht/ProjectUsersClient";
 import { CheckoutCancelToast } from "@/components/CheckoutCancelToast";
+import { CoverRender } from "@/components/cover/CoverRender";
+import { DEFAULT_COLOR_ID } from "@/lib/cover-colors";
+import { DEFAULT_THEME_ID } from "@/lib/cover-themes";
+import type { CoverData, CoverRowRaw } from "@/lib/cover-types";
 import { type Chapter, countWordsFromBody } from "@/lib/projektuebersicht-chapters";
 import {
   addChapterAction,
@@ -114,28 +118,63 @@ export default async function ProjektuebersichtPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/anmelden");
 
-  // Fetch project + user membership + paywall-state in one go.
+  // Fetch project + user membership + paywall-state + cover in one go.
   // PROJ-6: expires_at liegt jetzt in `project_access` (RLS-SELECT-Policy
   // erlaubt nur Mitgliedern den Lesezugriff — kein client-seitiges
   // UPDATE möglich, nur der Stripe-Webhook über service_role schreibt).
-  const [{ data: project }, { data: membership }, { data: accessRow }] =
-    await Promise.all([
-      supabase.from("projects").select("id, title").eq("id", project_id).single(),
-      supabase
-        .from("project_members")
-        .select("role")
-        .eq("project_id", project_id)
-        .eq("user_id", user.id)
-        .single(),
-      supabase
-        .from("project_access")
-        .select("expires_at")
-        .eq("project_id", project_id)
-        .maybeSingle(),
-    ]);
+  // PROJ-10: project_covers wird mitgeladen, damit die "Cover bearbeiten"-
+  // Karte direkt eine Vorschau zeigt (gilt auch für Default-Cover ohne Row).
+  const [
+    { data: project },
+    { data: membership },
+    { data: accessRow },
+    { data: coverRow },
+  ] = await Promise.all([
+    supabase.from("projects").select("id, title").eq("id", project_id).single(),
+    supabase
+      .from("project_members")
+      .select("role")
+      .eq("project_id", project_id)
+      .eq("user_id", user.id)
+      .single(),
+    supabase
+      .from("project_access")
+      .select("expires_at")
+      .eq("project_id", project_id)
+      .maybeSingle(),
+    supabase
+      .from("project_covers")
+      .select("image_url, theme, metadata")
+      .eq("project_id", project_id)
+      .maybeSingle(),
+  ]);
 
   // project not found OR user is not a member → 404 (avoids leaking project existence)
   if (!project || !membership) notFound();
+
+  // PROJ-10: Cover-Daten in CoverData übersetzen + signed URL erzeugen.
+  const coverRaw: CoverRowRaw | null = coverRow
+    ? {
+        image_url: coverRow.image_url,
+        theme: coverRow.theme,
+        metadata: (coverRow.metadata as CoverRowRaw["metadata"]) ?? null,
+      }
+    : null;
+  let coverSignedUrl: string | null = null;
+  if (coverRaw?.image_url) {
+    const { data: signed } = await supabase.storage
+      .from("project-covers")
+      .createSignedUrl(coverRaw.image_url, 60 * 60);
+    coverSignedUrl = signed?.signedUrl ?? null;
+  }
+  const coverData: CoverData = {
+    title: project.title,
+    subtitle: coverRaw?.metadata?.subtitle ?? "",
+    authorLine: coverRaw?.metadata?.author_line ?? "",
+    themeId: coverRaw?.theme ?? DEFAULT_THEME_ID,
+    colorId: coverRaw?.metadata?.background_color ?? DEFAULT_COLOR_ID,
+    imageUrl: coverSignedUrl,
+  };
 
   // Vapi-Sprechzeit-Berechnung (PROJ-6):
   //   36 000 s (10 h Inklusiv) + Σ vapi-Top-Ups × 3 600 − Σ voice-sessions.duration
@@ -259,11 +298,24 @@ export default async function ProjektuebersichtPage({
             <div className="flex flex-col gap-10 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-10">
               <div className="flex min-w-0 flex-col gap-3 sm:gap-4">
                 <SectionHeader icon={<IconEye />} title="Cover bearbeiten" />
-                <div className="flex flex-col gap-4 bg-[#FAF8F6] p-5 sm:p-7">
-                  <p className="text-base leading-7 text-[#848484] sm:text-lg sm:leading-8">
-                    Der Cover-Editor ist in Kürze verfügbar (PROJ-10).
-                  </p>
-                </div>
+                <Link
+                  href={`/projektuebersicht/${project_id}/cover-bearbeiten`}
+                  className="group flex flex-col items-stretch gap-4 bg-[#FAF8F6] p-5 transition-colors hover:bg-[#f5f3ee] sm:flex-row sm:items-center sm:gap-6 sm:p-7"
+                  aria-label="Cover-Editor öffnen"
+                >
+                  <div className="mx-auto w-full max-w-[180px] shrink-0 sm:mx-0 sm:w-44">
+                    <CoverRender data={coverData} size="overview" />
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col gap-3">
+                    <p className="text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
+                      Gestalten Sie die Vorderseite Ihres Buches: Titel,
+                      Untertitel, Foto, Muster und Farbe.
+                    </p>
+                    <span className="inline-flex h-12 w-fit items-center justify-center bg-[#D0BCA6] px-5 text-lg font-bold leading-6 text-[#0a0909] transition-colors group-hover:bg-[#c0ad98]">
+                      Cover öffnen
+                    </span>
+                  </div>
+                </Link>
               </div>
               <div className="flex min-w-0 flex-col gap-3 sm:gap-4">
                 <SectionHeader icon={<IconPhoneHandset />} title="Code für das Telefonieren" />

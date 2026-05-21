@@ -5,6 +5,8 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { CoverRender } from "@/components/cover/CoverRender";
+import type { CoverData } from "@/lib/cover-types";
 
 export type ProjectCardData = {
   id: string;
@@ -12,26 +14,11 @@ export type ProjectCardData = {
   formattedUpdatedAt: string;
   chapterCount: number;
   userRole: "projektleiter" | "co_author";
+  // PROJ-10: Cover-Daten ersetzen das statische Buch-Icon. Default-Werte
+  // werden vom Server-Lader synthetisiert, wenn keine project_covers-
+  // Row existiert.
+  coverData: CoverData;
 };
-
-function ProjectBookIcon() {
-  return (
-    <div
-      className="h-6 w-6 shrink-0 bg-[#3c493c]"
-      style={{
-        maskImage: "url(/images/project-book.png)",
-        maskSize: "contain",
-        maskRepeat: "no-repeat",
-        maskPosition: "center",
-        WebkitMaskImage: "url(/images/project-book.png)",
-        WebkitMaskSize: "contain",
-        WebkitMaskRepeat: "no-repeat",
-        WebkitMaskPosition: "center",
-      }}
-      aria-hidden
-    />
-  );
-}
 
 function IconTrash({ className }: { className?: string }) {
   return (
@@ -298,9 +285,9 @@ export function ProjectCard({ project, deleteProjectAction }: Props) {
         />
         <div className="relative z-10 flex min-h-0 flex-col pointer-events-none">
           <div className="flex flex-row items-start justify-between gap-3 sm:gap-4">
-            <div className="flex min-w-0 flex-1 flex-row items-center gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center bg-[#EAF0EA] px-3">
-                <ProjectBookIcon />
+            <div className="flex min-w-0 flex-1 flex-row items-center gap-4">
+              <div className="w-14 shrink-0 sm:w-16">
+                <CoverRender data={project.coverData} size="card" />
               </div>
               <div className="flex min-w-0 flex-col">
                 <h3 className="[font-family:var(--font-pt-serif)] text-xl leading-8 text-[#3E3831] sm:text-2xl sm:leading-9">
