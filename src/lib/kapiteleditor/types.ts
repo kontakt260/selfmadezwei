@@ -48,4 +48,9 @@ export type ChapterDraft = {
   body: unknown;
   imageSections: ImageSections;
   colorPageCount: number;
+  // PROJ-7: lokale A5-Seitenzahl dieses Kapitels — von der Pagination-
+  // Engine nach jedem Settle gemeldet. Server persistiert das als
+  // chapters.page_count; DB-Trigger berechnet daraus start_page der
+  // Folge-Kapitel neu.
+  pageCount: number;
 };

@@ -34,6 +34,11 @@ const autosaveSchema = z.object({
   body: z.unknown().optional(),
   imageSections: imageSectionsSchema,
   colorPageCount: z.number().int().min(0).max(10000),
+  // PROJ-7: lokale A5-Seitenzahl dieses Kapitels (von der Pagination-
+  // Engine beim Settle gemeldet). Optional — alte Clients senden noch
+  // keinen Wert; der Server lässt page_count dann unverändert (kein
+  // Reset auf 1). Range matched chapters_page_count_range-CHECK.
+  pageCount: z.number().int().min(1).max(999).optional(),
 });
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 h
@@ -65,10 +70,11 @@ export async function chapterAutosaveAction(input: {
   body: unknown;
   imageSections: ImageSections;
   colorPageCount: number;
+  pageCount?: number;
 }): Promise<{ ok?: true; error?: string }> {
   const parsed = autosaveSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
-  const { projectId, chapterId, title, body, imageSections, colorPageCount } = parsed.data;
+  const { projectId, chapterId, title, body, imageSections, colorPageCount, pageCount } = parsed.data;
 
   const supabase = await createClient();
   const {
@@ -99,15 +105,23 @@ export async function chapterAutosaveAction(input: {
   };
 
   // RLS sorgt für Membership-Check; .eq("project_id") für Defense-in-depth.
+  // PROJ-7: page_count nur ins UPDATE-Set aufnehmen, wenn der Client einen
+  // Wert geliefert hat — sonst bleibt der DB-Wert unverändert (verhindert
+  // Reset auf 1 durch alte Builds, die das Feld nicht senden).
+  const updatePayload: Record<string, unknown> = {
+    title,
+    body: (body ?? null) as never,
+    image_sections: stripped as never,
+    color_page_count: colorPageCount,
+    updated_at: new Date().toISOString(),
+  };
+  if (pageCount !== undefined) {
+    updatePayload.page_count = pageCount;
+  }
+
   const { error } = await supabase
     .from("chapters")
-    .update({
-      title,
-      body: (body ?? null) as never,
-      image_sections: stripped as never,
-      color_page_count: colorPageCount,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload as never)
     .eq("id", chapterId)
     .eq("project_id", projectId);
 

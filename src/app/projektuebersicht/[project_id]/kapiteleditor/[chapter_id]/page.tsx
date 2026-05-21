@@ -63,7 +63,7 @@ export default async function KapiteleditorPage({
   const [{ data: chapter }, { data: membership }] = await Promise.all([
     supabase
       .from("chapters")
-      .select("id, title, body, image_sections, project_id")
+      .select("id, title, body, image_sections, project_id, start_page")
       .eq("id", chapter_id)
       .eq("project_id", project_id)
       .single(),
@@ -116,6 +116,7 @@ export default async function KapiteleditorPage({
           initialTitle={chapter.title}
           initialBody={chapter.body}
           initialImageSections={initialImageSections}
+          initialStartPage={chapter.start_page ?? 1}
         />
       </div>
     </>

@@ -33,6 +33,10 @@ type Props = {
   initialTitle: string;
   initialBody: unknown;
   initialImageSections: ImageSections;
+  // PROJ-7: Buch-Offset, an dem dieses Kapitel beginnt (1-indexed).
+  // Vom Server beim Laden geliefert; bleibt während der Editor-Session
+  // konstant (kein Realtime-Push aus anderen Tabs — Spec-Entscheidung).
+  initialStartPage: number;
 };
 
 export function EditorClient({
@@ -41,6 +45,7 @@ export function EditorClient({
   initialTitle,
   initialBody,
   initialImageSections,
+  initialStartPage,
 }: Props) {
   const [title, setTitle] = useState(initialTitle);
   const [body, setBody] = useState<unknown>(initialBody);
@@ -88,33 +93,6 @@ export function EditorClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const draft: ChapterDraft = useMemo(
-    () => ({
-      title,
-      body,
-      imageSections,
-      colorPageCount: estimateColorPages(imageSections),
-    }),
-    [title, body, imageSections],
-  );
-
-  const saveDraft = useCallback(
-    async (d: ChapterDraft): Promise<void> => {
-      const res = await chapterAutosaveAction({
-        projectId,
-        chapterId,
-        title: d.title,
-        body: d.body,
-        imageSections: d.imageSections,
-        colorPageCount: d.colorPageCount,
-      });
-      if (res.error) throw new Error(res.error);
-    },
-    [projectId, chapterId],
-  );
-
-  const { state, retry } = useAutoSave(draft, saveDraft, 2_000);
-
   const wordCount = useMemo(() => countWordsFromBody(body), [body]);
 
   const stackRef = useRef<HTMLDivElement>(null);
@@ -127,6 +105,42 @@ export function EditorClient({
     imageSectionsDeps: imageSections,
     titleDep: title,
   });
+
+  // PROJ-7: Buch-Offset bleibt während der Editor-Session konstant
+  // (siehe Tech-Design Sektion C — kein Realtime-Push aus anderen Tabs).
+  const startPage = initialStartPage;
+
+  // PROJ-7: pageCount ist Teil des Auto-Save-Drafts — beim ersten Settle
+  // schreibt der Server den realen Wert in chapters.page_count und der
+  // DB-Trigger rechnet start_page der Folge-Kapitel neu.
+  const draft: ChapterDraft = useMemo(
+    () => ({
+      title,
+      body,
+      imageSections,
+      colorPageCount: estimateColorPages(imageSections),
+      pageCount,
+    }),
+    [title, body, imageSections, pageCount],
+  );
+
+  const saveDraft = useCallback(
+    async (d: ChapterDraft): Promise<void> => {
+      const res = await chapterAutosaveAction({
+        projectId,
+        chapterId,
+        title: d.title,
+        body: d.body,
+        imageSections: d.imageSections,
+        colorPageCount: d.colorPageCount,
+        pageCount: d.pageCount,
+      });
+      if (res.error) throw new Error(res.error);
+    },
+    [projectId, chapterId],
+  );
+
+  const { state, retry } = useAutoSave(draft, saveDraft, 2_000);
 
   // Trigger PaginationDecorations (ProseMirror plugin) bei React-State-
   // Änderungen, die keine Doc-Transaktion auslösen — sonst zeigen Image-
@@ -351,7 +365,9 @@ export function EditorClient({
             />
           </div>
           {/* Seitenzahl-Overlay: über FG, damit Zahlen nicht von Bildern
-              oder Text in der oberen rechten Ecke verdeckt werden. */}
+              oder Text in der oberen rechten Ecke verdeckt werden.
+              PROJ-7: buchweite Zahl = startPage + lokaler-Index. startPage
+              ist konstant für die Editor-Session (Spec-Sektion C). */}
           <div className="a5-stack__numbers" aria-hidden>
             {Array.from({ length: pageCount }).map((_, i) => (
               <span
@@ -363,7 +379,7 @@ export function EditorClient({
                 // (-50%) im CSS zentriert die Zahl auf diesem Punkt.
                 style={{ top: `calc(${i} * (var(--a5-page-height) + var(--a5-page-gap)) + var(--a5-margin-top) / 2)` }}
               >
-                {i + 1}
+                {startPage + i}
               </span>
             ))}
           </div>
