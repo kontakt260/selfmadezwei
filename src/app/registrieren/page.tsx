@@ -1,149 +1,42 @@
-"use client";
+import { RegistrierenClient } from "./RegistrierenClient";
 
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense, useActionState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { AuthLayout } from "@/components/auth/AuthLayout";
-import { OAuthButtons } from "@/components/auth/OAuthButtons";
-import { registerAction, type RegisterState } from "./actions";
+// PROJ-9 Hotfix B-3: Server-Component liest searchParams server-seitig
+// und reicht initiale Werte (email/next/onboardingIntent) an die
+// Client-Komponente. Vorher war die ganze Seite Client mit useSearchParams
+// in einer Suspense-Boundary — auf Vercel-Edge-Cache lieferte das SSR-HTML
+// ohne die Hidden-Inputs aus → User submittete vor JS-Hydration → next-Param
+// verloren → Accept-Flow brach.
+//
+// force-dynamic verhindert zusätzlich, dass Next.js die Seite statisch
+// pre-rendert (was bei Auth-Pages mit Session-/URL-Param-Logik sowieso
+// die richtige Semantik ist).
 
-function RegistrierenContent() {
-  const searchParams = useSearchParams();
-  const onboardingIntent = searchParams.get("for") ?? searchParams.get("forWhom") ?? "";
-  const onboardingPath = onboardingIntent
-    ? `/onboarding?for=${encodeURIComponent(onboardingIntent)}`
-    : "/onboarding";
-  // PROJ-9: Accept-Page leitet mit ?email=<invited>&next=/einladung/<token>
-  // hierher. Email wird im Input vorbefüllt, next wird als hidden Input
-  // an die Server-Action weitergegeben (registerAction routet danach).
-  const presetEmail = searchParams.get("email") ?? "";
-  const nextParam = searchParams.get("next") ?? "";
-  const [state, formAction, pending] = useActionState<RegisterState, FormData>(
-    registerAction,
-    {},
-  );
+export const dynamic = "force-dynamic";
 
-  return (
-    <AuthLayout>
-      <div className="mb-8 text-center md:mb-10">
-        <h1 className="[font-family:var(--font-merriweather)] mb-4 text-[2.75rem] font-normal leading-[1.15] tracking-[-0.03rem] text-[#3E3831] sm:text-5xl sm:leading-[1.18] xl:whitespace-nowrap">
-          Konto erstellen
-        </h1>
-        <p className="text-[#535252]">
-          Starte dein Lebensbuch in wenigen Minuten.
-        </p>
-      </div>
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-      <form action={formAction} className="grid gap-4" noValidate>
-        <input type="hidden" name="onboardingIntent" value={onboardingIntent} />
-        <input type="hidden" name="next" value={nextParam} />
-
-        <div className="grid gap-1.5">
-          <Label htmlFor="fullName">Vollständiger Name</Label>
-          <Input
-            id="fullName"
-            name="fullName"
-            type="text"
-            autoComplete="name"
-            required
-            aria-invalid={Boolean(state.fieldErrors?.fullName)}
-            className="h-12"
-          />
-          {state.fieldErrors?.fullName && (
-            <p className="text-sm text-destructive">{state.fieldErrors.fullName}</p>
-          )}
-        </div>
-
-        <div className="grid gap-1.5">
-          <Label htmlFor="email">E-Mail</Label>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            defaultValue={presetEmail}
-            aria-invalid={Boolean(state.fieldErrors?.email)}
-            className="h-12"
-          />
-          {state.fieldErrors?.email && (
-            <p className="text-sm text-destructive">{state.fieldErrors.email}</p>
-          )}
-        </div>
-
-        <div className="grid gap-1.5">
-          <Label htmlFor="password">Passwort</Label>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={8}
-            aria-invalid={Boolean(state.fieldErrors?.password)}
-            className="h-12"
-          />
-          {state.fieldErrors?.password && (
-            <p className="text-sm text-destructive">{state.fieldErrors.password}</p>
-          )}
-        </div>
-
-        <div className="grid gap-1.5">
-          <Label htmlFor="confirmPassword">Passwort wiederholen</Label>
-          <Input
-            id="confirmPassword"
-            name="confirmPassword"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={8}
-            aria-invalid={Boolean(state.fieldErrors?.confirmPassword)}
-            className="h-12"
-          />
-          {state.fieldErrors?.confirmPassword && (
-            <p className="text-sm text-destructive">
-              {state.fieldErrors.confirmPassword}
-            </p>
-          )}
-        </div>
-
-        {state.error && (
-          <p className="text-sm text-destructive" role="alert">
-            {state.error}
-          </p>
-        )}
-
-        <Button type="submit" className="h-12 sm:whitespace-nowrap" disabled={pending}>
-          {pending ? "Konto wird erstellt …" : "Konto erstellen"}
-        </Button>
-
-        <div className="my-3 flex items-center gap-3">
-          <Separator className="flex-1" />
-          <span className="text-xs font-bold uppercase tracking-[0.18em] text-[#848484]">oder</span>
-          <Separator className="flex-1" />
-        </div>
-
-        <OAuthButtons mode="registrieren" redirectPath={onboardingPath} />
-      </form>
-
-      <div className="mt-6 flex justify-center gap-x-1 text-center text-sm">
-        <p className="text-[#848484]">Bereits ein Konto?</p>
-        <Link href="/anmelden" className="underline underline-offset-4 transition-colors hover:text-[#96B897]">
-          Anmelden
-        </Link>
-      </div>
-    </AuthLayout>
-  );
+function firstString(value: string | string[] | undefined): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+  return "";
 }
 
-export default function RegistrierenPage() {
+export default async function RegistrierenPage({
+  searchParams,
+}: {
+  searchParams?: SearchParams;
+}) {
+  const params = searchParams ? await searchParams : {};
+  const initialEmail = firstString(params.email);
+  const initialNext = firstString(params.next);
+  const initialOnboardingIntent =
+    firstString(params.for) || firstString(params.forWhom);
+
   return (
-    <Suspense fallback={null}>
-      <RegistrierenContent />
-    </Suspense>
+    <RegistrierenClient
+      initialEmail={initialEmail}
+      initialNext={initialNext}
+      initialOnboardingIntent={initialOnboardingIntent}
+    />
   );
 }
