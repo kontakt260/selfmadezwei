@@ -94,18 +94,25 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && !isPublic(pathname) && !bypassesPaymentCheck(pathname)) {
-    const { data: projects } = await supabase
-      .from("projects")
-      .select("portal_access_expires_at")
+    // PROJ-6 Paywall-Lockdown: expires_at liegt nicht mehr in `projects`
+    // (das wäre client-UPDATE-bar gewesen), sondern in der strikt
+    // service_role-write-only `project_access`-Tabelle. RLS-SELECT-Policy
+    // filtert automatisch auf Projekte des eingeloggten Users.
+    const { data: accessRows } = await supabase
+      .from("project_access")
+      .select("expires_at")
       .limit(50);
 
     const now = Date.now();
-    const hasNeverPaid = !projects || projects.every((p) => p.portal_access_expires_at === null);
+    const hasNeverPaid =
+      !accessRows ||
+      accessRows.length === 0 ||
+      accessRows.every((r) => r.expires_at === null);
     const allExpired =
-      projects &&
-      projects.length > 0 &&
-      projects.every(
-        (p) => p.portal_access_expires_at && new Date(p.portal_access_expires_at).getTime() < now,
+      !!accessRows &&
+      accessRows.length > 0 &&
+      accessRows.every(
+        (r) => r.expires_at && new Date(r.expires_at).getTime() < now,
       );
 
     if (hasNeverPaid) {

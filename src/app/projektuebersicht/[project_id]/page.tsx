@@ -112,20 +112,25 @@ export default async function ProjektuebersichtPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/anmelden");
 
-  // Fetch project + user membership in one go
-  const [{ data: project }, { data: membership }] = await Promise.all([
-    supabase
-      .from("projects")
-      .select("id, title, portal_access_expires_at")
-      .eq("id", project_id)
-      .single(),
-    supabase
-      .from("project_members")
-      .select("role")
-      .eq("project_id", project_id)
-      .eq("user_id", user.id)
-      .single(),
-  ]);
+  // Fetch project + user membership + paywall-state in one go.
+  // PROJ-6: expires_at liegt jetzt in `project_access` (RLS-SELECT-Policy
+  // erlaubt nur Mitgliedern den Lesezugriff — kein client-seitiges
+  // UPDATE möglich, nur der Stripe-Webhook über service_role schreibt).
+  const [{ data: project }, { data: membership }, { data: accessRow }] =
+    await Promise.all([
+      supabase.from("projects").select("id, title").eq("id", project_id).single(),
+      supabase
+        .from("project_members")
+        .select("role")
+        .eq("project_id", project_id)
+        .eq("user_id", user.id)
+        .single(),
+      supabase
+        .from("project_access")
+        .select("expires_at")
+        .eq("project_id", project_id)
+        .maybeSingle(),
+    ]);
 
   // project not found OR user is not a member → 404 (avoids leaking project existence)
   if (!project || !membership) notFound();
@@ -158,9 +163,7 @@ export default async function ProjektuebersichtPage({
   const vapiSecondsAvailable = hasInitialPayment
     ? Math.max(0, 36_000 + vapiTopUps * 3_600 - consumedSeconds)
     : null;
-  const portalExpiresAt = hasInitialPayment
-    ? project.portal_access_expires_at ?? null
-    : null;
+  const portalExpiresAt = hasInitialPayment ? accessRow?.expires_at ?? null : null;
 
   const { data: rawChapters } = await supabase
     .from("chapters")

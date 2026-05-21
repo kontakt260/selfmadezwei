@@ -295,13 +295,38 @@ export type Database = {
           },
         ]
       }
+      project_access: {
+        Row: {
+          expires_at: string | null
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          expires_at?: string | null
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          expires_at?: string | null
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_access_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           created_at: string
           id: string
           logo_url: string | null
           owner_id: string
-          portal_access_expires_at: string | null
           title: string
           updated_at: string
         }
@@ -310,7 +335,6 @@ export type Database = {
           id?: string
           logo_url?: string | null
           owner_id: string
-          portal_access_expires_at?: string | null
           title: string
           updated_at?: string
         }
@@ -319,7 +343,6 @@ export type Database = {
           id?: string
           logo_url?: string | null
           owner_id?: string
-          portal_access_expires_at?: string | null
           title?: string
           updated_at?: string
         }

@@ -1,27 +1,15 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { getStripe } from "@/lib/stripe/server";
 
 // Erfolgsseite nach Stripe-Hosted-Checkout (PROJ-6).
 //
-// Der Nutzer landet hier nach erfolgreicher Zahlung. Die URL enthält
-// eine `session_id` von Stripe, die wir SERVER-SEITIG gegen die
-// Stripe-API verifizieren — wir lesen NICHT aus der DB, weil der
-// Webhook möglicherweise noch nicht eingetroffen ist (Stripe garantiert
-// keine Reihenfolge zwischen Browser-Redirect und Webhook-Call).
-//
-// Die ServerComponent prüft:
-//   - session_id existiert in der URL → sonst Redirect auf /
-//   - Stripe-Session ist tatsächlich completed/paid → sonst Redirect auf /
-//   - product_type aus session.metadata → bestimmt welche der 3 Varianten
-//     gerendert wird:
-//       (a) Initial-Selbst   → "Willkommen bei NARRAVIT!" + → /
-//       (b) Initial-Geschenk → "Einladung verschickt an …" + → /
-//       (c) Renewal/Vapi     → "Kauf erfolgreich" + → /projektuebersicht/{pid}
-//
-// PROJ-6 Frontend-Phase: Stripe-API-Call ist gestubbed (gibt synthetische
-// Metadata zurück); in /backend wird das durch echten
-// `stripe.checkout.sessions.retrieve(session_id)` ersetzt.
+// Verifiziert die `session_id` SERVER-SEITIG gegen die Stripe-API.
+// Wir lesen NICHT aus der DB — der Webhook könnte noch nicht
+// eingetroffen sein (Stripe garantiert keine Reihenfolge zwischen
+// Browser-Redirect und Webhook-Call). Stripe ist die definitive
+// Wahrheit, die DB ist eventually consistent.
 
 type Variant =
   | { type: "initial-self" }
@@ -29,23 +17,31 @@ type Variant =
   | { type: "renewal"; projectId: string }
   | { type: "vapi"; projectId: string };
 
-async function verifyStripeSessionStub(sessionId: string): Promise<Variant | null> {
-  // PROJ-6 Frontend-Stub: in /backend ersetzt durch:
-  //   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-  //   const session = await stripe.checkout.sessions.retrieve(sessionId);
-  //   if (session.status !== "complete" || session.payment_status !== "paid") {
-  //     return null;
-  //   }
-  //   const meta = session.metadata;
-  //   ... daraus Variant ableiten
-  //
-  // Für die Frontend-Phase: wenn die session_id den Stub-Prefix "stub_"
-  // hat, parsen wir den Rest als URL-encodiertes JSON. Das erlaubt
-  // lokale Tests aller 3 Bestätigungs-Varianten ohne Stripe-Account.
-  if (!sessionId.startsWith("stub_")) return null;
+async function verifyStripeSession(sessionId: string): Promise<Variant | null> {
   try {
-    const json = decodeURIComponent(sessionId.slice("stub_".length));
-    return JSON.parse(json) as Variant;
+    const stripe = getStripe();
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    if (session.status !== "complete" || session.payment_status !== "paid") {
+      return null;
+    }
+    const meta = session.metadata ?? {};
+    const productType = meta.product_type;
+    if (productType === "initial") {
+      if (meta.is_gift === "1") {
+        return {
+          type: "initial-gift",
+          recipientEmail: meta.gift_recipient_email ?? "",
+        };
+      }
+      return { type: "initial-self" };
+    }
+    if (productType === "renewal" && meta.project_id) {
+      return { type: "renewal", projectId: meta.project_id };
+    }
+    if (productType === "vapi" && meta.project_id) {
+      return { type: "vapi", projectId: meta.project_id };
+    }
+    return null;
   } catch {
     return null;
   }
@@ -59,7 +55,7 @@ export default async function KaufErfolgreichPage({
   const { session_id } = await searchParams;
   if (!session_id) redirect("/");
 
-  const variant = await verifyStripeSessionStub(session_id);
+  const variant = await verifyStripeSession(session_id);
   if (!variant) redirect("/");
 
   return (

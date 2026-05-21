@@ -70,7 +70,6 @@ function VapiStat({
         <CheckoutButton
           label="60 Minuten nachkaufen — 19 €"
           loadingLabel="Wird vorbereitet …"
-          successLabel="Stripe-Checkout folgt in /backend PROJ-6"
           input={{ productType: "vapi", projectId }}
           variant={
             secondsAvailable !== null && secondsAvailable < 60 * 60
@@ -121,7 +120,6 @@ function PortalAccessStat({
         <CheckoutButton
           label="Um 12 Monate verlängern — 99 €"
           loadingLabel="Wird vorbereitet …"
-          successLabel="Stripe-Checkout folgt in /backend PROJ-6"
           input={{ productType: "renewal", projectId }}
           variant={
             daysLeft !== null && daysLeft < 30 ? "primary" : "secondary"
@@ -168,31 +166,28 @@ function StatCard({
 function CheckoutButton({
   label,
   loadingLabel,
-  successLabel,
   input,
   variant,
   disabled,
 }: {
   label: string;
   loadingLabel: string;
-  successLabel: string;
   input: Parameters<typeof startCheckoutAction>[0];
   variant: "primary" | "secondary";
   disabled?: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
-  const [feedback, setFeedback] = useState<
-    { type: "ok"; msg: string } | { type: "err"; msg: string } | null
-  >(null);
+  const [error, setError] = useState<string | null>(null);
   const handleClick = () => {
-    setFeedback(null);
+    setError(null);
     startTransition(async () => {
       const res = await startCheckoutAction(input);
       if (!res.ok) {
-        setFeedback({ type: "err", msg: res.error });
+        setError(res.error);
         return;
       }
-      setFeedback({ type: "ok", msg: successLabel });
+      // Stripe Hosted Checkout — Vollredirect.
+      window.location.href = res.checkoutUrl;
     });
   };
   return (
@@ -216,16 +211,12 @@ function CheckoutButton({
           label
         )}
       </Button>
-      {feedback && (
+      {error && (
         <p
-          className={
-            feedback.type === "ok"
-              ? "rounded border border-[#96B897]/40 bg-[#96B897]/10 px-3 py-2 text-xs text-[#3E3831]"
-              : "rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
-          }
-          role={feedback.type === "err" ? "alert" : "status"}
+          className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+          role="alert"
         >
-          {feedback.msg}
+          {error}
         </p>
       )}
     </div>

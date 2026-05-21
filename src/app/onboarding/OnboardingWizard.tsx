@@ -129,10 +129,8 @@ export function OnboardingWizard({
   };
 
   const [isPending, startTransition] = useTransition();
-  const [purchaseInfo, setPurchaseInfo] = useState<string | null>(null);
   const handlePurchase = () => {
     setError(null);
-    setPurchaseInfo(null);
     startTransition(async () => {
       const res = await startCheckoutAction({
         productType: "initial",
@@ -150,11 +148,9 @@ export function OnboardingWizard({
         setError(res.error);
         return;
       }
-      // PROJ-6 Frontend-Phase: keine echte Stripe-Weiterleitung. Wir zeigen
-      // einen Hinweis, dass der Backend-Schritt folgt.
-      setPurchaseInfo(
-        "Checkout-Daten validiert ✓ — Stripe-Hosted-Checkout wird in /backend PROJ-6 angebunden.",
-      );
+      // Stripe Hosted Checkout — Vollredirect (kein router.push, sonst
+      // ratet Next.js die Route als interne Navigation).
+      window.location.href = res.checkoutUrl;
     });
   };
 
@@ -216,15 +212,6 @@ export function OnboardingWizard({
           {error && (
             <p className="mt-4 text-sm text-destructive" role="alert">
               {error}
-            </p>
-          )}
-
-          {purchaseInfo && (
-            <p
-              className="mt-4 rounded border border-[#96B897]/40 bg-[#96B897]/10 p-3 text-sm text-[#3E3831]"
-              role="status"
-            >
-              {purchaseInfo}
             </p>
           )}
 

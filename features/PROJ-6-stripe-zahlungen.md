@@ -528,6 +528,114 @@ Frontend-UI für PROJ-6 ist live (Phase `/frontend`). Stripe-Backend
   `/registrieren?next=/onboarding` umgeleitet.
 - TypeScript-Check (`npx tsc --noEmit`) ohne Fehler.
 
+## Implementation Notes — Phase Backend (2026-05-21)
+
+PROJ-6 ist code-seitig fertig. Stripe-Konto + Price-IDs müssen
+manuell konfiguriert werden (siehe Env-Vars unten), dann ist der Flow
+End-to-End live.
+
+### Migration
+
+`supabase/migrations/20260521120000_proj6_paywall_lockdown.sql`
+gegen den **stage**-Branch (`kdjhxqitfxnsavhiafdn`) angewendet:
+
+- Neue Tabelle `public.project_access` (PK `project_id` mit FK auf
+  `projects.id` ON DELETE CASCADE, `expires_at TIMESTAMPTZ`,
+  `updated_at` auto-trigger).
+- RLS aktiviert, eine einzige Policy: `project_access_select_members`
+  (SELECT für Projekt-Mitglieder). KEINE INSERT/UPDATE/DELETE-Policy →
+  nur `service_role` (Webhook) schreibt.
+- Bestandsdaten aus `projects.portal_access_expires_at` migriert
+  (3 Zeilen).
+- `projects.portal_access_expires_at` Spalte **entfernt**.
+- Pflicht-Negativtest live verifiziert: ein simulierter co_author kann
+  `expires_at` nicht UPDATE'n (RLS blockiert silent, 0 Rows).
+
+### Neue Dateien
+
+- `src/lib/stripe/server.ts` — Stripe-Singleton (server-only),
+  PRODUCTS-Konfiguration, Price-ID-Lookup, Site-URL-Helper.
+- `src/lib/supabase/serviceRole.ts` — Service-Role-Client (server-only)
+  für den Webhook + spätere PROJ-11 Mail-Sender.
+- `src/app/api/stripe/webhook/route.ts` — Node-Runtime-Route mit
+  Signatur-Verify, Idempotenz-Check, 3 Aktionspfaden (initial /
+  renewal / vapi) und allen 5 Geschenk-Varianten.
+- `src/app/api/stripe/webhook/route.test.ts` — Vitest-Suite mit 8
+  Tests: Signatur-Check (×2), Idempotenz, Initial-Self, Gift-mit-
+  Käufer-Zugang, Gift-ohne-Käufer-Zugang, Renewal-GREATEST-Trick,
+  Vapi-Top-Up.
+
+### Geänderte Dateien
+
+- `src/app/checkout/actions.ts` — `startCheckoutAction` macht jetzt
+  echte Stripe-Checkout-Sessions (`mode: payment`, Hosted Checkout),
+  liefert `{ ok, checkoutUrl }` zurück. Frontend redirected via
+  `window.location.href`.
+- `src/app/kauf-erfolgreich/page.tsx` — `verifyStripeSessionStub`
+  ersetzt durch echten `stripe.checkout.sessions.retrieve` mit
+  Status + payment_status-Check.
+- `src/app/onboarding/OnboardingWizard.tsx` + `PaywallStats.tsx` —
+  Erfolg-Handler navigiert zur Stripe-URL.
+- `src/app/projektuebersicht/[project_id]/page.tsx` — liest
+  `expires_at` aus `project_access` statt `projects`.
+- `src/lib/supabase/middleware.ts` — Paywall-Check liest aus
+  `project_access`.
+- `src/lib/database.types.ts` — regeneriert (project_access dazu,
+  portal_access_expires_at aus projects raus).
+- `src/middleware.ts` — Matcher schließt `/api/stripe/webhook` aus
+  (Stripe-Webhook darf NICHT durch die Auth-Middleware laufen).
+- `.env.local.example` — STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
+  STRIPE_PRICE_ID_{INITIAL,RENEWAL,VAPI_60} dokumentiert mit
+  „server-only, kein NEXT_PUBLIC_"-Warnung.
+- `vitest.config.ts` + `src/test/empty.ts` — `server-only`-Pragma als
+  Empty-Module aliasen, damit Tests die server-only-Module laden
+  können.
+
+### Pflicht-Tests Status
+
+| # | Test | Status |
+| :--- | :--- | :--- |
+| 1 | Paywall-Lockdown (co_author UPDATE blocked) | ✅ Live DB-Test passed |
+| 2 | Webhook-Signatur 400 (invalid + missing) | ✅ 2 Vitest-Tests |
+| 3 | Idempotenz (zweiter Webhook-Call) | ✅ 1 Vitest-Test |
+| 4 | Onboarding-Auth-Gate (anon → /registrieren?next) | ✅ in Frontend-Phase |
+| 5 | Erfolgsseite Session-Verify | ✅ implementiert (real stripe.retrieve) |
+| 6 | Renewal-GREATEST-Trick (12mo on top, no reset) | ✅ 1 Vitest-Test |
+| 7 | Vapi-Verfügbarkeit (payments + voice_sessions) | ✅ Frontend-Berechnung + Vitest-Base |
+
+Gesamt-Suite: 57/57 Vitest-Tests grün.
+
+### Manuelle Setup-Schritte für Go-Live
+
+1. **Stripe-Konto:** Test-Mode + Live-Mode-Account-IDs festlegen.
+2. **3 Produkte in Stripe-Dashboard anlegen:**
+   - Portal-Zugang Initial: 249 €
+   - Portal-Zugang Verlängerung: 99 €
+   - Vapi +60 Min: 19 €
+3. **Webhook in Stripe registrieren** für `checkout.session.completed`
+   mit Endpoint-URL `https://<domain>/api/stripe/webhook`.
+   Webhook-Secret kopieren → `STRIPE_WEBHOOK_SECRET`.
+4. **Env-Variablen setzen** (server-only, niemals NEXT_PUBLIC_):
+   - `STRIPE_SECRET_KEY`
+   - `STRIPE_WEBHOOK_SECRET`
+   - `STRIPE_PRICE_ID_INITIAL`
+   - `STRIPE_PRICE_ID_RENEWAL`
+   - `STRIPE_PRICE_ID_VAPI_60`
+5. **TOS + Privacy-Policy-URLs** in Stripe-Checkout-Settings
+   ergänzen (DSGVO-Anforderung — Folge-Ticket).
+6. **MwSt-Behandlung:** Stripe-Tax aktivieren ODER 249/99/19 € als
+   Brutto-Endpreise behandeln (Folge-Ticket).
+7. **Resend-Mailer** (PROJ-11) abonniert das `invitations`-INSERT-
+   Event für Geschenk-Variante „Auch Computer" und verschickt die
+   Einladungs-E-Mail.
+
+### Deferred (für PROJ-3 `/refine`)
+
+- PROJ-3 (Persönlicher Bereich + Konto): „Zugang verlängern"- und
+  Vapi-Nachkauf-Buttons müssen aus dem persönlichen Bereich entfernt
+  werden — sie sind ab PROJ-6 ausschließlich über die Projektübersicht
+  zugänglich. Folge-Ticket via `/refine PROJ-3`.
+
 ## QA Test Results
 _To be added by /qa_
 

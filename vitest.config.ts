@@ -14,6 +14,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),
+      // Next.js' `server-only` Pragma ist nicht als npm-Modul installiert
+      // (es ist Teil der Next-Runtime); in Tests stubben wir es zu einem
+      // leeren Modul, damit Module mit `import "server-only"` ladbar bleiben.
+      'server-only': resolve(__dirname, './src/test/empty.ts'),
     },
   },
 })
