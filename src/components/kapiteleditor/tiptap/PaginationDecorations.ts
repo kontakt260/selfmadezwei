@@ -530,35 +530,51 @@ function buildSpacerDecoration(pos: number, height: number, opts: SpacerOpts): D
   return Decoration.widget(
     pos,
     () => {
-      const span = document.createElement("span");
-      span.className = "a5-soft-break-spacer";
-      span.setAttribute("data-soft-break", "1");
-      span.setAttribute("aria-hidden", "true");
-      // Spacer rendert nichts Sichtbares — er nimmt nur Platz ein, damit die
-      // Folgezeilen optisch auf der nächsten Seite landen. Die Blockquote-
-      // Border in seinem Y-Bereich wird per `mask-image` auf der Blockquote
-      // selbst entfernt (siehe Decoration.node-Block in computeDecorations),
-      // KEIN visueller Overlay mehr.
+      // 2-Layer-Struktur (BugFix 2026-05-21 — Caret-Höhen-Bug auf
+      // Seitenende):
       //
-      // User-Anforderung 2026-05-21: die ZEILE VOR DEM SPACER (= letzte
-      // sichtbare Zeile auf der Seite bei automatischem Page-Wrap) muss
-      // im Blocksatz bündig zur rechten Marge stehen — der Paragraph
-      // geht ja auf der nächsten Seite weiter, das ist KEINE „letzte
-      // Zeile eines Absatzes".
+      // Vorher: 1 Inline-Block mit width:100% UND height = page-gap.
+      //   Effekt: Browser-Line-Box, in der der Cursor landet, ist so
+      //   hoch wie der gesamte Spacer → Caret wird visuell auf die
+      //   volle Page-Gap-Höhe ausgedehnt (langer Strich durch den Tisch).
       //
-      // Trick: `display: inline-block; width: 100%`. Der Spacer ist
-      // inline-level (anders als `display: block`), erzwingt aber wegen
-      // 100 % Breite einen Wrap. Die Browser-Engine behandelt die Zeile
-      // davor als „normal gewrappte Zeile" (NICHT als „letzte Zeile vor
-      // Block-Element") → `text-align: justify` justifiziert sie zur
-      // rechten Marge. Truly-last lines (Paragraph-Enter oder Doc-Ende)
-      // bleiben unberührt, weil dort kein Spacer steht.
-      const css = `display:inline-block;width:100%;height:${height}px;line-height:0;user-select:none;pointer-events:none;vertical-align:top;`;
+      // Jetzt: Wrapper (display:contents) mit zwei Kindern.
+      //   1. Trigger-Span: display:inline-block; width:100%; height:0.
+      //      Forciert den Zeilenumbruch der vorhergehenden Text-Zeile
+      //      (Browser behandelt sie als „gewrappt", nicht als „letzte
+      //      Zeile vor Block-Element" → text-align: justify greift
+      //      auch auf die letzte sichtbare Zeile auf der Seite).
+      //      Höhe 0 → Line-Box bleibt natürliche Textzeilen-Höhe → Caret
+      //      hat normale Größe.
+      //   2. Gap-Span: display:block; height = page-gap. Sitzt als
+      //      Block-Element auf seiner eigenen Zeile, nimmt den Platz
+      //      ein, ohne die vorhergehende Line-Box zu beeinflussen.
+      //      Da Widget-Decorations standardmäßig contenteditable=false
+      //      sind, kann der Caret hier nicht reinklicken.
+      const wrap = document.createElement("span");
+      wrap.className = "a5-soft-break-spacer";
+      wrap.setAttribute("data-soft-break", "1");
+      wrap.setAttribute("aria-hidden", "true");
       if (opts.inBlockquote) {
-        span.setAttribute("data-in-blockquote", "1");
+        wrap.setAttribute("data-in-blockquote", "1");
       }
-      span.style.cssText = css;
-      return span;
+      // display:contents → der Wrapper rendert KEINE eigene Box; seine
+      // Kinder werden als direkte Kinder des Paragraphs behandelt.
+      wrap.style.cssText =
+        "display:contents;user-select:none;pointer-events:none;";
+
+      const trigger = document.createElement("span");
+      trigger.className = "a5-soft-break-spacer__trigger";
+      trigger.style.cssText =
+        "display:inline-block;width:100%;height:0;line-height:0;vertical-align:top;user-select:none;pointer-events:none;";
+      wrap.appendChild(trigger);
+
+      const gap = document.createElement("span");
+      gap.className = "a5-soft-break-spacer__gap";
+      gap.style.cssText = `display:block;height:${height}px;line-height:0;margin:0;padding:0;user-select:none;pointer-events:none;`;
+      wrap.appendChild(gap);
+
+      return wrap;
     },
     {
       side: -1,
