@@ -385,9 +385,23 @@ export function ChapterSectionClient({
           queueMicrotask(() => setSavedOrderIds(next.map((c) => c.id)));
           return next;
         });
-      } else {
-        router.refresh();
+        return;
       }
+      // Optimistische ID durch die echte chapter.id aus dem Server-Insert
+      // ersetzen (Bug 2026-05-21: sonst zeigt der „Bearbeiten"-Link auf
+      // /kapiteleditor/optimistic-<ts> → 404, weil die optimistische ID
+      // niemals in der DB existiert).
+      const realId = result.chapterId;
+      if (realId) {
+        setChapters((prev) => {
+          const next = prev.map((c) =>
+            c.id === tempId ? { ...c, id: realId } : c,
+          );
+          queueMicrotask(() => setSavedOrderIds(next.map((c) => c.id)));
+          return next;
+        });
+      }
+      router.refresh();
     });
   }, [currentImpulseTitle, closeImpulseModal, addImpulseChapterAction, projectId, router]);
 
