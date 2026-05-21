@@ -189,6 +189,16 @@
  * der Zoom ignoriert (Override unten in @media print). */
 .a5-stack {
   zoom: var(--ui-zoom, 1);
+  /* Initial-Lade-Fade (User-Anforderung 2026-05-21): während der Stack
+   * mountet + die Pagination-Settling-Passes laufen, halten wir den
+   * Stack unsichtbar (opacity 0). Sobald data-ready="1" gesetzt wird,
+   * blendet er in einem sanften Schwung ein. Verhindert das visuelle
+   * Zerstückelt-Erscheinen während der initialen Layout-Iterationen. */
+  opacity: 0;
+  transition: opacity 0.4s ease-out;
+}
+.a5-stack[data-ready="1"] {
+  opacity: 1;
 }
 
 @media print {

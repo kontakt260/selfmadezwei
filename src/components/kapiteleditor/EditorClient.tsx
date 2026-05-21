@@ -48,6 +48,13 @@ export function EditorClient({
     initialImageSections ?? EMPTY_IMAGE_SECTIONS,
   );
   const [zoom, setZoom] = useState<ZoomLevel>(DEFAULT_ZOOM);
+  // Lade-Animation (User-Anforderung 2026-05-21): während der Editor
+  // initial mountet + die ersten Pagination-Settling-Passes laufen,
+  // wird der Content visuell zerstückelt sichtbar (Text erst ungelayouted,
+  // dann Image-Scales springen, HRs settlen). Wir blenden den Editor-
+  // Stack solange aus, bis Layout + Image-Loads beruhigt sind, und
+  // fadeen ihn DANN in einem Schwung ein.
+  const [editorReady, setEditorReady] = useState(false);
 
   const editor = useEditor({
     extensions: editorExtensions,
@@ -127,6 +134,50 @@ export function EditorClient({
   useEffect(() => {
     document.dispatchEvent(new Event("narravit:pagination-recompute"));
   }, [imageSections, title]);
+
+  // Editor-Ready-Flag setzen, sobald die initialen Pagination-Settling-
+  // Passes durch sind. Der Editor mountet, lädt Body/Images, läuft durch
+  // die Settling-Timer (max 5 000 ms) — danach ist das Layout stabil
+  // und wir fadeen den Stack in einem Schwung ein.
+  // Bilder werden zusätzlich abgewartet (load-Listener), damit kein
+  // halb-geladenes Bild kurz die Page-Höhe springen lässt.
+  useEffect(() => {
+    if (!editor) return;
+    let cancelled = false;
+    const fg = fgRef.current;
+    const imgs = fg ? Array.from(fg.querySelectorAll("img")) : [];
+    const allImagesLoaded = () =>
+      imgs.every((img) => img.complete && img.naturalHeight > 0);
+    const markReady = () => {
+      if (cancelled) return;
+      setEditorReady(true);
+    };
+    // Wenn alle Bilder bereits geladen sind, nach dem letzten Settling-
+    // Timer (5 000 ms) markieren. Sonst auf Image-Loads warten + Timer.
+    if (allImagesLoaded()) {
+      const timer = setTimeout(markReady, 5200);
+      return () => {
+        cancelled = true;
+        clearTimeout(timer);
+      };
+    }
+    let imgsRemaining = imgs.filter((img) => !img.complete).length;
+    const onLoad = () => {
+      imgsRemaining--;
+      if (imgsRemaining <= 0) markReady();
+    };
+    for (const img of imgs) {
+      if (!img.complete) img.addEventListener("load", onLoad, { once: true });
+    }
+    // Safety: nach 8 s in jedem Fall freigeben (sehr langsame Bild-Loads
+    // sollen die UX nicht ewig blockieren).
+    const fallback = setTimeout(markReady, 8000);
+    return () => {
+      cancelled = true;
+      clearTimeout(fallback);
+      for (const img of imgs) img.removeEventListener("load", onLoad);
+    };
+  }, [editor]);
 
   // Bild-Skalierung: Per-Row, eingebettet in usePagination → recalc().
   // Spec 2026-05-20: jede 1-spaltig-Sektion füllt zuerst den Restplatz der
@@ -217,9 +268,37 @@ export function EditorClient({
       </header>
 
       <main className="flex flex-1 flex-col items-center gap-8 px-4 py-8 pb-16 sm:px-6 md:px-10">
+        {!editorReady && (
+          // Lade-Animation während Initial-Mount + Pagination-Settling.
+          // Wir blenden ein zentriertes Spinner-Element über dem Tisch
+          // ein. Der A5-Stack selbst ist unsichtbar (opacity 0), bis
+          // das Layout stabil ist — verhindert das „zerstückelte"
+          // Initial-Rendering (Text → Pagination-Shifts → Image-Loads).
+          <div
+            className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-[var(--a5-desk-color)] transition-opacity duration-300"
+            aria-hidden
+          >
+            <div className="flex flex-col items-center gap-3 text-[#3E3831]/70">
+              <svg
+                className="h-6 w-6 animate-spin"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+              <p className="text-sm">Kapitel wird vorbereitet …</p>
+            </div>
+          </div>
+        )}
         <div
-          className="a5-stack"
+          className="a5-stack a5-stack--loading"
           data-chapter-id={chapterId}
+          data-ready={editorReady ? "1" : "0"}
           ref={stackRef}
           style={{
             // bg-Layer (absolute) stapelt N Frames + Gaps; ohne min-height
