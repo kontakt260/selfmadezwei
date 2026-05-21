@@ -15,7 +15,7 @@ import {
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { type Chapter, reorderChapters } from "@/lib/projektuebersicht-chapters";
-import { ERZAEHL_IMPULSE_TITLES } from "@/lib/projektuebersicht-erzaehl-impulse";
+import type { ErzaehlImpuls } from "@/lib/projektuebersicht-erzaehl-impulse";
 
 const DELETE_CONFIRM_SECONDS = 3;
 
@@ -127,6 +127,10 @@ type AddImpulseChapterAction = (formData: FormData) => Promise<{ chapterId?: str
 type Props = {
   projectId: string;
   initialChapters: Chapter[];
+  /** PROJ-8: Server-geladener Impuls-Katalog (UUIDs aus impulse_catalog).
+   * Wird vom Shuffle-Modal genutzt — beim „Impuls übernehmen" geht die
+   * UUID als impulseId zur Server-Action und landet in chapters.source_impulse_id. */
+  impulses: ErzaehlImpuls[];
   addChapterAction: AddChapterAction;
   addImpulseChapterAction: AddImpulseChapterAction;
   renameChapterAction: RenameChapterAction;
@@ -137,6 +141,7 @@ type Props = {
 export function ChapterSectionClient({
   projectId,
   initialChapters,
+  impulses,
   addChapterAction,
   addImpulseChapterAction,
   renameChapterAction,
@@ -341,14 +346,14 @@ export function ChapterSectionClient({
     setEditTitleValue("");
     setAddOpen(false);
     setAddTitleValue("");
-    const len = ERZAEHL_IMPULSE_TITLES.length;
+    const len = impulses.length;
     setImpulseIndex(len > 0 ? Math.floor(Math.random() * len) : 0);
     setImpulseOpen(true);
-  }, []);
+  }, [impulses.length]);
 
   const shuffleImpulse = useCallback(() => {
     setImpulseIndex((prev) => {
-      const len = ERZAEHL_IMPULSE_TITLES.length;
+      const len = impulses.length;
       if (len <= 1) return 0;
       let next = Math.floor(Math.random() * len);
       let guard = 0;
@@ -358,9 +363,13 @@ export function ChapterSectionClient({
       }
       return next;
     });
-  }, []);
+  }, [impulses.length]);
 
-  const currentImpulseTitle = ERZAEHL_IMPULSE_TITLES[impulseIndex] ?? "";
+  const currentImpulse = impulses[impulseIndex];
+  const currentImpulseTitle = currentImpulse?.title ?? "";
+  const currentImpulseCategory = currentImpulse?.category ?? "";
+  const currentImpulsePreviewQuestion = currentImpulse?.leading_questions[0] ?? "";
+  const currentImpulseId = currentImpulse?.id ?? "";
 
   const confirmErzaehlImpulse = useCallback(() => {
     const title = currentImpulseTitle.trim();
@@ -377,6 +386,11 @@ export function ChapterSectionClient({
       const fd = new FormData();
       fd.set("title", title);
       fd.set("projectId", projectId);
+      // PROJ-8: impulse_id für Server-Action — /backend nutzt sie, um
+      // chapters.source_impulse_id korrekt zu setzen (statt hardcoded NULL).
+      // Frontend-Phase: der Wert ist der Mock-Slug; /backend ersetzt durch
+      // echte UUID nach der DB-Migration.
+      if (currentImpulseId) fd.set("impulseId", currentImpulseId);
       const result = await addImpulseChapterAction(fd);
       if (result.error) {
         toast.error(result.error);
@@ -403,7 +417,7 @@ export function ChapterSectionClient({
       }
       router.refresh();
     });
-  }, [currentImpulseTitle, closeImpulseModal, addImpulseChapterAction, projectId, router]);
+  }, [currentImpulseTitle, currentImpulseId, closeImpulseModal, addImpulseChapterAction, projectId, router]);
 
   // ─── Drag and Drop ────────────────────────────────────────────────────────
 
@@ -636,9 +650,19 @@ export function ChapterSectionClient({
             Mischen Sie durch Vorschläge, bis ein Thema passt — dann übernehmen Sie es als neues Kapitel.
           </p>
           <div className="mt-8 border border-[#e0dcd5] bg-white px-5 py-6 sm:px-6 sm:py-8" aria-live="polite" aria-atomic="true">
-            <p className="[font-family:var(--font-pt-serif)] text-xl leading-8 text-[#3E3831] sm:text-2xl sm:leading-10">
+            {currentImpulseCategory && (
+              <p className="[font-family:var(--font-lato)] text-xs font-semibold uppercase tracking-wide text-[#848484] sm:text-sm">
+                {currentImpulseCategory}
+              </p>
+            )}
+            <p className="[font-family:var(--font-pt-serif)] mt-2 text-xl leading-8 text-[#3E3831] sm:text-2xl sm:leading-10">
               {currentImpulseTitle}
             </p>
+            {currentImpulsePreviewQuestion && (
+              <p className="mt-4 text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
+                {currentImpulsePreviewQuestion}
+              </p>
+            )}
           </div>
           <div className="mt-8 flex flex-col gap-4">
             <button type="button" onClick={shuffleImpulse} className="group inline-flex min-h-12 w-full items-center justify-center gap-2 border border-[#e0dcd5] bg-white px-6 py-3.5 text-center text-lg font-semibold text-[#3E3831] transition-colors hover:bg-[#f5f3f0] sm:w-auto sm:self-start">

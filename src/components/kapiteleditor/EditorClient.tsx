@@ -10,6 +10,7 @@ import { FirstPageHeader } from "./FirstPageTemplate";
 import { ImageSection } from "./ImageSection";
 import { SaveStatus } from "./SaveStatus";
 import { WordCount } from "./WordCount";
+import { ImpulseHintBanner } from "./ImpulseHintBanner";
 import { ZoomControl, DEFAULT_ZOOM, type ZoomLevel } from "./ZoomControl";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { countWordsFromBody } from "@/lib/kapiteleditor/countWords";
@@ -37,6 +38,11 @@ type Props = {
   // Vom Server beim Laden geliefert; bleibt während der Editor-Session
   // konstant (kein Realtime-Push aus anderen Tabs — Spec-Entscheidung).
   initialStartPage: number;
+  // PROJ-8: optionaler Impuls für das Banner. Null wenn das Kapitel
+  // keinen source_impulse_id hat ODER der referenzierte Impuls nicht
+  // mehr existiert. Frontend-Phase reicht null durch (kein DB-Lookup);
+  // /backend befüllt es nach der Schema-Migration.
+  initialImpulse: { title: string; leadingQuestions: readonly string[] } | null;
 };
 
 export function EditorClient({
@@ -46,6 +52,7 @@ export function EditorClient({
   initialBody,
   initialImageSections,
   initialStartPage,
+  initialImpulse,
 }: Props) {
   const [title, setTitle] = useState(initialTitle);
   const [body, setBody] = useState<unknown>(initialBody);
@@ -282,6 +289,16 @@ export function EditorClient({
       </header>
 
       <main className="flex flex-1 flex-col items-center gap-8 px-4 py-8 pb-16 sm:px-6 md:px-10">
+        {/* PROJ-8: Leitfragen-Banner für Impuls-Kapitel.
+            Wird nur gerendert, wenn das Kapitel einen referenzierten Impuls
+            aus dem Katalog hat. Sitzt VOR dem A5-Stack, NICHT auf die
+            A5-Seite gelegt (Spec AC). */}
+        {initialImpulse && (
+          <ImpulseHintBanner
+            title={initialImpulse.title}
+            leadingQuestions={initialImpulse.leadingQuestions}
+          />
+        )}
         {!editorReady && (
           // Lade-Animation während Initial-Mount + Pagination-Settling.
           // Wir blenden ein zentriertes Spinner-Element über dem Tisch

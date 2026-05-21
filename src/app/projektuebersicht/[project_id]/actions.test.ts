@@ -185,15 +185,15 @@ describe("addChapterAction", () => {
 // ─── addImpulseChapterAction ───────────────────────────────────────────────────
 
 describe("addImpulseChapterAction", () => {
-  it("inserts with chapter_origin 'catalog_impulse' and source_impulse_id null", async () => {
+  it("inserts with chapter_origin 'catalog_impulse' and source_impulse_id null when no impulseId given (backward compat)", async () => {
     const client = makeMockClient();
     const form = new FormData();
     form.set("title", "Ein Impuls-Titel");
     form.set("projectId", PROJECT_ID);
     client.from
-      .mockReturnValueOnce(makeBuilder({ data: null }))
-      .mockReturnValueOnce(makeBuilder({ data: { id: CHAPTER_1 } }))
-      .mockReturnValueOnce(makeBuilder());
+      .mockReturnValueOnce(makeBuilder({ data: null })) // sort_order lookup
+      .mockReturnValueOnce(makeBuilder({ data: { id: CHAPTER_1 } })) // chapter insert
+      .mockReturnValueOnce(makeBuilder()); // projects update
     vi.mocked(createClient).mockResolvedValue(client as never);
 
     const result = await addImpulseChapterAction(form);
@@ -202,6 +202,50 @@ describe("addImpulseChapterAction", () => {
     expect(client.from.mock.results[1].value.insert).toHaveBeenCalledWith(
       expect.objectContaining({ chapter_origin: "catalog_impulse", source_impulse_id: null }),
     );
+  });
+
+  it("PROJ-8: writes source_impulse_id when valid impulseId is provided", async () => {
+    const IMPULSE_UUID = "eeeeeeee-eeee-4eee-aeee-eeeeeeeeeeee";
+    const client = makeMockClient();
+    const form = new FormData();
+    form.set("title", "Kindheit");
+    form.set("projectId", PROJECT_ID);
+    form.set("impulseId", IMPULSE_UUID);
+    client.from
+      .mockReturnValueOnce(makeBuilder({ data: { id: IMPULSE_UUID } })) // impulse exists check
+      .mockReturnValueOnce(makeBuilder({ data: null })) // sort_order lookup
+      .mockReturnValueOnce(makeBuilder({ data: { id: CHAPTER_1 } })) // chapter insert
+      .mockReturnValueOnce(makeBuilder()); // projects update
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const result = await addImpulseChapterAction(form);
+    expect(result).toEqual({ chapterId: CHAPTER_1 });
+    expect(client.from.mock.results[2].value.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ source_impulse_id: IMPULSE_UUID }),
+    );
+  });
+
+  it("PROJ-8: returns error for malformed impulseId (non-UUID)", async () => {
+    const form = new FormData();
+    form.set("title", "Impuls");
+    form.set("projectId", PROJECT_ID);
+    form.set("impulseId", "kindheit-erinnerungen"); // slug instead of UUID
+    expect(await addImpulseChapterAction(form)).toEqual({ error: "Ungültige Impuls-ID." });
+  });
+
+  it("PROJ-8: returns error when impulse does not exist in catalog", async () => {
+    const NON_EXISTENT = "ffffffff-ffff-4fff-afff-ffffffffffff";
+    const client = makeMockClient();
+    const form = new FormData();
+    form.set("title", "Impuls");
+    form.set("projectId", PROJECT_ID);
+    form.set("impulseId", NON_EXISTENT);
+    client.from.mockReturnValueOnce(makeBuilder({ data: null })); // impulse lookup → null
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    expect(await addImpulseChapterAction(form)).toEqual({
+      error: "Erzähl-Impuls nicht gefunden.",
+    });
   });
 
   it("returns error when not authenticated", async () => {

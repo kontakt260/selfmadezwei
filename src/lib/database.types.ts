@@ -85,20 +85,26 @@ export type Database = {
       }
       impulse_catalog: {
         Row: {
+          category: string
           created_at: string
           id: string
+          leading_questions: string[]
           sort_order: number
           title: string
         }
         Insert: {
+          category: string
           created_at?: string
           id?: string
+          leading_questions: string[]
           sort_order: number
           title: string
         }
         Update: {
+          category?: string
           created_at?: string
           id?: string
+          leading_questions?: string[]
           sort_order?: number
           title?: string
         }

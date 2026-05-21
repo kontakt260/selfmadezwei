@@ -63,7 +63,7 @@ export default async function KapiteleditorPage({
   const [{ data: chapter }, { data: membership }] = await Promise.all([
     supabase
       .from("chapters")
-      .select("id, title, body, image_sections, project_id, start_page")
+      .select("id, title, body, image_sections, project_id, start_page, source_impulse_id")
       .eq("id", chapter_id)
       .eq("project_id", project_id)
       .single(),
@@ -104,6 +104,25 @@ export default async function KapiteleditorPage({
     }));
   }
 
+  // PROJ-8: wenn das Kapitel auf einen Impuls verweist, laden wir den
+  // referenzierten Impuls für das Banner mit. Bei NULL (PROJ-4-Bestand
+  // ODER Eigenes-Kapitel) bleibt initialImpulse null und das Banner
+  // wird nicht gerendert.
+  let initialImpulse: { title: string; leadingQuestions: string[] } | null = null;
+  if (chapter.source_impulse_id) {
+    const { data: impulseRow } = await supabase
+      .from("impulse_catalog")
+      .select("title, leading_questions")
+      .eq("id", chapter.source_impulse_id)
+      .maybeSingle();
+    if (impulseRow) {
+      initialImpulse = {
+        title: impulseRow.title,
+        leadingQuestions: impulseRow.leading_questions ?? [],
+      };
+    }
+  }
+
   return (
     <>
       <div className="md:hidden">
@@ -117,6 +136,7 @@ export default async function KapiteleditorPage({
           initialBody={chapter.body}
           initialImageSections={initialImageSections}
           initialStartPage={chapter.start_page ?? 1}
+          initialImpulse={initialImpulse}
         />
       </div>
     </>

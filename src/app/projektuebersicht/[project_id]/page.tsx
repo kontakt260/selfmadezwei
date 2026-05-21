@@ -178,6 +178,22 @@ export default async function ProjektuebersichtPage({
     words: countWordsFromBody(c.body),
   }));
 
+  // PROJ-8: Erzähl-Impuls-Katalog für das Shuffle-Modal. RLS erlaubt
+  // SELECT für authenticated; jeder Nutzer sieht den vollständigen Katalog.
+  // Wir reichen den Katalog als Prop an die Client-Komponente — kein
+  // Roundtrip beim Öffnen des Modals.
+  const { data: rawImpulses } = await supabase
+    .from("impulse_catalog")
+    .select("id, title, category, leading_questions")
+    .order("sort_order", { ascending: true });
+
+  const impulses = (rawImpulses ?? []).map((i) => ({
+    id: i.id,
+    title: i.title,
+    category: i.category,
+    leading_questions: i.leading_questions ?? [],
+  }));
+
   return (
     <>
       <Navbar />
@@ -231,6 +247,7 @@ export default async function ProjektuebersichtPage({
             <ChapterListSection
               projectId={project_id}
               initialChapters={chapters}
+              impulses={impulses}
               addChapterAction={addChapterAction}
               addImpulseChapterAction={addImpulseChapterAction}
               renameChapterAction={renameChapterAction}

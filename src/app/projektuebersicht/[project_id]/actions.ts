@@ -126,11 +126,38 @@ export async function addImpulseChapterAction(
 
   const { title, projectId } = parsed.data;
 
+  // PROJ-8: optionaler impulseId-Parameter. UUID-Format wird validiert;
+  // Lookup in impulse_catalog stellt sicher, dass der Impuls existiert
+  // (FK-Check würde das auch beim INSERT abfangen, aber wir wollen
+  // einen klaren UI-Fehler liefern, nicht 23503).
+  const rawImpulseId = formData.get("impulseId");
+  let impulseId: string | null = null;
+  if (typeof rawImpulseId === "string" && rawImpulseId.length > 0) {
+    const idCheck = uuidSchema.safeParse(rawImpulseId);
+    if (!idCheck.success) {
+      return { error: "Ungültige Impuls-ID." };
+    }
+    impulseId = idCheck.data;
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
+
+  // Wenn impulseId geliefert wurde, vorab existieren prüfen — sonst
+  // landet später ein FK-Fehler aus chapters_source_impulse_id_fkey.
+  if (impulseId) {
+    const { data: impulseRow } = await supabase
+      .from("impulse_catalog")
+      .select("id")
+      .eq("id", impulseId)
+      .maybeSingle();
+    if (!impulseRow) {
+      return { error: "Erzähl-Impuls nicht gefunden." };
+    }
+  }
 
   const { data: lastChapter } = await supabase
     .from("chapters")
@@ -149,7 +176,7 @@ export async function addImpulseChapterAction(
       project_id: projectId,
       sort_order: nextSortOrder,
       chapter_origin: "catalog_impulse",
-      source_impulse_id: null,
+      source_impulse_id: impulseId,
       body: null,
     })
     .select("id")
