@@ -1,8 +1,8 @@
 # PROJ-7: Buchweite Seitenzahl – Live-Anzeige
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-21
-**Last Updated:** 2026-05-21 — Bug B-1 gefixt + Approval-QA grün (Vitest 68/68, Playwright 71+5 Flakes (alle bei Retry grün))
+**Last Updated:** 2026-05-21 — Deployed to stage-app.narravit.de (Commit `e8454ed`)
 
 ## Dependencies
 - Requires **PROJ-1** (Supabase-Datenmodell & RLS) — neue persistierte Felder `chapters.page_count` + `chapters.start_page` (oder gleichwertiges Modell, konkrete Modellierung in `/architecture`)
@@ -514,4 +514,24 @@ Nach B-1-Fix erneut durchgelaufen:
 **Production-Ready:** ✅ READY — Status auf Approved.
 
 ## Deployment
-_To be added by /deploy_
+
+**Date:** 2026-05-21
+**Target:** stage-app.narravit.de (Vercel Preview-Env, Branch `stage`)
+**Commit:** `e8454ed feat(PROJ-7): Buchweite Seitenzahl — Editor zeigt Buch-Position live`
+**Vercel Build:** Ready in 41 s
+
+### Was geht live
+- 2 Migrationen auf stage-Supabase (`kdjhxqitfxnsavhiafdn`):
+  page_count + start_page + Trigger + Backfill + B-1-Security-Lockdown.
+- Editor: Overlay zeigt buchweite Seitenzahl (`start_page + i`), Footer
+  bleibt kapitel-lokal.
+- Auto-Save: schreibt `page_count` bei jedem Settle, Trigger rechnet
+  Folge-Kapitel atomar neu.
+- 11 neue Vitest-Tests, 3 neue Playwright-Tests in der Suite.
+
+### Manuelles für Production-Roll-out (main-Branch)
+- Migrationen 20260521170000_proj7_book_pagenumbers.sql und
+  20260521190000_proj7_recalc_security_lockdown.sql gegen main-Supabase
+  anwenden (Memory-Rule: nur User selbst, MCP-Writes nur gegen stage).
+- Backfill verifizieren: kein chapter mit `start_page IS NULL`.
+- Anschließend stage → main Merge + Push.
