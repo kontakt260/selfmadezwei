@@ -539,7 +539,21 @@ function buildSpacerDecoration(pos: number, height: number, opts: SpacerOpts): D
       // Border in seinem Y-Bereich wird per `mask-image` auf der Blockquote
       // selbst entfernt (siehe Decoration.node-Block in computeDecorations),
       // KEIN visueller Overlay mehr.
-      const css = `display:block;height:${height}px;line-height:0;user-select:none;pointer-events:none;`;
+      //
+      // User-Anforderung 2026-05-21: die ZEILE VOR DEM SPACER (= letzte
+      // sichtbare Zeile auf der Seite bei automatischem Page-Wrap) muss
+      // im Blocksatz bündig zur rechten Marge stehen — der Paragraph
+      // geht ja auf der nächsten Seite weiter, das ist KEINE „letzte
+      // Zeile eines Absatzes".
+      //
+      // Trick: `display: inline-block; width: 100%`. Der Spacer ist
+      // inline-level (anders als `display: block`), erzwingt aber wegen
+      // 100 % Breite einen Wrap. Die Browser-Engine behandelt die Zeile
+      // davor als „normal gewrappte Zeile" (NICHT als „letzte Zeile vor
+      // Block-Element") → `text-align: justify` justifiziert sie zur
+      // rechten Marge. Truly-last lines (Paragraph-Enter oder Doc-Ende)
+      // bleiben unberührt, weil dort kein Spacer steht.
+      const css = `display:inline-block;width:100%;height:${height}px;line-height:0;user-select:none;pointer-events:none;vertical-align:top;`;
       if (opts.inBlockquote) {
         span.setAttribute("data-in-blockquote", "1");
       }
