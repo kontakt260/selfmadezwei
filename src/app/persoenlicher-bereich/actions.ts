@@ -40,40 +40,6 @@ export async function updateNameAction(
   return { success: true, fullName };
 }
 
-// ─── Update Email ────────────────────────────────────────────────────────────
-
-const emailSchema = z.object({
-  email: z.string().email("Bitte eine gültige E-Mail-Adresse angeben."),
-});
-
-export type UpdateEmailState = { success?: boolean; error?: string; email?: string };
-
-export async function updateEmailAction(
-  _prev: UpdateEmailState,
-  formData: FormData,
-): Promise<UpdateEmailState> {
-  const parsed = emailSchema.safeParse({ email: formData.get("email") });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message };
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Nicht angemeldet." };
-
-  const newEmail = parsed.data.email.trim().toLowerCase();
-  const currentEmail = user.email?.trim().toLowerCase();
-
-  if (newEmail === currentEmail) {
-    return { error: "Das ist bereits deine aktuelle E-Mail-Adresse." };
-  }
-
-  const { error } = await supabase.auth.updateUser({ email: newEmail });
-  if (error) return { error: error.message };
-
-  return { success: true, email: newEmail };
-}
-
 // ─── Reset Password ──────────────────────────────────────────────────────────
 
 export type ResetPasswordState = { success?: boolean; error?: string };

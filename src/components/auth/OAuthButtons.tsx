@@ -31,7 +31,9 @@ const icons: Record<OAuthProvider, typeof GoogleIcon> = {
   apple: AppleIcon,
 };
 
-const activeProviders: OAuthProvider[] = ["google", "apple"];
+// Apple Auth ist bewusst archiviert, bis die Provider-Konfiguration steht.
+// Zum Reaktivieren: "apple" wieder in diese Liste aufnehmen.
+const activeProviders: OAuthProvider[] = ["google", "facebook"];
 
 export function OAuthButtons({ mode, redirectPath = "/" }: OAuthButtonsProps) {
   const [loading, setLoading] = useState<OAuthProvider | null>(null);

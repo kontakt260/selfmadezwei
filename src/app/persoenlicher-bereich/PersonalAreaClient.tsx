@@ -18,11 +18,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   updateNameAction,
-  updateEmailAction,
   resetPasswordAction,
   deleteAccountAction,
   type UpdateNameState,
-  type UpdateEmailState,
   type ResetPasswordState,
   type DeleteAccountState,
 } from "./actions";
@@ -142,31 +140,15 @@ function AccountSection({
     {},
   );
 
-  const [emailValue, setEmailValue] = useState(email);
-  const [emailState, emailFormAction, emailPending] = useActionState<UpdateEmailState, FormData>(
-    updateEmailAction,
-    {},
-  );
-
   useEffect(() => {
     setNameValue(fullName);
   }, [fullName]);
-
-  useEffect(() => {
-    setEmailValue(email);
-  }, [email]);
 
   useEffect(() => {
     if (!nameState.success) return;
     if (nameState.fullName) setNameValue(nameState.fullName);
     toast.success("Name gespeichert.");
   }, [nameState.fullName, nameState.success]);
-
-  useEffect(() => {
-    if (!emailState.success) return;
-    if (emailState.email) setEmailValue(emailState.email);
-    toast.success("E-Mail gespeichert.");
-  }, [emailState.email, emailState.success]);
 
   return (
     <SectionShell>
@@ -221,36 +203,23 @@ function AccountSection({
           </form>
         </FieldCard>
 
-        {/* E-Mail */}
+        {/* E-Mail (read-only) */}
         <FieldCard
           label="E-Mail"
-          hint="Hier können Sie Ihre primäre E-Mail-Adresse für Anmeldung und Benachrichtigungen ändern."
-          pinContentToBottom
+          hint="Um Ihre E-Mail-Adresse zu ändern, wenden Sie sich bitte an den Support."
         >
-          <form action={emailFormAction} className="flex flex-col gap-2">
-            <input
-              id="account-email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              value={emailValue}
-              onChange={(event) => setEmailValue(event.target.value)}
-              className={`${editableInputClass} text-[#3E3831]`}
-              aria-describedby="account-email-hint"
-            />
-            <p
-              id="account-email-hint"
-              className="min-h-[5rem] text-sm leading-6 text-[#848484] sm:min-h-[5.5rem] xl:min-h-[6.5rem]"
-            >
-              Ihre Anmelde-E-Mail — wird auch für Benachrichtigungen verwendet.
-            </p>
-            {emailState.error && (
-              <p className="text-base text-destructive">{emailState.error}</p>
-            )}
-            <SandButton type="submit" disabled={emailPending}>
-              {emailPending ? "Wird gespeichert …" : "E-Mail ändern"}
-            </SandButton>
-          </form>
+          <input
+            id="account-email"
+            name="email"
+            type="email"
+            readOnly
+            tabIndex={-1}
+            value={email}
+            className={`${editableInputClass} cursor-default select-none text-[#848484]`}
+          />
+          <p className="min-h-[5rem] text-sm leading-6 text-[#848484] sm:min-h-[5.5rem] xl:min-h-[6.5rem]">
+            Ihre Anmelde-E-Mail — für Änderungen wenden Sie sich an den Support.
+          </p>
         </FieldCard>
 
       </div>
@@ -393,7 +362,7 @@ function DeleteAccountSection() {
               type="button"
               className="[font-family:var(--font-lato)] h-12 w-full shrink-0 whitespace-nowrap bg-[#53444B] px-4 text-center text-lg font-bold leading-6 text-white transition-colors hover:bg-[#45383e] sm:w-auto sm:px-6"
             >
-              Account unwiderruflich löschen
+              Account löschen
             </button>
           </AlertDialogTrigger>
 
