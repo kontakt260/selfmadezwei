@@ -139,11 +139,8 @@ export default async function ProjektuebersichtPage({
 
   // Vapi-Sprechzeit-Berechnung (PROJ-6):
   //   36 000 s (10 h Inklusiv) + Σ vapi-Top-Ups × 3 600 − Σ voice-sessions.duration
-  // Sichtbarkeit: project_access.expires_at ist der Truth-Anker für
-  // aktiven Zugang (Stripe-Webhook setzt ihn, Bestandsdaten haben ihn
-  // ebenfalls). Vorher prüften wir auf einen erfolgreichen
-  // initial_portal_access-Payment — das schloss Bestandsprojekte (vor
-  // PROJ-6 angelegt) aus, weil sie keinen Stripe-Payment-Eintrag haben.
+  // Sichtbarkeit: nur wenn Projekt einen erfolgreich abgeschlossenen
+  // initial_portal_access-Payment hat (= Zugang aktiviert).
   const [{ data: payments }, { data: voiceSessions }] = await Promise.all([
     supabase
       .from("payments")
@@ -155,7 +152,9 @@ export default async function ProjektuebersichtPage({
       .select("duration_seconds")
       .eq("project_id", project_id),
   ]);
-  const hasActiveAccess = !!accessRow?.expires_at;
+  const hasInitialPayment = (payments ?? []).some(
+    (p) => p.type === "initial_portal_access",
+  );
   const vapiTopUps = (payments ?? []).filter(
     (p) => p.type === "vapi_voice_minutes_60",
   ).length;
@@ -163,10 +162,10 @@ export default async function ProjektuebersichtPage({
     (sum, s) => sum + (s.duration_seconds ?? 0),
     0,
   );
-  const vapiSecondsAvailable = hasActiveAccess
+  const vapiSecondsAvailable = hasInitialPayment
     ? Math.max(0, 36_000 + vapiTopUps * 3_600 - consumedSeconds)
     : null;
-  const portalExpiresAt = hasActiveAccess ? accessRow?.expires_at ?? null : null;
+  const portalExpiresAt = hasInitialPayment ? accessRow?.expires_at ?? null : null;
 
   const { data: rawChapters } = await supabase
     .from("chapters")
