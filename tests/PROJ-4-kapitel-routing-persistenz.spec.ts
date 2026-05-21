@@ -85,14 +85,15 @@ test.describe("PROJ-4 — Projektübersicht", () => {
     await expect(backLink).toHaveAttribute("href", "/");
   });
 
-  test("AC-PÜ-3: Platzhalter-Sektionen Cover, Telefon und Mitglieder sichtbar", async ({ page }) => {
+  test("AC-PÜ-3: Sektionen Cover-Platzhalter, Telefon-Platzhalter, Nutzerübersicht sichtbar", async ({ page }) => {
     await page.goto(PROJECT_URL);
     await expect(page.getByRole("heading", { name: "Cover bearbeiten" })).toBeVisible();
     await expect(page.getByText(/PROJ-10/)).toBeVisible();
     // PROJ-12 appears in two places (phone section + stat card) — use first()
     await expect(page.getByText(/PROJ-12/).first()).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Projektmitglieder" })).toBeVisible();
-    await expect(page.getByText(/PROJ-9/)).toBeVisible();
+    // PROJ-9 ersetzt den alten „Projektmitglieder"-Placeholder durch die
+    // echte „Nutzerübersicht"-Sektion mit Mitglieder-Liste.
+    await expect(page.getByRole("heading", { name: "Nutzerübersicht" })).toBeVisible();
   });
 
   test("AC-PÜ-4: Stat-Karten Platzhalter sichtbar", async ({ page }) => {

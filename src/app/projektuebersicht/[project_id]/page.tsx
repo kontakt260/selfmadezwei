@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Navbar } from "@/components/Navbar";
 import { ChapterListSection } from "@/components/projektuebersicht/ChapterListSection";
 import { PaywallStats } from "@/components/projektuebersicht/PaywallStats";
+import { ProjectUsersSection } from "@/components/projektuebersicht/ProjectUsersSection";
+import type { MemberDisplay } from "@/components/projektuebersicht/ProjectUsersClient";
 import { CheckoutCancelToast } from "@/components/CheckoutCancelToast";
 import { type Chapter, countWordsFromBody } from "@/lib/projektuebersicht-chapters";
 import {
@@ -194,6 +196,38 @@ export default async function ProjektuebersichtPage({
     leading_questions: i.leading_questions ?? [],
   }));
 
+  // PROJ-9: Mitglieder + Profile parallel laden. RLS lässt nur Mitglieder
+  // ihres eigenen Projekts sehen — kein zusätzlicher Filter nötig.
+  const { data: rawMembers } = await supabase
+    .from("project_members")
+    .select("id, user_id, role")
+    .eq("project_id", project_id)
+    .order("created_at", { ascending: true });
+
+  let members: MemberDisplay[] = [];
+  if (rawMembers && rawMembers.length > 0) {
+    const memberUserIds = rawMembers.map((m) => m.user_id);
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .in("id", memberUserIds);
+    const profileMap = new Map<string, { full_name: string | null; email: string | null }>();
+    (profiles ?? []).forEach((p) => {
+      profileMap.set(p.id, { full_name: p.full_name, email: p.email });
+    });
+    members = rawMembers.map((m) => {
+      const p = profileMap.get(m.user_id);
+      return {
+        memberId: m.id,
+        userId: m.user_id,
+        fullName: p?.full_name ?? "",
+        email: p?.email ?? "",
+        role: m.role,
+        isMe: m.user_id === user.id,
+      };
+    });
+  }
+
   return (
     <>
       <Navbar />
@@ -263,13 +297,12 @@ export default async function ProjektuebersichtPage({
             vapiSecondsAvailable={vapiSecondsAvailable}
           />
 
-          {/* Projektmitglieder placeholder */}
-          <SectionShell>
-            <SectionHeader icon={<IconUsers />} title="Projektmitglieder" />
-            <p className="text-base leading-7 text-[#848484] sm:text-lg sm:leading-8">
-              Die Mitgliederverwaltung wird mit PROJ-9 aktiviert.
-            </p>
-          </SectionShell>
+          {/* PROJ-9: Mitgliederverwaltung */}
+          <ProjectUsersSection
+            projectId={project_id}
+            members={members}
+            myRole={membership.role}
+          />
 
         </div>
       </main>

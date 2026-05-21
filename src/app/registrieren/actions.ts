@@ -11,11 +11,21 @@ const schema = z
     password: z.string().min(8, "Mindestens 8 Zeichen."),
     confirmPassword: z.string(),
     onboardingIntent: z.string().optional(),
+    // PROJ-9: optionaler Redirect-Pfad nach erfolgreicher Email-Bestätigung
+    // (z. B. zurück zur Einladungsseite).
+    next: z.string().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     path: ["confirmPassword"],
     message: "Passwörter stimmen nicht überein.",
   });
+
+// Sicherer next-Pfad: nur relative URLs erlaubt (gleicher Mechanismus wie
+// in /anmelden), damit Open-Redirect-Vector ausgeschlossen ist.
+function safeNext(next: string | undefined): string | null {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return null;
+  return next;
+}
 
 function getOnboardingRedirect(intent?: string): string {
   switch (intent?.toLowerCase()) {
@@ -50,6 +60,7 @@ export async function registerAction(
     password: formData.get("password"),
     confirmPassword: formData.get("confirmPassword"),
     onboardingIntent: formData.get("onboardingIntent"),
+    next: formData.get("next"),
   });
 
   if (!parsed.success) {
@@ -63,14 +74,18 @@ export async function registerAction(
 
   const supabase = await createClient();
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const onboardingRedirect = getOnboardingRedirect(parsed.data.onboardingIntent);
+  // PROJ-9: wenn `next` mitgeliefert wurde und sicher relativ ist, geht der
+  // Post-Confirm-Redirect dorthin; sonst auf den Onboarding-Pfad.
+  const safeNextPath = safeNext(parsed.data.next);
+  const postConfirmTarget =
+    safeNextPath ?? getOnboardingRedirect(parsed.data.onboardingIntent);
 
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
       data: { full_name: parsed.data.fullName },
-      emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(onboardingRedirect)}`,
+      emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(postConfirmTarget)}`,
     },
   });
 

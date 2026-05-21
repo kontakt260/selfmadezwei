@@ -18,6 +18,10 @@ const PUBLIC_ROUTES = [
   // damit Nutzer ihr Konto auch nach Projekt-Löschung erreichen können.
   // Die Seite selbst (page.tsx) erzwingt weiterhin Login.
   "/persoenlicher-bereich",
+  // PROJ-9: Accept-Page ist Token-authentifiziert (Token IS das Geheimnis).
+  // Anonyme User müssen die Vorschau sehen können, um sich danach mit der
+  // korrekten E-Mail anzumelden/registrieren.
+  "/einladung",
 ];
 
 const AUTH_ONLY_ROUTES = ["/anmelden", "/registrieren"];
@@ -27,7 +31,10 @@ const AUTH_ONLY_ROUTES = ["/anmelden", "/registrieren"];
 // ein Loop: /onboarding selbst löst die Weiterleitung auf /onboarding
 // aus, und /kauf-erfolgreich kann zwischen Stripe-Redirect und Webhook-
 // Eintreffen kurz „kein Projekt" sein.
-const NO_PAYMENT_BYPASS = ["/onboarding", "/kauf-erfolgreich"];
+// PROJ-9: /einladung gehört dazu, sonst kollidiert die „kein-Projekt →
+// /onboarding"-Weiterleitung mit dem Accept-Flow für frisch registrierte
+// Eingeladene (haben per Definition noch kein Projekt).
+const NO_PAYMENT_BYPASS = ["/onboarding", "/kauf-erfolgreich", "/einladung"];
 
 function isPublic(pathname: string): boolean {
   if (pathname === "/") return false;

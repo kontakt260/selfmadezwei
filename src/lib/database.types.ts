@@ -114,6 +114,7 @@ export type Database = {
         Row: {
           accepted_at: string | null
           created_at: string
+          created_by: string | null
           email: string
           expires_at: string
           id: string
@@ -124,6 +125,7 @@ export type Database = {
         Insert: {
           accepted_at?: string | null
           created_at?: string
+          created_by?: string | null
           email: string
           expires_at: string
           id?: string
@@ -134,6 +136,7 @@ export type Database = {
         Update: {
           accepted_at?: string | null
           created_at?: string
+          created_by?: string | null
           email?: string
           expires_at?: string
           id?: string
@@ -424,7 +427,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      am_i_pl_of: { Args: { p_project_id: string }; Returns: boolean }
       get_my_project_ids: { Args: never; Returns: string[] }
+      lookup_invitation_by_token: {
+        Args: { p_token: string }
+        Returns: {
+          accepted_at: string
+          email: string
+          expires_at: string
+          invitation_id: string
+          inviter_full_name: string
+          project_id: string
+          project_title: string
+          role: Database["public"]["Enums"]["member_role"]
+        }[]
+      }
       recalc_chapter_start_pages: {
         Args: { p_project_id: string }
         Returns: undefined

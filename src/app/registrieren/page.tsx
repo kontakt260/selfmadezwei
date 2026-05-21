@@ -17,6 +17,11 @@ function RegistrierenContent() {
   const onboardingPath = onboardingIntent
     ? `/onboarding?for=${encodeURIComponent(onboardingIntent)}`
     : "/onboarding";
+  // PROJ-9: Accept-Page leitet mit ?email=<invited>&next=/einladung/<token>
+  // hierher. Email wird im Input vorbefüllt, next wird als hidden Input
+  // an die Server-Action weitergegeben (registerAction routet danach).
+  const presetEmail = searchParams.get("email") ?? "";
+  const nextParam = searchParams.get("next") ?? "";
   const [state, formAction, pending] = useActionState<RegisterState, FormData>(
     registerAction,
     {},
@@ -35,6 +40,7 @@ function RegistrierenContent() {
 
       <form action={formAction} className="grid gap-4" noValidate>
         <input type="hidden" name="onboardingIntent" value={onboardingIntent} />
+        <input type="hidden" name="next" value={nextParam} />
 
         <div className="grid gap-1.5">
           <Label htmlFor="fullName">Vollständiger Name</Label>
@@ -60,6 +66,7 @@ function RegistrierenContent() {
             type="email"
             autoComplete="email"
             required
+            defaultValue={presetEmail}
             aria-invalid={Boolean(state.fieldErrors?.email)}
             className="h-12"
           />

@@ -23,8 +23,8 @@
 | PROJ-6 | Stripe-Zahlungen (Portal + Vapi-Paket) | P0 | Approved | PROJ-2, PROJ-4 | [Spec](PROJ-6-stripe-zahlungen.md) | 2026-05-15 |
 | PROJ-7 | Buchweite Seitenzahl – Live-Anzeige | P1 | Deployed | PROJ-1, PROJ-5 | [Spec](PROJ-7-buchweite-seitenzahl-live-anzeige.md) | 2026-05-15 |
 | PROJ-8 | Erzähl-Impulse (Katalog + API) | P1 | Deployed | PROJ-1, PROJ-4, PROJ-5 | [Spec](PROJ-8-erzaehl-impulse-katalog-api.md) | 2026-05-15 |
-| PROJ-9 | Projekt-Mitglieder + Einladungen | P1 | Architected | PROJ-1, PROJ-2, PROJ-4 | [Spec](PROJ-9-projekt-mitglieder-einladungen.md) | 2026-05-15 |
-| PROJ-10 | Cover-Editor | P1 | Roadmap | PROJ-4 | — | 2026-05-15 |
+| PROJ-9 | Projekt-Mitglieder + Einladungen | P1 | Deployed | PROJ-1, PROJ-2, PROJ-4 | [Spec](PROJ-9-projekt-mitglieder-einladungen.md) | 2026-05-15 |
+| PROJ-10 | Cover-Editor | P1 | Architected | PROJ-1, PROJ-2, PROJ-3, PROJ-4 | [Spec](PROJ-10-cover-editor.md) | 2026-05-15 |
 | PROJ-11 | Resend-Transaktionsmails | P1 | Roadmap | PROJ-6 | — | 2026-05-15 |
 | PROJ-12 | Vapi-Pipeline | P1 | Roadmap | PROJ-5, PROJ-6 | — | 2026-05-15 |
 | PROJ-13 | Querschnitt: Stabilität & Observability | P1 | Roadmap | PROJ-2, PROJ-5 | — | 2026-05-15 |
