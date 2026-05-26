@@ -809,14 +809,30 @@ export function ChapterSectionClient({
                 >
                   <IconTrash className="pointer-events-none h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
                 </button>
-                <Link
-                  href={`/projektuebersicht/${projectId}/kapiteleditor/${chapter.id}`}
-                  draggable={false}
-                  onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                  className="relative z-20 inline-flex h-12 w-full min-w-0 cursor-pointer items-center justify-center bg-[#0A0909]/5 px-4 text-base font-bold leading-6 text-[#534B42] transition-colors hover:bg-[#0A0909]/10 sm:w-auto sm:text-lg"
-                >
-                  Bearbeiten
-                </Link>
+                {chapter.id.startsWith("optimistic-") ? (
+                  // Optimistic-Phase: das Kapitel ist noch nicht in der DB,
+                  // ein Klick auf den echten Link würde /kapiteleditor/
+                  // optimistic-<ts> → 404 öffnen. Wir rendern stattdessen
+                  // einen disabled Button, bis die Server-Action die echte
+                  // chapter.id einsetzt.
+                  <button
+                    type="button"
+                    disabled
+                    aria-disabled="true"
+                    className="relative z-20 inline-flex h-12 w-full min-w-0 cursor-not-allowed items-center justify-center bg-[#0A0909]/5 px-4 text-base font-bold leading-6 text-[#534B42] opacity-50 sm:w-auto sm:text-lg"
+                  >
+                    Wird angelegt …
+                  </button>
+                ) : (
+                  <Link
+                    href={`/projektuebersicht/${projectId}/kapiteleditor/${chapter.id}`}
+                    draggable={false}
+                    onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    className="relative z-20 inline-flex h-12 w-full min-w-0 cursor-pointer items-center justify-center bg-[#0A0909]/5 px-4 text-base font-bold leading-6 text-[#534B42] transition-colors hover:bg-[#0A0909]/10 sm:w-auto sm:text-lg"
+                  >
+                    Bearbeiten
+                  </Link>
+                )}
               </div>
             </div>
           ))}
