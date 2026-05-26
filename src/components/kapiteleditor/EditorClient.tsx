@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Pencil } from "lucide-react";
 import { editorExtensions } from "./tiptap/extensions";
 import { EditorToolbar } from "./EditorToolbar";
 import { FirstPageHeader } from "./FirstPageTemplate";
@@ -274,14 +274,23 @@ export function EditorClient({
           Zurück zur Projektübersicht
         </Link>
         <div className="flex flex-1 items-center gap-3 md:justify-center">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Kapitel-Titel"
-            className="[font-family:var(--font-merriweather)] w-full max-w-md border-0 border-b border-transparent bg-transparent px-1 py-1 text-center text-lg text-[#3E3831] outline-none transition-colors focus:border-[#96B897] md:text-xl"
-            aria-label="Kapitel-Titel"
-          />
+          {/* Wrapper-Label: das Stift-Icon sitzt als Affordance NEBEN dem
+              Input. Click auf das Icon fokussiert den Input (label-für-
+              input-Verhalten). */}
+          <label className="flex w-full max-w-md items-center justify-center gap-2 cursor-text">
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Kapitel-Titel"
+              className="[font-family:var(--font-merriweather)] flex-1 border-0 border-b border-transparent bg-transparent px-1 py-1 text-center text-lg text-[#3E3831] outline-none transition-colors focus:border-[#96B897] md:text-xl"
+              aria-label="Kapitel-Titel"
+            />
+            <Pencil
+              className="h-4 w-4 shrink-0 text-[#848484]"
+              aria-hidden
+            />
+          </label>
         </div>
         <div className="flex shrink-0 items-center justify-end gap-2 md:min-w-[12rem]">
           <SaveStatus state={state} onRetry={retry} />

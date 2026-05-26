@@ -290,7 +290,7 @@ export function ProjectCard({ project, deleteProjectAction }: Props) {
                 <CoverRender data={project.coverData} size="card" />
               </div>
               <div className="flex min-w-0 flex-col">
-                <h3 className="[font-family:var(--font-pt-serif)] text-xl leading-8 text-[#3E3831] sm:text-2xl sm:leading-9">
+                <h3 className="[font-family:var(--font-pt-serif)] [overflow-wrap:anywhere] text-xl leading-8 text-[#3E3831] sm:text-2xl sm:leading-9">
                   {project.title}
                 </h3>
                 <p className="mt-1 text-base leading-6 text-[#848484]">
