@@ -340,6 +340,11 @@ export function CoverEditorClient({
             placeholder="z. B. Mein Leben"
             aria-label="Buchtitel"
           />
+          <p className="text-sm leading-5 text-[#848484]">
+            Tipp: Zeilenumbrüche im Titel werden nicht automatisch
+            gesetzt. Möchten Sie ein langes Wort umbrechen, fügen Sie an
+            der gewünschten Stelle einen Bindestrich ein.
+          </p>
         </FieldShell>
 
         {/* Untertitel */}
