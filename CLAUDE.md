@@ -5,7 +5,7 @@
 ## Produkt (Kurzfassung)
 
 NARRAVIT verwandelt persönliche Lebensgeschichten in ein **hochwertig gedrucktes Hardcover-Buch** ("Lebensbuch"). Zwei Erzählwege:
-- **Telefon-Assistent (Vapi):** Geschichten am Telefon erzählen → Audio → Text.
+- **Audio-Erzählen (Sprachnachricht):** Aufforderung per Mail/SMS → Person erzählt ihre Geschichte zu einem Kapitel als Monolog (Audiodatei) → Transkript → intern ausformulierter Kapiteltext. Ersetzt den früheren Vapi-Telefon-Assistenten.
 - **Schreibportal (dieses Repo):** Selbst schreiben in einem Word-ähnlichen A5-Editor.
 
 Unterstützt durch Leitfragen, Erzähl-Impulse, Lektorat und Print-on-Demand. Käufer sind oft jüngere Generationen, die Familiengeschichte als Geschenk festhalten wollen.
@@ -66,7 +66,10 @@ Quelle: `/Users/jakobtrierweiler/Desktop/GitHub/selfmade/my-app/`
 
 - **A5-Hochformat** im Editor; **Phone:** kein produktiver Kapitel-Editor (Hinweis + Link); **Tablet & Desktop:** voll.
 - **Einmalkauf + Verlängerung**, **kein Abo**. Initial-Portalzugang typ. 1 Jahr.
-- **10 h Vapi-Erzählzeit inkl.** pro Projekt; Nachkauf **+60 Min / 19 €** bei <60 Min Rest.
+- **Audio-Erzählen statt Vapi** (Entscheidung 2026-10-13): Aufnahme über persönlichen Link aus Mail/SMS (Browser, kein Login); Ergebnis ist ein per LLM ausformulierter Kapiteltext in Ich-Form, Audio + Roh-Transkript bleiben gespeichert. Aufforderungs-Links kommen **nur automatisch** (wöchentlich, eine erzählende Person pro Projekt, Mail und/oder SMS; kein manueller Versand); im Portal kann zusätzlich jederzeit zu einem **noch leeren** Kapitel erzählt werden. **Kein Zeit-Kontingent, kein Minuten-Nachkauf** — Erzählen ist im Portal-Zugang enthalten.
+- **Aufnahme-Links ohne Login müssen sicher sein:** ≥ 256 Bit Zufall, nicht aus IDs ableitbar, nur als Hash in der DB, an genau ein Kapitel gebunden, nur Einreichen (kein Lesezugriff), verfallen nach Nutzung/Ablauf; alle Prüfungen serverseitig. Details: [features/PROJ-12-audio-erzaehlpipeline.md](features/PROJ-12-audio-erzaehlpipeline.md).
+- **Onboarding-Erzählweise (Geschenk):** „Nur per Sprachnachricht erzählen" (beschenkte Person ohne Konto, Käufer ist Projektleiter) vs. „Auch am Computer schreiben" (zusätzlich Portal-Einladung). Erzählen ist die Basis, der Computer die Ergänzung.
+- **Handgeschriebenes ist Master:** Audio füllt nur leere Kapitel und überschreibt/ergänzt nie vorhandenen Text. Kein Pausieren und keine Abmelde-Funktion für Erzähl-Aufforderungen.
 - **Kein Live-Co-Editing.** Mehrnutzer per Last-Writer-Wins + geplantes `content_version`-Locking.
 - **LLMs nur serverseitig** (Keys nie im Client), Provider-Abstraktion.
 - **Chapter title** ist die einzige Überschriftenquelle (Sync mit Übersicht).
@@ -119,7 +122,7 @@ docs/
 - **shadcn/ui first:** keine eigenen Versionen installierter shadcn-Komponenten
 - **Read-before-edit:** Dateien immer erst lesen, nie aus dem Gedächtnis raten
 - **Tests neben Source:** `useHook.test.ts` neben `useHook.ts`; E2E in `tests/`
-- **Server-side first:** `project_id` / `chapter_id` und Auth immer serverseitig validieren; keine Secrets im Client; Stripe/Vapi-Webhooks signieren
+- **Server-side first:** `project_id` / `chapter_id` und Auth immer serverseitig validieren; keine Secrets im Client; Stripe- und sonstige Provider-Webhooks signieren
 - **Keine visuellen Overlay-Hacks:** Wenn ein Element falsch rendert (z. B. Border läuft durch Seitenzwischenraum), das Element ECHT im Code anpassen — niemals ein farbiges Pseudo-Element / weißes Div darüber legen, das den Bug optisch verdeckt. Overlays brechen bei Skalierung, Theme-Wechsel, Print-Export und sind Pixel-genau abhängig von Font-Metriken. Stattdessen: DOM strukturell ändern, CSS-`mask-image`/`clip-path` direkt auf dem fehlerhaften Element, oder Rendering-Logik in der Engine korrigieren.
 
 ## Build- & Test-Commands

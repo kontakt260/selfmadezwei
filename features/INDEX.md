@@ -20,13 +20,13 @@
 | PROJ-3 | Persönlicher Bereich + Konto | P0 | Deployed | PROJ-2 | [Spec](PROJ-3-persoenlicher-bereich-konto.md) | 2026-05-15 |
 | PROJ-4 | Kapitel-Routing & Persistenz | P0 | Deployed | PROJ-2 | [Spec](PROJ-4-kapitel-routing-persistenz.md) | 2026-05-15 |
 | PROJ-5 | Kapitel-Editor (A5, TipTap, Tablet) | P0 | Approved | PROJ-4 | [Spec](PROJ-5-kapitel-editor.md) | 2026-05-15 |
-| PROJ-6 | Stripe-Zahlungen (Portal + Vapi-Paket) | P0 | Approved | PROJ-2, PROJ-4 | [Spec](PROJ-6-stripe-zahlungen.md) | 2026-05-15 |
+| PROJ-6 | Stripe-Zahlungen (Portal; Rückbau Vapi-Paket offen) | P0 | In Progress | PROJ-2, PROJ-4 | [Spec](PROJ-6-stripe-zahlungen.md) | 2026-05-15 |
 | PROJ-7 | Buchweite Seitenzahl – Live-Anzeige | P1 | Deployed | PROJ-1, PROJ-5 | [Spec](PROJ-7-buchweite-seitenzahl-live-anzeige.md) | 2026-05-15 |
 | PROJ-8 | Erzähl-Impulse (Katalog + API) | P1 | Deployed | PROJ-1, PROJ-4, PROJ-5 | [Spec](PROJ-8-erzaehl-impulse-katalog-api.md) | 2026-05-15 |
 | PROJ-9 | Projekt-Mitglieder + Einladungen | P1 | Deployed | PROJ-1, PROJ-2, PROJ-4 | [Spec](PROJ-9-projekt-mitglieder-einladungen.md) | 2026-05-15 |
 | PROJ-10 | Cover-Editor | P1 | Deployed | PROJ-1, PROJ-2, PROJ-3, PROJ-4 | [Spec](PROJ-10-cover-editor.md) | 2026-05-15 |
 | PROJ-11 | Resend-Transaktionsmails | P1 | In Review | PROJ-2, PROJ-6, PROJ-9 | [Spec](PROJ-11-resend-transaktionsmails.md) | 2026-05-15 |
-| PROJ-12 | Vapi-Pipeline | P1 | Roadmap | PROJ-5, PROJ-6 | — | 2026-05-15 |
+| PROJ-12 | Audio-Erzählpipeline (Sprachnachrichten, ersetzt Vapi) | P1 | Planned | PROJ-1, PROJ-3, PROJ-4, PROJ-5, PROJ-6, PROJ-8, PROJ-9, PROJ-11 | [Spec](PROJ-12-audio-erzaehlpipeline.md) | 2026-05-15 |
 | PROJ-13 | Querschnitt: Stabilität & Observability | P1 | Roadmap | PROJ-2, PROJ-5 | — | 2026-05-15 |
 | PROJ-14 | KI-Review + LLM-Abstraktion | P2 | Roadmap | PROJ-5, PROJ-6 | — | 2026-05-15 |
 | PROJ-15 | Mehrnutzer-Concurrency & Versioning | P2 | Roadmap | PROJ-5 | — | 2026-05-15 |

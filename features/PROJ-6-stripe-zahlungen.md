@@ -1,8 +1,32 @@
 # PROJ-6: Stripe-Zahlungen (Portal + Vapi-Paket)
 
-## Status: Approved
+> ⚠️ **Rückbau offen (2026-10-13):** Das Erzählzeit-Kontingent entfällt (Vapi → Audio-Sprachnachrichten, Erzählen im Portal-Zugang enthalten). Produkt „Vapi +60 Min / 19 €", Stat-Karte „Telefonzeit übrig", Guthaben-Formel und Kauf-Mail sind noch im Code und müssen entfernt werden — siehe „Refinement 2026-10-13" direkt unten. Alle Vapi-/Sprechzeit-Kriterien weiter unten im Dokument sind damit überholt.
+
+## Refinement 2026-10-13 — Rückbau Erzählzeit-Kontingent
+**Anlass:** Vapi wird durch Audio-Sprachnachrichten ersetzt ([PROJ-12](PROJ-12-audio-erzaehlpipeline.md)). Erzählen ist im Portal-Zugang enthalten; es gibt kein Zeit-Kontingent und kein Nachkauf-Produkt mehr. PROJ-6 umfasst damit nur noch **Portal-Zugang Initial (249 €)** und **Verlängerung (99 €)**.
+
+### Acceptance Criteria (Rückbau)
+- [ ] Das Produkt „Vapi +60 Min" ist nicht mehr kaufbar: Checkout akzeptiert nur noch `initial` und `renewal`; ein Aufruf mit dem alten Produkt-Typ wird serverseitig abgelehnt.
+- [ ] Die Stat-Karte „Telefonzeit übrig" inkl. „Nachkaufen"-Button ist aus der Projektübersicht entfernt; die Karte „Projektzugang endet in" bleibt.
+- [ ] Die Guthaben-Berechnung (`36 000 + Top-ups × 3 600 − Verbrauch`) ist entfernt.
+- [ ] Der Webhook verarbeitet keine neuen Vapi-Käufe mehr; ein dennoch eintreffendes Altereignis wird protokolliert und ohne Fehler quittiert.
+- [ ] Bestätigungsseite `/kauf-erfolgreich` und Abbruch-Pfade kennen nur noch Initial (selbst / Geschenk) und Verlängerung.
+- [ ] Onboarding-Kaufschritt und Kauf-Mail nennen keine „10 Stunden Vapi-Erzählzeit" mehr (neuer Text siehe PROJ-12).
+- [ ] Kauf-Mail „Vapi-Paket" und zugehöriger Versand-Helper sind entfernt (PROJ-11).
+- [ ] Der Checkout nimmt die neuen Onboarding-Angaben aus PROJ-12 (Erzählweise, Kontaktwege, Wochentag) entgegen und der Webhook speichert sie beim Anlegen des Projekts. *(Umsetzung zusammen mit PROJ-12.)*
+- [ ] Altbestand: Der Zahlungstyp `vapi_voice_minutes_60` bleibt in der Datenbank bestehen (bestehende Zahlungen bleiben als Beleg im persönlichen Bereich sichtbar), wird aber nicht mehr neu vergeben.
+- [ ] `STRIPE_PRICE_ID_VAPI_60` und `VAPI_API_KEY` sind aus `.env.local.example` und der Vercel-Konfiguration entfernt; das Stripe-Produkt ist im Stripe-Dashboard archiviert (manueller Schritt).
+- [ ] Unit- und E2E-Tests zum Vapi-Pfad sind entfernt bzw. auf „wird abgelehnt" umgestellt.
+
+### Edge Cases (Rückbau)
+- Projekte mit früher gekauftem Vapi-Paket (bisher nur Testkäufe auf stage): kein Ausgleich nötig; vor Rückbau prüfen, ob es echte Käufe gibt.
+- Offene Stripe-Checkout-Sessions für das alte Produkt zum Zeitpunkt des Deployments: laufen ins Leere bzw. werden wie oben quittiert.
+
+---
+
+## Status: In Progress
 **Created:** 2026-05-15
-**Last Updated:** 2026-05-21
+**Last Updated:** 2026-10-13
 
 ## Dependencies
 - Requires: PROJ-2 (Auth + SSR) — Session, Onboarding-Wizard-Daten, Middleware
