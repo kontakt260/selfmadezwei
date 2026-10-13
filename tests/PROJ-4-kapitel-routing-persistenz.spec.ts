@@ -1,4 +1,5 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+import { QA_PROJECT_TITLE, restoreQaProjectTitle } from "./helpers/qa-project";
 
 // All tests run as the QA test user (qa-test@narravit.de), role: projektleiter.
 // Auth state from globalSetup. Stage DB: project "QA-Testprojekt".
@@ -11,6 +12,9 @@ const PROJECT_URL = `/projektuebersicht/${QA_PROJECT_ID}`;
 test.beforeAll(async ({ browser }) => {
   // Set hook timeout to 120 seconds to allow deleting many leftover chapters
   test.setTimeout(120000);
+  // Titel-Tests (AC-Home-*, AC-PÜ-1) erwarten den Seed-Titel — falls eine
+  // andere Suite ihn verändert hat, hier zurücksetzen.
+  await restoreQaProjectTitle(browser);
   const ctx = await browser.newContext({ storageState: "tests/.auth/user.json" });
   const p = await ctx.newPage();
   await p.goto(PROJECT_URL);
@@ -32,6 +36,12 @@ test.beforeAll(async ({ browser }) => {
   await ctx.close();
 });
 
+// Kartentitel auf der Home-Seite. Seit PROJ-10 zeigt die Karte den Titel
+// zusätzlich im Mini-Cover (h2) — getByText wäre mehrdeutig.
+function projectCardTitle(page: Page) {
+  return page.getByRole("heading", { name: QA_PROJECT_TITLE, level: 3 });
+}
+
 // NOTE: Chapter modals use role="presentation" (accessibility BUG-3, Medium).
 // Tests avoid getByRole("dialog") for chapter modals and use direct locators instead.
 
@@ -41,8 +51,10 @@ test.describe("PROJ-4 — Home-Seite (/)", () => {
   test("AC-Home-1: Zeigt Projektkarte mit Titel und Öffnen-Button", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "Willkommen zurück bei NARRAVIT" })).toBeVisible();
-    await expect(page.getByText("QA-Testprojekt")).toBeVisible();
-    await expect(page.getByRole("link", { name: /Öffnen/ })).toBeVisible();
+    await expect(projectCardTitle(page)).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: `Projekt „${QA_PROJECT_TITLE}" öffnen` }),
+    ).toBeVisible();
   });
 
   test("AC-Home-2: 'Weiteren Projekt-Zugang kaufen' verlinkt auf /onboarding", async ({ page }) => {
@@ -54,7 +66,7 @@ test.describe("PROJ-4 — Home-Seite (/)", () => {
 
   test("AC-Home-3: Löschen-Button für projektleiter sichtbar", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("QA-Testprojekt")).toBeVisible();
+    await expect(projectCardTitle(page)).toBeVisible();
     const card = page.locator("a", { hasText: "Öffnen" }).first();
     await expect(card).toBeVisible();
     const deleteBtn = page.getByRole("button", { name: /löschen/i }).first();
@@ -63,7 +75,7 @@ test.describe("PROJ-4 — Home-Seite (/)", () => {
 
   test("AC-Home-4: Projektkarte zeigt Kapitelanzahl und Bearbeitungsdatum", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("QA-Testprojekt")).toBeVisible();
+    await expect(projectCardTitle(page)).toBeVisible();
     await expect(page.getByText(/bearbeitet/i)).toBeVisible();
     await expect(page.getByText(/Kapitel/i)).toBeVisible();
   });
@@ -75,7 +87,7 @@ test.describe("PROJ-4 — Projektübersicht", () => {
   test("AC-PÜ-1: Seite lädt mit korrektem Projekttitel und URL", async ({ page }) => {
     await page.goto(PROJECT_URL);
     await expect(page).toHaveURL(new RegExp(QA_PROJECT_ID));
-    await expect(page.getByRole("heading", { name: "QA-Testprojekt", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: QA_PROJECT_TITLE, level: 1 })).toBeVisible();
   });
 
   test("AC-PÜ-2: 'Zurück zur Startseite' Link vorhanden", async ({ page }) => {
@@ -148,7 +160,7 @@ test.describe("PROJ-4 — Kapitel CRUD", () => {
   test("AC-Ch-2: 'Hinzufügen'-Button disabled wenn Titel leer", async ({ page }) => {
     await page.goto(PROJECT_URL);
     await page.locator("button", { hasText: "Eigenes Kapitel" }).first().click();
-    const addButton = page.getByRole("button", { name: "Hinzufügen" });
+    const addButton = page.getByRole("button", { name: "Hinzufügen", exact: true });
     await expect(addButton).toBeDisabled();
   });
 
@@ -156,9 +168,9 @@ test.describe("PROJ-4 — Kapitel CRUD", () => {
     await page.goto(PROJECT_URL);
     await page.locator("button", { hasText: "Eigenes Kapitel" }).first().click();
     await page.getByPlaceholder("z. B. Reisen und Begegnungen").fill("QA-Testkapitel");
-    await page.getByRole("button", { name: "Hinzufügen" }).click();
+    await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();
 
-    await page.waitForURL(/kapiteleditor/, { timeout: 10_000 });
+    await page.waitForURL(/kapiteleditor/, { timeout: 20_000 });
     await expect(page).toHaveURL(new RegExp(`${QA_PROJECT_ID}/kapiteleditor/`));
     await expect(page.getByRole("heading", { name: "QA-Testkapitel" })).toBeVisible();
   });
@@ -204,14 +216,23 @@ test.describe("PROJ-4 — Kapitel CRUD", () => {
   test("AC-Ch-8: Erzähl-Impuls übernehmen → Kapitel erscheint in Liste, kein Redirect", async ({ page }) => {
     await page.goto(PROJECT_URL);
     await page.locator("button", { hasText: "Erzähl-Impuls" }).first().click();
-    const impulsTitle = await page.locator("[aria-live='polite'][aria-atomic='true']").textContent();
+    // Die Live-Region enthält seit PROJ-8 Kategorie + Titel + Leitfrage —
+    // der Kapiteltitel ist nur ein Teil davon.
+    const impulseText =
+      (await page.locator("[aria-live='polite'][aria-atomic='true']").textContent()) ?? "";
+    const renameButtons = page.getByRole("button", { name: /Kapitel „.+" umbenennen/ });
+    const countBefore = await renameButtons.count();
 
     await page.getByRole("button", { name: "Impuls übernehmen" }).click();
 
     await expect(page).toHaveURL(new RegExp(QA_PROJECT_ID));
     await expect(page).not.toHaveURL(/kapiteleditor/);
 
-    await expect(page.getByText(impulsTitle!.trim())).toBeVisible({ timeout: 8_000 });
+    await expect(renameButtons).toHaveCount(countBefore + 1, { timeout: 8_000 });
+    const label = (await renameButtons.last().getAttribute("aria-label")) ?? "";
+    const newTitle = label.match(/„(.+)" umbenennen/)?.[1] ?? "";
+    expect(newTitle.length).toBeGreaterThan(0);
+    expect(impulseText).toContain(newTitle);
   });
 
   test("AC-Ch-9: Kapitel umbenennen — Modal öffnet mit aktuellem Titel, speichert neuen", async ({ page }) => {

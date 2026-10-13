@@ -3,6 +3,10 @@ import { defineConfig, devices } from '@playwright/test'
 export default defineConfig({
   testDir: './tests',
   fullyParallel: false,
+  // Alle Suites arbeiten auf demselben QA-Testprojekt in der Stage-DB
+  // (Titel, Kapitel). Parallele Worker würden sich gegenseitig den
+  // Zustand ändern — deshalb strikt nacheinander.
+  workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: 'html',

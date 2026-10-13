@@ -123,13 +123,16 @@ async function createImpulseChapterAndOpenEditor(
   page: import("@playwright/test").Page,
 ) {
   await page.goto(QA_PROJECT_URL);
+  const editLinks = page.getByRole("link", { name: "Bearbeiten" });
+  const linksBefore = await editLinks.count();
   await page.getByRole("button", { name: /Erzähl-Impuls/ }).first().click();
   await page.getByRole("button", { name: /Impuls übernehmen/ }).click();
   // Auf das neue Kapitel warten (Optimistic-Add ersetzt Temp-ID durch echte).
+  // Ohne den Count-Check kann „last()" noch auf das vorherige Kapitel zeigen.
   await expect(page).toHaveURL(new RegExp(QA_PROJECT_ID + "$"));
+  await expect(editLinks).toHaveCount(linksBefore + 1, { timeout: 10_000 });
   await page.waitForLoadState("networkidle");
   // Letzten „Bearbeiten"-Link öffnen (= das neu angelegte Kapitel).
-  const editLinks = page.getByRole("link", { name: "Bearbeiten" });
   await editLinks.last().click();
   await page.waitForURL(/kapiteleditor/, { timeout: 15_000 });
 }
@@ -149,7 +152,7 @@ test.describe("PROJ-8 — Editor-Banner", () => {
     await page.goto(QA_PROJECT_URL);
     await page.getByRole("button", { name: /Eigenes Kapitel/ }).first().click();
     await page.getByPlaceholder("z. B. Reisen und Begegnungen").fill("PROJ-8 No-Banner-Test");
-    await page.getByRole("button", { name: "Hinzufügen" }).click();
+    await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();
     await page.waitForURL(/kapiteleditor/, { timeout: 15_000 });
     // Banner darf NICHT da sein (Eigenes Kapitel hat source_impulse_id = NULL).
     const banner = page.getByRole("region", { name: /Leitfragen-Hinweis/ });

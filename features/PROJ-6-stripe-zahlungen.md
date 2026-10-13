@@ -15,7 +15,7 @@
 - [x] Kauf-Mail „Vapi-Paket" und zugehöriger Versand-Helper sind entfernt (PROJ-11).
 - *Nach PROJ-12 verschoben (kein PROJ-6-Kriterium mehr):* Der Checkout nimmt die neuen Onboarding-Angaben (Erzählweise, Kontaktwege, Wochentag) entgegen und der Webhook speichert sie beim Anlegen des Projekts.
 - [x] Altbestand: Der Zahlungstyp `vapi_voice_minutes_60` bleibt in der Datenbank bestehen (bestehende Zahlungen bleiben als Beleg im persönlichen Bereich sichtbar), wird aber nicht mehr neu vergeben.
-- [ ] `STRIPE_PRICE_ID_VAPI_60` und `VAPI_API_KEY` sind aus `.env.local.example` und der Vercel-Konfiguration entfernt; das Stripe-Produkt ist im Stripe-Dashboard archiviert (manueller Schritt). — *Im Repo erledigt (`.env.local.example`, `playwright.config.ts`); Vercel-Env und Stripe-Dashboard sind noch manuell offen.*
+- [x] `STRIPE_PRICE_ID_VAPI_60` und `VAPI_API_KEY` sind aus `.env.local.example` und der Vercel-Konfiguration entfernt; das Stripe-Produkt ist im Stripe-Dashboard archiviert. — *Repo: erledigt. Vercel-Env + Stripe-Dashboard: vom Nutzer am 2026-10-13 als erledigt bestätigt.*
 - [x] Unit- und E2E-Tests zum Vapi-Pfad sind entfernt bzw. auf „wird abgelehnt" umgestellt.
 
 ### Implementation Notes (Rückbau, 2026-10-13)
@@ -50,7 +50,7 @@
 | 6 | Kein „10 Stunden Vapi-Erzählzeit" in Kaufschritt/Kauf-Mail | ✅ | Textsuche im Quellcode |
 | 7 | Vapi-Paket-Mail + Helper entfernt | ✅ | Dateien gelöscht, Typprüfung fehlerfrei |
 | 8 | Altbestand `vapi_voice_minutes_60` bleibt in der DB | ✅ | keine Migration |
-| 9 | Env-Variablen entfernt, Stripe-Produkt archiviert | ⚠️ teilweise | Repo erledigt; Vercel-Env + Stripe-Dashboard manuell offen |
+| 9 | Env-Variablen entfernt, Stripe-Produkt archiviert | ✅ | Repo erledigt; Vercel-Env + Stripe-Dashboard vom Nutzer als erledigt bestätigt (nicht selbst geprüft) |
 | 10 | Tests entfernt bzw. umgestellt | ✅ | siehe oben |
 
 **Security-Audit**
@@ -62,10 +62,16 @@
 - **BUG-R1 (Low) — Onboarding nennt weiterhin das Telefon.** Schritt 3 zeigt „Nur per Telefon erzählen" / „Die beschenkte Person ruft an …", die Zusammenfassung „Nur Telefon". Bewusst nicht Teil des Rückbaus; wird mit dem PROJ-12-Frontend ersetzt. Vor einem Produktiv-Deployment muss das erledigt sein.
 - **BUG-R2 (Low) — Bezahltes Altereignis wird nicht verbucht.** Zahlt jemand über eine noch offene alte Checkout-Session für „Vapi +60 Min", quittiert der Webhook ohne `payments`-Eintrag; die Zahlung erscheint nicht im persönlichen Bereich. Bisher nur Testkäufe auf Stage. Abhilfe: Stripe-Preis archivieren (Kriterium 9), dann kann keine neue Session entstehen.
 - **BUG-R3 (Low, bestand vorher) — `npm run lint` läuft nicht.** `next lint` gibt es in Next.js 16 nicht mehr und ESLint 9 findet keine `eslint.config.*` (im Repo liegt nur `.eslintrc.json`).
-- **BUG-R4 (Medium, nicht durch den Rückbau verursacht) — 5 PROJ-4-E2E-Tests schlagen fehl**, 9 Folgetests laufen dadurch nicht. Ursachen: Der Projekttitel in der Stage-DB lautet nicht mehr „QA-Testprojekt" (AC-Home-1/3/4, AC-PÜ-1), und der Locator „Hinzufügen" trifft seit PROJ-9 zwei Buttons (AC-Ch-2). Die Regressions-Suite für PROJ-4 ist damit derzeit nicht aussagekräftig. Nicht gegen den Stand vor dem Rückbau gegengeprüft; die Fehlerbilder betreffen aber keine geänderte Stelle.
+- **BUG-R4 (Medium, nicht durch den Rückbau verursacht) — behoben 2026-10-13.** 5 PROJ-4-E2E-Tests schlugen fehl, 9 Folgetests liefen dadurch nicht. Ursachen und Fixes (nur Testcode):
+    - Der Cover-Editor-Test (PROJ-10, AC-Page-7) überschrieb per Auto-Save den Projekttitel mit „AutoTest-…" und stellte ihn nie wieder her → neuer Helfer `tests/helpers/qa-project.ts` setzt den Titel nach der PROJ-10-Suite und vor der PROJ-4-Suite auf „QA-Testprojekt" zurück.
+    - Alle Suites teilen sich ein Stage-Projekt, liefen aber in parallelen Workern → `workers: 1` in `playwright.config.ts`.
+    - „Hinzufügen" traf seit PROJ-9 auch „Nutzer hinzufügen" → `exact: true` (PROJ-4, PROJ-7, PROJ-8).
+    - Seit PROJ-10 steht der Titel zweimal auf der Projektkarte, seit PROJ-8 enthält der Impuls-Dialog Kategorie + Titel + Leitfrage → Locator in AC-Home-1/3/4 und AC-Ch-8 angepasst.
+    - Zwei zeitabhängige Tests gehärtet (PROJ-8 Banner-Helfer wartet auf das neue Kapitel; PROJ-4 AC-Ch-3 Redirect-Timeout 10 s → 20 s).
+    - Ergebnis: PROJ-4 26/26 und PROJ-8 6/6 in Chromium grün. Gesamte Chromium-Suite: 100 von 101 ausgeführten Tests grün im ersten Lauf, 92 + 8 nicht gelaufen im zweiten (jeweils ein Timing-Ausfall, beide danach gehärtet); ein dritter vollständiger Lauf nach den letzten Härtungen wurde nicht mehr gemacht.
 - Hinweis: Im Dev-Server-Log erschien während des E2E-Laufs einmal `TypeError: Cannot read properties of undefined (reading 'call')` ohne fehlschlagenden Test — beobachten.
 
-**Entscheidung:** Keine Critical/High-Befunde → Rückbau **freigegeben (Approved)**. Offen vor Produktiv-Deployment: BUG-R1 (mit PROJ-12) und die zwei manuellen Schritte aus Kriterium 9.
+**Entscheidung:** Keine Critical/High-Befunde → Rückbau **freigegeben (Approved)**. Offen vor Produktiv-Deployment: BUG-R1 (mit PROJ-12).
 
 ### Edge Cases (Rückbau)
 - Projekte mit früher gekauftem Vapi-Paket (bisher nur Testkäufe auf stage): kein Ausgleich nötig; vor Rückbau prüfen, ob es echte Käufe gibt.

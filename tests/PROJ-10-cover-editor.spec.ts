@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { restoreQaProjectTitle } from "./helpers/qa-project";
 
 // PROJ-10 — Cover-Editor Browser-Smoke gegen Stage-DB.
 //
@@ -18,6 +19,12 @@ test.use({ storageState: "tests/.auth/user.json" });
 const QA_PROJECT_ID = "cccccccc-0099-0099-0099-000000000099";
 const QA_PROJECT_URL = `/projektuebersicht/${QA_PROJECT_ID}`;
 const COVER_URL = `${QA_PROJECT_URL}/cover-bearbeiten`;
+
+// AC-Page-6/7 überschreiben den Projekttitel per Auto-Save. Danach den
+// Seed-Titel wiederherstellen, sonst brechen die Titel-Tests in PROJ-4.
+test.afterAll(async ({ browser }) => {
+  await restoreQaProjectTitle(browser);
+});
 
 // ─── Einstieg von der Projektübersicht ──────────────────────────────────────
 

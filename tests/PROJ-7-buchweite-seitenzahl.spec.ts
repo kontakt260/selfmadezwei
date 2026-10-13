@@ -32,7 +32,7 @@ async function createTestChapter(page: import("@playwright/test").Page) {
   await page.goto(QA_PROJECT_URL);
   await page.locator("button", { hasText: "Eigenes Kapitel" }).first().click();
   await page.getByPlaceholder("z. B. Reisen und Begegnungen").fill(TEST_CHAPTER_TITLE);
-  await page.getByRole("button", { name: "Hinzufügen" }).click();
+  await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();
   await page.waitForURL(/kapiteleditor/, { timeout: 15_000 });
 }
 
