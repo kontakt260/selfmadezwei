@@ -386,8 +386,8 @@ function StepGiftDetails({
         <ChoiceCard
           selected={giftMode === "phone-only"}
           onClick={() => onChangeMode("phone-only")}
-          title="Nur per Telefon erzählen"
-          description="Die beschenkte Person ruft an und erzählt — wir transkribieren."
+          title="Nur per Sprachnachricht erzählen"
+          description="Die beschenkte Person erzählt — wir transkribieren."
         />
         <ChoiceCard
           selected={giftMode === "phone-plus-computer"}
@@ -490,7 +490,7 @@ function StepPurchase({ state }: { state: WizardState }) {
     summary.push({ label: "Beschenkte Person", value: state.giftRecipientName });
     summary.push({
       label: "Erzählweise",
-      value: state.giftMode === "phone-only" ? "Nur Telefon" : "Auch Computer",
+      value: state.giftMode === "phone-only" ? "Nur Sprachnachricht" : "Auch Computer",
     });
     if (state.giftMode === "phone-plus-computer") {
       summary.push({ label: "E-Mail Beschenkte:r", value: state.giftRecipientEmail });

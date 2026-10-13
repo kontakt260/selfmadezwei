@@ -59,7 +59,7 @@
 - Keine neuen Env-Variablen, keine Secrets im Client, keine Änderung an RLS oder Auth-Flow. ✅
 
 **Befunde**
-- **BUG-R1 (Low) — Onboarding nennt weiterhin das Telefon.** Schritt 3 zeigt „Nur per Telefon erzählen" / „Die beschenkte Person ruft an …", die Zusammenfassung „Nur Telefon". Bewusst nicht Teil des Rückbaus; wird mit dem PROJ-12-Frontend ersetzt. Vor einem Produktiv-Deployment muss das erledigt sein.
+- **BUG-R1 (Low) — behoben 2026-10-13.** Das Onboarding nannte noch das Telefon. Schritt 3 heißt jetzt „Nur per Sprachnachricht erzählen" mit der Beschreibung „Die beschenkte Person erzählt — wir transkribieren.", die Zusammenfassung zeigt „Nur Sprachnachricht". Der neue Kontakt-Schritt kommt weiterhin mit dem PROJ-12-Frontend.
 - **BUG-R2 (Low) — Bezahltes Altereignis wird nicht verbucht.** Zahlt jemand über eine noch offene alte Checkout-Session für „Vapi +60 Min", quittiert der Webhook ohne `payments`-Eintrag; die Zahlung erscheint nicht im persönlichen Bereich. Bisher nur Testkäufe auf Stage. Abhilfe: Stripe-Preis archivieren (Kriterium 9), dann kann keine neue Session entstehen.
 - **BUG-R3 (Low, bestand vorher) — `npm run lint` läuft nicht.** `next lint` gibt es in Next.js 16 nicht mehr und ESLint 9 findet keine `eslint.config.*` (im Repo liegt nur `.eslintrc.json`).
 - **BUG-R4 (Medium, nicht durch den Rückbau verursacht) — behoben 2026-10-13.** 5 PROJ-4-E2E-Tests schlugen fehl, 9 Folgetests liefen dadurch nicht. Ursachen und Fixes (nur Testcode):
@@ -71,7 +71,7 @@
     - Ergebnis: PROJ-4 26/26 und PROJ-8 6/6 in Chromium grün. Gesamte Chromium-Suite: 100 von 101 ausgeführten Tests grün im ersten Lauf, 92 + 8 nicht gelaufen im zweiten (jeweils ein Timing-Ausfall, beide danach gehärtet); ein dritter vollständiger Lauf nach den letzten Härtungen wurde nicht mehr gemacht.
 - Hinweis: Im Dev-Server-Log erschien während des E2E-Laufs einmal `TypeError: Cannot read properties of undefined (reading 'call')` ohne fehlschlagenden Test — beobachten.
 
-**Entscheidung:** Keine Critical/High-Befunde → Rückbau **freigegeben (Approved)**. Offen vor Produktiv-Deployment: BUG-R1 (mit PROJ-12).
+**Entscheidung:** Keine Critical/High-Befunde → Rückbau **freigegeben (Approved)**.
 
 ### Edge Cases (Rückbau)
 - Projekte mit früher gekauftem Vapi-Paket (bisher nur Testkäufe auf stage): kein Ausgleich nötig; vor Rückbau prüfen, ob es echte Käufe gibt.

@@ -634,7 +634,7 @@ Keine Critical oder High Bugs in PROJ-5-Scope. Alle Acceptance Criteria erfüllt
 
 **Verifikation nach dem Push:**
 - Der Push auf `origin/stage` war erfolgreich.
-- **Nicht verifiziert:** Vercel-Build-Status und Live-Verhalten. stage-app.narravit.de liegt hinter dem Vercel-Login (Deployment Protection); jeder anonyme Abruf wird auf die Vercel-Anmeldung umgeleitet. Bitte im Vercel-Dashboard prüfen, dass der Build zu `1feb598` grün ist.
+- Vercel: Das Deployment zum Folge-Commit `256ed28` (enthält `1feb598`) ist laut Nutzer das aktuelle Deployment im Vercel-Dashboard (bestätigt am 2026-10-13). Das Live-Verhalten selbst konnte von außen nicht geprüft werden — stage-app.narravit.de liegt hinter dem Vercel-Login.
 - Datenbank-Migrationen konnten in dieser Sitzung nicht gegen Supabase geprüft werden (MCP-Token ungültig). Indiz, dass sie auf Stage angewendet sind: Die E2E-Suite läuft gegen die Stage-DB grün.
 
 ---

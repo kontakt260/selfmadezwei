@@ -179,7 +179,7 @@ test.describe("PROJ-2 — Onboarding wizard", () => {
 
     // Step 3: Gift details
     await page.locator('input[id="recipientName"]').fill("Oma Helga");
-    await page.getByRole("button", { name: /Nur per Telefon erzählen/ }).click();
+    await page.getByRole("button", { name: /Nur per Sprachnachricht erzählen/ }).click();
 
     // Hint about Projektleiter must appear
     await expect(page.getByText(/vollen Zugriff auf das Projekt/)).toBeVisible();
@@ -187,7 +187,7 @@ test.describe("PROJ-2 — Onboarding wizard", () => {
 
     // Step 4: Purchase step shows gift summary
     await expect(page.getByText("Oma Helga")).toBeVisible();
-    await expect(page.getByText("Nur Telefon")).toBeVisible();
+    await expect(page.getByText("Nur Sprachnachricht")).toBeVisible();
   });
 
   test("Path B2 (gift + phone+computer): 5 steps with role selection", async ({ page }) => {
