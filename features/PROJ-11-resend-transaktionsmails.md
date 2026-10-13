@@ -4,7 +4,7 @@
 
 ## Status: In Review
 **Created:** 2026-05-22
-**Last Updated:** 2026-05-26
+**Last Updated:** 2026-10-13
 
 ## Dependencies
 - Requires **PROJ-2** (Auth + SSR) — User-Profile mit E-Mail-Adressen als Empfänger; Verifikations-Status als Voraussetzung für Welcome-Mail
@@ -533,6 +533,114 @@ BUG-3 (Käufer-ohne-Zugang) ist Spec-Lücke; eigenes Folge-Ticket.
 2. (Roll-out-Prerequisites: Resend-Domain + Env-Vars in Vercel)
 3. BUG-2 — defensives Newline-Strippen in `sendEmail`
 4. BUG-3 — Geschenk-Käufer-Bestätigungs-Mail (eigenes Ticket)
+
+## QA Re-Test — 2026-10-13
+
+**Anlass:** Abschluss der offenen QA nach dem Vapi-Rückbau (PROJ-6) und der neuen Anforderung „durchgängige Sie-Anrede". Unabhängiges Code-Review aller Versandpfade plus neue Regressionstests. Die Bug-Nummern setzen die Liste vom 2026-05-26 fort.
+
+### Testing-Lauf
+
+| Lauf | Ergebnis |
+|------|----------|
+| Vitest (gesamte Suite) | **173/173 grün** (13 Dateien) |
+| Neu: `src/emails/emails.test.tsx` | **24/24 grün** — jede Vorlage rendert (HTML + Klartext), durchgängige Sie-Anrede, keine Vapi-/Telefon-Reste, Footer mit Impressum + Kontaktadresse |
+| `npx tsc --noEmit` / `npx next build` | fehlerfrei, Route `/api/cron/reminders` registriert |
+| Playwright Chromium (PROJ-9 Einladungs-Flow, PROJ-2 Auth) | grün; der Einladungs-Flow ruft den Mail-Versand auf (lokal erwartungsgemäß „RESEND_API_KEY is not set") |
+| **Nicht ausgeführt** | Echter Versand über Resend, Vercel-Cron-Live-Lauf, Zustellung/Darstellung in Mail-Clients, Mobile Safari/Firefox. Gründe: lokal kein `RESEND_API_KEY`; stage-app.narravit.de liegt hinter dem Vercel-Login; Supabase-Zugriff in dieser Sitzung nicht möglich (daher auch **nicht geprüft**, ob die Migration `proj11_mail_log` auf Stage angewendet ist). |
+
+### Acceptance Criteria
+
+| Bereich | Ergebnis | Anmerkung |
+|---|---|---|
+| Allgemein: Resend, From aus Env, deutsch, Sie-Form | ✅ | Sie-Anrede per Test abgesichert. Die Inhaltsbeschreibungen der Kriterien oben nennen noch „du"-Formulierungen — die Vorlagen sind maßgeblich. |
+| Allgemein: Footer mit Impressum-Link | ❌ | BUG-1 weiter offen (Link führt ins Leere) |
+| Allgemein: Versand blockiert nie den User-Flow | ⚠️ | Blockiert nicht — aber Versand ist auf Vercel nicht garantiert (BUG-5) |
+| Allgemein: Idempotenz | ⚠️ | Welcome ✅; Reminder nur für den ersten Laufzeit-Zyklus korrekt (BUG-6) |
+| Mail 1 — Einladung (über „Nutzer einladen") | ✅ | Trigger, Empfänger, Inhalt, Modal-Text |
+| Mail 1 — Einladung bei Geschenk-Kauf | ❌ | BUG-4: wird nie verschickt |
+| Mail 2 — Portal-Kauf | ⚠️ | Inhalt ✅ (ohne Vapi); Rechnungs-Link nie vorhanden bzw. defekt (BUG-7); Käufer ohne eigenen Zugang bekommt keine Mail (BUG-3) |
+| Mail 3 — Vapi-Paket | entfällt | mit PROJ-6-Rückbau entfernt |
+| Mail 4 — Welcome | ⚠️ | einmal pro Konto ✅; Auslöser zu breit (BUG-8) |
+| Mail 5 — Verlängerung | ✅ | Rechnungs-Link wie BUG-7 |
+| Mail 6/7 — Reminder 30/7 Tage | ⚠️ | Fenster, Empfänger (alle Projektleiter), Inhalt ✅; Wiederholung im Folgejahr ❌ (BUG-6) |
+| Fehlerverhalten: Sentry-Eintrag | ❌ (Abweichung) | Es gibt kein Sentry im Projekt; Fehler landen nur per `console.error` im Server-Log (Empfänger gehasht ✅). Folgt mit PROJ-13. |
+| Fehlerverhalten: ungültige Adresse → kein API-Call | ✅ | Unit-Test |
+
+### Sicherheits-Audit
+
+- Cron-Endpunkt: ohne/mit falschem Secret 401, ohne konfiguriertes Secret 500 (Unit-Tests) ✅. Vergleich des Secrets ist nicht zeitkonstant (siehe BUG-11).
+- Keine Schlüssel im Client (`server-only` in allen Mail-Modulen) ✅; `mail_log` ohne Policies, nur Service-Role ✅ (laut Migration; auf Stage nicht nachgeprüft).
+- Nutzereingaben in Mail-HTML werden von React maskiert ✅.
+- Missbrauch als Mail-Schleuder: siehe BUG-10.
+
+### Neue Befunde
+
+#### BUG-4 (High) — Bei Geschenk-Käufen wird keine Einladungs-Mail verschickt
+**Ort:** `src/app/api/stripe/webhook/route.ts`, `handleInitial` (Block `if (inviteRecipient && recipientEmail)`).
+**Befund:** Der Webhook legt für die beschenkte Person eine Zeile in `invitations` an, ruft aber `sendInvitationMail` nicht auf. Die Einladungs-Mail hängt nur an `createInvitationAction` (manuelles „Nutzer einladen").
+**Auswirkung:** Die Bestätigungsseite `/kauf-erfolgreich` sagt dem Käufer „Einladungs-Mail unterwegs an …" — das stimmt nicht. Im Pfad „Auch am Computer schreiben" **ohne** eigenen Käufer-Zugang ist danach niemand Projektmitglied, der Einladungs-Link existiert nur in der Datenbank, und der Käufer bekommt wegen BUG-3 auch keine Kauf-Mail: Ein bezahltes Projekt ist für niemanden erreichbar.
+**Reproduktion:** Onboarding → „Als Geschenk" → „Auch am Computer schreiben" → E-Mail der beschenkten Person → „Möchten Sie selbst Zugang?" aus → bezahlen. Erwartet: Einladungs-Mail. Tatsächlich: kein Versandaufruf im Code.
+**Status:** per Code-Review festgestellt, nicht live durchgespielt.
+
+#### BUG-5 (High, nicht live reproduziert) — Versand läuft ungesichert nach der Antwort
+**Ort:** `void maybeSendWelcomeMail(…)` in `src/app/auth/callback/route.ts`, `void sendInvitationMail(…)` in `members-actions.ts`, `void sendPortalPurchaseMail(…)` / `void sendRenewalMail(…)` im Stripe-Webhook.
+**Befund:** Der Versand wird gestartet, aber nicht abgewartet und nicht über `after()` bzw. `waitUntil` an die Laufzeit gebunden. Auf Vercel darf eine Funktion nach dem Senden der Antwort angehalten werden; noch laufende Arbeit ist dann nicht garantiert.
+**Auswirkung:** Welcome-, Einladungs-, Kauf- und Verlängerungs-Mails können sporadisch ausbleiben oder stark verzögert kommen. Bei der Welcome-Mail wird der Idempotenz-Marker **vor** dem Versand gesetzt — bricht der Lauf dazwischen ab, wird die Mail nie mehr verschickt. Die Reminder sind nicht betroffen (der Cron wartet den Versand ab).
+**Zusatz:** Die Spec-Annahme „beim nächsten Stripe-Retry wird der Mail-Versand erneut versucht" trifft nicht zu: Der Retry endet am Idempotenz-Check (`duplicate`) vor dem Mail-Aufruf.
+**Status:** aus Code und Plattformverhalten abgeleitet; lokal läuft der Versandaufruf durch. Muss auf Stage mit echtem Resend-Schlüssel gegengeprüft werden.
+
+#### BUG-6 (Medium) — Reminder funktionieren nur im ersten Laufzeit-Zyklus
+**Ort:** `mail_log_idempotency_uq` (`user_id, project_id, mail_type`) + `maybeSendReminderMail`.
+**Befund:** Der Schlüssel enthält weder Ablaufdatum noch Jahr. Nach einer Verlängerung trifft der 30-/7-Tage-Reminder des Folgejahres auf den Marker des Vorjahres und wird als Duplikat übersprungen.
+**Auswirkung:** Ab dem zweiten Jahr bekommt niemand mehr eine Ablauf-Erinnerung — genau die Mails, die Verlängerungen auslösen sollen. Tritt frühestens ein Jahr nach dem ersten Kauf auf, daher Medium; muss vor den ersten Verlängerungs-Jahrgängen behoben sein.
+**Zusatz:** Ein fehlgeschlagener Versand (z. B. Resend nicht erreichbar) lässt den Marker ebenfalls stehen — der Reminder wird nicht nachgeholt.
+
+#### BUG-7 (Low) — Rechnungs-Link ist nie vorhanden und wäre defekt
+`invoiceUrl` wird aus `session.invoice` befüllt. Das ist eine Stripe-Rechnungs-**ID** (`in_…`), keine URL; außerdem erzeugt der Checkout im Modus „payment" ohne `invoice_creation` gar keine Rechnung. Ergebnis heute: Der Satz „Ihre Rechnung finden Sie hier" erscheint nie; würde eine Rechnung erzeugt, zeigte der Link auf `in_…`.
+
+#### BUG-8 (Low) — Welcome-Mail hängt an jedem `/auth/callback`
+Der Auslöser prüft nur „E-Mail bestätigt + noch kein Marker". Bestandskonten ohne Marker bekommen „Willkommen bei narravit" beim nächsten Passwort-Reset oder OAuth-Login. Schlägt der erste Versand fehl (z. B. fehlender Resend-Schlüssel auf Stage), bleibt der Marker stehen und das Konto bekommt nie eine Welcome-Mail.
+
+#### BUG-9 (Low) — Mails versprechen „per Sprachnachricht erzählen"
+Welcome- und Kauf-Mail nennen seit dem PROJ-6-Rückbau das Erzählen per Sprachnachricht. Die Funktion (PROJ-12) ist noch nicht gebaut. Für Stage unkritisch; vor Produktiv-Versand muss PROJ-12 live sein oder der Satz angepasst werden.
+
+#### BUG-10 (Low) — Einladungs-Mail ohne Mengenbegrenzung
+Jeder Projektleiter kann beliebig viele Einladungen an beliebige Adressen auslösen; Einlader-Name und Projekttitel sind frei wählbarer Text in einer Mail von der narravit-Domain. Durch die Bezahlschranke (Projekt nötig) begrenzt, trotzdem als Spam-/Phishing-Hebel nutzbar. Empfehlung: Begrenzung pro Projekt/Tag, in PROJ-17 aufnehmen.
+
+#### BUG-11 (Low) — Härtung Cron und Konfiguration
+- Secret-Vergleich per `===` statt zeitkonstant.
+- Listenabfragen ohne `.limit()`, pro Projekt mehrere Einzelabfragen nacheinander — bei vielen Projekten Laufzeitrisiko.
+- Fällt ein täglicher Lauf aus, wird das 1-Tages-Fenster verpasst und der Reminder nie verschickt.
+- Datumsangaben werden in Server-Zeit (UTC) formatiert, nicht in deutscher Zeit.
+- `EMAIL_TEST_RECIPIENT` hat keine Umgebungs-Sperre: Ist die Variable versehentlich in Produktion gesetzt, gehen alle Mails an die Testadresse.
+
+#### BUG-12 (Low) — Textdetails
+- Klartext-Fassung klebt Bezeichnung und Wert zusammen („Betrag249,00 €", „ProjektOmas Lebensbuch").
+- Welcome-Mail: „antworten Sie uns einfach an kontakt@narravit.de", während der Footer sagt, dass Antworten nicht ankommen.
+
+### Stand der Befunde vom 2026-05-26
+- **BUG-1 (Medium)** — offen: `/impressum` existiert weiterhin nicht (auch nicht in der Routenliste des Builds).
+- **BUG-2 (Low)** — offen: kein Entfernen von Zeilenumbrüchen in Betreffzeilen.
+- **BUG-3 (Low)** — offen und durch BUG-4 verschärft (siehe dort).
+
+### Befunde nach Schweregrad
+
+| Schweregrad | Anzahl | Befunde |
+|---|---|---|
+| Critical | 0 | — |
+| High | 2 | BUG-4, BUG-5 |
+| Medium | 2 | BUG-1, BUG-6 |
+| Low | 8 | BUG-2, BUG-3, BUG-7 – BUG-12 |
+
+### Production-Ready Decision
+**NOT READY** — zwei High-Befunde. Status bleibt **In Review**.
+
+**Empfohlene Reihenfolge:**
+1. BUG-4 — Einladungs-Mail im Geschenk-Pfad verschicken (und BUG-3 gleich mit: Kauf-Bestätigung für Käufer ohne Zugang).
+2. BUG-5 — Versand an die Laufzeit binden; Marker-Reihenfolge bei der Welcome-Mail überdenken.
+3. BUG-6 — Reminder-Idempotenz um den Ablaufzeitpunkt erweitern (braucht Migration).
+4. BUG-1 — Impressum-Link.
+5. Danach Live-Test auf Stage mit Resend-Schlüssel und `EMAIL_TEST_RECIPIENT`.
 
 ## Deployment
 _To be added by /deploy_
