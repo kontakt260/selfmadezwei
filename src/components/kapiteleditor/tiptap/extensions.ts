@@ -240,7 +240,7 @@ export const editorExtensions = [
     defaultAlignment: "justify",
   }),
   Placeholder.configure({
-    placeholder: "Erzähle hier deine Geschichte …",
+    placeholder: "Erzählen Sie hier Ihre Geschichte …",
     emptyEditorClass: "is-editor-empty",
   }),
   PageBreakNode,

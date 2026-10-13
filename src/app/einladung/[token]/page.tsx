@@ -69,7 +69,7 @@ export default async function EinladungAcceptPage({
         </h1>
         <p className="text-base leading-7 text-[#535252] sm:text-lg">
           Dieser Einladungs-Link ist ungültig oder wurde widerrufen.
-          Bitte erfrage einen neuen Link bei deinem Projektleiter.
+          Bitte erfragen Sie einen neuen Link bei Ihrem Projektleiter.
         </p>
         <HomeLink />
       </CenteredCard>
@@ -99,7 +99,7 @@ export default async function EinladungAcceptPage({
           Diese Einladung wurde bereits angenommen
         </h1>
         <p className="text-base leading-7 text-[#535252] sm:text-lg">
-          Wenn du Mitglied dieses Projekts bist, findest du es in deiner
+          Wenn Sie Mitglied dieses Projekts sind, finden Sie es in Ihrer
           Projektliste auf der Startseite.
         </p>
         <HomeLink />
@@ -115,7 +115,7 @@ export default async function EinladungAcceptPage({
           Diese Einladung ist abgelaufen
         </h1>
         <p className="text-base leading-7 text-[#535252] sm:text-lg">
-          Bitte erfrage einen neuen Link bei deinem Projektleiter.
+          Bitte erfragen Sie einen neuen Link bei Ihrem Projektleiter.
         </p>
         <HomeLink />
       </CenteredCard>
@@ -165,13 +165,13 @@ export default async function EinladungAcceptPage({
     return (
       <CenteredCard>
         <h1 className="[font-family:var(--font-merriweather)] text-2xl text-[#3E3831] sm:text-3xl">
-          Du wurdest zu einem Projekt eingeladen
+          Sie wurden zu einem Projekt eingeladen
         </h1>
         {preview}
         <p className="text-base leading-7 text-[#535252] sm:text-lg">
-          Bitte melde dich mit deiner E-Mail-Adresse an oder erstelle ein
-          neues Konto. Achte darauf, exakt die eingeladene Adresse zu
-          verwenden — sonst kannst du die Einladung nicht annehmen.
+          Bitte melden Sie sich mit Ihrer E-Mail-Adresse an oder erstellen Sie ein
+          neues Konto. Achten Sie darauf, exakt die eingeladene Adresse zu
+          verwenden — sonst können Sie die Einladung nicht annehmen.
         </p>
         <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
           <Link
@@ -200,11 +200,11 @@ export default async function EinladungAcceptPage({
         </h1>
         <p className="text-base leading-7 text-[#535252] sm:text-lg">
           Diese Einladung gilt für{" "}
-          <span className="font-semibold">{lookup.email}</span>, du bist aber als{" "}
+          <span className="font-semibold">{lookup.email}</span>, Sie sind aber als{" "}
           <span className="font-semibold">{user.email}</span> eingeloggt.
         </p>
         <p className="text-base leading-7 text-[#535252] sm:text-lg">
-          Bitte melde dich mit der korrekten E-Mail-Adresse an, um die
+          Bitte melden Sie sich mit der korrekten E-Mail-Adresse an, um die
           Einladung anzunehmen.
         </p>
         <div className="self-start">
@@ -222,8 +222,8 @@ export default async function EinladungAcceptPage({
       </h1>
       {preview}
       <p className="text-base leading-7 text-[#535252] sm:text-lg">
-        Wenn du auf „Annehmen" klickst, wirst du als Mitglied hinzugefügt
-        und landest direkt in der Projektübersicht.
+        Wenn Sie auf „Annehmen" klicken, werden Sie als Mitglied hinzugefügt
+        und landen direkt in der Projektübersicht.
       </p>
       <AcceptInvitationButton token={token} projectId={lookup.project_id} />
     </CenteredCard>

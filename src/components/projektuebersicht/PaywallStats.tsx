@@ -57,7 +57,7 @@ function PortalAccessStat({
         daysLeft === null
           ? "Wird nach abgeschlossener Zahlung angezeigt (PROJ-6)"
           : daysLeft < 30
-            ? "Verlängere jetzt, damit dein Zugang ohne Unterbrechung weiterläuft."
+            ? "Verlängern Sie jetzt, damit Ihr Zugang ohne Unterbrechung weiterläuft."
             : "Bezahlt bis " +
               new Date(expiresAt!).toLocaleDateString("de-DE", {
                 day: "2-digit",

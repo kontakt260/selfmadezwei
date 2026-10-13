@@ -20,7 +20,7 @@ export default function PasswortVergessenPage() {
         <div className="text-center">
           <h1 className="heading-style-h2 mb-4">E-Mail unterwegs</h1>
           <p className="mb-8 text-[#535252]">
-            Falls ein Konto mit dieser E-Mail existiert, hast du einen Reset-Link erhalten.
+            Falls ein Konto mit dieser E-Mail existiert, haben Sie einen Reset-Link erhalten.
           </p>
           <Link href="/anmelden" className="underline underline-offset-4 transition-colors hover:text-[#96B897]">
             Zurück zur Anmeldung
@@ -35,13 +35,13 @@ export default function PasswortVergessenPage() {
       <div className="mb-8 text-center md:mb-10">
         <h1 className="heading-style-h2 mb-4">Passwort vergessen?</h1>
         <p className="text-[#535252]">
-          Wir schicken dir einen Link, um ein neues Passwort zu setzen.
+          Wir schicken Ihnen einen Link, um ein neues Passwort zu setzen.
         </p>
       </div>
 
       <p className="mb-6 border border-[#e0dcd5] bg-[#FAF8F6] p-4 text-sm text-[#535252]">
-        Hast du dich mit Google oder Apple registriert? Dann setzt du dein Passwort
-        bei deinem Provider zurück — NARRAVIT kann nur Passwörter für E-Mail-Konten ändern.
+        Haben Sie sich mit Google oder Apple registriert? Dann setzen Sie Ihr Passwort
+        bei Ihrem Provider zurück — NARRAVIT kann nur Passwörter für E-Mail-Konten ändern.
       </p>
 
       <form action={formAction} className="grid gap-4" noValidate>

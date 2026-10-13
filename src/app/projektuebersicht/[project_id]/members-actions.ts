@@ -78,7 +78,7 @@ export async function createInvitationAction(formData: FormData): Promise<{
   // Self-Invite ablehnen.
   const ownEmail = (user.email ?? "").trim().toLowerCase();
   if (ownEmail === email) {
-    return { error: "Du kannst dich nicht selbst einladen." };
+    return { error: "Sie können sich nicht selbst einladen." };
   }
 
   // PL-Check + bereits-Mitglied-Check kombiniert: lese eigene Rolle und alle
@@ -244,7 +244,7 @@ export async function leaveProjectAction(formData: FormData): Promise<{
     if (delErr.code === "23514") {
       return {
         error:
-          "Befördere zuerst eine andere Person zum Projektleiter, bevor du das Projekt verlässt.",
+          "Befördern Sie zuerst eine andere Person zum Projektleiter, bevor Sie das Projekt verlassen.",
       };
     }
     return { error: "Projekt konnte nicht verlassen werden." };
@@ -301,7 +301,7 @@ export async function acceptInvitationAction(formData: FormData): Promise<{
   const inviteEmail = (lookup.email ?? "").trim().toLowerCase();
   if (ownEmail !== inviteEmail) {
     return {
-      error: `Diese Einladung gilt für ${lookup.email}. Du bist als ${user.email} eingeloggt.`,
+      error: `Diese Einladung gilt für ${lookup.email}. Sie sind als ${user.email} eingeloggt.`,
     };
   }
 

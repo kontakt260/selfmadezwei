@@ -18,7 +18,7 @@ export default function PasswortZuruecksetzenPage() {
       <div className="mb-8 text-center md:mb-10">
         <h1 className="heading-style-h2 mb-4">Neues Passwort</h1>
         <p className="text-[#535252]">
-          Wähle ein sicheres Passwort mit mindestens 8 Zeichen.
+          Wählen Sie ein sicheres Passwort mit mindestens 8 Zeichen.
         </p>
       </div>
 

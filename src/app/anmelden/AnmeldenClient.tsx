@@ -40,7 +40,7 @@ function ExpiredLinkBanner() {
   if (resendState.success) {
     return (
       <div className="mb-6 border border-[#e0dcd5] bg-[#FAF8F6] p-4 text-sm text-[#535252]">
-        Falls ein Konto mit dieser E-Mail existiert, hast du eine neue
+        Falls ein Konto mit dieser E-Mail existiert, haben Sie eine neue
         Bestätigungs-E-Mail erhalten.
       </div>
     );
@@ -50,7 +50,7 @@ function ExpiredLinkBanner() {
     <form action={resendForm} className="mb-6 grid gap-3 border border-[#e0dcd5] bg-[#FAF8F6] p-4 text-sm">
       <p className="font-medium">Dieser Link ist nicht mehr gültig.</p>
       <p className="text-[#535252]">
-        Trage deine E-Mail ein, und wir schicken dir eine neue Bestätigungs-E-Mail.
+        Tragen Sie Ihre E-Mail ein, und wir schicken Ihnen eine neue Bestätigungs-E-Mail.
       </p>
       <div className="grid gap-1.5">
         <Label htmlFor="resend-email" className="text-xs">E-Mail</Label>

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const schema = z
   .object({
-    fullName: z.string().min(2, "Bitte deinen vollständigen Namen angeben."),
+    fullName: z.string().min(2, "Bitte geben Sie Ihren vollständigen Namen an."),
     email: z.string().email("Bitte eine gültige E-Mail-Adresse angeben."),
     password: z.string().min(8, "Mindestens 8 Zeichen."),
     confirmPassword: z.string(),
@@ -90,7 +90,7 @@ export async function registerAction(
   });
 
   if (error) {
-    return { error: "Registrierung fehlgeschlagen. Bitte versuche es erneut." };
+    return { error: "Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut." };
   }
 
   // Supabase returns a user object with an empty `identities` array when the

@@ -127,7 +127,7 @@ describe("createInvitationAction", () => {
   it("rejects self-invite (own email)", async () => {
     vi.mocked(createClient).mockResolvedValue(makeMockClient() as never);
     expect(await createInvitationAction(fd({ email: PL_EMAIL }))).toEqual({
-      error: "Du kannst dich nicht selbst einladen.",
+      error: "Sie können sich nicht selbst einladen.",
     });
   });
 
@@ -251,7 +251,7 @@ describe("leaveProjectAction", () => {
     );
     vi.mocked(createClient).mockResolvedValue(client as never);
     const result = await leaveProjectAction(fd());
-    expect(result.error).toMatch(/Befördere zuerst eine andere Person/);
+    expect(result.error).toMatch(/Befördern Sie zuerst eine andere Person/);
   });
 });
 

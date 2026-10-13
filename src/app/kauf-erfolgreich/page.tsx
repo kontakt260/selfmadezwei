@@ -215,7 +215,7 @@ function RenewalContent({ projectId }: { projectId: string }) {
         Kauf erfolgreich
       </h1>
       <p className="text-lg leading-8 text-[#535252]">
-        Dein Projekt-Zugang wurde um 12 Monate verlängert.
+        Ihr Projekt-Zugang wurde um 12 Monate verlängert.
       </p>
       <Link
         href={`/projektuebersicht/${projectId}`}

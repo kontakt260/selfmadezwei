@@ -48,7 +48,7 @@ export function RegistrierenClient({
           Konto erstellen
         </h1>
         <p className="text-[#535252]">
-          Starte dein Lebensbuch in wenigen Minuten.
+          Starten Sie Ihr Lebensbuch in wenigen Minuten.
         </p>
       </div>
 

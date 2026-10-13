@@ -49,7 +49,7 @@ export function OAuthButtons({ mode, redirectPath = "/" }: OAuthButtonsProps) {
     });
 
     if (error) {
-      toast.error("Anmeldung fehlgeschlagen. Bitte versuche es erneut.");
+      toast.error("Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.");
       setLoading(null);
     }
   };

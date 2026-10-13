@@ -288,7 +288,7 @@ function SecuritySection({ authProvider }: { authProvider: string }) {
           </>
         ) : (
           <p className="max-w-3xl text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
-            Du meldest dich über {providerLabel} an — die Passwort-Verwaltung
+            Sie melden sich über {providerLabel} an — die Passwort-Verwaltung
             erfolgt dort.
           </p>
         )}
@@ -299,8 +299,8 @@ function SecuritySection({ authProvider }: { authProvider: string }) {
           <div className="flex flex-col gap-1 max-w-xl">
             {state.success ? (
               <p className="text-base leading-7 text-[#96B897]">
-                Wir haben dir einen Link zum Zurücksetzen geschickt. Bitte prüfe
-                auch deinen Spam-Ordner.
+                Wir haben Ihnen einen Link zum Zurücksetzen geschickt. Bitte prüfen Sie
+                auch Ihren Spam-Ordner.
               </p>
             ) : (
               <p className="text-base leading-7 text-[#848484]">

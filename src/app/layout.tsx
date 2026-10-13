@@ -23,7 +23,7 @@ const ptSerif = PT_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "NARRAVIT — Dein Lebensbuch",
+  title: "NARRAVIT — Ihr Lebensbuch",
   description:
     "NARRAVIT verwandelt persönliche Lebensgeschichten in ein hochwertig gedrucktes Hardcover-Buch. Schreiben oder erzählen — wir machen daraus ein Buch.",
 };

@@ -205,7 +205,7 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
                     {name}
                     {m.isMe && (
                       <span className="ml-2 text-sm font-normal text-[#848484]">
-                        (Du)
+                        (Sie)
                       </span>
                     )}
                   </p>
@@ -229,7 +229,7 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
                         isLastPL
                           ? "Mindestens ein Projektleiter muss verbleiben."
                           : m.isMe
-                            ? "Nutze die Projekt-verlassen-Schaltfläche, um dich selbst zu entfernen."
+                            ? "Nutzen Sie die Projekt-verlassen-Schaltfläche, um sich selbst zu entfernen."
                             : "Mitglied entfernen"
                       }
                       aria-label={`Mitglied „${name}" entfernen`}
@@ -251,7 +251,7 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
           type="button"
           onClick={() => setConfirmLeaveOpen(true)}
           disabled={!canLeave || actionPending}
-          title={!canLeave ? "Befördere zuerst eine andere Person zum Projektleiter." : undefined}
+          title={!canLeave ? "Befördern Sie zuerst eine andere Person zum Projektleiter." : undefined}
           className="inline-flex h-12 items-center justify-center border border-[#e0dcd5] bg-white px-5 text-base font-semibold text-[#3E3831] transition-colors hover:bg-[#f5f3f0] disabled:cursor-not-allowed disabled:opacity-40 sm:text-lg"
         >
           Projekt verlassen
@@ -267,8 +267,8 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
                 Nutzer einladen
               </h3>
               <p className="text-base leading-7 text-[#535252] sm:text-lg">
-                Trage die E-Mail-Adresse der Person ein und wähle ihre Rolle.
-                Wir verschicken die Einladung automatisch per Mail — du kannst
+                Tragen Sie die E-Mail-Adresse der Person ein und wählen Sie ihre Rolle.
+                Wir verschicken die Einladung automatisch per Mail — Sie können
                 den Link bei Bedarf zusätzlich manuell teilen (z. B. per
                 WhatsApp).
               </p>
@@ -328,7 +328,7 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
               <p className="text-base leading-7 text-[#535252] sm:text-lg">
                 Die Einladung für{" "}
                 <span className="font-semibold">{addEmail}</span> ist unterwegs
-                — wir verschicken sie automatisch per Mail. Du kannst den
+                — wir verschicken sie automatisch per Mail. Sie können den
                 folgenden Link bei Bedarf zusätzlich manuell teilen; er ist
                 14 Tage gültig.
               </p>
@@ -366,7 +366,7 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
             Mitglied entfernen?
           </h3>
           <p className="text-base leading-7 text-[#535252] sm:text-lg">
-            Möchtest du{" "}
+            Möchten Sie{" "}
             <span className="font-semibold">{displayName(confirmRemove)}</span>{" "}
             wirklich aus dem Projekt entfernen? Der Nutzer verliert den
             Zugriff auf dieses Projekt.
@@ -402,7 +402,7 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
             Projekt verlassen?
           </h3>
           <p className="text-base leading-7 text-[#535252] sm:text-lg">
-            Möchtest du dieses Projekt wirklich verlassen? Du verlierst den
+            Möchten Sie dieses Projekt wirklich verlassen? Sie verlieren den
             Zugriff auf die Kapitel und alle Projekt-Daten.
           </p>
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-4">

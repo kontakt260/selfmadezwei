@@ -6,10 +6,10 @@ export default function ZugangAbgelaufenPage() {
   return (
     <AuthLayout>
       <div className="text-center">
-        <h1 className="heading-style-h2 mb-4">Dein Zugang ist abgelaufen</h1>
+        <h1 className="heading-style-h2 mb-4">Ihr Zugang ist abgelaufen</h1>
         <p className="mb-8 text-[#535252]">
-          Dein NARRAVIT-Portalzugang ist nicht mehr aktiv. Verlängere ihn, um wieder
-          in deinem Projekt zu schreiben.
+          Ihr NARRAVIT-Portalzugang ist nicht mehr aktiv. Verlängern Sie ihn, um wieder
+          in Ihrem Projekt zu schreiben.
         </p>
 
         {/* TODO PROJ-6: Button auf Stripe-Checkout-Session umstellen. */}

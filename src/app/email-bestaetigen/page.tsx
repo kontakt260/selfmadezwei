@@ -9,15 +9,15 @@ export default function EmailBestaetigenPage() {
         <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center border border-[#e0dcd5] bg-[#FAF8F6] text-[#96B897]">
           <Mail className="h-8 w-8" aria-hidden="true" />
         </div>
-        <h1 className="heading-style-h2 mb-4">Prüfe deine E-Mail</h1>
+        <h1 className="heading-style-h2 mb-4">Prüfen Sie Ihre E-Mail</h1>
         <p className="mb-8 text-[#535252]">
-          Wir haben dir einen Bestätigungslink geschickt. Klicke auf den Link, um dein
+          Wir haben Ihnen einen Bestätigungslink geschickt. Klicken Sie auf den Link, um Ihr
           Konto zu aktivieren und mit dem Onboarding zu starten.
         </p>
         <p className="text-sm text-[#848484]">
-          Keine E-Mail erhalten? Prüfe deinen Spam-Ordner oder{" "}
+          Keine E-Mail erhalten? Prüfen Sie Ihren Spam-Ordner oder{" "}
           <Link href="/registrieren" className="underline underline-offset-4 transition-colors hover:text-[#96B897]">
-            registriere dich erneut
+            registrieren Sie sich erneut
           </Link>
           .
         </p>

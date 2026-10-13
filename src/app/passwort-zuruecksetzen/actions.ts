@@ -43,7 +43,7 @@ export async function resetPasswordAction(
   });
 
   if (error) {
-    return { error: "Link ungültig oder abgelaufen. Bitte fordere einen neuen an." };
+    return { error: "Link ungültig oder abgelaufen. Bitte fordern Sie einen neuen an." };
   }
 
   redirect("/");

@@ -117,6 +117,7 @@ docs/
 ## Konventionen
 
 - **Feature-IDs:** PROJ-1, PROJ-2, … (sequentiell)
+- **Anrede: immer „Sie"** (Anforderung 2026-10-13). Alle Texte, die den Kunden ansprechen — Oberfläche, Fehlermeldungen, Mails, SMS, Erzähl-Aufforderungen, Leitfragen — verwenden die Sie-Form; Anredepronomen werden großgeschrieben (Sie, Ihr, Ihre, Ihnen). Kein „du", auch nicht in neuen Features.
 - **Commits:** `feat(PROJ-X): description`, `fix(PROJ-X): description`
 - **Single Responsibility:** ein Feature pro Spec
 - **shadcn/ui first:** keine eigenen Versionen installierter shadcn-Komponenten

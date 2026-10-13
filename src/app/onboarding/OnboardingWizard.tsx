@@ -77,14 +77,14 @@ export function OnboardingWizard({
   const validateCurrent = (): string | null => {
     switch (currentStep) {
       case "name":
-        if (state.fullName.trim().length < 2) return "Bitte deinen Namen angeben (mind. 2 Zeichen).";
+        if (state.fullName.trim().length < 2) return "Bitte geben Sie Ihren Namen an (mind. 2 Zeichen).";
         return null;
       case "for-whom":
-        if (!state.forWhom) return "Bitte triff eine Auswahl.";
+        if (!state.forWhom) return "Bitte treffen Sie eine Auswahl.";
         return null;
       case "gift-details":
         if (state.giftRecipientName.trim().length < 2) return "Name der beschenkten Person fehlt.";
-        if (!state.giftMode) return "Bitte wähle, wie geschrieben werden soll.";
+        if (!state.giftMode) return "Bitte wählen Sie, wie geschrieben werden soll.";
         return null;
       case "gift-computer": {
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(state.giftRecipientEmail)) {
@@ -256,7 +256,7 @@ export function OnboardingWizard({
 
           {showAccountDeleteLink && (
             <p className="mt-8 border-t border-[#e0dcd5] pt-6 text-center text-sm text-[#848484]">
-              Du möchtest stattdessen dein NARRAVIT-Konto endgültig löschen?{" "}
+              Sie möchten stattdessen Ihr NARRAVIT-Konto endgültig löschen?{" "}
               <a
                 href="/persoenlicher-bereich"
                 className="text-[#3E3831] underline underline-offset-4 hover:no-underline"
@@ -300,9 +300,9 @@ function StepName({
 }) {
   return (
     <div>
-      <h2 className="heading-style-h3 mb-3">Wie heißt du?</h2>
+      <h2 className="heading-style-h3 mb-3">Wie heißen Sie?</h2>
       <p className="mb-6 text-[#535252]">
-        Dein Name erscheint später in deinem Profil und im Buch.
+        Ihr Name erscheint später in Ihrem Profil und im Buch.
       </p>
       <div className="grid gap-2">
         <Label htmlFor="fullName">Vollständiger Name</Label>
@@ -331,7 +331,7 @@ function StepForWhom({
     <div>
       <h2 className="heading-style-h3 mb-3">Für wen ist das Lebensbuch?</h2>
       <p className="mb-6 text-[#535252]">
-        Du kannst es für dich selbst anlegen oder als Geschenk für jemanden.
+        Sie können es für sich selbst anlegen oder als Geschenk für jemanden.
       </p>
       <div className="grid gap-3">
         <ChoiceCard
@@ -366,7 +366,7 @@ function StepGiftDetails({
     <div>
       <h2 className="heading-style-h3 mb-3">Für wen ist das Geschenk?</h2>
       <p className="mb-6 text-[#535252]">
-        Erzähl uns ein bisschen über die beschenkte Person.
+        Erzählen Sie uns ein bisschen über die beschenkte Person.
       </p>
 
       <div className="grid gap-2">
@@ -399,7 +399,7 @@ function StepGiftDetails({
 
       {giftMode === "phone-only" && (
         <p className="mt-6 border border-[#e0dcd5] bg-[#FAF8F6] p-5 text-base text-[#535252]">
-          Hinweis: Du erhältst als Käufer vollen Zugriff auf das Projekt (Projektleiter).
+          Hinweis: Sie erhalten als Käufer vollen Zugriff auf das Projekt (Projektleiter).
         </p>
       )}
     </div>
@@ -442,9 +442,9 @@ function StepGiftComputer({
 
       <div className="mt-8 flex items-start justify-between border border-[#e0dcd5] bg-[#FAF8F6] p-5">
         <div className="pr-6">
-          <p className="font-medium">Möchtest du selbst Zugang zum Projekt?</p>
+          <p className="font-medium">Möchten Sie selbst Zugang zum Projekt?</p>
           <p className="mt-1 text-base text-[#535252]">
-            Wenn ja, wirst du als Projektleiter eingetragen.
+            Wenn ja, werden Sie als Projektleiter eingetragen.
           </p>
         </div>
         <Switch checked={buyerWantsAccess} onCheckedChange={onChangeBuyerAccess} />
@@ -469,7 +469,7 @@ function StepGiftComputer({
 
       {!buyerWantsAccess && (
         <p className="mt-4 border border-[#e0dcd5] bg-[#FAF8F6] p-5 text-base text-[#535252]">
-          Da du selbst keinen Zugang möchtest, wird die beschenkte Person automatisch Projektleiter
+          Da Sie selbst keinen Zugang möchten, wird die beschenkte Person automatisch Projektleiter
           — jedes Projekt braucht mindestens eine:n Projektleiter:in.
         </p>
       )}
@@ -503,7 +503,7 @@ function StepPurchase({ state }: { state: WizardState }) {
         value: state.buyerWantsAccess ? "Ja (Projektleiter)" : "Nein",
       });
     } else {
-      summary.push({ label: "Dein Zugang", value: "Projektleiter (Standard)" });
+      summary.push({ label: "Ihr Zugang", value: "Projektleiter (Standard)" });
     }
   }
 
@@ -511,7 +511,7 @@ function StepPurchase({ state }: { state: WizardState }) {
     <div>
       <h2 className="heading-style-h3 mb-3">Bereit zum Start?</h2>
       <p className="mb-6 text-[#535252]">
-        Mit dem Kauf schalten wir dein Projekt frei und du kannst sofort loslegen.
+        Mit dem Kauf schalten wir Ihr Projekt frei und Sie können sofort loslegen.
       </p>
 
       <dl className="mb-8 grid gap-4 border border-[#e0dcd5] bg-white p-4 sm:gap-3 sm:p-6">

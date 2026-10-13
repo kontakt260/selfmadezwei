@@ -59,7 +59,7 @@ export async function resetPasswordAction(
     redirectTo: `${origin}/auth/callback?next=/passwort-zuruecksetzen`,
   });
 
-  if (error) return { error: "Zurücksetzen fehlgeschlagen. Bitte versuche es erneut." };
+  if (error) return { error: "Zurücksetzen fehlgeschlagen. Bitte versuchen Sie es erneut." };
   return { success: true };
 }
 
@@ -113,7 +113,7 @@ export async function deleteAccountAction(
     );
     return {
       error:
-        "Account-Löschung ist serverseitig nicht konfiguriert. Bitte wende dich an den Support.",
+        "Account-Löschung ist serverseitig nicht konfiguriert. Bitte wenden Sie sich an den Support.",
     };
   }
 
@@ -131,7 +131,7 @@ export async function deleteAccountAction(
   if (profileError) {
     console.error("[deleteAccountAction] profile delete failed:", profileError);
     return {
-      error: "Account konnte nicht gelöscht werden. Bitte wende dich an den Support.",
+      error: "Account konnte nicht gelöscht werden. Bitte wenden Sie sich an den Support.",
     };
   }
 
@@ -142,7 +142,7 @@ export async function deleteAccountAction(
     console.error("[deleteAccountAction] auth delete failed:", authError);
     return {
       error:
-        "Profil-Daten wurden gelöscht, aber der Auth-Account konnte nicht entfernt werden. Bitte wende dich an den Support.",
+        "Profil-Daten wurden gelöscht, aber der Auth-Account konnte nicht entfernt werden. Bitte wenden Sie sich an den Support.",
     };
   }
 

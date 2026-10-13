@@ -28,7 +28,7 @@ test.describe("PROJ-9 — Mitgliederliste", () => {
       page.getByRole("heading", { name: "Nutzerübersicht" }),
     ).toBeVisible();
     await expect(page.getByText("qa-test@narravit.de").first()).toBeVisible();
-    await expect(page.getByText("(Du)")).toBeVisible();
+    await expect(page.getByText("(Sie)")).toBeVisible();
   });
 
   test("AC-List-2: PL sieht 'Nutzer hinzufügen'-Button", async ({ page }) => {

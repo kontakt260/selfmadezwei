@@ -33,7 +33,7 @@ test.describe("PROJ-2 — Public auth pages render", () => {
 
   test("/email-bestaetigen shows confirmation hint", async ({ page }) => {
     await page.goto("/email-bestaetigen");
-    await expect(page.getByRole("heading", { name: /Prüfe deine E-Mail/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Prüfen Sie Ihre E-Mail/ })).toBeVisible();
   });
 
   test("/passwort-vergessen shows email input", async ({ page }) => {
@@ -231,7 +231,7 @@ test.describe("PROJ-2 — Onboarding wizard", () => {
     await page.goto("/onboarding");
     // for-whom is now step 1 — click Weiter without selecting
     await page.getByRole("button", { name: "Weiter" }).click();
-    await expect(page.getByText(/Bitte triff eine Auswahl/)).toBeVisible();
+    await expect(page.getByText(/Bitte treffen Sie eine Auswahl/)).toBeVisible();
   });
 
   test("gift-computer step rejects invalid email", async ({ page }) => {
