@@ -175,6 +175,17 @@ Test-Infrastruktur:
 
 **✅ BEREIT** — Keine Critical oder High Bugs. BUG-1 (Medium, UX-only) blockiert nicht das Deployment.
 
+## Nachtrag 2026-10-14 — Passwort für Google-/Facebook-Konten
+
+- Abschnitt „Sicherheit" zeigt den Button jetzt auch für Konten, die per Google oder Facebook angelegt wurden (früher nur Hinweis „Passwort-Verwaltung erfolgt dort").
+- Drei Zustände:
+  - E-Mail-Konto: unverändert „Passwort zurücksetzen".
+  - Google-/Facebook-Konto ohne Passwort: „Sie melden sich über Google an. Wenn Sie sich zusätzlich mit einer E-Mail-Adresse und einem Passwort anmelden möchten, können Sie hier ein Passwort festlegen." — Button „Passwort festlegen".
+  - Google-/Facebook-Konto mit Passwort: Hinweis, dass zusätzlich ein Passwort festgelegt ist — Button „Passwort ändern".
+- Ob ein Passwort existiert, liefert Supabase nicht mit dem Nutzer-Objekt. Das Reset-Formular setzt deshalb beim Speichern den Marker `has_password` in den Nutzer-Metadaten; ausgewertet wird er in `src/lib/auth/has-password.ts` (mit Unit-Test). Der Marker steuert nur die Beschriftung, keine Berechtigung.
+- Bewusst **ohne** Datenbank-Änderung: Eine Hilfsfunktion in der Datenbank wäre genauer gewesen, die Supabase-Anbindung durfte am 2026-10-14 aber keine Migration anwenden („You do not have permission").
+- Nicht im Browser mit einem Google-Konto geprüft (QA-Konto ist ein E-Mail-Konto); Typprüfung, Unit-Tests und der E2E-Test für E-Mail-Konten (AC-13) sind grün.
+
 ## Deployment
 
 **Deployed:** 2026-05-17

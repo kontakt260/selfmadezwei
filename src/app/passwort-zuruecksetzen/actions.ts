@@ -38,8 +38,12 @@ export async function resetPasswordAction(
   }
 
   const supabase = await createClient();
+  // `has_password` merkt sich, dass dieses Konto jetzt (auch) ein Passwort
+  // hat — relevant für per Google/Facebook angelegte Konten, siehe
+  // src/lib/auth/has-password.ts.
   const { error } = await supabase.auth.updateUser({
     password: parsed.data.password,
+    data: { has_password: true },
   });
 
   if (error) {

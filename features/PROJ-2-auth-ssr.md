@@ -566,6 +566,19 @@ Nach dem ersten QA-Lauf wurden alle Critical/High/Medium Bugs gefixt. Re-Test mi
 | BUG-12 | ❌ Offen | Vor nächstem Deploy |
 | BUG-13 | ❌ Offen (Spec-Update) | Low |
 
+## Nachtrag 2026-10-14 — Mail-Links und Anmeldewege
+
+**Anlass:** Ein Passwort-Reset-Link wurde als „nicht mehr gültig" angezeigt, obwohl er 18 Sekunden nach der Anforderung angeklickt wurde. Ursache laut Auth-Log: Der bisherige Ablauf (PKCE-Code) funktioniert nur in dem Browser, in dem der Vorgang gestartet wurde; im anderen Browser fehlt der Verifier im Cookie.
+
+**Umgesetzt (auf Stage, Commits `9effcf7`, `fca4fa4` und Folge-Commit):**
+- `/auth/callback` bestätigt Mail-Links zusätzlich per `token_hash` + `type` (serverseitig `verifyOtp`). Der Code-Weg für Google/Facebook bleibt unverändert. Lokal mit echtem PKCE-Token des QA-Kontos geprüft: erster Klick ohne Cookies → Reset-Formular, zweiter Klick → Hinweis.
+- Fehlgeschlagener Reset-Link: Die Anmeldeseite bietet „Neuen Link anfordern" statt einer neuen Bestätigungs-Mail.
+- **Produktentscheidung:** Pro E-Mail-Adresse funktionieren alle Anmeldewege. Wer sich mit Google/Facebook (später Apple) registriert hat, bekommt über „Passwort vergessen" ebenfalls einen Link und kann ein Passwort festlegen. Der frühere Hinweis „Passwort beim Provider zurücksetzen" ist entfernt.
+
+**Backlog — Supabase-Mail-Vorlagen:** Entwürfe für „Confirm signup" und „Reset password" liegen in `supabase/templates/` (erzeugt aus `src/emails/auth/`). Sie sind **noch nicht** in Supabase eingesetzt; das Design soll separat überarbeitet werden. Erst mit den eigenen Vorlagen greift der neue Token-Weg — bis dahin laufen Mail-Links weiter über den Code-Weg (nur im selben Browser). Die Vorlagen sind außerdem der Ort für die Sie-Anrede in den Auth-Mails.
+
+**Befund ohne Fehler:** Das vermutete Zustellproblem bei Gmail war keines — die Test-Registrierung lief auf eine vom Browser vorgeschlagene, falsche Adresse. Supabase verschickt über Resend (Absender-Domain `mail.narravit.de`).
+
 ## Deployment
 
 **Datum:** 2026-10-13

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { hasPasswordLogin } from "@/lib/auth/has-password";
 import { PersonalAreaClient } from "./PersonalAreaClient";
 
 export default async function PersoenlicherBereichPage() {
@@ -24,6 +25,7 @@ export default async function PersoenlicherBereichPage() {
       fullName={profile?.full_name ?? ""}
       email={user.email ?? ""}
       authProvider={authProvider}
+      hasPassword={hasPasswordLogin(user)}
     />
   );
 }

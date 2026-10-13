@@ -260,7 +260,13 @@ function InvoiceSection() {
 
 // ─── Sicherheit ──────────────────────────────────────────────────────────────
 
-function SecuritySection({ authProvider }: { authProvider: string }) {
+function SecuritySection({
+  authProvider,
+  hasPassword,
+}: {
+  authProvider: string;
+  hasPassword: boolean;
+}) {
   const [state, formAction, pending] = useActionState<ResetPasswordState, FormData>(
     resetPasswordAction,
     {},
@@ -295,15 +301,24 @@ function SecuritySection({ authProvider }: { authProvider: string }) {
           </>
         ) : (
           <>
-            <p className="[font-family:var(--font-lato)] max-w-4xl text-lg font-semibold leading-8 text-[#3E3831] sm:text-xl sm:leading-9">
-              Sie melden sich über {providerLabel} an. Wenn Sie sich zusätzlich
-              mit E-Mail-Adresse und Passwort anmelden möchten, können Sie
-              hier ein Passwort festlegen.
-            </p>
+            {hasPassword ? (
+              <p className="[font-family:var(--font-lato)] max-w-4xl text-lg font-semibold leading-8 text-[#3E3831] sm:text-xl sm:leading-9">
+                Sie melden sich über {providerLabel} an und haben zusätzlich
+                ein Passwort festgelegt. Mit dem Klick auf „Passwort ändern"
+                erhalten Sie eine E-Mail von uns mit einem sicheren Link, über
+                den Sie ein neues Passwort vergeben können.
+              </p>
+            ) : (
+              <p className="[font-family:var(--font-lato)] max-w-4xl text-lg font-semibold leading-8 text-[#3E3831] sm:text-xl sm:leading-9">
+                Sie melden sich über {providerLabel} an. Wenn Sie sich
+                zusätzlich mit einer E-Mail-Adresse und einem Passwort
+                anmelden möchten, können Sie hier ein Passwort festlegen.
+              </p>
+            )}
             <p className="max-w-3xl text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
-              Sie erhalten dazu eine E-Mail mit einem sicheren Link. Die
-              Anmeldung über {providerLabel} funktioniert danach weiterhin wie
-              gewohnt.
+              {hasPassword
+                ? `Die Anmeldung über ${providerLabel} funktioniert weiterhin wie gewohnt.`
+                : `Sie erhalten dazu eine E-Mail mit einem sicheren Link. Die Anmeldung über ${providerLabel} funktioniert danach weiterhin wie gewohnt.`}
             </p>
           </>
         )}
@@ -332,7 +347,9 @@ function SecuritySection({ authProvider }: { authProvider: string }) {
               ? "Wird gesendet …"
               : isEmailProvider
                 ? "Passwort zurücksetzen"
-                : "Passwort festlegen"}
+                : hasPassword
+                  ? "Passwort ändern"
+                  : "Passwort festlegen"}
           </SandButton>
         </form>
       </div>
@@ -456,12 +473,14 @@ export interface PersonalAreaProps {
   fullName: string;
   email: string;
   authProvider: string;
+  hasPassword: boolean;
 }
 
 export function PersonalAreaClient({
   fullName,
   email,
   authProvider,
+  hasPassword,
 }: PersonalAreaProps) {
   return (
     <>
@@ -498,7 +517,7 @@ export function PersonalAreaClient({
           <div className="flex flex-col gap-6 sm:gap-8">
             <AccountSection fullName={fullName} email={email} />
             <InvoiceSection />
-            <SecuritySection authProvider={authProvider} />
+            <SecuritySection authProvider={authProvider} hasPassword={hasPassword} />
             <DeleteAccountSection />
           </div>
         </div>
