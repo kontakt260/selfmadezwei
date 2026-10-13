@@ -85,7 +85,7 @@ test.describe("PROJ-4 — Projektübersicht", () => {
     await expect(backLink).toHaveAttribute("href", "/");
   });
 
-  test("AC-PÜ-3: Sektionen Cover-Karte, Telefon-Platzhalter, Nutzerübersicht sichtbar", async ({ page }) => {
+  test("AC-PÜ-3: Sektionen Cover-Karte, Sprachnachricht-Platzhalter, Nutzerübersicht sichtbar", async ({ page }) => {
     await page.goto(PROJECT_URL);
     await expect(page.getByRole("heading", { name: "Cover bearbeiten" })).toBeVisible();
     // PROJ-10 ersetzt den alten Cover-Editor-Placeholder durch die echte
@@ -96,8 +96,9 @@ test.describe("PROJ-4 — Projektübersicht", () => {
       "href",
       `${PROJECT_URL}/cover-bearbeiten`,
     );
-    // PROJ-12 appears in two places (phone section + stat card) — use first()
-    await expect(page.getByText(/PROJ-12/).first()).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Erzählen per Sprachnachricht" }),
+    ).toBeVisible();
     // PROJ-9 ersetzt den alten „Projektmitglieder"-Placeholder durch die
     // echte „Nutzerübersicht"-Sektion mit Mitglieder-Liste.
     await expect(page.getByRole("heading", { name: "Nutzerübersicht" })).toBeVisible();
@@ -105,7 +106,7 @@ test.describe("PROJ-4 — Projektübersicht", () => {
 
   test("AC-PÜ-4: Stat-Karten Platzhalter sichtbar", async ({ page }) => {
     await page.goto(PROJECT_URL);
-    await expect(page.getByText("Telefonzeit übrig")).toBeVisible();
+    await expect(page.getByText("Telefonzeit übrig")).toHaveCount(0);
     await expect(page.getByText(/NARRAVIT-Projektzugang endet in/)).toBeVisible();
   });
 

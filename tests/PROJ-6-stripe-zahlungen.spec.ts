@@ -1,6 +1,6 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
 
-// PROJ-6 — Stripe-Zahlungen (Portal + Vapi-Paket).
+// PROJ-6 — Stripe-Zahlungen (Portal). Vapi-Paket zurückgebaut 2026-10-13.
 //
 // Diese E2E-Suite deckt die acceptance criteria ab, die nicht schon
 // von der Vitest-Suite (`src/app/api/stripe/webhook/route.test.ts`,
@@ -116,14 +116,17 @@ test.describe("PROJ-6 — Stat-Cards", () => {
   const QA_PROJECT_URL =
     "/projektuebersicht/cccccccc-0099-0099-0099-000000000099";
 
-  test("AC-Stats-1: Projektübersicht zeigt Telefonzeit-Stat + Nachkauf-Button", async ({
+  test("AC-Stats-1: Projektübersicht zeigt keine Telefonzeit-Stat und keinen Nachkauf-Button mehr", async ({
     page,
   }) => {
     await page.goto(QA_PROJECT_URL);
-    await expect(page.getByText("Telefonzeit übrig")).toBeVisible();
+    await expect(
+      page.getByText(/NARRAVIT-Projektzugang endet/i),
+    ).toBeVisible();
+    await expect(page.getByText("Telefonzeit übrig")).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: /60 Minuten nachkaufen/ }),
-    ).toBeVisible();
+    ).toHaveCount(0);
   });
 
   test("AC-Stats-2: Projektübersicht zeigt Zugang-endet-in-Stat + Verlängern-Button", async ({

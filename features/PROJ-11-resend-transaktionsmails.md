@@ -1,6 +1,6 @@
 # PROJ-11: Resend-Transaktionsmails
 
-> ⚠️ **Anpassung offen (2026-10-13):** Vapi entfällt ([PROJ-12](PROJ-12-audio-erzaehlpipeline.md)). „Mail 3 — Vapi-Paket-Kauf-Bestätigung" (Template, Helper, Webhook-Hook) wird mit dem PROJ-6-Rückbau entfernt; der Satz „10 Stunden Vapi-Erzählzeit sind inklusive" in der Portal-Kauf-Mail wird ersetzt. Die neuen Mails (Erzähl-Aufforderung, Erinnerung, „neues Kapitel erzählt") gehören zu PROJ-12 und nutzen die hier gebaute Infrastruktur.
+> ℹ️ **Anpassung 2026-10-13:** Vapi entfällt ([PROJ-12](PROJ-12-audio-erzaehlpipeline.md)). „Mail 3 — Vapi-Paket-Kauf-Bestätigung" (Template, Helper, Webhook-Hook) wurde mit dem PROJ-6-Rückbau entfernt; die Portal-Kauf-Mail und die Welcome-Mail nennen jetzt „per Sprachnachricht erzählen" statt Telefon/10 Stunden. Alle Vapi-Passagen weiter unten sind damit überholt. Die neuen Mails (Erzähl-Aufforderung, Erinnerung, „neues Kapitel erzählt") gehören zu PROJ-12 und nutzen die hier gebaute Infrastruktur.
 
 ## Status: In Review
 **Created:** 2026-05-22

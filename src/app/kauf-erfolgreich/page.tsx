@@ -14,7 +14,7 @@ import { getStripe } from "@/lib/stripe/server";
 type Variant =
   | { type: "initial-self" }
   // Geschenk, gift_mode = "phone-only": Käufer bleibt Projektleiter,
-  // beschenkte Person erzählt am Telefon, kein Portal-Login für sie.
+  // beschenkte Person erzählt per Sprachnachricht, kein Portal-Login für sie.
   | { type: "initial-gift-phone-only"; recipientEmail: string }
   // Geschenk, gift_mode = "phone-plus-computer" (beide Sub-Varianten —
   // mit oder ohne buyer_retains_access). Für den Empfänger wurde eine
@@ -24,8 +24,7 @@ type Variant =
       recipientEmail: string;
       buyerRetainsAccess: boolean;
     }
-  | { type: "renewal"; projectId: string }
-  | { type: "vapi"; projectId: string };
+  | { type: "renewal"; projectId: string };
 
 async function verifyStripeSession(sessionId: string): Promise<Variant | null> {
   try {
@@ -56,9 +55,6 @@ async function verifyStripeSession(sessionId: string): Promise<Variant | null> {
     }
     if (productType === "renewal" && meta.project_id) {
       return { type: "renewal", projectId: meta.project_id };
-    }
-    if (productType === "vapi" && meta.project_id) {
-      return { type: "vapi", projectId: meta.project_id };
     }
     return null;
   } catch {
@@ -95,9 +91,6 @@ export default async function KaufErfolgreichPage({
         {variant.type === "renewal" && (
           <RenewalContent projectId={variant.projectId} />
         )}
-        {variant.type === "vapi" && (
-          <VapiContent projectId={variant.projectId} />
-        )}
       </div>
     </main>
   );
@@ -111,8 +104,7 @@ function InitialSelfContent() {
       </h1>
       <p className="text-lg leading-8 text-[#535252]">
         Ihr Zugang ist aktiv — viel Freude beim Schreiben Ihres
-        Lebensbuchs. 10 Stunden Telefon-Erzählzeit sind inklusive, Ihr
-        Portal-Zugang gilt 12 Monate.
+        Lebensbuchs. Ihr Portal-Zugang gilt 12 Monate.
       </p>
       <Link
         href="/"
@@ -143,17 +135,15 @@ function InitialGiftPhoneOnlyContent({
         {recipientEmail ? (
           <>
             Ihre beschenkte Person (
-            <span className="font-semibold">{recipientEmail}</span>) kann ab
-            sofort am Telefon erzählen. Geben Sie ihr einfach die
-            Telefonnummer, die Sie in der Projektübersicht finden — ein
-            eigener Portal-Zugang ist für sie nicht nötig.
+            <span className="font-semibold">{recipientEmail}</span>) erzählt
+            ihre Geschichten per Sprachnachricht — ein eigener
+            Portal-Zugang ist für sie nicht nötig.
           </>
         ) : (
           <>
-            Ihre beschenkte Person kann ab sofort am Telefon erzählen.
-            Geben Sie ihr die Telefonnummer, die Sie in der
-            Projektübersicht finden — ein eigener Portal-Zugang ist für
-            sie nicht nötig.
+            Ihre beschenkte Person erzählt ihre Geschichten per
+            Sprachnachricht — ein eigener Portal-Zugang ist für sie nicht
+            nötig.
           </>
         )}
       </p>
@@ -181,8 +171,8 @@ function InitialGiftPhoneComputerContent({
       </h1>
       <p className="text-lg leading-8 text-[#535252]">
         Vielen Dank für Ihren Kauf. Wir haben eine Einladung an Ihre
-        beschenkte Person geschickt — sobald sie sie annimmt, kann sie am
-        Telefon erzählen oder selbst im Portal schreiben.
+        beschenkte Person geschickt — sobald sie sie annimmt, kann sie
+        selbst im Portal schreiben.
       </p>
       <p className="border border-[#96B897]/40 bg-[#96B897]/10 p-4 text-base text-[#3E3831]">
         Einladungs-Mail unterwegs an{" "}
@@ -226,25 +216,6 @@ function RenewalContent({ projectId }: { projectId: string }) {
       </h1>
       <p className="text-lg leading-8 text-[#535252]">
         Dein Projekt-Zugang wurde um 12 Monate verlängert.
-      </p>
-      <Link
-        href={`/projektuebersicht/${projectId}`}
-        className="inline-flex h-12 items-center justify-center bg-[#D0BCA6] px-6 text-lg font-bold text-[#0a0909] transition-colors hover:bg-[#c0ad98]"
-      >
-        Zurück zum Projekt
-      </Link>
-    </>
-  );
-}
-
-function VapiContent({ projectId }: { projectId: string }) {
-  return (
-    <>
-      <h1 className="[font-family:var(--font-merriweather)] text-3xl font-medium text-[#3E3831]">
-        Kauf erfolgreich
-      </h1>
-      <p className="text-lg leading-8 text-[#535252]">
-        60 Minuten Telefonzeit wurden deinem Projekt gutgeschrieben.
       </p>
       <Link
         href={`/projektuebersicht/${projectId}`}

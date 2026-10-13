@@ -6,17 +6,29 @@
 **Anlass:** Vapi wird durch Audio-Sprachnachrichten ersetzt ([PROJ-12](PROJ-12-audio-erzaehlpipeline.md)). Erzählen ist im Portal-Zugang enthalten; es gibt kein Zeit-Kontingent und kein Nachkauf-Produkt mehr. PROJ-6 umfasst damit nur noch **Portal-Zugang Initial (249 €)** und **Verlängerung (99 €)**.
 
 ### Acceptance Criteria (Rückbau)
-- [ ] Das Produkt „Vapi +60 Min" ist nicht mehr kaufbar: Checkout akzeptiert nur noch `initial` und `renewal`; ein Aufruf mit dem alten Produkt-Typ wird serverseitig abgelehnt.
-- [ ] Die Stat-Karte „Telefonzeit übrig" inkl. „Nachkaufen"-Button ist aus der Projektübersicht entfernt; die Karte „Projektzugang endet in" bleibt.
-- [ ] Die Guthaben-Berechnung (`36 000 + Top-ups × 3 600 − Verbrauch`) ist entfernt.
-- [ ] Der Webhook verarbeitet keine neuen Vapi-Käufe mehr; ein dennoch eintreffendes Altereignis wird protokolliert und ohne Fehler quittiert.
-- [ ] Bestätigungsseite `/kauf-erfolgreich` und Abbruch-Pfade kennen nur noch Initial (selbst / Geschenk) und Verlängerung.
-- [ ] Onboarding-Kaufschritt und Kauf-Mail nennen keine „10 Stunden Vapi-Erzählzeit" mehr (neuer Text siehe PROJ-12).
-- [ ] Kauf-Mail „Vapi-Paket" und zugehöriger Versand-Helper sind entfernt (PROJ-11).
+- [x] Das Produkt „Vapi +60 Min" ist nicht mehr kaufbar: Checkout akzeptiert nur noch `initial` und `renewal`; ein Aufruf mit dem alten Produkt-Typ wird serverseitig abgelehnt.
+- [x] Die Stat-Karte „Telefonzeit übrig" inkl. „Nachkaufen"-Button ist aus der Projektübersicht entfernt; die Karte „Projektzugang endet in" bleibt.
+- [x] Die Guthaben-Berechnung (`36 000 + Top-ups × 3 600 − Verbrauch`) ist entfernt.
+- [x] Der Webhook verarbeitet keine neuen Vapi-Käufe mehr; ein dennoch eintreffendes Altereignis wird protokolliert und ohne Fehler quittiert.
+- [x] Bestätigungsseite `/kauf-erfolgreich` und Abbruch-Pfade kennen nur noch Initial (selbst / Geschenk) und Verlängerung.
+- [x] Onboarding-Kaufschritt und Kauf-Mail nennen keine „10 Stunden Vapi-Erzählzeit" mehr (neuer Text siehe PROJ-12).
+- [x] Kauf-Mail „Vapi-Paket" und zugehöriger Versand-Helper sind entfernt (PROJ-11).
 - [ ] Der Checkout nimmt die neuen Onboarding-Angaben aus PROJ-12 (Erzählweise, Kontaktwege, Wochentag) entgegen und der Webhook speichert sie beim Anlegen des Projekts. *(Umsetzung zusammen mit PROJ-12.)*
-- [ ] Altbestand: Der Zahlungstyp `vapi_voice_minutes_60` bleibt in der Datenbank bestehen (bestehende Zahlungen bleiben als Beleg im persönlichen Bereich sichtbar), wird aber nicht mehr neu vergeben.
-- [ ] `STRIPE_PRICE_ID_VAPI_60` und `VAPI_API_KEY` sind aus `.env.local.example` und der Vercel-Konfiguration entfernt; das Stripe-Produkt ist im Stripe-Dashboard archiviert (manueller Schritt).
-- [ ] Unit- und E2E-Tests zum Vapi-Pfad sind entfernt bzw. auf „wird abgelehnt" umgestellt.
+- [x] Altbestand: Der Zahlungstyp `vapi_voice_minutes_60` bleibt in der Datenbank bestehen (bestehende Zahlungen bleiben als Beleg im persönlichen Bereich sichtbar), wird aber nicht mehr neu vergeben.
+- [ ] `STRIPE_PRICE_ID_VAPI_60` und `VAPI_API_KEY` sind aus `.env.local.example` und der Vercel-Konfiguration entfernt; das Stripe-Produkt ist im Stripe-Dashboard archiviert (manueller Schritt). — *Im Repo erledigt (`.env.local.example`, `playwright.config.ts`); Vercel-Env und Stripe-Dashboard sind noch manuell offen.*
+- [x] Unit- und E2E-Tests zum Vapi-Pfad sind entfernt bzw. auf „wird abgelehnt" umgestellt.
+
+### Implementation Notes (Rückbau, 2026-10-13)
+- `src/lib/stripe/server.ts`: Produkt `vapi` aus `PRODUCTS` entfernt; `ProductType` ist nur noch `initial | renewal`.
+- `src/app/checkout/actions.ts`: Laufzeit-Prüfung lehnt jeden anderen Produkt-Typ ab (Server-Actions sind von außen aufrufbar). Neuer Test `actions.test.ts`.
+- `src/app/api/stripe/webhook/route.ts`: `handleVapi` entfernt; Altereignisse mit `product_type = vapi` werden per `console.warn` protokolliert und mit 200 (`ignored: retired_product`) quittiert, ohne `payments`-Eintrag.
+- `src/components/projektuebersicht/PaywallStats.tsx`: Karte „Telefonzeit übrig" entfernt, nur noch die Zugangs-Karte (volle Breite).
+- `src/app/projektuebersicht/[project_id]/page.tsx`: Guthaben-Formel und `voice_sessions`-Abfrage entfernt; Platzhalter-Sektion heißt jetzt „Erzählen per Sprachnachricht" (Inhalt folgt mit PROJ-12).
+- `src/app/kauf-erfolgreich/page.tsx`: Variante `vapi` entfernt; Telefon-/10-Stunden-Texte ersetzt.
+- Mails: `VapiPackagePurchaseEmail.tsx` und `send-vapi-package.ts` gelöscht; Texte in `PortalPurchaseEmail` und `WelcomeEmail` angepasst; Mail-Typ `vapi_package` aus dem TS-Typ entfernt (der DB-Check in `mail_log` lässt den Wert als Altbestand weiter zu).
+- Onboarding-Kaufschritt: neuer Preistext. **Nicht** Teil dieses Schritts: Umbenennung der Erzählweise („Nur per Telefon erzählen") und der neue Kontakt-Schritt — das kommt mit dem PROJ-12-Frontend.
+- Keine Datenbank-Migration: Enum-Wert `vapi_voice_minutes_60` und Tabelle `voice_sessions` bleiben unverändert bestehen (Stilllegung von `voice_sessions` mit PROJ-12).
+- Tests: Vitest 149/149 grün, `tsc --noEmit` ohne Fehler. E2E-Specs (PROJ-4, PROJ-6) angepasst, aber **nicht ausgeführt** (brauchen Stage-DB + Login). `npm run lint` läuft derzeit nicht (keine ESLint-9-Konfigurationsdatei im Repo — bestand schon vorher).
 
 ### Edge Cases (Rückbau)
 - Projekte mit früher gekauftem Vapi-Paket (bisher nur Testkäufe auf stage): kein Ausgleich nötig; vor Rückbau prüfen, ob es echte Käufe gibt.

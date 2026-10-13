@@ -4,10 +4,11 @@ import { useState, useTransition } from "react";
 import { Loader2 } from "lucide-react";
 import { startCheckoutAction } from "@/app/checkout/actions";
 
-// Client-Komponente für die zwei zahlungsbezogenen Stat-Karten der
+// Client-Komponente für die zahlungsbezogene Stat-Karte der
 // Projektübersicht (PROJ-6 Frontend):
-//   1. "NARRAVIT-Projektzugang endet in …" + "Verlängern"-Button
-//   2. "Telefonzeit übrig" + "Nachkaufen"-Button
+//   "NARRAVIT-Projektzugang endet in …" + "Verlängern"-Button
+// Die frühere Karte "Telefonzeit übrig" ist mit dem Rückbau des
+// Erzählzeit-Kontingents entfallen (2026-10-13).
 //
 // Die Stat-Werte werden vom Server (Server-Component) als Props
 // übergeben. Die Buttons rufen `startCheckoutAction` auf. PROJ-6
@@ -18,62 +19,16 @@ type Props = {
   projectId: string;
   // ISO-String der Ablaufzeit, ODER null wenn noch nicht aktiviert.
   portalExpiresAt: string | null;
-  // Sekunden — verfügbare Vapi-Sprechzeit (10h Inkl. + Top-Ups − Verbrauch).
-  // null wenn Projekt noch keinen aktiven Zugang hat.
-  vapiSecondsAvailable: number | null;
 };
 
-export function PaywallStats({
-  projectId,
-  portalExpiresAt,
-  vapiSecondsAvailable,
-}: Props) {
+export function PaywallStats({ projectId, portalExpiresAt }: Props) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
-      <VapiStat
-        projectId={projectId}
-        secondsAvailable={vapiSecondsAvailable}
-      />
+    <div className="grid grid-cols-1 gap-4 sm:gap-6">
       <PortalAccessStat
         projectId={projectId}
         expiresAt={portalExpiresAt}
       />
     </div>
-  );
-}
-
-function VapiStat({
-  projectId,
-  secondsAvailable,
-}: {
-  projectId: string;
-  secondsAvailable: number | null;
-}) {
-  return (
-    <StatCard
-      icon={<IconClock />}
-      label="Telefonzeit übrig"
-      value={
-        secondsAvailable === null
-          ? "—"
-          : formatHours(secondsAvailable)
-      }
-      hint={
-        secondsAvailable === null
-          ? "Verfügbar nach Aktivierung des Telefon-Assistenten (PROJ-12)"
-          : secondsAvailable < 60 * 60
-            ? "Nur noch weniger als 60 Minuten — jetzt nachkaufen empfohlen."
-            : "Genug Zeit für deine nächsten Erzähl-Sessions."
-      }
-      action={
-        <CheckoutButton
-          label="60 Minuten nachkaufen — 19 €"
-          loadingLabel="Wird vorbereitet …"
-          input={{ productType: "vapi", projectId }}
-          disabled={secondsAvailable === null}
-        />
-      }
-    />
   );
 }
 
@@ -205,25 +160,6 @@ function CheckoutButton({
         </p>
       )}
     </div>
-  );
-}
-
-function formatHours(seconds: number): string {
-  if (seconds <= 0) return "0 Minuten";
-  const totalMinutes = Math.floor(seconds / 60);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  if (hours === 0) return `${minutes} Minuten`;
-  if (minutes === 0) return `${hours} h`;
-  return `${hours} h ${minutes} min`;
-}
-
-function IconClock() {
-  return (
-    <svg width={28} height={28} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx={12} cy={12} r={9} stroke="currentColor" strokeWidth={2} />
-      <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
-    </svg>
   );
 }
 

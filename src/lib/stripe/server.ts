@@ -46,12 +46,6 @@ export const PRODUCTS = {
     currency: "eur",
     paymentType: "portal_access_renewal" as const,
   },
-  vapi: {
-    priceIdEnv: "STRIPE_PRICE_ID_VAPI_60",
-    amountCents: 1900,
-    currency: "eur",
-    paymentType: "vapi_voice_minutes_60" as const,
-  },
 } as const;
 
 export type ProductType = keyof typeof PRODUCTS;

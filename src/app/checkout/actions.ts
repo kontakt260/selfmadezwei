@@ -19,7 +19,7 @@ import { getStripe, getPriceId, getSiteUrl } from "@/lib/stripe/server";
 //     dann doch noch eine Antwort braucht. Stattdessen geben wir die
 //     `url` zurück und der Client navigiert via `window.location`.
 
-export type CheckoutProductType = "initial" | "renewal" | "vapi";
+export type CheckoutProductType = "initial" | "renewal";
 
 export type InitialMetadata = {
   fullName: string;
@@ -33,8 +33,7 @@ export type InitialMetadata = {
 
 export type StartCheckoutInput =
   | { productType: "initial"; metadata: InitialMetadata }
-  | { productType: "renewal"; projectId: string }
-  | { productType: "vapi"; projectId: string };
+  | { productType: "renewal"; projectId: string };
 
 export type StartCheckoutResult =
   | { ok: true; checkoutUrl: string }
@@ -48,6 +47,14 @@ export async function startCheckoutAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Nicht eingeloggt." };
+
+  // Server-Actions sind von außen aufrufbar — Typen schützen zur Laufzeit
+  // nicht. Nur die zwei kaufbaren Produkte zulassen (das frühere
+  // Vapi-Top-Up ist seit 2026-10-13 nicht mehr kaufbar).
+  const requestedType: string = input.productType;
+  if (requestedType !== "initial" && requestedType !== "renewal") {
+    return { ok: false, error: "Dieses Produkt ist nicht verfügbar." };
+  }
 
   // Eingabe-Validierung pro Produkt-Typ.
   if (input.productType === "initial") {
@@ -69,7 +76,7 @@ export async function startCheckoutAction(
       return { ok: false, error: "Projekt-ID fehlt." };
     }
     // Mitgliedschaft prüfen — jedes Projekt-Mitglied (PL oder Co-Autor)
-    // darf Verlängerung + Vapi-Top-Up kaufen. User-Request 2026-05-21:
+    // darf die Verlängerung kaufen. User-Request 2026-05-21:
     // „jeder muss die Möglichkeit haben, für ein Projekt mehr zu erwerben".
     const { data: membership } = await supabase
       .from("project_members")
@@ -97,7 +104,7 @@ export async function startCheckoutAction(
 
   // success_url + cancel_url:
   // success → /kauf-erfolgreich mit session_id (verifiziert server-seitig)
-  // cancel  → /onboarding (initial) bzw. /projektuebersicht/[pid] (renewal/vapi)
+  // cancel  → /onboarding (initial) bzw. /projektuebersicht/[pid] (renewal)
   const successUrl = `${siteUrl}/kauf-erfolgreich?session_id={CHECKOUT_SESSION_ID}`;
   const cancelUrl =
     input.productType === "initial"
@@ -135,7 +142,7 @@ export async function startCheckoutAction(
       customer_email: user.email ?? undefined,
       allow_promotion_codes: true,
       // Metadata wird vom Webhook gelesen, um die richtige DB-Aktion
-      // auszuführen (Projekt anlegen / Renewal / Vapi-Top-Up).
+      // auszuführen (Projekt anlegen / Renewal).
       metadata,
       // payment_intent_data.metadata zusätzlich befüllen — manche
       // Stripe-Reports zeigen nur die PaymentIntent-Metadata.

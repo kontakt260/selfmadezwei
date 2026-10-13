@@ -530,7 +530,7 @@ function StepPurchase({ state }: { state: WizardState }) {
         <p className="text-base text-[#848484]">12 Monate Portal-Zugang</p>
         <p className="heading-style-h4 mt-1">249 €</p>
         <p className="mt-2 text-base text-[#535252]">
-          Inklusive 10 Stunden Vapi-Erzählzeit, Editor und Druck-Vorbereitung.
+          Inklusive Erzählen per Sprachnachricht, Editor und Druck-Vorbereitung.
         </p>
       </div>
     </div>

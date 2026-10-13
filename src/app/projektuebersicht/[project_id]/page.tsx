@@ -176,34 +176,16 @@ export default async function ProjektuebersichtPage({
     imageUrl: coverSignedUrl,
   };
 
-  // Vapi-Sprechzeit-Berechnung (PROJ-6):
-  //   36 000 s (10 h Inklusiv) + Σ vapi-Top-Ups × 3 600 − Σ voice-sessions.duration
-  // Sichtbarkeit: nur wenn Projekt einen erfolgreich abgeschlossenen
-  // initial_portal_access-Payment hat (= Zugang aktiviert).
-  const [{ data: payments }, { data: voiceSessions }] = await Promise.all([
-    supabase
-      .from("payments")
-      .select("type, status")
-      .eq("project_id", project_id)
-      .eq("status", "completed"),
-    supabase
-      .from("voice_sessions")
-      .select("duration_seconds")
-      .eq("project_id", project_id),
-  ]);
-  const hasInitialPayment = (payments ?? []).some(
-    (p) => p.type === "initial_portal_access",
-  );
-  const vapiTopUps = (payments ?? []).filter(
-    (p) => p.type === "vapi_voice_minutes_60",
-  ).length;
-  const consumedSeconds = (voiceSessions ?? []).reduce(
-    (sum, s) => sum + (s.duration_seconds ?? 0),
-    0,
-  );
-  const vapiSecondsAvailable = hasInitialPayment
-    ? Math.max(0, 36_000 + vapiTopUps * 3_600 - consumedSeconds)
-    : null;
+  // Ablaufdatum nur anzeigen, wenn das Projekt einen erfolgreich
+  // abgeschlossenen initial_portal_access-Payment hat (= Zugang aktiviert).
+  const { data: payments } = await supabase
+    .from("payments")
+    .select("type, status")
+    .eq("project_id", project_id)
+    .eq("status", "completed")
+    .eq("type", "initial_portal_access")
+    .limit(1);
+  const hasInitialPayment = (payments ?? []).length > 0;
   const portalExpiresAt = hasInitialPayment ? accessRow?.expires_at ?? null : null;
 
   const { data: rawChapters } = await supabase
@@ -318,10 +300,10 @@ export default async function ProjektuebersichtPage({
                 </Link>
               </div>
               <div className="flex min-w-0 flex-col gap-3 sm:gap-4">
-                <SectionHeader icon={<IconPhoneHandset />} title="Code für das Telefonieren" />
+                <SectionHeader icon={<IconPhoneHandset />} title="Erzählen per Sprachnachricht" />
                 <div className="flex flex-col gap-4 bg-[#FAF8F6] p-5 sm:p-7">
                   <p className="text-base leading-7 text-[#848484] sm:text-lg sm:leading-8">
-                    Der Telefon-Code wird mit dem Vapi-Modul aktiviert (PROJ-12).
+                    Das Erzählen per Sprachnachricht wird mit der Audio-Erzählpipeline aktiviert (PROJ-12).
                   </p>
                 </div>
               </div>
@@ -342,11 +324,10 @@ export default async function ProjektuebersichtPage({
             />
           </SectionShell>
 
-          {/* Stat cards mit Verlängerungs- und Vapi-Nachkauf-Buttons (PROJ-6) */}
+          {/* Stat-Karte mit Verlängerungs-Button (PROJ-6) */}
           <PaywallStats
             projectId={project_id}
             portalExpiresAt={portalExpiresAt}
-            vapiSecondsAvailable={vapiSecondsAvailable}
           />
 
           {/* PROJ-9: Mitgliederverwaltung */}

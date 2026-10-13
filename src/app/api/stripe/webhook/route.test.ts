@@ -4,7 +4,7 @@
 //   1. Webhook-Signaturen: 400 bei ungültiger Signatur.
 //   2. Idempotenz: zweimaliger Webhook → ein payments-Eintrag.
 //   3. Renewal-GREATEST-Trick: kein Zeitverlust bei früher Verlängerung.
-//   4. Vapi-Verfügbarkeit: 36 000 + Top-Ups × 3 600 − Sessions.
+//   4. Altprodukt „vapi" wird quittiert, ohne State zu ändern.
 //
 // Negativtest „Paywall-Lockdown" (Pflicht 1) ist ein SQL-Test gegen
 // project_access — siehe tests/PROJ-6-stripe-zahlungen.spec.ts.
@@ -18,7 +18,6 @@ process.env.STRIPE_SECRET_KEY = "sk_test_dummy";
 process.env.STRIPE_WEBHOOK_SECRET = "whsec_test_dummy";
 process.env.STRIPE_PRICE_ID_INITIAL = "price_initial_test";
 process.env.STRIPE_PRICE_ID_RENEWAL = "price_renewal_test";
-process.env.STRIPE_PRICE_ID_VAPI_60 = "price_vapi_test";
 process.env.NEXT_PUBLIC_SITE_URL = "http://localhost:3000";
 process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-dummy";
@@ -191,7 +190,7 @@ describe("Stripe webhook — idempotency (Pflicht-Test 3)", () => {
   it("returns 200 with duplicate:true on second call with same session.id", async () => {
     const session = makeSession({
       id: "cs_dupe",
-      metadata: { product_type: "vapi", user_id: "user-1", project_id: "proj-1" },
+      metadata: { product_type: "renewal", user_id: "user-1", project_id: "proj-1" },
     });
     constructEventMock.mockReturnValue({
       type: "checkout.session.completed",
@@ -323,8 +322,8 @@ describe("Stripe webhook — renewal GREATEST-trick (Pflicht-Test 6)", () => {
   });
 });
 
-describe("Stripe webhook — vapi top-up (Pflicht-Test 7 base)", () => {
-  it("inserts payments-row only, no other state change", async () => {
+describe("Stripe webhook — retired vapi product (PROJ-6-Rückbau)", () => {
+  it("acknowledges with 200 and changes no state", async () => {
     const session = makeSession({
       metadata: {
         product_type: "vapi",
@@ -341,8 +340,10 @@ describe("Stripe webhook — vapi top-up (Pflicht-Test 7 base)", () => {
     const res = await callPost("body", "valid-sig");
     expect(res.status).toBe(200);
 
-    expect(fakeDb.payments.length).toBe(1);
-    expect(fakeDb.payments[0].type).toBe("vapi_voice_minutes_60");
+    const json = await res.json();
+    expect(json.ignored).toBe("retired_product");
+
+    expect(fakeDb.payments.length).toBe(0);
     expect(fakeDb.projects.length).toBe(0);
     expect(fakeDb.project_access.length).toBe(0);
     expect(fakeDb.project_members.length).toBe(0);

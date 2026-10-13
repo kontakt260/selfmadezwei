@@ -11,9 +11,6 @@ export type { InvitationEmailProps } from "./InvitationEmail";
 export { PortalPurchaseEmail } from "./PortalPurchaseEmail";
 export type { PortalPurchaseEmailProps } from "./PortalPurchaseEmail";
 
-export { VapiPackagePurchaseEmail } from "./VapiPackagePurchaseEmail";
-export type { VapiPackagePurchaseEmailProps } from "./VapiPackagePurchaseEmail";
-
 export { WelcomeEmail } from "./WelcomeEmail";
 export type { WelcomeEmailProps } from "./WelcomeEmail";
 

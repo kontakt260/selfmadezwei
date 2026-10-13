@@ -20,7 +20,6 @@ export type MailType =
   | "welcome"
   | "invitation"
   | "portal_purchase"
-  | "vapi_package"
   | "renewal"
   | "reminder_30"
   | "reminder_7";
@@ -39,7 +38,7 @@ export type ReserveResult =
  * Versucht, einen mail_log-Marker anzulegen. Schlägt fehl, wenn
  * (user_id, project_id, mail_type) bereits existiert.
  *
- * Wichtig: Stripe-Mails (portal_purchase, vapi_package, renewal) brauchen
+ * Wichtig: Stripe-Mails (portal_purchase, renewal) brauchen
  * KEIN reserve — der Stripe-Webhook ist bereits idempotent (UNIQUE
  * stripe_session_id im payments). Für diese Mails wird der mail_log nur
  * als Lookup-Tabelle befüllt (mit createNonIdempotentLogEntry), damit

@@ -3,7 +3,6 @@ import type Stripe from "stripe";
 import { getStripe, PRODUCTS, type ProductType } from "@/lib/stripe/server";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { sendPortalPurchaseMail } from "@/lib/email/send-portal-purchase";
-import { sendVapiPackageMail } from "@/lib/email/send-vapi-package";
 import { sendRenewalMail } from "@/lib/email/send-renewal";
 import crypto from "node:crypto";
 
@@ -115,7 +114,7 @@ export async function POST(req: NextRequest) {
   }
 
   const meta = session.metadata ?? {};
-  const productType = meta.product_type as ProductType | undefined;
+  const productType = meta.product_type as ProductType | "vapi" | undefined;
   const userId = meta.user_id as string | undefined;
   if (!productType || !userId) {
     // Metadata fehlt — kein State-Update möglich. Wir loggen aber
@@ -132,7 +131,16 @@ export async function POST(req: NextRequest) {
     } else if (productType === "renewal") {
       await handleRenewal(supabase, session, meta, userId);
     } else if (productType === "vapi") {
-      await handleVapi(supabase, session, meta, userId);
+      // Das Vapi-Top-Up ist seit 2026-10-13 kein kaufbares Produkt mehr
+      // (PROJ-6-Rückbau). Altereignisse quittieren wir ohne State-Update,
+      // damit Stripe nicht endlos retried.
+      console.warn(
+        `[stripe-webhook] retired product "vapi" ignored (session ${session.id})`,
+      );
+      return NextResponse.json(
+        { received: true, ignored: "retired_product", productType },
+        { status: 200 },
+      );
     } else {
       return NextResponse.json(
         { received: true, error: "unknown_product_type", productType },
@@ -185,8 +193,9 @@ async function handleInitial(
 
   // 3. project_members befüllen je nach Geschenk-Variante:
   //    - „Für mich selbst": Käufer = projektleiter.
-  //    - „Geschenk — Nur Telefon": Käufer = projektleiter (Empfänger nutzt
-  //      nur Vapi; kein Portal-Login).
+  //    - „Geschenk — Nur erzählen" (gift_mode phone-only): Käufer =
+  //      projektleiter (Empfänger erzählt nur per Sprachnachricht; kein
+  //      Portal-Login).
   //    - „Geschenk — Auch Computer", Käufer behält Zugang: Käufer = projektleiter
   //      + invitation für Empfänger (co_author).
   //    - „Geschenk — Auch Computer", Käufer verzichtet auf Zugang: KEIN
@@ -335,55 +344,6 @@ async function handleRenewal(
       paymentDateFormatted: formatGermanDate(Date.now()),
       newExpiresAtFormatted: formatGermanDate(newExpiresAt),
       invoiceUrl,
-    });
-  }
-}
-
-// ─── Vapi-Top-Up (19 €) ───────────────────────────────────────────────
-
-async function handleVapi(
-  supabase: ReturnType<typeof createServiceRoleClient>,
-  session: Stripe.Checkout.Session,
-  meta: Record<string, string>,
-  userId: string,
-) {
-  const projectId = meta.project_id?.trim();
-  if (!projectId) throw new Error("vapi: missing project_id in metadata");
-
-  // Kein State-Update außer payments — die verfügbare Sprechzeit wird
-  // bei Bedarf aus payments + voice_sessions berechnet (siehe
-  // Tech-Design Sektion G).
-  const { error: payErr } = await supabase.from("payments").insert({
-    project_id: projectId,
-    user_id: userId,
-    stripe_session_id: session.id,
-    type: PRODUCTS.vapi.paymentType,
-    amount_cents: session.amount_total ?? PRODUCTS.vapi.amountCents,
-    currency: (session.currency ?? PRODUCTS.vapi.currency).toLowerCase(),
-    status: "completed",
-  });
-  if (payErr) throw new Error(payErr.message);
-
-  // PROJ-11: Vapi-Paket-Bestätigung fire-and-forget. Wir holen den
-  // Projekt-Titel für die Personalisierung; bei Fetch-Fehler fällt der
-  // Mail-Text auf einen generischen Hinweis zurück.
-  const buyer = await resolveBuyerEmail(supabase, session, userId);
-  if (buyer.email) {
-    const { data: projectRow } = await supabase
-      .from("projects")
-      .select("title")
-      .eq("id", projectId)
-      .maybeSingle();
-    void sendVapiPackageMail({
-      to: buyer.email,
-      fullName: buyer.fullName ?? undefined,
-      projectName: projectRow?.title ?? "Ihr Projekt",
-      projectId,
-      amountFormatted: formatEur(
-        session.amount_total ?? PRODUCTS.vapi.amountCents,
-        (session.currency ?? PRODUCTS.vapi.currency).toUpperCase(),
-      ),
-      paymentDateFormatted: formatGermanDate(Date.now()),
     });
   }
 }

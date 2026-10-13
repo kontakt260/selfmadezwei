@@ -54,8 +54,8 @@ export function PortalPurchaseEmail({
       <MailParagraph>{greeting}</MailParagraph>
       <MailParagraph>
         herzlich willkommen bei narravit. Ihre Zahlung ist eingegangen — ab
-        sofort können Sie Ihre Lebensgeschichte schreiben oder am Telefon
-        erzählen lassen. <strong>10 Stunden Vapi-Erzählzeit</strong> sind in
+        sofort können Sie Ihre Lebensgeschichte schreiben oder per
+        Sprachnachricht erzählen lassen. <strong>Das Erzählen</strong> ist in
         Ihrem Zugang bereits enthalten.
       </MailParagraph>
 

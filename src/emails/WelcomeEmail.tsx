@@ -35,14 +35,15 @@ export function WelcomeEmail({ fullName, siteUrl }: WelcomeEmailProps) {
       <MailParagraph>{greeting}</MailParagraph>
       <MailParagraph>
         Ihr narravit-Konto ist bestätigt. Sie können jetzt loslegen — egal,
-        ob Sie selbst schreiben oder am Telefon erzählen möchten:
+        ob Sie selbst schreiben oder per Sprachnachricht erzählen möchten:
       </MailParagraph>
       <MailParagraph>
         — Legen Sie Ihr <strong>Lebensbuch-Projekt</strong> an und gestalten
         Sie das Cover.
         <br />— Laden Sie <strong>Familienmitglieder</strong> als
         Co-Autorinnen oder Projektleiter:innen ein.
-        <br />— Erzählen Sie Ihre Geschichten am <strong>Telefon</strong>{" "}
+        <br />— Erzählen Sie Ihre Geschichten per{" "}
+        <strong>Sprachnachricht</strong>{" "}
         oder schreiben Sie sie selbst im <strong>A5-Editor</strong>.
         <br />— Lassen Sie sich von <strong>Erzähl-Impulsen</strong>{" "}
         inspirieren.
