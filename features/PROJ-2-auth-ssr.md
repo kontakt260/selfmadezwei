@@ -1,6 +1,6 @@
 # PROJ-2: Auth + SSR
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-15
 **Last Updated:** 2026-05-16
 
@@ -567,4 +567,24 @@ Nach dem ersten QA-Lauf wurden alle Critical/High/Medium Bugs gefixt. Re-Test mi
 | BUG-13 | ❌ Offen (Spec-Update) | Low |
 
 ## Deployment
-_To be added by /deploy_
+
+**Datum:** 2026-10-13
+**Ziel:** Stage — Branch `stage` → stage-app.narravit.de (Vercel Auto-Deploy). Kein Produktiv-Deployment (`main` unverändert).
+**Commit:** `1feb598` (Stand von `origin/stage` nach dem Push)
+
+**Pre-Deployment-Checks:**
+- `npx next build` — erfolgreich, alle 16 Routen registriert
+- `npx tsc --noEmit` — fehlerfrei
+- Vitest 149/149 grün
+- Playwright (Chromium, lokaler Server gegen Stage-DB): `PROJ-2-auth-ssr.spec.ts` 22/22 grün (nach Umstellung der Texte auf Sie-Anrede)
+- `npm run lint` — **nicht ausführbar** (keine ESLint-9-Konfiguration im Repo; bekannter Befund BUG-R3 in PROJ-6)
+- Keine neuen Env-Variablen durch dieses Feature; keine Secrets im Repo
+
+**Verifikation nach dem Push:**
+- Der Push auf `origin/stage` war erfolgreich.
+- **Nicht verifiziert:** Vercel-Build-Status und Live-Verhalten. stage-app.narravit.de liegt hinter dem Vercel-Login (Deployment Protection); jeder anonyme Abruf wird auf die Vercel-Anmeldung umgeleitet. Bitte im Vercel-Dashboard prüfen, dass der Build zu `1feb598` grün ist.
+- Datenbank-Migrationen konnten in dieser Sitzung nicht gegen Supabase geprüft werden (MCP-Token ungültig). Indiz, dass sie auf Stage angewendet sind: Die E2E-Suite läuft gegen die Stage-DB grün.
+
+**Offene Befunde aus der QA:**
+- BUG-12 (High, Debug-Telemetrie-Calls im Onboarding) ist behoben: PROJ-18 ist Approved, im Quellcode gibt es keine `#region agent log`-Blöcke bzw. `127.0.0.1:…/ingest`-Aufrufe mehr (per Suche geprüft am 2026-10-13).
+- BUG-13 (Low): `/zugang-abgelaufen` zeigt weiterhin einen deaktivierten Button „Zugang verlängern — 79 €" (Preis veraltet, Verlängerung kostet 99 € und läuft über die Projektübersicht).

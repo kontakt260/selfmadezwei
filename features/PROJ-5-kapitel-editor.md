@@ -1,6 +1,6 @@
 # PROJ-5: Kapitel-Editor (A5, TipTap, Tablet)
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-15
 **Last Updated:** 2026-05-19 (Backend angeschlossen — Migration + Server Actions, End-to-End-Persistenz validiert)
 
@@ -619,7 +619,23 @@ Keine Critical oder High Bugs. Alle heutigen Fixes (Tasks #25–#33) verifiziert
 Keine Critical oder High Bugs in PROJ-5-Scope. Alle Acceptance Criteria erfüllt. Security Audit clean. Heutige Fixes regression-getestet und stabil. Ready für `/deploy`.
 
 ## Deployment
-_To be added by /deploy_
+
+**Datum:** 2026-10-13
+**Ziel:** Stage — Branch `stage` → stage-app.narravit.de (Vercel Auto-Deploy). Kein Produktiv-Deployment (`main` unverändert).
+**Commit:** `1feb598` (Stand von `origin/stage` nach dem Push)
+
+**Pre-Deployment-Checks:**
+- `npx next build` — erfolgreich, alle 16 Routen registriert
+- `npx tsc --noEmit` — fehlerfrei
+- Vitest 149/149 grün
+- Playwright (Chromium, lokaler Server gegen Stage-DB): PROJ-7 und PROJ-8 (Editor-Seitenzahl, Impuls-Banner im Editor) grün; PROJ-4 AC-Ch-3/4 (Kapitel anlegen → Editor) grün
+- `npm run lint` — **nicht ausführbar** (keine ESLint-9-Konfiguration im Repo; bekannter Befund BUG-R3 in PROJ-6)
+- Keine neuen Env-Variablen durch dieses Feature; keine Secrets im Repo
+
+**Verifikation nach dem Push:**
+- Der Push auf `origin/stage` war erfolgreich.
+- **Nicht verifiziert:** Vercel-Build-Status und Live-Verhalten. stage-app.narravit.de liegt hinter dem Vercel-Login (Deployment Protection); jeder anonyme Abruf wird auf die Vercel-Anmeldung umgeleitet. Bitte im Vercel-Dashboard prüfen, dass der Build zu `1feb598` grün ist.
+- Datenbank-Migrationen konnten in dieser Sitzung nicht gegen Supabase geprüft werden (MCP-Token ungültig). Indiz, dass sie auf Stage angewendet sind: Die E2E-Suite läuft gegen die Stage-DB grün.
 
 ---
 

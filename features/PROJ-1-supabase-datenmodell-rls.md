@@ -1,6 +1,6 @@
 # PROJ-1: Supabase-Datenmodell & RLS
 
-## Status: In Progress
+## Status: Deployed
 **Created:** 2026-05-15
 **Last Updated:** 2026-05-15
 
@@ -315,4 +315,23 @@ Schema-Grundgerüst ist solide und für PROJ-2 (Auth + SSR) tragfähig. Eine off
 - BUG-3 (Low): kosmetischer Tippfehler im migrierten TS-File
 
 ## Deployment
-_To be added by /deploy_
+
+**Datum:** 2026-10-13
+**Ziel:** Stage — Branch `stage` → stage-app.narravit.de (Vercel Auto-Deploy). Kein Produktiv-Deployment (`main` unverändert).
+**Commit:** `1feb598` (Stand von `origin/stage` nach dem Push)
+
+**Pre-Deployment-Checks:**
+- `npx next build` — erfolgreich, alle 16 Routen registriert
+- `npx tsc --noEmit` — fehlerfrei
+- Vitest 149/149 grün
+- Playwright (Chromium, lokaler Server gegen Stage-DB): gesamte Suite 100/101 im ersten Lauf (1 Timing-Ausfall, danach gehärtet); alle Suites arbeiten auf dem Schema aus PROJ-1
+- `npm run lint` — **nicht ausführbar** (keine ESLint-9-Konfiguration im Repo; bekannter Befund BUG-R3 in PROJ-6)
+- Keine neuen Env-Variablen durch dieses Feature; keine Secrets im Repo
+
+**Verifikation nach dem Push:**
+- Der Push auf `origin/stage` war erfolgreich.
+- **Nicht verifiziert:** Vercel-Build-Status und Live-Verhalten. stage-app.narravit.de liegt hinter dem Vercel-Login (Deployment Protection); jeder anonyme Abruf wird auf die Vercel-Anmeldung umgeleitet. Bitte im Vercel-Dashboard prüfen, dass der Build zu `1feb598` grün ist.
+- Datenbank-Migrationen konnten in dieser Sitzung nicht gegen Supabase geprüft werden (MCP-Token ungültig). Indiz, dass sie auf Stage angewendet sind: Die E2E-Suite läuft gegen die Stage-DB grün.
+
+**Offene Befunde aus der QA:**
+- BUG-2 (High, `portal_access_expires_at` für Mitglieder schreibbar) ist seit PROJ-6 behoben: Migration `20260521120000_proj6_paywall_lockdown.sql` verschiebt das Feld in die schreibgeschützte Tabelle `project_access`.
