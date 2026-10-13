@@ -267,7 +267,14 @@ function SecuritySection({ authProvider }: { authProvider: string }) {
   );
 
   const isEmailProvider = authProvider === "email";
-  const providerLabel = authProvider === "google" ? "Google" : authProvider === "apple" ? "Apple" : authProvider;
+  const providerLabel =
+    authProvider === "google"
+      ? "Google"
+      : authProvider === "facebook"
+        ? "Facebook"
+        : authProvider === "apple"
+          ? "Apple"
+          : authProvider;
 
   return (
     <SectionShell>
@@ -287,38 +294,48 @@ function SecuritySection({ authProvider }: { authProvider: string }) {
             </p>
           </>
         ) : (
-          <p className="max-w-3xl text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
-            Sie melden sich über {providerLabel} an — die Passwort-Verwaltung
-            erfolgt dort.
-          </p>
+          <>
+            <p className="[font-family:var(--font-lato)] max-w-4xl text-lg font-semibold leading-8 text-[#3E3831] sm:text-xl sm:leading-9">
+              Sie melden sich über {providerLabel} an. Wenn Sie sich zusätzlich
+              mit E-Mail-Adresse und Passwort anmelden möchten, können Sie
+              hier ein Passwort festlegen.
+            </p>
+            <p className="max-w-3xl text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
+              Sie erhalten dazu eine E-Mail mit einem sicheren Link. Die
+              Anmeldung über {providerLabel} funktioniert danach weiterhin wie
+              gewohnt.
+            </p>
+          </>
         )}
       </div>
 
-      {isEmailProvider && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-col gap-1 max-w-xl">
-            {state.success ? (
-              <p className="text-base leading-7 text-[#96B897]">
-                Wir haben Ihnen einen Link zum Zurücksetzen geschickt. Bitte prüfen Sie
-                auch Ihren Spam-Ordner.
-              </p>
-            ) : (
-              <p className="text-base leading-7 text-[#848484]">
-                Sie bleiben während des Vorgangs angemeldet; nach erfolgreicher
-                Änderung sollten Sie sich neu anmelden.
-              </p>
-            )}
-            {state.error && (
-              <p className="text-base text-destructive">{state.error}</p>
-            )}
-          </div>
-          <form action={formAction}>
-            <SandButton type="submit" disabled={pending || !!state.success}>
-              {pending ? "Wird gesendet …" : "Passwort zurücksetzen"}
-            </SandButton>
-          </form>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-1 max-w-xl">
+          {state.success ? (
+            <p className="text-base leading-7 text-[#96B897]">
+              Wir haben Ihnen einen Link zum Zurücksetzen geschickt. Bitte prüfen Sie
+              auch Ihren Spam-Ordner.
+            </p>
+          ) : (
+            <p className="text-base leading-7 text-[#848484]">
+              Sie bleiben während des Vorgangs angemeldet; nach erfolgreicher
+              Änderung sollten Sie sich neu anmelden.
+            </p>
+          )}
+          {state.error && (
+            <p className="text-base text-destructive">{state.error}</p>
+          )}
         </div>
-      )}
+        <form action={formAction}>
+          <SandButton type="submit" disabled={pending || !!state.success}>
+            {pending
+              ? "Wird gesendet …"
+              : isEmailProvider
+                ? "Passwort zurücksetzen"
+                : "Passwort festlegen"}
+          </SandButton>
+        </form>
+      </div>
     </SectionShell>
   );
 }
