@@ -37,6 +37,24 @@ function ExpiredLinkBanner() {
 
   if (!showExpired) return null;
 
+  // Fehlgeschlagener Link aus „Passwort vergessen": hier hilft keine neue
+  // Bestätigungs-Mail, sondern ein neuer Reset-Link.
+  if (params.get("flow") === "recovery") {
+    return (
+      <div className="mb-6 grid gap-3 border border-[#e0dcd5] bg-[#FAF8F6] p-4 text-sm">
+        <p className="font-medium">Dieser Link ist nicht mehr gültig.</p>
+        <p className="text-[#535252]">
+          Links zum Zurücksetzen des Passworts können nur einmal verwendet
+          werden und sind nur begrenzt gültig. Fordern Sie einfach einen
+          neuen an.
+        </p>
+        <Button asChild variant="outline" className="h-12">
+          <Link href="/passwort-vergessen">Neuen Link anfordern</Link>
+        </Button>
+      </div>
+    );
+  }
+
   if (resendState.success) {
     return (
       <div className="mb-6 border border-[#e0dcd5] bg-[#FAF8F6] p-4 text-sm text-[#535252]">

@@ -63,9 +63,21 @@ type Props = {
    * Time-Resolution). Wir nehmen den Param an als Default-Fallback.
    */
   siteUrl?: string;
+  /**
+   * Ersetzt den Impressum-Link im Footer durch eigenen Inhalt (z. B. die
+   * Pflichtangaben direkt im Text). Wird von den Supabase-Auth-Vorlagen
+   * genutzt, die keinen App-Link ins Impressum setzen können.
+   */
+  footerLegal?: ReactNode;
 };
 
-export function Layout({ preview, children, headerEyebrow, siteUrl }: Props) {
+export function Layout({
+  preview,
+  children,
+  headerEyebrow,
+  siteUrl,
+  footerLegal,
+}: Props) {
   const baseUrl =
     siteUrl ?? process.env.NEXT_PUBLIC_SITE_URL ?? "https://narravit.de";
   const impressumUrl = `${baseUrl}/impressum`;
@@ -223,15 +235,25 @@ export function Layout({ preview, children, headerEyebrow, siteUrl }: Props) {
                 opacity: 0.7,
               }}
             >
-              <Link
-                href={impressumUrl}
-                style={{ color: COLORS.ink, textDecoration: "underline" }}
-              >
-                Impressum
-              </Link>
-              {" · "}
+              {footerLegal === undefined ? (
+                <>
+                  <Link
+                    href={impressumUrl}
+                    style={{ color: COLORS.ink, textDecoration: "underline" }}
+                  >
+                    Impressum
+                  </Link>
+                  {" · "}
+                </>
+              ) : null}
               Dies ist eine Transaktions-E-Mail. Antworten landen nicht im
               Posteingang.
+              {footerLegal !== undefined ? (
+                <>
+                  <br />
+                  {footerLegal}
+                </>
+              ) : null}
             </Text>
           </Section>
         </Container>
