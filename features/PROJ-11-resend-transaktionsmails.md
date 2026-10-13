@@ -546,7 +546,7 @@ BUG-3 (Käufer-ohne-Zugang) ist Spec-Lücke; eigenes Folge-Ticket.
 | Neu: `src/emails/emails.test.tsx` | **24/24 grün** — jede Vorlage rendert (HTML + Klartext), durchgängige Sie-Anrede, keine Vapi-/Telefon-Reste, Footer mit Impressum + Kontaktadresse |
 | `npx tsc --noEmit` / `npx next build` | fehlerfrei, Route `/api/cron/reminders` registriert |
 | Playwright Chromium (PROJ-9 Einladungs-Flow, PROJ-2 Auth) | grün; der Einladungs-Flow ruft den Mail-Versand auf (lokal erwartungsgemäß „RESEND_API_KEY is not set") |
-| **Nicht ausgeführt** | Echter Versand über Resend, Vercel-Cron-Live-Lauf, Zustellung/Darstellung in Mail-Clients, Mobile Safari/Firefox. Gründe: lokal kein `RESEND_API_KEY`; stage-app.narravit.de liegt hinter dem Vercel-Login; Supabase-Zugriff in dieser Sitzung nicht möglich (daher auch **nicht geprüft**, ob die Migration `proj11_mail_log` auf Stage angewendet ist). |
+| **Nicht ausgeführt** | Echter Versand über Resend, Vercel-Cron-Live-Lauf, Zustellung/Darstellung in Mail-Clients, Mobile Safari/Firefox. Gründe: lokal kein `RESEND_API_KEY`; stage-app.narravit.de liegt hinter dem Vercel-Login; Supabase-Zugriff war am 2026-10-13 nicht möglich. **Nachtrag 2026-10-14:** Über die Supabase-Anbindung geprüft — alle 14 Migrationen aus dem Repo sind im Projekt `kdjhxqitfxnsavhiafdn` (Backend von stage-app.narravit.de) angewendet, einschließlich `proj11_mail_log`. |
 
 ### Acceptance Criteria
 
