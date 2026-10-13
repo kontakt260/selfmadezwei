@@ -1,6 +1,6 @@
-# PROJ-6: Stripe-Zahlungen (Portal + Vapi-Paket)
+# PROJ-6: Stripe-Zahlungen (Portal)
 
-> ⚠️ **Rückbau offen (2026-10-13):** Das Erzählzeit-Kontingent entfällt (Vapi → Audio-Sprachnachrichten, Erzählen im Portal-Zugang enthalten). Produkt „Vapi +60 Min / 19 €", Stat-Karte „Telefonzeit übrig", Guthaben-Formel und Kauf-Mail sind noch im Code und müssen entfernt werden — siehe „Refinement 2026-10-13" direkt unten. Alle Vapi-/Sprechzeit-Kriterien weiter unten im Dokument sind damit überholt.
+> ℹ️ **Rückbau umgesetzt und geprüft (2026-10-13):** Das Erzählzeit-Kontingent ist entfernt (Vapi → Audio-Sprachnachrichten, Erzählen im Portal-Zugang enthalten). Siehe „Refinement 2026-10-13" direkt unten inkl. QA-Ergebnis. Alle Vapi-/Sprechzeit-Kriterien weiter unten im Dokument sind damit überholt.
 
 ## Refinement 2026-10-13 — Rückbau Erzählzeit-Kontingent
 **Anlass:** Vapi wird durch Audio-Sprachnachrichten ersetzt ([PROJ-12](PROJ-12-audio-erzaehlpipeline.md)). Erzählen ist im Portal-Zugang enthalten; es gibt kein Zeit-Kontingent und kein Nachkauf-Produkt mehr. PROJ-6 umfasst damit nur noch **Portal-Zugang Initial (249 €)** und **Verlängerung (99 €)**.
@@ -13,7 +13,7 @@
 - [x] Bestätigungsseite `/kauf-erfolgreich` und Abbruch-Pfade kennen nur noch Initial (selbst / Geschenk) und Verlängerung.
 - [x] Onboarding-Kaufschritt und Kauf-Mail nennen keine „10 Stunden Vapi-Erzählzeit" mehr (neuer Text siehe PROJ-12).
 - [x] Kauf-Mail „Vapi-Paket" und zugehöriger Versand-Helper sind entfernt (PROJ-11).
-- [ ] Der Checkout nimmt die neuen Onboarding-Angaben aus PROJ-12 (Erzählweise, Kontaktwege, Wochentag) entgegen und der Webhook speichert sie beim Anlegen des Projekts. *(Umsetzung zusammen mit PROJ-12.)*
+- *Nach PROJ-12 verschoben (kein PROJ-6-Kriterium mehr):* Der Checkout nimmt die neuen Onboarding-Angaben (Erzählweise, Kontaktwege, Wochentag) entgegen und der Webhook speichert sie beim Anlegen des Projekts.
 - [x] Altbestand: Der Zahlungstyp `vapi_voice_minutes_60` bleibt in der Datenbank bestehen (bestehende Zahlungen bleiben als Beleg im persönlichen Bereich sichtbar), wird aber nicht mehr neu vergeben.
 - [ ] `STRIPE_PRICE_ID_VAPI_60` und `VAPI_API_KEY` sind aus `.env.local.example` und der Vercel-Konfiguration entfernt; das Stripe-Produkt ist im Stripe-Dashboard archiviert (manueller Schritt). — *Im Repo erledigt (`.env.local.example`, `playwright.config.ts`); Vercel-Env und Stripe-Dashboard sind noch manuell offen.*
 - [x] Unit- und E2E-Tests zum Vapi-Pfad sind entfernt bzw. auf „wird abgelehnt" umgestellt.
@@ -30,13 +30,50 @@
 - Keine Datenbank-Migration: Enum-Wert `vapi_voice_minutes_60` und Tabelle `voice_sessions` bleiben unverändert bestehen (Stilllegung von `voice_sessions` mit PROJ-12).
 - Tests: Vitest 149/149 grün, `tsc --noEmit` ohne Fehler. E2E-Specs (PROJ-4, PROJ-6) angepasst, aber **nicht ausgeführt** (brauchen Stage-DB + Login). `npm run lint` läuft derzeit nicht (keine ESLint-9-Konfigurationsdatei im Repo — bestand schon vorher).
 
+### QA Test Results (Rückbau, 2026-10-13)
+**Umfang:** nur das Refinement „Rückbau Erzählzeit-Kontingent". Die ursprüngliche PROJ-6-QA weiter unten bleibt gültig für Initial-Kauf und Verlängerung.
+
+**Automatisierte Tests**
+- Vitest: 149/149 bestanden (12 Dateien), inkl. neuem Test „Checkout lehnt Altprodukt ab" und umgestelltem Webhook-Test „Altprodukt wird quittiert, kein `payments`-Eintrag".
+- `tsc --noEmit`: fehlerfrei.
+- Playwright (Chromium, gegen Stage-DB): `PROJ-6-stripe-zahlungen.spec.ts` 9 bestanden, 1 übersprungen (Stage-Smoke). Die angepassten Tests AC-Stats-1, AC-PÜ-3, AC-PÜ-4 bestehen.
+- Nicht ausgeführt: Playwright-Projekt „Mobile Safari", Firefox, echte Stripe-Roundtrips (Bestätigungsseite mit bezahlter Session), `npm run lint` (siehe BUG-R3).
+
+**Acceptance Criteria (Rückbau)**
+| # | Kriterium | Ergebnis | Nachweis |
+|---|---|---|---|
+| 1 | „Vapi +60 Min" nicht mehr kaufbar, serverseitig abgelehnt | ✅ | Unit-Test `checkout/actions.test.ts`; Produkt aus `PRODUCTS` entfernt |
+| 2 | Stat-Karte „Telefonzeit übrig" + Nachkauf-Button entfernt | ✅ | E2E AC-Stats-1, AC-PÜ-4 |
+| 3 | Guthaben-Berechnung entfernt | ✅ | Code-Review Projektseite; keine `voice_sessions`-Abfrage mehr |
+| 4 | Webhook quittiert Altereignisse ohne State-Änderung | ✅ | Unit-Test Webhook |
+| 5 | Bestätigungsseite kennt nur Initial + Verlängerung | ✅ (Code-Review) | Variante entfernt; nicht mit echter Session im Browser geprüft |
+| 6 | Kein „10 Stunden Vapi-Erzählzeit" in Kaufschritt/Kauf-Mail | ✅ | Textsuche im Quellcode |
+| 7 | Vapi-Paket-Mail + Helper entfernt | ✅ | Dateien gelöscht, Typprüfung fehlerfrei |
+| 8 | Altbestand `vapi_voice_minutes_60` bleibt in der DB | ✅ | keine Migration |
+| 9 | Env-Variablen entfernt, Stripe-Produkt archiviert | ⚠️ teilweise | Repo erledigt; Vercel-Env + Stripe-Dashboard manuell offen |
+| 10 | Tests entfernt bzw. umgestellt | ✅ | siehe oben |
+
+**Security-Audit**
+- Checkout: Authentifizierung und Projektmitgliedschaft werden weiterhin serverseitig geprüft; unbekannte Produkt-Typen werden vor jedem Stripe-Aufruf abgelehnt. ✅
+- Webhook: Signaturprüfung und Idempotenz unverändert (E2E AC-Webhook-1…3 bestehen). Der Altprodukt-Zweig liegt hinter der Signaturprüfung und schreibt nichts. ✅
+- Keine neuen Env-Variablen, keine Secrets im Client, keine Änderung an RLS oder Auth-Flow. ✅
+
+**Befunde**
+- **BUG-R1 (Low) — Onboarding nennt weiterhin das Telefon.** Schritt 3 zeigt „Nur per Telefon erzählen" / „Die beschenkte Person ruft an …", die Zusammenfassung „Nur Telefon". Bewusst nicht Teil des Rückbaus; wird mit dem PROJ-12-Frontend ersetzt. Vor einem Produktiv-Deployment muss das erledigt sein.
+- **BUG-R2 (Low) — Bezahltes Altereignis wird nicht verbucht.** Zahlt jemand über eine noch offene alte Checkout-Session für „Vapi +60 Min", quittiert der Webhook ohne `payments`-Eintrag; die Zahlung erscheint nicht im persönlichen Bereich. Bisher nur Testkäufe auf Stage. Abhilfe: Stripe-Preis archivieren (Kriterium 9), dann kann keine neue Session entstehen.
+- **BUG-R3 (Low, bestand vorher) — `npm run lint` läuft nicht.** `next lint` gibt es in Next.js 16 nicht mehr und ESLint 9 findet keine `eslint.config.*` (im Repo liegt nur `.eslintrc.json`).
+- **BUG-R4 (Medium, nicht durch den Rückbau verursacht) — 5 PROJ-4-E2E-Tests schlagen fehl**, 9 Folgetests laufen dadurch nicht. Ursachen: Der Projekttitel in der Stage-DB lautet nicht mehr „QA-Testprojekt" (AC-Home-1/3/4, AC-PÜ-1), und der Locator „Hinzufügen" trifft seit PROJ-9 zwei Buttons (AC-Ch-2). Die Regressions-Suite für PROJ-4 ist damit derzeit nicht aussagekräftig. Nicht gegen den Stand vor dem Rückbau gegengeprüft; die Fehlerbilder betreffen aber keine geänderte Stelle.
+- Hinweis: Im Dev-Server-Log erschien während des E2E-Laufs einmal `TypeError: Cannot read properties of undefined (reading 'call')` ohne fehlschlagenden Test — beobachten.
+
+**Entscheidung:** Keine Critical/High-Befunde → Rückbau **freigegeben (Approved)**. Offen vor Produktiv-Deployment: BUG-R1 (mit PROJ-12) und die zwei manuellen Schritte aus Kriterium 9.
+
 ### Edge Cases (Rückbau)
 - Projekte mit früher gekauftem Vapi-Paket (bisher nur Testkäufe auf stage): kein Ausgleich nötig; vor Rückbau prüfen, ob es echte Käufe gibt.
 - Offene Stripe-Checkout-Sessions für das alte Produkt zum Zeitpunkt des Deployments: laufen ins Leere bzw. werden wie oben quittiert.
 
 ---
 
-## Status: In Progress
+## Status: Approved
 **Created:** 2026-05-15
 **Last Updated:** 2026-10-13
 
