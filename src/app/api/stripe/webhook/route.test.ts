@@ -50,6 +50,10 @@ type FakeRows = {
   project_access: Array<Record<string, unknown>>;
   project_members: Array<Record<string, unknown>>;
   invitations: Array<Record<string, unknown>>;
+  // PROJ-11: Webhook-Route liest profiles für die Mail-Personalisierung
+  // (resolveBuyerEmail). Der Test braucht das nicht zu bestücken — ein
+  // leeres Array reicht, damit maybeSingle null zurückgibt.
+  profiles: Array<Record<string, unknown>>;
 };
 
 let fakeDb: FakeRows;
@@ -161,6 +165,7 @@ beforeEach(() => {
     project_access: [],
     project_members: [],
     invitations: [],
+    profiles: [],
   };
   constructEventMock.mockReset();
 });

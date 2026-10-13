@@ -268,8 +268,9 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
               </h3>
               <p className="text-base leading-7 text-[#535252] sm:text-lg">
                 Trage die E-Mail-Adresse der Person ein und wähle ihre Rolle.
-                Nach Abschluss bekommst du einen Link, den du manuell
-                weiterleitest (z. B. per WhatsApp oder Mail).
+                Wir verschicken die Einladung automatisch per Mail — du kannst
+                den Link bei Bedarf zusätzlich manuell teilen (z. B. per
+                WhatsApp).
               </p>
               <label className="flex flex-col gap-2">
                 <span className="text-sm font-bold text-[#3E3831]">E-Mail-Adresse</span>
@@ -325,9 +326,11 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
                 Einladung erstellt
               </h3>
               <p className="text-base leading-7 text-[#535252] sm:text-lg">
-                Einladung für <span className="font-semibold">{addEmail}</span> wurde
-                angelegt. Bitte leite den folgenden Link manuell an die Person
-                weiter — er ist 14 Tage gültig.
+                Die Einladung für{" "}
+                <span className="font-semibold">{addEmail}</span> ist unterwegs
+                — wir verschicken sie automatisch per Mail. Du kannst den
+                folgenden Link bei Bedarf zusätzlich manuell teilen; er ist
+                14 Tage gültig.
               </p>
               <div className="flex flex-col gap-2 break-all border border-[#e0dcd5] bg-[#FAF8F6] p-3 text-sm text-[#535252] sm:text-base">
                 {addedLink}

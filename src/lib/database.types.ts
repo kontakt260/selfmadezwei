@@ -154,6 +154,47 @@ export type Database = {
           },
         ]
       }
+      mail_log: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          mail_type: string
+          project_id: string | null
+          resend_message_id: string | null
+          sent_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          mail_type: string
+          project_id?: string | null
+          resend_message_id?: string | null
+          sent_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          mail_type?: string
+          project_id?: string | null
+          resend_message_id?: string | null
+          sent_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mail_log_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount_cents: number

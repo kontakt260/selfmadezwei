@@ -2,7 +2,57 @@ import { NextResponse, type NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { getStripe, PRODUCTS, type ProductType } from "@/lib/stripe/server";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
+import { sendPortalPurchaseMail } from "@/lib/email/send-portal-purchase";
+import { sendVapiPackageMail } from "@/lib/email/send-vapi-package";
+import { sendRenewalMail } from "@/lib/email/send-renewal";
 import crypto from "node:crypto";
+
+// PROJ-11 Helper: gemeinsame Formatierung für Mails.
+function formatEur(amountCents: number, currency: string): string {
+  const formatter = new Intl.NumberFormat("de-DE", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  });
+  return formatter.format(amountCents / 100);
+}
+
+function formatGermanDate(iso: string | number | Date): string {
+  return new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(iso));
+}
+
+async function resolveBuyerEmail(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  session: Stripe.Checkout.Session,
+  userId: string,
+): Promise<{ email: string | null; fullName: string | null }> {
+  // Priorität: Stripe customer_details (vom Käufer eingegeben), dann
+  // session-Metadata, dann profiles-Row.
+  const stripeEmail =
+    session.customer_details?.email?.trim() ||
+    session.customer_email?.trim() ||
+    null;
+  if (stripeEmail) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", userId)
+      .maybeSingle();
+    return { email: stripeEmail, fullName: profile?.full_name ?? null };
+  }
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("email, full_name")
+    .eq("id", userId)
+    .maybeSingle();
+  return {
+    email: profile?.email ?? null,
+    fullName: profile?.full_name ?? null,
+  };
+}
 
 // Stripe-Webhook-Route (PROJ-6 Backend).
 //
@@ -199,6 +249,27 @@ async function handleInitial(
     status: "completed",
   });
   if (payErr) throw new Error(payErr.message);
+
+  // 5. PROJ-11: Mail-Versand fire-and-forget — der Webhook quittiert
+  //    Stripe sofort mit 200, der Versand läuft im Hintergrund weiter.
+  if (buyerIsMember) {
+    const buyer = await resolveBuyerEmail(supabase, session, userId);
+    if (buyer.email) {
+      const invoiceUrl =
+        (session.invoice as string | null | undefined) ?? undefined;
+      void sendPortalPurchaseMail({
+        to: buyer.email,
+        fullName: buyer.fullName ?? undefined,
+        amountFormatted: formatEur(
+          session.amount_total ?? PRODUCTS.initial.amountCents,
+          (session.currency ?? PRODUCTS.initial.currency).toUpperCase(),
+        ),
+        paymentDateFormatted: formatGermanDate(Date.now()),
+        expiresAtFormatted: formatGermanDate(expiresAt),
+        invoiceUrl,
+      });
+    }
+  }
 }
 
 // ─── Portal-Verlängerung (99 €) ───────────────────────────────────────
@@ -248,6 +319,24 @@ async function handleRenewal(
     status: "completed",
   });
   if (payErr) throw new Error(payErr.message);
+
+  // PROJ-11: Verlängerungs-Bestätigung fire-and-forget.
+  const buyer = await resolveBuyerEmail(supabase, session, userId);
+  if (buyer.email) {
+    const invoiceUrl =
+      (session.invoice as string | null | undefined) ?? undefined;
+    void sendRenewalMail({
+      to: buyer.email,
+      fullName: buyer.fullName ?? undefined,
+      amountFormatted: formatEur(
+        session.amount_total ?? PRODUCTS.renewal.amountCents,
+        (session.currency ?? PRODUCTS.renewal.currency).toUpperCase(),
+      ),
+      paymentDateFormatted: formatGermanDate(Date.now()),
+      newExpiresAtFormatted: formatGermanDate(newExpiresAt),
+      invoiceUrl,
+    });
+  }
 }
 
 // ─── Vapi-Top-Up (19 €) ───────────────────────────────────────────────
@@ -274,6 +363,29 @@ async function handleVapi(
     status: "completed",
   });
   if (payErr) throw new Error(payErr.message);
+
+  // PROJ-11: Vapi-Paket-Bestätigung fire-and-forget. Wir holen den
+  // Projekt-Titel für die Personalisierung; bei Fetch-Fehler fällt der
+  // Mail-Text auf einen generischen Hinweis zurück.
+  const buyer = await resolveBuyerEmail(supabase, session, userId);
+  if (buyer.email) {
+    const { data: projectRow } = await supabase
+      .from("projects")
+      .select("title")
+      .eq("id", projectId)
+      .maybeSingle();
+    void sendVapiPackageMail({
+      to: buyer.email,
+      fullName: buyer.fullName ?? undefined,
+      projectName: projectRow?.title ?? "Ihr Projekt",
+      projectId,
+      amountFormatted: formatEur(
+        session.amount_total ?? PRODUCTS.vapi.amountCents,
+        (session.currency ?? PRODUCTS.vapi.currency).toUpperCase(),
+      ),
+      paymentDateFormatted: formatGermanDate(Date.now()),
+    });
+  }
 }
 
 function generateInviteToken(): string {

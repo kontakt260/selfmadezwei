@@ -165,7 +165,13 @@ describe("createInvitationAction", () => {
     client.from
       .mockReturnValueOnce(makeBuilder({ data: [{ user_id: PL_USER_ID, role: "projektleiter" }] }))
       .mockReturnValueOnce(makeBuilder({ data: [] }))
-      .mockReturnValueOnce(makeBuilder()); // invitations insert
+      .mockReturnValueOnce(makeBuilder()) // invitations insert
+      // PROJ-11: nach dem invitation-insert holt der Action den Projekt-
+      // Titel + das Inviter-Profil für die Mail-Personalisierung (fire-
+      // and-forget). Beide Reads dürfen leer zurückkommen — die Mail
+      // verwendet dann Fallback-Werte.
+      .mockReturnValueOnce(makeBuilder({ data: { title: "Mein Projekt" } }))
+      .mockReturnValueOnce(makeBuilder({ data: { full_name: "Test PL" } }));
     vi.mocked(createClient).mockResolvedValue(client as never);
 
     const result = await createInvitationAction(fd());

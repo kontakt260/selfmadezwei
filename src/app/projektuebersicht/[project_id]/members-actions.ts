@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import crypto from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
+import { sendInvitationMail } from "@/lib/email/send-invitation";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -133,6 +134,23 @@ export async function createInvitationAction(formData: FormData): Promise<{
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
     "https://app.narravit.de";
   const acceptUrl = `${siteUrl}/einladung/${token}`;
+
+  // PROJ-11: Einladungs-Mail fire-and-forget verschicken. Wir holen
+  // Projekt-Titel und Einlader-Name nach, damit die Mail personalisiert
+  // ist. Bei Fetch-Fehler trotzdem die Mail mit Fallback verschicken —
+  // der Stop-the-World-Pfad ist KEINE Option.
+  const [{ data: projectRow }, { data: inviterProfile }] = await Promise.all([
+    supabase.from("projects").select("title").eq("id", projectId).maybeSingle(),
+    supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
+  ]);
+  void sendInvitationMail({
+    to: email,
+    inviterName: inviterProfile?.full_name ?? "",
+    inviterEmail: user.email ?? "",
+    projectName: projectRow?.title ?? "Ihr narravit-Projekt",
+    role,
+    token,
+  });
 
   revalidatePath(`/projektuebersicht/${projectId}`);
   return { token, acceptUrl };
