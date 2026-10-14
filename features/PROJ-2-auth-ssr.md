@@ -577,6 +577,9 @@ Nach dem ersten QA-Lauf wurden alle Critical/High/Medium Bugs gefixt. Re-Test mi
 
 **Backlog — Supabase-Mail-Vorlagen:** Entwürfe für „Confirm signup" und „Reset password" liegen in `supabase/templates/` (erzeugt aus `src/emails/auth/`). Sie sind **noch nicht** in Supabase eingesetzt; das Design soll separat überarbeitet werden. Erst mit den eigenen Vorlagen greift der neue Token-Weg — bis dahin laufen Mail-Links weiter über den Code-Weg (nur im selben Browser). Die Vorlagen sind außerdem der Ort für die Sie-Anrede in den Auth-Mails.
 
+**Fix — irreführende Fehlermeldung beim Passwort-Setzen (2026-10-14):** Ein Reset-Link für das Google-Konto wurde scheinbar als „ungültig" abgelehnt. Laut Auth-Log hatte der Link funktioniert (`/verify` 303, `/token` 200); abgelehnt hat Supabase erst das Speichern mit `same_password`, weil das eingegebene Passwort dem bereits gesetzten entsprach. `resetPasswordAction` meldete jeden Fehler als „Link ungültig oder abgelaufen". Jetzt zeigen `same_password` und `weak_password` einen passenden Hinweis am Passwort-Feld; die Sitzung bleibt bestehen, die Person kann direkt ein anderes Passwort eingeben. Nur andere Fehler (z. B. fehlende Sitzung) melden weiterhin einen ungültigen Link. Tests: `src/app/passwort-zuruecksetzen/actions.test.ts`.
+Nebenbefund: Konten, die ihr Passwort vor dem `has_password`-Marker (Commit `f0478b0`) gesetzt haben, sehen im persönlichen Bereich noch „Passwort festlegen" statt „Passwort ändern". Das betrifft nur das eigene Test-Konto und korrigiert sich beim nächsten Speichern eines Passworts.
+
 **Befund ohne Fehler:** Das vermutete Zustellproblem bei Gmail war keines — die Test-Registrierung lief auf eine vom Browser vorgeschlagene, falsche Adresse. Supabase verschickt über Resend (Absender-Domain `mail.narravit.de`).
 
 ## Deployment

@@ -46,6 +46,25 @@ export async function resetPasswordAction(
     data: { has_password: true },
   });
 
+  // Nicht jeder Fehler heißt „Link abgelaufen": Die Sitzung aus dem Link
+  // ist bei diesen beiden noch gültig, die Person muss nur ein anderes
+  // Passwort wählen.
+  if (error?.code === "same_password") {
+    return {
+      fieldErrors: {
+        password:
+          "Dieses Passwort verwenden Sie bereits. Bitte wählen Sie ein anderes.",
+      },
+    };
+  }
+  if (error?.code === "weak_password") {
+    return {
+      fieldErrors: {
+        password:
+          "Dieses Passwort ist zu unsicher. Bitte wählen Sie ein längeres oder weniger gängiges.",
+      },
+    };
+  }
   if (error) {
     return { error: "Link ungültig oder abgelaufen. Bitte fordern Sie einen neuen an." };
   }
