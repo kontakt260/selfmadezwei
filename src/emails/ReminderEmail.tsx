@@ -1,8 +1,10 @@
 // PROJ-11 — Ablauf-Reminder (30- oder 7-Tage-Variante).
 //
-// Trigger: täglicher Vercel-Cron-Job (siehe Tech Design F.5 +
-// /api/cron/reminders), selektiert Portal-Zugänge in den Fenstern
-// [now+29d..now+30d] und [now+6d..now+7d].
+// Trigger: täglicher Vercel-Cron-Job (/api/cron/reminders). Die 30-Tage-
+// Variante geht raus, sobald der Zugang in 30 Tagen oder weniger abläuft,
+// die 7-Tage-Variante ab 7 Tagen. Fällt ein Cron-Lauf aus, holt der
+// nächste die Erinnerung nach — deshalb nennt die Mail die tatsächlich
+// verbleibenden Tage (`daysLeft`) statt fest „30" bzw. „7".
 //
 // Eine Komponente, zwei Varianten — gesteuert per `variant`-Prop.
 // Beide Mails verlinken auf den Verlängerungs-Stripe-Checkout (PROJ-6).
@@ -22,22 +24,34 @@ export type ReminderEmailProps = {
   projectName: string;
   /** Ablauf-Datum, z. B. „22. Juni 2026" */
   expiresAtFormatted: string;
+  /** Verbleibende Tage bis zum Ablauf (≥ 1) */
+  daysLeft: number;
   variant: ReminderVariant;
   /** Verlängerungs-Checkout-URL (z. B. /onboarding?type=renewal&project=…) */
   renewUrl: string;
   siteUrl: string;
 };
 
-const HEADINGS: Record<ReminderVariant, string> = {
-  "30": "Ihr Portal-Zugang läuft in 30 Tagen ab",
-  "7": "Nur noch 7 Tage Portal-Zugang",
+/** „1 Tag" / „7 Tage" */
+function daysNominative(daysLeft: number): string {
+  return daysLeft === 1 ? "1 Tag" : `${daysLeft} Tage`;
+}
+
+/** „einem Tag" / „30 Tagen" (nach „in") */
+function daysDative(daysLeft: number): string {
+  return daysLeft === 1 ? "einem Tag" : `${daysLeft} Tagen`;
+}
+
+const HEADINGS: Record<ReminderVariant, (daysLeft: number) => string> = {
+  "30": (d) => `Ihr Portal-Zugang läuft in ${daysDative(d)} ab`,
+  "7": (d) => `Nur noch ${daysNominative(d)} Portal-Zugang`,
 };
 
-const TONE: Record<ReminderVariant, string> = {
-  "30":
-    "ein freundlicher Hinweis: Ihr Portal-Zugang für dieses Projekt läuft in rund 30 Tagen ab. Falls Sie weiter schreiben möchten, können Sie den Zugang jetzt um 12 Monate verlängern — es eilt aber noch nicht.",
-  "7":
-    "nur noch 7 Tage: Ihr Portal-Zugang läuft am unten genannten Datum ab. Wenn Sie weiter am Projekt arbeiten möchten, verlängern Sie den Zugang bitte rechtzeitig, sonst verlieren Sie kurzzeitig den Zugriff.",
+const TONE: Record<ReminderVariant, (daysLeft: number) => string> = {
+  "30": (d) =>
+    `ein freundlicher Hinweis: Ihr Portal-Zugang für dieses Projekt läuft in ${daysDative(d)} ab. Falls Sie weiter schreiben möchten, können Sie den Zugang jetzt um 12 Monate verlängern — es eilt aber noch nicht.`,
+  "7": (d) =>
+    `nur noch ${daysNominative(d)}: Ihr Portal-Zugang läuft am unten genannten Datum ab. Wenn Sie weiter am Projekt arbeiten möchten, verlängern Sie den Zugang bitte rechtzeitig, sonst verlieren Sie kurzzeitig den Zugriff.`,
 };
 
 const CTA_LABEL: Record<ReminderVariant, string> = {
@@ -50,18 +64,21 @@ const EYEBROW: Record<ReminderVariant, string> = {
   "7": "Wichtiger Hinweis",
 };
 
-const PREVIEW: Record<ReminderVariant, (project: string, date: string) => string> =
-  {
-    "30": (project, date) =>
-      `Ihr narravit-Portal-Zugang für „${project}" läuft am ${date} ab.`,
-    "7": (project, date) =>
-      `Nur noch 7 Tage: Portal-Zugang für „${project}" läuft am ${date} ab.`,
-  };
+const PREVIEW: Record<
+  ReminderVariant,
+  (project: string, date: string, daysLeft: number) => string
+> = {
+  "30": (project, date) =>
+    `Ihr narravit-Portal-Zugang für „${project}" läuft am ${date} ab.`,
+  "7": (project, date, d) =>
+    `Nur noch ${daysNominative(d)}: Portal-Zugang für „${project}" läuft am ${date} ab.`,
+};
 
 export function ReminderEmail({
   fullName,
   projectName,
   expiresAtFormatted,
+  daysLeft,
   variant,
   renewUrl,
   siteUrl,
@@ -77,13 +94,13 @@ export function ReminderEmail({
 
   return (
     <Layout
-      preview={PREVIEW[variant](projectName, expiresAtFormatted)}
+      preview={PREVIEW[variant](projectName, expiresAtFormatted, daysLeft)}
       headerEyebrow={EYEBROW[variant]}
       siteUrl={siteUrl}
     >
-      <MailHeading>{HEADINGS[variant]}</MailHeading>
+      <MailHeading>{HEADINGS[variant](daysLeft)}</MailHeading>
       <MailParagraph>{greeting}</MailParagraph>
-      <MailParagraph>{TONE[variant]}</MailParagraph>
+      <MailParagraph>{TONE[variant](daysLeft)}</MailParagraph>
 
       <MailDetailsList items={details} />
 

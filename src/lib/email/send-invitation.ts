@@ -4,9 +4,9 @@ import { InvitationEmail } from "@/emails/InvitationEmail";
 
 // PROJ-11 — Einladungs-Mail-Versand.
 //
-// Trigger: createInvitationAction nach erfolgreicher invitations-Row-Insert.
-// Fire-and-forget: das aufrufende Code-Stück soll `void sendInvitationMail(...)`
-// nutzen, damit die UI-Response nicht auf Resend wartet.
+// Trigger: createInvitationAction nach erfolgreicher invitations-Row-Insert
+// (über `sendInBackground`, damit die UI-Response nicht auf Resend wartet)
+// und der Stripe-Webhook beim Geschenk-Kauf „Auch am Computer schreiben".
 
 export type SendInvitationInput = {
   /** Empfänger-Adresse (= eingeladene E-Mail) */
@@ -16,7 +16,17 @@ export type SendInvitationInput = {
   projectName: string;
   role: "projektleiter" | "co_author";
   token: string;
+  /** Einladung aus einem Geschenk-Kauf */
+  isGift?: boolean;
 };
+
+function subjectFor(input: SendInvitationInput): string {
+  if (input.isGift) {
+    const inviter = input.inviterName.trim() || input.inviterEmail;
+    return `${inviter} schenkt Ihnen ein Lebensbuch`;
+  }
+  return `Einladung zum Projekt „${input.projectName}"`;
+}
 
 /**
  * Versendet die Einladungs-Mail an die eingeladene Adresse.
@@ -31,11 +41,10 @@ export async function sendInvitationMail(
   input: SendInvitationInput,
 ): Promise<void> {
   const siteUrl = getSiteUrl();
-  const subject = `Einladung zum Projekt „${input.projectName}"`;
 
   const result = await sendEmail({
     to: input.to,
-    subject,
+    subject: subjectFor(input),
     react: InvitationEmail({
       inviterName: input.inviterName,
       inviterEmail: input.inviterEmail,
@@ -43,8 +52,9 @@ export async function sendInvitationMail(
       role: input.role,
       token: input.token,
       siteUrl,
+      isGift: input.isGift,
     }),
-    tags: [{ name: "type", value: "invitation" }],
+    tags: [{ name: "type", value: input.isGift ? "gift_invitation" : "invitation" }],
   });
 
   if (!result.ok) {

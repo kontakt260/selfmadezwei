@@ -11,9 +11,12 @@ import crypto from "node:crypto";
 //
 // Env-Variablen (siehe .env.local.example):
 //   RESEND_API_KEY        — Resend-API-Schlüssel (Produktion: re_…)
-//   EMAIL_FROM            — From-Header, z. B. "narravit <no-reply@narravit.de>"
+//   EMAIL_FROM            — From-Header, z. B. "narravit <no-reply@mail.narravit.de>"
+//                           (Absender muss auf der in Resend verifizierten
+//                           Domain mail.narravit.de liegen)
 //   EMAIL_TEST_RECIPIENT  — falls gesetzt: ALLE Mails gehen an diese Adresse
-//                           (Override für stage + lokal). In Produktion leer.
+//                           (Override für stage + lokal). In Vercel-Production
+//                           wird die Variable ignoriert.
 //
 // Versand-Verhalten:
 //   - Fire-and-Forget aus Sicht der aufrufenden Action/Webhook-Route:
@@ -38,8 +41,10 @@ function getResend(): Resend {
 }
 
 function getFromAddress(): string {
+  // Fallback auf der verifizierten Resend-Domain: narravit.de selbst ist
+  // in Resend nicht eingerichtet, Mails von dort würden abgelehnt.
   return (
-    process.env.EMAIL_FROM ?? "narravit <no-reply@narravit.de>"
+    process.env.EMAIL_FROM ?? "narravit <no-reply@mail.narravit.de>"
   );
 }
 
@@ -47,13 +52,32 @@ function getFromAddress(): string {
  * Resolves the actual recipient. In stage/local environments, the
  * `EMAIL_TEST_RECIPIENT` override redirects every mail to a single test
  * inbox to avoid leaking test-data into real inboxes.
+ *
+ * In der Vercel-Produktionsumgebung wird der Override ignoriert: Ist die
+ * Variable dort versehentlich gesetzt, gingen sonst alle Kunden-Mails an
+ * die Testadresse.
  */
 function resolveRecipient(to: string): { to: string; redirected: boolean } {
   const override = process.env.EMAIL_TEST_RECIPIENT?.trim();
   if (override && override.length > 0) {
+    if (process.env.VERCEL_ENV === "production") {
+      console.warn(
+        "[email] EMAIL_TEST_RECIPIENT is set in production and is ignored",
+      );
+      return { to, redirected: false };
+    }
     return { to: override, redirected: true };
   }
   return { to, redirected: false };
+}
+
+/**
+ * Betreffzeilen enthalten Nutzertext (Projekttitel, Namen). Zeilenumbrüche
+ * werden entfernt, damit niemand über den Betreff zusätzliche Mail-Header
+ * einschleusen kann; überlange Betreffs werden gekürzt.
+ */
+export function sanitizeSubject(subject: string): string {
+  return subject.replace(/[\r\n]+/g, " ").trim().slice(0, 200);
 }
 
 /**
@@ -121,7 +145,7 @@ export async function sendEmail(input: SendMailInput): Promise<SendMailResult> {
     const { data, error } = await resend.emails.send({
       from: getFromAddress(),
       to: recipient,
-      subject: input.subject,
+      subject: sanitizeSubject(input.subject),
       html,
       text,
       tags: input.tags,

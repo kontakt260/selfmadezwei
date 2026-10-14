@@ -29,6 +29,8 @@ function chainable(result: { data: unknown; error?: unknown }) {
     in: vi.fn().mockReturnThis(),
     gte: vi.fn().mockReturnThis(),
     lt: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
     maybeSingle: vi.fn().mockResolvedValue(result),
     then: (cb: (v: typeof result) => unknown) => Promise.resolve(cb(result)),
   };
@@ -105,6 +107,13 @@ describe("/api/cron/reminders — auth", () => {
     const res = await GET(makeRequest({ "x-cron-secret": "wrong" }));
     expect(res.status).toBe(401);
   });
+
+  it("rejects a secret that only shares the prefix", async () => {
+    const res = await GET(
+      makeRequest({ authorization: "Bearer test_cron_secret_123-extra" }),
+    );
+    expect(res.status).toBe(401);
+  });
 });
 
 describe("/api/cron/reminders — happy path", () => {
@@ -136,6 +145,28 @@ describe("/api/cron/reminders — happy path", () => {
     expect(firstCall.to).toBe("pl@example.com");
     expect(firstCall.variant).toBe("30");
     expect(firstCall.projectName).toBe("Mein Lebensbuch");
+    expect(sendCalls[0]).toMatchObject({ expiresAt: inThirtyDays, daysLeft: 30 });
+  });
+
+  it("catches up a missed 7-day reminder and passes the real days left", async () => {
+    // Ein ausgefallener Cron-Lauf darf die Erinnerung nicht verschlucken:
+    // 3 Tage vor Ablauf liegt der Zugang weiterhin im 7-Tage-Fenster.
+    const inThreeDays = new Date(
+      Date.now() + 2.5 * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    accessRows = [{ project_id: "proj-1", expires_at: inThreeDays }];
+    memberRows = [{ user_id: "user-pl" }];
+    projectRow = { title: "Mein Lebensbuch" };
+    profileRow = { email: "pl@example.com", full_name: "Maria" };
+
+    await GET(makeRequest({ "x-cron-secret": "test_cron_secret_123" }));
+
+    // Der Mock liefert für beide Fenster dieselben Zeilen; maßgeblich ist
+    // der Aufruf aus dem 7-Tage-Fenster.
+    const sevenDayCall = sendCalls.find(
+      (c) => (c as { variant: string }).variant === "7",
+    );
+    expect(sevenDayCall).toMatchObject({ daysLeft: 3, expiresAt: inThreeDays });
   });
 
   it("skips when reserve returns duplicate (already-sent)", async () => {

@@ -2,6 +2,14 @@
 //
 // Trigger: Stripe-Webhook checkout.session.completed mit
 // payment_type = initial_portal_access (PROJ-6).
+//
+// Drei Fälle:
+//   - Kauf für sich selbst bzw. Geschenk mit eigenem Zugang: „Ihr
+//     Portal-Zugang ist freigeschaltet" (+ Hinweis auf die Einladung an die
+//     beschenkte Person, falls eine verschickt wurde).
+//   - Geschenk ohne eigenen Zugang (`buyerHasAccess = false`): Der Käufer ist
+//     kein Projektmitglied — die Mail bestätigt Zahlung und Geschenk, ohne
+//     auf einen Portal-Zugang zu verweisen.
 
 import {
   Layout,
@@ -23,7 +31,28 @@ export type PortalPurchaseEmailProps = {
   /** Optional: Link zur Stripe-Rechnung */
   invoiceUrl?: string;
   siteUrl: string;
+  /** Adresse der beschenkten Person, an die eine Einladung ging */
+  giftRecipientEmail?: string;
+  /** false = Geschenk ohne eigenen Portal-Zugang des Käufers */
+  buyerHasAccess?: boolean;
 };
+
+function InvoiceHint({ invoiceUrl }: { invoiceUrl?: string }) {
+  if (!invoiceUrl) return null;
+  return (
+    <>
+      {" "}
+      Ihre Rechnung finden Sie{" "}
+      <a
+        href={invoiceUrl}
+        style={{ color: "#3E3831", textDecoration: "underline" }}
+      >
+        hier
+      </a>
+      .
+    </>
+  );
+}
 
 export function PortalPurchaseEmail({
   fullName,
@@ -32,6 +61,8 @@ export function PortalPurchaseEmail({
   expiresAtFormatted,
   invoiceUrl,
   siteUrl,
+  giftRecipientEmail,
+  buyerHasAccess = true,
 }: PortalPurchaseEmailProps) {
   const greeting = fullName?.trim()
     ? `Hallo ${fullName.trim()},`
@@ -43,6 +74,35 @@ export function PortalPurchaseEmail({
     { label: "Zahlungs-Datum", value: paymentDateFormatted },
     { label: "Zugang gültig bis", value: expiresAtFormatted },
   ];
+
+  if (!buyerHasAccess) {
+    const recipient = giftRecipientEmail ?? "die beschenkte Person";
+    return (
+      <Layout
+        preview="Vielen Dank — Ihr narravit-Geschenk ist unterwegs."
+        headerEyebrow="Geschenk"
+        siteUrl={siteUrl}
+      >
+        <MailHeading>Ihr Geschenk ist unterwegs</MailHeading>
+        <MailParagraph>{greeting}</MailParagraph>
+        <MailParagraph>
+          vielen Dank für Ihren Kauf. Ihre Zahlung ist eingegangen, und wir
+          haben <strong>{recipient}</strong> eine Einladung geschickt. Mit
+          dem Link darin nimmt die beschenkte Person das Lebensbuch an und
+          kann sofort mit dem Erzählen beginnen.
+        </MailParagraph>
+
+        <MailDetailsList items={details} />
+
+        <MailParagraph>
+          Die Einladung ist 14 Tage gültig. Wie gewünscht haben Sie selbst
+          keinen Zugang zum Projekt — die beschenkte Person kann Sie später
+          jederzeit als Co-Autorin oder Co-Autor dazuholen.
+          <InvoiceHint invoiceUrl={invoiceUrl} />
+        </MailParagraph>
+      </Layout>
+    );
+  }
 
   return (
     <Layout
@@ -61,6 +121,13 @@ export function PortalPurchaseEmail({
 
       <MailDetailsList items={details} />
 
+      {giftRecipientEmail ? (
+        <MailParagraph>
+          Die Einladung an <strong>{giftRecipientEmail}</strong> ist
+          unterwegs. Sie ist 14 Tage gültig.
+        </MailParagraph>
+      ) : null}
+
       <MailCtaButton href={personalAreaUrl}>
         Zum persönlichen Bereich
       </MailCtaButton>
@@ -68,19 +135,7 @@ export function PortalPurchaseEmail({
       <MailParagraph>
         Ihr Portal-Zugang ist <strong>12 Monate</strong> gültig. Rechtzeitig
         vor dem Ablauf erinnern wir Sie an die Verlängerung.
-        {invoiceUrl ? (
-          <>
-            {" "}
-            Ihre Rechnung finden Sie{" "}
-            <a
-              href={invoiceUrl}
-              style={{ color: "#3E3831", textDecoration: "underline" }}
-            >
-              hier
-            </a>
-            .
-          </>
-        ) : null}
+        <InvoiceHint invoiceUrl={invoiceUrl} />
       </MailParagraph>
     </Layout>
   );

@@ -1,7 +1,10 @@
 // PROJ-11 — Einladungs-Mail.
 //
-// Trigger: createInvitationAction in PROJ-9 — nach erfolgreicher Anlage
-// der invitations-Row, vor Rückgabe an den UI-Step-2-Modal.
+// Trigger:
+//   - createInvitationAction in PROJ-9 — nach erfolgreicher Anlage der
+//     invitations-Row, vor Rückgabe an den UI-Step-2-Modal.
+//   - Stripe-Webhook beim Geschenk-Kauf „Auch am Computer schreiben"
+//     (`isGift`): Die beschenkte Person bekommt ihre Einladung ins Portal.
 
 import {
   Layout,
@@ -21,6 +24,8 @@ export type InvitationEmailProps = {
   token: string;
   /** Base-URL für den Einladungs-Link, z. B. https://stage-app.narravit.de */
   siteUrl: string;
+  /** Einladung aus einem Geschenk-Kauf — eigener Einstieg statt „Sie wurden eingeladen". */
+  isGift?: boolean;
 };
 
 const ROLE_LABEL: Record<Role, string> = {
@@ -35,9 +40,50 @@ export function InvitationEmail({
   role,
   token,
   siteUrl,
+  isGift = false,
 }: InvitationEmailProps) {
   const acceptUrl = `${siteUrl}/einladung/${token}`;
   const inviterDisplay = inviterName.trim() || inviterEmail;
+
+  if (isGift) {
+    return (
+      <Layout
+        preview={`${inviterDisplay} schenkt Ihnen ein Lebensbuch bei narravit.`}
+        headerEyebrow="Ein Geschenk für Sie"
+        siteUrl={siteUrl}
+      >
+        <MailHeading>Ihr Lebensbuch wartet auf Sie</MailHeading>
+        <MailParagraph>
+          <strong>{inviterDisplay}</strong> schenkt Ihnen ein Lebensbuch bei
+          narravit. Darin halten Sie Ihre Lebensgeschichte fest — Kapitel für
+          Kapitel, in Ruhe und in Ihrem eigenen Tempo. Am Ende entsteht daraus
+          ein gedrucktes Buch.
+        </MailParagraph>
+        <MailParagraph>
+          Mit einem Klick auf den Button nehmen Sie das Geschenk an. Falls
+          Sie noch kein narravit-Konto haben, legen Sie dabei eines an.
+          Danach können Sie Ihre Geschichten direkt am Computer oder Tablet
+          aufschreiben.
+        </MailParagraph>
+
+        <MailCtaButton href={acceptUrl}>Geschenk annehmen</MailCtaButton>
+
+        <MailInlineFallbackLink href={acceptUrl} />
+
+        <MailParagraph>
+          Der Link ist 14 Tage gültig. Sollte er abgelaufen sein, schreiben
+          Sie uns an{" "}
+          <a
+            href="mailto:kontakt@narravit.de"
+            style={{ color: "#3E3831", textDecoration: "underline" }}
+          >
+            kontakt@narravit.de
+          </a>{" "}
+          — wir schicken Ihnen gern einen neuen.
+        </MailParagraph>
+      </Layout>
+    );
+  }
 
   return (
     <Layout

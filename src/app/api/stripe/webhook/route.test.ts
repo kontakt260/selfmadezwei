@@ -38,6 +38,24 @@ vi.mock("stripe", () => {
   };
 });
 
+// ─── Mock Mail-Versand (PROJ-11) ────────────────────────────────────
+//
+// Die Send-Helper werden ersetzt, damit die Tests prüfen können, welche
+// Mails der Webhook auslöst — ohne Resend.
+
+const sendInvitationMailMock = vi.fn(async (_input: Record<string, unknown>) => undefined);
+const sendPortalPurchaseMailMock = vi.fn(async (_input: Record<string, unknown>) => undefined);
+const sendRenewalMailMock = vi.fn(async (_input: Record<string, unknown>) => undefined);
+vi.mock("@/lib/email/send-invitation", () => ({
+  sendInvitationMail: (input: Record<string, unknown>) => sendInvitationMailMock(input),
+}));
+vi.mock("@/lib/email/send-portal-purchase", () => ({
+  sendPortalPurchaseMail: (input: Record<string, unknown>) => sendPortalPurchaseMailMock(input),
+}));
+vi.mock("@/lib/email/send-renewal", () => ({
+  sendRenewalMail: (input: Record<string, unknown>) => sendRenewalMailMock(input),
+}));
+
 // ─── Mock Supabase Service-Role-Client ───────────────────────────────
 //
 // Der Webhook ruft Insert/Upsert/Select-Methoden. Wir tracken alle
@@ -164,9 +182,15 @@ beforeEach(() => {
     project_access: [],
     project_members: [],
     invitations: [],
-    profiles: [],
+    profiles: [
+      { id: "user-1", email: "user@example.com", full_name: "Test User" },
+      { id: "buyer-1", email: "buyer@example.com", full_name: "Bea Buyer" },
+    ],
   };
   constructEventMock.mockReset();
+  sendInvitationMailMock.mockClear();
+  sendPortalPurchaseMailMock.mockClear();
+  sendRenewalMailMock.mockClear();
 });
 
 // ─── Tests ───────────────────────────────────────────────────────────
@@ -286,6 +310,147 @@ describe("Stripe webhook — initial purchase (5 gift variants)", () => {
     expect(fakeDb.project_members.length).toBe(0);
     expect(fakeDb.invitations.length).toBe(1);
     expect(fakeDb.invitations[0].role).toBe("projektleiter");
+  });
+});
+
+describe("Stripe webhook — purchase mails (PROJ-11)", () => {
+  function giftSession(overrides: Record<string, string>) {
+    return makeSession({
+      metadata: {
+        product_type: "initial",
+        user_id: "buyer-1",
+        is_gift: "1",
+        gift_recipient_email: "Oma@Example.com",
+        ...overrides,
+      },
+    });
+  }
+
+  it("self-purchase: only the purchase mail, with portal access", async () => {
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: makeSession({
+          metadata: { product_type: "initial", user_id: "user-1", is_gift: "0" },
+        }),
+      },
+    });
+    await callPost("body", "valid-sig");
+
+    expect(sendInvitationMailMock).not.toHaveBeenCalled();
+    expect(sendPortalPurchaseMailMock).toHaveBeenCalledTimes(1);
+    expect(sendPortalPurchaseMailMock.mock.calls[0][0]).toMatchObject({
+      to: "user@example.com",
+      fullName: "Test User",
+      amountFormatted: expect.stringContaining("249,00"),
+      buyerHasAccess: true,
+      giftRecipientEmail: undefined,
+      invoiceUrl: undefined,
+    });
+  });
+
+  it("gift without own access (BUG-4/BUG-3): invitation to the recipient + gift confirmation to the buyer", async () => {
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: giftSession({
+          gift_mode: "phone-plus-computer",
+          buyer_retains_access: "0",
+        }),
+      },
+    });
+    await callPost("body", "valid-sig");
+
+    expect(sendInvitationMailMock).toHaveBeenCalledTimes(1);
+    expect(sendInvitationMailMock.mock.calls[0][0]).toMatchObject({
+      to: "Oma@Example.com",
+      inviterName: "Bea Buyer",
+      inviterEmail: "buyer@example.com",
+      role: "projektleiter",
+      token: fakeDb.invitations[0].token,
+      isGift: true,
+    });
+    expect(sendPortalPurchaseMailMock).toHaveBeenCalledTimes(1);
+    expect(sendPortalPurchaseMailMock.mock.calls[0][0]).toMatchObject({
+      to: "buyer@example.com",
+      buyerHasAccess: false,
+      giftRecipientEmail: "Oma@Example.com",
+    });
+  });
+
+  it("gift with own access: invitation as co-author + regular purchase mail", async () => {
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: giftSession({
+          gift_mode: "phone-plus-computer",
+          buyer_retains_access: "1",
+          gift_recipient_role: "co_author",
+        }),
+      },
+    });
+    await callPost("body", "valid-sig");
+
+    expect(sendInvitationMailMock.mock.calls[0][0]).toMatchObject({
+      role: "co_author",
+      isGift: true,
+    });
+    expect(sendPortalPurchaseMailMock.mock.calls[0][0]).toMatchObject({
+      buyerHasAccess: true,
+      giftRecipientEmail: "Oma@Example.com",
+    });
+  });
+
+  it("gift 'Nur per Sprachnachricht': no portal invitation, buyer keeps access", async () => {
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: { object: giftSession({ gift_mode: "phone-only" }) },
+    });
+    await callPost("body", "valid-sig");
+
+    expect(sendInvitationMailMock).not.toHaveBeenCalled();
+    expect(sendPortalPurchaseMailMock.mock.calls[0][0]).toMatchObject({
+      buyerHasAccess: true,
+      giftRecipientEmail: undefined,
+    });
+  });
+
+  it("still answers 200 when a mail helper fails — payment is already stored", async () => {
+    sendPortalPurchaseMailMock.mockRejectedValueOnce(new Error("resend down"));
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: makeSession({
+          metadata: { product_type: "initial", user_id: "user-1", is_gift: "0" },
+        }),
+      },
+    });
+    const res = await callPost("body", "valid-sig");
+    expect(res.status).toBe(200);
+    expect(fakeDb.payments.length).toBe(1);
+  });
+
+  it("renewal: confirmation mail with the new expiry date", async () => {
+    fakeDb.project_access.push({
+      project_id: "proj-1",
+      expires_at: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: makeSession({
+          metadata: { product_type: "renewal", user_id: "user-1", project_id: "proj-1" },
+          amount_total: 9900,
+        }),
+      },
+    });
+    await callPost("body", "valid-sig");
+
+    expect(sendRenewalMailMock).toHaveBeenCalledTimes(1);
+    expect(sendRenewalMailMock.mock.calls[0][0]).toMatchObject({
+      to: "user@example.com",
+      amountFormatted: expect.stringContaining("99,00"),
+    });
   });
 });
 

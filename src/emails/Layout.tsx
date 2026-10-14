@@ -342,6 +342,8 @@ export function MailDetailsList({
           >
             {item.label}
           </span>
+          {/* Leerzeichen trennt Bezeichnung und Wert in der Klartext-Fassung */}
+          {" "}
           <span style={{ fontWeight: 600 }}>{item.value}</span>
         </Text>
       ))}

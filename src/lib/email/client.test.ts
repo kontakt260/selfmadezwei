@@ -19,11 +19,12 @@ process.env.RESEND_API_KEY = "re_test_key";
 process.env.EMAIL_FROM = "narravit <no-reply@test.local>";
 process.env.NEXT_PUBLIC_SITE_URL = "https://stage-app.narravit.de";
 
-import { sendEmail, hashEmailForLog, getSiteUrl } from "./client";
+import { sendEmail, hashEmailForLog, getSiteUrl, sanitizeSubject } from "./client";
 
 beforeEach(() => {
   vi.clearAllMocks();
   delete process.env.EMAIL_TEST_RECIPIENT;
+  delete process.env.VERCEL_ENV;
 });
 
 describe("sendEmail", () => {
@@ -87,6 +88,37 @@ describe("sendEmail", () => {
     );
   });
 
+  it("ignores EMAIL_TEST_RECIPIENT in the Vercel production environment", async () => {
+    process.env.EMAIL_TEST_RECIPIENT = "qa@narravit.de";
+    process.env.VERCEL_ENV = "production";
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockSend.mockResolvedValueOnce({ data: { id: "msg_ok" }, error: null });
+
+    const result = await sendEmail({
+      to: "real-user@example.com",
+      subject: "Test",
+      react: { type: "div", props: {}, key: null } as never,
+    });
+    if (result.ok) expect(result.redirected).toBe(false);
+    expect(mockSend).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "real-user@example.com" }),
+    );
+  });
+
+  it("strips line breaks from the subject before sending", async () => {
+    mockSend.mockResolvedValueOnce({ data: { id: "msg_ok" }, error: null });
+    await sendEmail({
+      to: "user@example.com",
+      subject: "Einladung zum Projekt „Oma\r\nBcc: x@evil.example\"",
+      react: { type: "div", props: {}, key: null } as never,
+    });
+    expect(mockSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: "Einladung zum Projekt „Oma Bcc: x@evil.example\"",
+      }),
+    );
+  });
+
   it("returns error when Resend API returns error", async () => {
     mockSend.mockResolvedValueOnce({
       data: null,
@@ -125,6 +157,13 @@ describe("hashEmailForLog", () => {
     expect(hashEmailForLog("a@example.com")).not.toBe(
       hashEmailForLog("b@example.com"),
     );
+  });
+});
+
+describe("sanitizeSubject", () => {
+  it("collapses line breaks and caps the length", () => {
+    expect(sanitizeSubject("  Zeile 1\n\nZeile 2  ")).toBe("Zeile 1 Zeile 2");
+    expect(sanitizeSubject("x".repeat(300))).toHaveLength(200);
   });
 });
 

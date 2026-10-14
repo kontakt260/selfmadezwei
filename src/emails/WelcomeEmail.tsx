@@ -1,8 +1,8 @@
 // PROJ-11 — Welcome-Mail nach Account-Verifikation.
 //
-// Trigger: erster Server-Render einer Auth-geschützten Route NACH
-// email_confirmed_at gesetzt, sofern kein mail_log-Eintrag „welcome"
-// für die user_id existiert.
+// Trigger: /auth/callback nach Bestätigung der E-Mail bzw. erstem
+// Google-/Facebook-Login, für Konten jünger als 14 Tage, sofern kein
+// mail_log-Eintrag „welcome" für die user_id existiert.
 //
 // Abgrenzung: Diese Mail kommt NICHT direkt nach Sign-up — die
 // Verifikations-Mail von Supabase Auth ist eine separate Mail.
@@ -54,7 +54,7 @@ export function WelcomeEmail({ fullName, siteUrl }: WelcomeEmailProps) {
       </MailCtaButton>
 
       <MailParagraph>
-        Wenn Sie Fragen haben oder etwas hakt, antworten Sie uns einfach an{" "}
+        Wenn Sie Fragen haben oder etwas hakt, schreiben Sie uns einfach an{" "}
         <a
           href="mailto:kontakt@narravit.de"
           style={{ color: "#3E3831", textDecoration: "underline" }}

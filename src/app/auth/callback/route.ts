@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
-import { maybeSendWelcomeMail } from "@/lib/email/send-welcome";
+import { isRecentSignup, maybeSendWelcomeMail } from "@/lib/email/send-welcome";
+import { sendInBackground } from "@/lib/email/background";
 
 function safeNext(next: string | null): string {
   if (!next || typeof next !== "string") return "/";
@@ -51,24 +52,34 @@ export async function GET(request: NextRequest) {
   }
 
   if (authenticated) {
-    // PROJ-11: Welcome-Mail fire-and-forget. Wird nur verschickt, wenn
-    // (a) der User verifiziert ist UND (b) noch kein mail_log-Eintrag
+    // PROJ-11: Welcome-Mail nach der Antwort (an die Laufzeit gebunden).
+    // Wird nur verschickt, wenn (a) der User verifiziert ist, (b) das Konto
+    // neu ist — Bestandskonten bekommen beim Passwort-Reset oder Google-
+    // Login kein „Willkommen" — und (c) noch kein mail_log-Eintrag
     // „welcome" für diese user_id existiert (Idempotenz via UNIQUE-
     // Constraint in mail_log).
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (user && user.email && user.email_confirmed_at) {
+    if (
+      user &&
+      user.email &&
+      user.email_confirmed_at &&
+      isRecentSignup(user.created_at)
+    ) {
       const { data: profile } = await supabase
         .from("profiles")
         .select("full_name")
         .eq("id", user.id)
         .maybeSingle();
-      void maybeSendWelcomeMail({
-        to: user.email,
-        userId: user.id,
-        fullName: profile?.full_name ?? undefined,
-      });
+      const to = user.email;
+      sendInBackground("welcome", () =>
+        maybeSendWelcomeMail({
+          to,
+          userId: user.id,
+          fullName: profile?.full_name ?? undefined,
+        }),
+      );
     }
     return NextResponse.redirect(`${origin}${next}`);
   }

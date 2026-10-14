@@ -2,9 +2,9 @@
 
 > ℹ️ **Anpassung 2026-10-13:** Vapi entfällt ([PROJ-12](PROJ-12-audio-erzaehlpipeline.md)). „Mail 3 — Vapi-Paket-Kauf-Bestätigung" (Template, Helper, Webhook-Hook) wurde mit dem PROJ-6-Rückbau entfernt; die Portal-Kauf-Mail und die Welcome-Mail nennen jetzt „per Sprachnachricht erzählen" statt Telefon/10 Stunden. Alle Vapi-Passagen weiter unten sind damit überholt. Die neuen Mails (Erzähl-Aufforderung, Erinnerung, „neues Kapitel erzählt") gehören zu PROJ-12 und nutzen die hier gebaute Infrastruktur.
 
-## Status: In Review
+## Status: In Progress
 **Created:** 2026-05-22
-**Last Updated:** 2026-10-13
+**Last Updated:** 2026-10-14
 
 ## Dependencies
 - Requires **PROJ-2** (Auth + SSR) — User-Profile mit E-Mail-Adressen als Empfänger; Verifikations-Status als Voraussetzung für Welcome-Mail
@@ -641,6 +641,27 @@ Jeder Projektleiter kann beliebig viele Einladungen an beliebige Adressen auslö
 3. BUG-6 — Reminder-Idempotenz um den Ablaufzeitpunkt erweitern (braucht Migration).
 4. BUG-1 — Impressum-Link.
 5. Danach Live-Test auf Stage mit Resend-Schlüssel und `EMAIL_TEST_RECIPIENT`.
+
+## Implementation Notes (Backend) — 2026-10-14: Fixes aus dem QA Re-Test
+
+**Behoben:**
+- **BUG-4 (High) + BUG-3 (Low) — Geschenk-Kauf:** Der Stripe-Webhook verschickt jetzt die Einladungs-Mail an die beschenkte Person (Geschenk-Variante: Betreff „<Käufer> schenkt Ihnen ein Lebensbuch", Button „Geschenk annehmen", bei abgelaufenem Link Verweis auf kontakt@narravit.de, weil ein Käufer ohne Zugang keine neue Einladung erstellen kann). Der Käufer bekommt immer eine Kauf-Bestätigung: mit eigenem Zugang wie bisher (plus Hinweis auf die verschickte Einladung), ohne eigenen Zugang als „Ihr Geschenk ist unterwegs" ohne Portal-Verweis.
+- **BUG-5 (High) — Versand an die Laufzeit gebunden:** Neuer Helfer `src/lib/email/background.ts` (`sendInBackground`, nutzt `after()` aus `next/server`, auf Vercel per `waitUntil`). Einsatz in `createInvitationAction` und `/auth/callback`. Im Stripe-Webhook werden die Mails direkt abgewartet (Server-zu-Server, niemand wartet auf die Antwort); ein Mail-Fehler lässt den Webhook nicht scheitern, weil Projekt und Zahlung schon gespeichert sind.
+- **BUG-6 (Medium) — Reminder im Folgejahr:** Ohne Migration gelöst. Ein Reminder-Marker, der früher als 60 Tage vor dem aktuellen Ablauf gesetzt wurde, gehört zu einem früheren Laufzeit-Zyklus und wird ersetzt (`deleteStaleMailLog`); die eindeutige Kombination `(user_id, project_id, mail_type)` sperrt weiterhin gegen Doppelversand. Schlägt ein Versand fehl, wird der Marker freigegeben (`releaseMailLog`) und der nächste Cron-Lauf versucht es erneut.
+- **BUG-11 (Low) — Cron:** Fenster nachholfähig (30-Tage-Erinnerung bei 7–30 Tagen Restlaufzeit, 7-Tage-Erinnerung bei 0–7 Tagen), Mails nennen die tatsächlich verbleibenden Tage (Singular am letzten Tag). Secret-Vergleich zeitkonstant, Listenabfragen mit `.limit()`, Datumsangaben in deutscher Zeit (`src/lib/email/format.ts`), `EMAIL_TEST_RECIPIENT` wird in Vercel-Production ignoriert.
+- **BUG-8 (Low) — Welcome-Mail:** Nur noch für Konten, die höchstens 14 Tage alt sind; schlägt der Versand fehl, wird der Marker freigegeben (nächster Login über `/auth/callback` versucht es erneut).
+- **BUG-2 (Low):** Betreffzeilen ohne Zeilenumbrüche, max. 200 Zeichen (`sanitizeSubject`).
+- **BUG-7 (Low):** Der Rechnungs-Link nutzt die echte `hosted_invoice_url` der Stripe-Rechnung statt der Rechnungs-ID. Solange der Checkout keine Rechnungen erzeugt, entfällt der Satz (unverändert).
+- **BUG-12 (Low):** Klartext trennt Bezeichnung und Wert („Betrag 249,00 €"); Welcome-Mail sagt „schreiben Sie uns an" statt „antworten Sie".
+- **Absender-Fallback:** `no-reply@mail.narravit.de` statt `no-reply@narravit.de` — nur die Subdomain ist in Resend verifiziert. Abweichung vom Akzeptanzkriterium „Absender `no-reply@narravit.de`".
+
+**Weiter offen:**
+- **BUG-1 (Medium) — Impressum:** Weder die App noch narravit.de haben eine Impressum-Seite (narravit.de liefert derzeit überall 404). Braucht die Pflichtangaben vom Betreiber, bevor eine Seite gebaut oder verlinkt werden kann.
+- **BUG-9 (Low):** Welcome- und Kauf-Mail erwähnen das Erzählen per Sprachnachricht; erst mit PROJ-12 live korrekt.
+- **BUG-10 (Low):** Mengenbegrenzung für Einladungen → PROJ-17.
+- Nicht im Code lösbar: Einladung beim Geschenk ohne Käufer-Zugang läuft nach 14 Tagen ab, und niemand im Projekt kann eine neue erstellen — die Mail verweist dafür auf kontakt@narravit.de.
+
+**Tests:** Vitest 246/246 grün (neu: `background.test.ts`, `send-welcome.test.ts`, `send-reminder.test.ts`; erweitert: Webhook-Mails für alle Kauf-Varianten, Cron-Nachholen und Secret-Präfix, Callback ohne Welcome für Bestandskonten, Client-Betreff und Production-Sperre, Marker-Freigabe, Geschenk-Vorlagen). `npx tsc --noEmit` und `npx next build` fehlerfrei. Playwright PROJ-9 (Einladungs-Flow, Chromium) 7/7 grün; der Versand läuft dabei über `after()` und meldet lokal erwartungsgemäß den fehlenden `RESEND_API_KEY`.
 
 ## Deployment
 _To be added by /deploy_

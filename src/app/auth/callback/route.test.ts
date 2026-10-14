@@ -6,7 +6,8 @@ import { maybeSendWelcomeMail } from "@/lib/email/send-welcome";
 import { GET } from "./route";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
-vi.mock("@/lib/email/send-welcome", () => ({
+vi.mock("@/lib/email/send-welcome", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/email/send-welcome")>()),
   maybeSendWelcomeMail: vi.fn(async () => undefined),
 }));
 
@@ -42,6 +43,7 @@ beforeEach(() => {
         id: "user-1",
         email: "maria@example.test",
         email_confirmed_at: "2026-10-14T00:00:00Z",
+        created_at: new Date().toISOString(),
       },
     },
   });
@@ -116,6 +118,22 @@ describe("/auth/callback — Code-Weg (OAuth, ältere Links)", () => {
       data: { user: { id: "user-2", email: "neu@example.test", email_confirmed_at: null } },
     });
     await call("next=%2F&code=oauth-code");
+    expect(maybeSendWelcomeMail).not.toHaveBeenCalled();
+  });
+
+  it("does not welcome existing accounts (e.g. password reset months later)", async () => {
+    getUser.mockResolvedValue({
+      data: {
+        user: {
+          id: "user-3",
+          email: "alt@example.test",
+          email_confirmed_at: "2026-01-01T00:00:00Z",
+          created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
+    });
+    const res = await call("next=/passwort-zuruecksetzen&token_hash=pkce_abc&type=recovery");
+    expect(res.headers.get("location")).toBe(`${ORIGIN}/passwort-zuruecksetzen`);
     expect(maybeSendWelcomeMail).not.toHaveBeenCalled();
   });
 

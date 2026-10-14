@@ -76,9 +76,9 @@ export async function reserveMailLog(
 }
 
 /**
- * Markiert einen mail_log-Eintrag mit dem Resend-Result. Wird auch dann
- * gerufen, wenn der Versand fehlschlug — der Idempotenz-Marker bleibt
- * stehen (kein automatischer Retry).
+ * Markiert einen mail_log-Eintrag mit dem Resend-Result. Welcome- und
+ * Reminder-Versand rufen bei Fehlern stattdessen `releaseMailLog`, damit
+ * der nächste Auslöser es erneut versucht.
  */
 export async function finalizeMailLog(
   logId: string,
@@ -94,6 +94,54 @@ export async function finalizeMailLog(
       error: result.ok ? null : result.error,
     })
     .eq("id", logId);
+}
+
+/**
+ * Gibt einen Marker wieder frei, wenn der Versand fehlgeschlagen ist.
+ * Der nächste Auslöser (Welcome: nächster Callback, Reminder: nächster
+ * Cron-Lauf) versucht es dann erneut, statt die Mail für immer zu
+ * verschlucken.
+ */
+export async function releaseMailLog(logId: string): Promise<void> {
+  const supabase = createServiceRoleClient();
+  const { error } = await supabase.from("mail_log").delete().eq("id", logId);
+  if (error) {
+    console.error(`[email/mail_log] release of ${logId} failed: ${error.message}`);
+  }
+}
+
+/**
+ * Entfernt einen Marker, der vor `sentBefore` gesetzt wurde. Für Reminder:
+ * Der Marker vom Vorjahr gehört zu einem früheren Ablaufdatum und darf die
+ * Erinnerung für das neue Ablaufdatum nicht blockieren. Gibt zurück, ob ein
+ * Marker entfernt wurde.
+ *
+ * Die eindeutige Kombination (user_id, project_id, mail_type) bleibt die
+ * Sperre gegen Doppelversand: Laufen zwei Crons parallel, entfernen beide
+ * höchstens den alten Marker, und nur einer bekommt danach die Reservierung.
+ */
+export async function deleteStaleMailLog(input: {
+  userId: string;
+  projectId: string;
+  mailType: MailType;
+  sentBefore: Date;
+}): Promise<boolean> {
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from("mail_log")
+    .delete()
+    .eq("user_id", input.userId)
+    .eq("project_id", input.projectId)
+    .eq("mail_type", input.mailType)
+    .lt("sent_at", input.sentBefore.toISOString())
+    .select("id");
+  if (error) {
+    console.error(
+      `[email/mail_log] stale cleanup failed for ${input.mailType}: ${error.message}`,
+    );
+    return false;
+  }
+  return (data ?? []).length > 0;
 }
 
 /**

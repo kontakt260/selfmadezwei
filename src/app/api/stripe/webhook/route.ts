@@ -4,23 +4,37 @@ import { getStripe, PRODUCTS, type ProductType } from "@/lib/stripe/server";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { sendPortalPurchaseMail } from "@/lib/email/send-portal-purchase";
 import { sendRenewalMail } from "@/lib/email/send-renewal";
+import { sendInvitationMail } from "@/lib/email/send-invitation";
+import { formatEur, formatGermanDate } from "@/lib/email/format";
 import crypto from "node:crypto";
 
-// PROJ-11 Helper: gemeinsame Formatierung für Mails.
-function formatEur(amountCents: number, currency: string): string {
-  const formatter = new Intl.NumberFormat("de-DE", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-  });
-  return formatter.format(amountCents / 100);
-}
+// PROJ-11: Die Mails werden hier abgewartet, nicht im Hintergrund
+// gestartet. Der Webhook ist ein Server-zu-Server-Aufruf (niemand wartet
+// auf die Antwort), und nur so ist sicher, dass der Versand nicht nach der
+// Antwort abgebrochen wird. Die Send-Helper werfen nicht; Fehler landen im
+// Server-Log. Ein Mail-Fehler darf den Webhook nicht scheitern lassen —
+// Projekt und Zahlung sind zu diesem Zeitpunkt schon gespeichert.
 
-function formatGermanDate(iso: string | number | Date): string {
-  return new Intl.DateTimeFormat("de-DE", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  }).format(new Date(iso));
+/**
+ * Link zur Stripe-Rechnung. `session.invoice` ist eine Rechnungs-ID (bzw.
+ * ein Objekt), keine URL — und nur gesetzt, wenn der Checkout Rechnungen
+ * erzeugt. Ohne Rechnung bleibt der Hinweis in der Mail weg.
+ */
+async function resolveInvoiceUrl(
+  session: Stripe.Checkout.Session,
+): Promise<string | undefined> {
+  const invoice = session.invoice;
+  if (!invoice) return undefined;
+  if (typeof invoice !== "string") return invoice.hosted_invoice_url ?? undefined;
+  try {
+    const retrieved = await getStripe().invoices.retrieve(invoice);
+    return retrieved.hosted_invoice_url ?? undefined;
+  } catch (err) {
+    console.error(
+      `[stripe-webhook] invoice lookup failed for session ${session.id}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return undefined;
+  }
 }
 
 async function resolveBuyerEmail(
@@ -65,6 +79,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const TWELVE_MONTHS_MS = 365 * 24 * 60 * 60 * 1000;
+
+/** Titel neuer Projekte; der Projektleiter kann ihn später ändern. */
+const PROJECT_DEFAULT_TITLE = "Lebensgeschichten";
 
 // 3-Linien-Verteidigung (siehe Tech-Design Sektion C):
 //   1. Signatur-Verifikation (Stripe-Secret).
@@ -176,7 +193,7 @@ async function handleInitial(
   const { data: project, error: projErr } = await supabase
     .from("projects")
     .insert({
-      title: "Lebensgeschichten",
+      title: PROJECT_DEFAULT_TITLE,
       owner_id: userId,
     })
     .select("id")
@@ -232,6 +249,7 @@ async function handleInitial(
     if (memErr) throw new Error(memErr.message);
   }
 
+  let invitationToken: string | null = null;
   if (inviteRecipient && recipientEmail) {
     const inviteExpiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
     const token = generateInviteToken();
@@ -245,6 +263,7 @@ async function handleInitial(
         expires_at: inviteExpiresAt,
       });
     if (invErr) throw new Error(invErr.message);
+    invitationToken = token;
   }
 
   // 4. payments-Eintrag (idempotenz-tragend via UNIQUE stripe_session_id).
@@ -259,25 +278,49 @@ async function handleInitial(
   });
   if (payErr) throw new Error(payErr.message);
 
-  // 5. PROJ-11: Mail-Versand fire-and-forget — der Webhook quittiert
-  //    Stripe sofort mit 200, der Versand läuft im Hintergrund weiter.
-  if (buyerIsMember) {
+  // 5. PROJ-11: Einladung an die beschenkte Person + Kauf-Bestätigung an
+  //    den Käufer (auch ohne eigenen Zugang, dann als Geschenk-Variante).
+  try {
     const buyer = await resolveBuyerEmail(supabase, session, userId);
-    if (buyer.email) {
-      const invoiceUrl =
-        (session.invoice as string | null | undefined) ?? undefined;
-      void sendPortalPurchaseMail({
-        to: buyer.email,
-        fullName: buyer.fullName ?? undefined,
-        amountFormatted: formatEur(
-          session.amount_total ?? PRODUCTS.initial.amountCents,
-          (session.currency ?? PRODUCTS.initial.currency).toUpperCase(),
-        ),
-        paymentDateFormatted: formatGermanDate(Date.now()),
-        expiresAtFormatted: formatGermanDate(expiresAt),
-        invoiceUrl,
-      });
+    const mails: Array<Promise<void>> = [];
+
+    if (invitationToken && recipientEmail) {
+      mails.push(
+        sendInvitationMail({
+          to: recipientEmail,
+          inviterName: buyer.fullName ?? "",
+          inviterEmail: buyer.email ?? "",
+          projectName: PROJECT_DEFAULT_TITLE,
+          role: inviteRole,
+          token: invitationToken,
+          isGift: true,
+        }),
+      );
     }
+
+    if (buyer.email) {
+      mails.push(
+        sendPortalPurchaseMail({
+          to: buyer.email,
+          fullName: buyer.fullName ?? undefined,
+          amountFormatted: formatEur(
+            session.amount_total ?? PRODUCTS.initial.amountCents,
+            (session.currency ?? PRODUCTS.initial.currency).toUpperCase(),
+          ),
+          paymentDateFormatted: formatGermanDate(Date.now()),
+          expiresAtFormatted: formatGermanDate(expiresAt),
+          invoiceUrl: await resolveInvoiceUrl(session),
+          giftRecipientEmail: invitationToken ? recipientEmail ?? undefined : undefined,
+          buyerHasAccess: buyerIsMember,
+        }),
+      );
+    }
+
+    await Promise.all(mails);
+  } catch (err) {
+    console.error(
+      `[stripe-webhook] purchase mails failed for session ${session.id}: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 }
 
@@ -329,22 +372,26 @@ async function handleRenewal(
   });
   if (payErr) throw new Error(payErr.message);
 
-  // PROJ-11: Verlängerungs-Bestätigung fire-and-forget.
-  const buyer = await resolveBuyerEmail(supabase, session, userId);
-  if (buyer.email) {
-    const invoiceUrl =
-      (session.invoice as string | null | undefined) ?? undefined;
-    void sendRenewalMail({
-      to: buyer.email,
-      fullName: buyer.fullName ?? undefined,
-      amountFormatted: formatEur(
-        session.amount_total ?? PRODUCTS.renewal.amountCents,
-        (session.currency ?? PRODUCTS.renewal.currency).toUpperCase(),
-      ),
-      paymentDateFormatted: formatGermanDate(Date.now()),
-      newExpiresAtFormatted: formatGermanDate(newExpiresAt),
-      invoiceUrl,
-    });
+  // PROJ-11: Verlängerungs-Bestätigung.
+  try {
+    const buyer = await resolveBuyerEmail(supabase, session, userId);
+    if (buyer.email) {
+      await sendRenewalMail({
+        to: buyer.email,
+        fullName: buyer.fullName ?? undefined,
+        amountFormatted: formatEur(
+          session.amount_total ?? PRODUCTS.renewal.amountCents,
+          (session.currency ?? PRODUCTS.renewal.currency).toUpperCase(),
+        ),
+        paymentDateFormatted: formatGermanDate(Date.now()),
+        newExpiresAtFormatted: formatGermanDate(newExpiresAt),
+        invoiceUrl: await resolveInvoiceUrl(session),
+      });
+    }
+  } catch (err) {
+    console.error(
+      `[stripe-webhook] renewal mail failed for session ${session.id}: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 }
 
