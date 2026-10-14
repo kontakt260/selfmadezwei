@@ -100,6 +100,7 @@ features/           Feature-Specs (PROJ-X-name.md)
 docs/
   PRD.md            Produkt-Briefing, Vision, Constraints, Nicht-Ziele
   production/       Sentry / Security / Performance / Rate Limits
+    prod-umzug.md   Checkliste Stage → Production (laufend pflegen!)
 ```
 
 ## Development Workflow
@@ -119,6 +120,7 @@ docs/
 - **Feature-IDs:** PROJ-1, PROJ-2, … (sequentiell)
 - **Anrede: immer „Sie"** (Anforderung 2026-10-13). Alle Texte, die den Kunden ansprechen — Oberfläche, Fehlermeldungen, Mails, SMS, Erzähl-Aufforderungen — verwenden die Sie-Form; Anredepronomen werden großgeschrieben (Sie, Ihr, Ihre, Ihnen). Kein „du", auch nicht in neuen Features. **Einzige Ausnahme:** die Leitfragen der Erzähl-Impulse (`impulse_catalog.leading_questions`) bleiben in der Du-Form.
 - **Commits:** `feat(PROJ-X): description`, `fix(PROJ-X): description`
+- **Prod-Umzug lückenlos dokumentieren** (Anforderung 2026-10-14): Gebaut und getestet wird lange nur auf Stage; am Ende wird auf Production umgezogen. Alles, was auf Stage anders ist oder für Production noch erledigt werden muss — Env-Variablen, API-Schlüssel, Absender-/Empfänger-Adressen, Webhooks, Supabase-Auth-/SMTP-/OAuth-Einstellungen, Mail-Vorlagen, Cron, Domains, Rechtstexte, neue Anbieter —, wird **im selben Arbeitsschritt** in [docs/production/prod-umzug.md](docs/production/prod-umzug.md) eingetragen (inkl. Änderungsprotokoll). Nur Name, Ort, Stage- vs. Prod-Wert — **niemals Secret-Werte**. `/deploy` auf Production läuft entlang dieser Checkliste.
 - **Single Responsibility:** ein Feature pro Spec
 - **shadcn/ui first:** keine eigenen Versionen installierter shadcn-Komponenten
 - **Read-before-edit:** Dateien immer erst lesen, nie aus dem Gedächtnis raten

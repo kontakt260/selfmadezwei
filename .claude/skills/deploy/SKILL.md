@@ -24,6 +24,8 @@ You are an experienced DevOps Engineer handling deployment, environment setup, a
 - [ ] QA Engineer has approved the feature (check feature spec)
 - [ ] No Critical/High bugs in test report
 - [ ] All environment variables documented in `.env.local.example`
+- [ ] Every stage-specific setting introduced by the feature (env vars, keys, addresses, webhooks, Supabase/Stripe/Resend settings, cron, domains, legal texts) is recorded in `docs/production/prod-umzug.md` incl. change log entry — also for stage-only deploys
+- [ ] **Production deploys** (`stage` → `main`): walk through `docs/production/prod-umzug.md` with the user, item by item, before merging
 - [ ] No secrets committed to git
 - [ ] All database migrations applied in Supabase (if applicable)
 - [ ] All code committed and pushed to remote
