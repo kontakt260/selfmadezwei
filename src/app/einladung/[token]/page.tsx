@@ -36,18 +36,6 @@ type LookupRow = {
   inviter_full_name: string;
 };
 
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString("de-DE", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    });
-  } catch {
-    return iso;
-  }
-}
-
 export default async function EinladungAcceptPage({
   params,
 }: {
@@ -149,10 +137,6 @@ export default async function EinladungAcceptPage({
         <div className="flex flex-row gap-3">
           <dt className="w-28 shrink-0 font-semibold text-[#3E3831]">Für</dt>
           <dd>{lookup.email}</dd>
-        </div>
-        <div className="flex flex-row gap-3">
-          <dt className="w-28 shrink-0 font-semibold text-[#3E3831]">Gültig bis</dt>
-          <dd>{formatDate(lookup.expires_at)}</dd>
         </div>
       </dl>
     </div>

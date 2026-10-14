@@ -56,7 +56,7 @@
 - [ ] Die Token-URL hat die Form `<app-origin>/einladung/<token>`.
 
 ### Accept-Flow (Eingeladene Person)
-- [ ] Route `/einladung/<token>` zeigt für gültige, ungenutzte Token eine Vorschau: Projektname, zugewiesene Rolle, Name des einladenden Projektleiters, Ablaufdatum.
+- [ ] Route `/einladung/<token>` zeigt für gültige, ungenutzte Token eine Vorschau: Projektname, zugewiesene Rolle, Name des einladenden Projektleiters. ~~Ablaufdatum~~ — **Änderung 2026-10-14 (Jakob):** kein „Gültig bis" auf der Seite; die eingeladene Person muss das Ablaufdatum nicht kennen. Abgelaufene Einladungen zeigen weiterhin „Diese Einladung ist abgelaufen".
 - [ ] Wenn der Token-Empfänger **nicht eingeloggt** ist: die Vorschau-Seite enthält Buttons „Anmelden" und „Konto erstellen", beide leiten zur Login/Signup-Seite mit vorausgefüllter E-Mail-Adresse aus der Einladung. Nach erfolgreichem Login/Signup landet der User zurück auf `/einladung/<token>`.
 - [ ] Wenn der Token-Empfänger **eingeloggt** ist und die eingeloggte E-Mail **exakt** der Einladungs-E-Mail entspricht: „Annehmen"-Button ist sichtbar. Klick fügt den User als Mitglied hinzu (Rolle aus Einladung), markiert die Einladung als angenommen (`accepted_at` gesetzt) und leitet zur Projektübersicht.
 - [ ] Wenn der Token-Empfänger **eingeloggt** ist, aber mit einer **anderen** E-Mail als der eingeladenen: kein „Annehmen"-Button. Stattdessen Hinweis „Diese Einladung gilt für a@x.de, du bist als b@x.de eingeloggt. Bitte melde dich mit der korrekten Adresse an." + „Abmelden"-Button.
