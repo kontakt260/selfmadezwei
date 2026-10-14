@@ -24,7 +24,6 @@ import { sendEmail, hashEmailForLog, getSiteUrl, sanitizeSubject } from "./clien
 beforeEach(() => {
   vi.clearAllMocks();
   delete process.env.EMAIL_TEST_RECIPIENT;
-  delete process.env.VERCEL_ENV;
 });
 
 describe("sendEmail", () => {
@@ -88,9 +87,10 @@ describe("sendEmail", () => {
     );
   });
 
-  it("ignores EMAIL_TEST_RECIPIENT in the Vercel production environment", async () => {
+  it("ignores EMAIL_TEST_RECIPIENT on the customer domain app.narravit.de", async () => {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    process.env.NEXT_PUBLIC_SITE_URL = "https://app.narravit.de";
     process.env.EMAIL_TEST_RECIPIENT = "qa@narravit.de";
-    process.env.VERCEL_ENV = "production";
     vi.spyOn(console, "warn").mockImplementation(() => {});
     mockSend.mockResolvedValueOnce({ data: { id: "msg_ok" }, error: null });
 
@@ -99,9 +99,28 @@ describe("sendEmail", () => {
       subject: "Test",
       react: { type: "div", props: {}, key: null } as never,
     });
+    process.env.NEXT_PUBLIC_SITE_URL = siteUrl;
     if (result.ok) expect(result.redirected).toBe(false);
     expect(mockSend).toHaveBeenCalledWith(
       expect.objectContaining({ to: "real-user@example.com" }),
+    );
+  });
+
+  it("keeps redirecting on stage even if Vercel reports VERCEL_ENV=production", async () => {
+    // Stage kann in Vercel als Umgebung „Production" laufen — der Override
+    // muss dort trotzdem greifen.
+    process.env.VERCEL_ENV = "production";
+    process.env.EMAIL_TEST_RECIPIENT = "qa@narravit.de";
+    mockSend.mockResolvedValueOnce({ data: { id: "msg_ok" }, error: null });
+
+    await sendEmail({
+      to: "real-user@example.com",
+      subject: "Test",
+      react: { type: "div", props: {}, key: null } as never,
+    });
+    delete process.env.VERCEL_ENV;
+    expect(mockSend).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "qa@narravit.de" }),
     );
   });
 

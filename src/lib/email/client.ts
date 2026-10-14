@@ -15,7 +15,7 @@ import crypto from "node:crypto";
 //                           (Absender muss auf der in Resend verifizierten
 //                           Domain mail.narravit.de liegen)
 //   EMAIL_TEST_RECIPIENT  — falls gesetzt: ALLE Mails gehen an diese Adresse
-//                           (Override für stage + lokal). In Vercel-Production
+//                           (Override für stage + lokal). Auf app.narravit.de
 //                           wird die Variable ignoriert.
 //
 // Versand-Verhalten:
@@ -48,19 +48,23 @@ function getFromAddress(): string {
   );
 }
 
+/** Die Kunden-Domain. Nur dort wird `EMAIL_TEST_RECIPIENT` ignoriert. */
+const PRODUCTION_SITE_URL = "https://app.narravit.de";
+
 /**
  * Resolves the actual recipient. In stage/local environments, the
  * `EMAIL_TEST_RECIPIENT` override redirects every mail to a single test
  * inbox to avoid leaking test-data into real inboxes.
  *
- * In der Vercel-Produktionsumgebung wird der Override ignoriert: Ist die
- * Variable dort versehentlich gesetzt, gingen sonst alle Kunden-Mails an
- * die Testadresse.
+ * Auf der Kunden-Domain wird der Override ignoriert: Ist die Variable dort
+ * versehentlich gesetzt, gingen sonst alle Kunden-Mails an die Testadresse.
+ * Bewusst an der Site-URL festgemacht und nicht an `VERCEL_ENV`: Stage kann
+ * in Vercel ebenfalls als Umgebung „Production" laufen.
  */
 function resolveRecipient(to: string): { to: string; redirected: boolean } {
   const override = process.env.EMAIL_TEST_RECIPIENT?.trim();
   if (override && override.length > 0) {
-    if (process.env.VERCEL_ENV === "production") {
+    if (getSiteUrl() === PRODUCTION_SITE_URL) {
       console.warn(
         "[email] EMAIL_TEST_RECIPIENT is set in production and is ignored",
       );

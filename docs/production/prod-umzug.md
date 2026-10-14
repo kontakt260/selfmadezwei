@@ -43,7 +43,7 @@ Production-Werte in Vercel unter **Settings → Environment Variables** mit Scop
 | `EMAIL_FROM` | nicht gesetzt (Fallback) | optional | Fallback im Code: `narravit <no-reply@mail.narravit.de>`. Absender muss auf `mail.narravit.de` liegen. |
 | `CRON_SECRET` | eigener Zufallswert | **neuer** Zufallswert | Sensitive. Erzeugen: `openssl rand -base64 32`. |
 
-Automatisch von Vercel gesetzt, nichts zu tun: `VERCEL_ENV` (`production` auf Production — schaltet `EMAIL_TEST_RECIPIENT` ab).
+Sicherung im Code: Auf `https://app.narravit.de` (= `NEXT_PUBLIC_SITE_URL` in Production) wird `EMAIL_TEST_RECIPIENT` ignoriert, selbst wenn die Variable versehentlich gesetzt ist.
 
 Entfallen, in Production **nicht** anlegen: `STRIPE_PRICE_ID_VAPI_60`, `VAPI_API_KEY` (Vapi-Rückbau 2026-10-13).
 
@@ -51,7 +51,8 @@ Entfallen, in Production **nicht** anlegen: `STRIPE_PRICE_ID_VAPI_60`, `VAPI_API
 
 - [ ] Domain `app.narravit.de` ist der Production-Domain zugeordnet (DNS siehe Abschnitt 7).
 - [ ] Deployment Protection (Vercel-Login) gilt nur für Stage/Preview, **nicht** für Production.
-- [ ] Cron `/api/cron/reminders` (täglich 09:00 UTC, `vercel.json`): läuft **nur in Production**. Nach dem ersten Lauf in den Vercel-Logs prüfen, dass er mit 200 antwortet.
+- [ ] Cron `/api/cron/reminders` (täglich 09:00 UTC, `vercel.json`): Vercel führt Crons nur für Deployments der Umgebung „Production" aus. Nach dem ersten Lauf in den Vercel-Logs prüfen, dass er mit 200 antwortet.
+- [ ] Klären, in welcher Vercel-Umgebung Stage läuft (Deployment-Liste: Label „Production" oder „Preview"). Läuft Stage als „Production", muss beim Umzug der Production-Branch auf `main` und die Domain `app.narravit.de` umgestellt werden — und alle Stage-Variablen dürfen dann nicht in die Production-Umgebung von `main` geraten.
 
 ---
 
@@ -173,4 +174,5 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
+| 2026-10-14 | Test-Empfänger-Sperre hängt an der Site-URL statt an `VERCEL_ENV` (Stage kann in Vercel als „Production" laufen); offene Frage zur Vercel-Umgebung von Stage ergänzt. |
 | 2026-10-14 | Datei angelegt mit dem Stand aus PROJ-1, -2, -6, -11 (Env-Variablen, Supabase-Auth, Stripe, Resend, Rechtliches). Stage-Mail-Variablen `RESEND_API_KEY`, `CRON_SECRET`, `EMAIL_TEST_RECIPIENT` werden eingerichtet. |
