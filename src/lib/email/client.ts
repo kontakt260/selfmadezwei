@@ -11,7 +11,8 @@ import crypto from "node:crypto";
 //
 // Env-Variablen (siehe .env.local.example):
 //   RESEND_API_KEY        — Resend-API-Schlüssel (Produktion: re_…)
-//   EMAIL_FROM            — From-Header, z. B. "narravit <no-reply@mail.narravit.de>"
+//   EMAIL_FROM            — From-Header, z. B. "NARRAVIT <no-reply@mail.narravit.de>"
+//                           (Absender-Name immer in Großbuchstaben)
 //                           (Absender muss auf der in Resend verifizierten
 //                           Domain mail.narravit.de liegen)
 //   EMAIL_TEST_RECIPIENT  — falls gesetzt: ALLE Mails gehen an diese Adresse
@@ -44,7 +45,7 @@ function getFromAddress(): string {
   // Fallback auf der verifizierten Resend-Domain: narravit.de selbst ist
   // in Resend nicht eingerichtet, Mails von dort würden abgelehnt.
   return (
-    process.env.EMAIL_FROM ?? "narravit <no-reply@mail.narravit.de>"
+    process.env.EMAIL_FROM ?? "NARRAVIT <no-reply@mail.narravit.de>"
   );
 }
 

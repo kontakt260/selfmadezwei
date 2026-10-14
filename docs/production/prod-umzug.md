@@ -40,7 +40,7 @@ Production-Werte in Vercel unter **Settings → Environment Variables** mit Scop
 | `STRIPE_PRICE_ID_RENEWAL` | Test-Preis | Live-Preis 99 € | |
 | `RESEND_API_KEY` | Schlüssel `narravit-app-stage` | eigener Schlüssel `narravit-app-prod` | Sensitive. Sending access, Domain `mail.narravit.de`. |
 | `EMAIL_TEST_RECIPIENT` | `kontakt@narravit.de` | **nicht setzen** | Leitet alle Mails um. Wird in Production zwar ignoriert, soll dort trotzdem fehlen. |
-| `EMAIL_FROM` | nicht gesetzt (Fallback) | optional | Fallback im Code: `narravit <no-reply@mail.narravit.de>`. Absender muss auf `mail.narravit.de` liegen. |
+| `EMAIL_FROM` | nicht gesetzt (Fallback) | optional | Fallback im Code: `NARRAVIT <no-reply@mail.narravit.de>`. Absender-Name immer in Großbuchstaben, Adresse auf `mail.narravit.de`. |
 | `CRON_SECRET` | eigener Zufallswert | **neuer** Zufallswert | Sensitive. Erzeugen: `openssl rand -base64 32`. |
 
 Sicherung im Code: Auf `https://app.narravit.de` (= `NEXT_PUBLIC_SITE_URL` in Production) wird `EMAIL_TEST_RECIPIENT` ignoriert, selbst wenn die Variable versehentlich gesetzt ist.
@@ -75,7 +75,7 @@ Stage = Projekt-Ref `kdjhxqitfxnsavhiafdn`. Production = Haupt-Projekt (`main`) 
 ### Auth → SMTP (Mails über Resend)
 
 - [ ] Custom SMTP aktiv: Host `smtp.resend.com`, Port 465, User `resend`, Passwort = eigener Resend-Schlüssel für Supabase-Production (nicht den App-Schlüssel teilen).
-- [ ] Absender-Adresse und -Name wie auf Stage übernehmen (Adresse auf `mail.narravit.de`).
+- [ ] Absender-Name **`NARRAVIT`** (Großbuchstaben, wie die App-Mails), Absender-Adresse wie auf Stage (auf `mail.narravit.de`).
 - [ ] Mail-Rate-Limit unter Auth → Rate Limits passend setzen (mit eigenem SMTP frei wählbar).
 
 ### Auth → Email Templates
@@ -121,8 +121,8 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Zweck | Adresse | Wo eingetragen |
 |---|---|---|
-| Absender App-Mails | `no-reply@mail.narravit.de` | Code-Fallback bzw. `EMAIL_FROM` |
-| Absender Supabase-Auth-Mails | Adresse auf `mail.narravit.de` | Supabase → Auth → SMTP |
+| Absender App-Mails | `NARRAVIT <no-reply@mail.narravit.de>` | Code-Fallback bzw. `EMAIL_FROM` |
+| Absender Supabase-Auth-Mails | Name `NARRAVIT`, Adresse auf `mail.narravit.de` | Supabase → Auth → SMTP |
 | Support / Kontakt in allen Mails | `kontakt@narravit.de` | `src/emails/Layout.tsx` (Footer), Willkommens-Mail |
 | Test-Empfänger Stage | `kontakt@narravit.de` | Vercel `EMAIL_TEST_RECIPIENT` (nur Stage) |
 
@@ -174,5 +174,6 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
+| 2026-10-14 | Absender-Name überall `NARRAVIT` in Großbuchstaben (App-Mails im Code; Supabase-SMTP auf Stage und Production manuell). |
 | 2026-10-14 | Test-Empfänger-Sperre hängt an der Site-URL statt an `VERCEL_ENV` (Stage kann in Vercel als „Production" laufen); offene Frage zur Vercel-Umgebung von Stage ergänzt. |
 | 2026-10-14 | Datei angelegt mit dem Stand aus PROJ-1, -2, -6, -11 (Env-Variablen, Supabase-Auth, Stripe, Resend, Rechtliches). Stage-Mail-Variablen `RESEND_API_KEY`, `CRON_SECRET`, `EMAIL_TEST_RECIPIENT` werden eingerichtet. |
