@@ -74,7 +74,7 @@ test.describe("PROJ-9 — AddUser-Modal", () => {
     await expect(page.getByRole("button", { name: /Einladen/ })).toBeDisabled();
   });
 
-  test("AC-Modal-2: Step 2 zeigt Token-Link + Copy-Button nach erfolgreicher Einladung", async ({
+  test("AC-Modal-2: Step 2 bestätigt den Mailversand, ohne Link zum manuellen Teilen", async ({
     page,
   }) => {
     await page.goto(QA_PROJECT_URL);
@@ -86,10 +86,11 @@ test.describe("PROJ-9 — AddUser-Modal", () => {
     await expect(
       page.getByRole("heading", { name: "Einladung erstellt" }),
     ).toBeVisible({ timeout: 10_000 });
-    // Link enthält /einladung/<token> — Host kommt aus NEXT_PUBLIC_SITE_URL
-    // (env-abhängig; lokal kann es localhost:3000 oder stage-app.narravit.de sein).
-    await expect(page.getByText(/\/einladung\/[A-Za-z0-9_-]+/)).toBeVisible();
-    await expect(page.getByRole("button", { name: /Link kopieren/ })).toBeVisible();
+    await expect(page.getByText(/Einladung per Mail an/)).toBeVisible();
+    // Entscheidung 2026-10-14: Die Einladung geht nur per Mail — kein Link,
+    // kein Kopieren-Button im Modal.
+    await expect(page.getByText(/\/einladung\//)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Link kopieren/ })).toHaveCount(0);
     // Cleanup: dialog schließen — den eigentlichen Invitation-Row räumen wir SQL-seitig auf.
     await page.getByRole("button", { name: "Schließen" }).click();
   });

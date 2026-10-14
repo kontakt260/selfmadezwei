@@ -49,6 +49,8 @@
 - [ ] Bei Abbrechen wird das Modal geschlossen, kein DB-Eintrag.
 
 ### Einladung erstellen — Modal Step 2 (Link-Anzeige)
+> **Änderung 2026-10-14 (Jakob):** Kein manuelles Teilen mehr. Einladungen gehen ausschließlich per Mail (PROJ-11). Step 2 bestätigt nur noch: „Wir haben die Einladung per Mail an name@beispiel.de geschickt. Sie ist 14 Tage gültig." + „Schließen". Kein Link, kein „Link kopieren"; die Server-Action gibt Token und Link nicht mehr an den Browser zurück. Die Kriterien darunter sind damit überholt.
+
 - [ ] Nach erfolgreichem Submit wechselt das Modal auf eine zweite Ansicht: Erfolgs-Meldung („Einladung für name@beispiel.de wurde angelegt") + generierte Token-URL prominent + „Link kopieren"-Button (kopiert in Zwischenablage) + Hinweis „Der Link ist 14 Tage gültig — bitte leite ihn manuell an die Person weiter."
 - [ ] „Schließen"-Button beendet das Modal. Der Link ist danach in der UI nicht mehr abrufbar.
 - [ ] Die Token-URL hat die Form `<app-origin>/einladung/<token>`.

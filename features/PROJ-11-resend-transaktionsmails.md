@@ -33,7 +33,7 @@
 - [ ] Trigger: `createInvitationAction` aus PROJ-9 erfolgreich (Invitation-Row angelegt).
 - [ ] Empfänger: die eingeladene E-Mail-Adresse (`invitations.email`).
 - [ ] Inhalt: Anrede, Hinweis "X hat dich zum Projekt Y eingeladen", Rolle (Projektleiter / Co-Autor), Einladungs-Link (führt zu `/einladung/<token>`), Hinweis auf 14-Tage-Gültigkeit.
-- [ ] Step-2-Modal aus PROJ-9 bleibt erhalten und zeigt den Link weiterhin (für manuelle Weiterleitung als Backup); Texte werden auf "Mail ist unterwegs — du kannst den Link bei Bedarf zusätzlich manuell teilen" angepasst.
+- [ ] ~~Step-2-Modal aus PROJ-9 bleibt erhalten und zeigt den Link weiterhin (für manuelle Weiterleitung als Backup)~~ — **Änderung 2026-10-14 (Jakob):** Die Mail ist der einzige Weg. Step 2 bestätigt nur den Versand, ohne Link und ohne „Link kopieren".
 
 ### Mail 2 — Portal-Kauf-Bestätigung
 - [ ] Trigger: Stripe-Webhook `checkout.session.completed` mit `payment_type = portal_initial` (oder vergleichbarer Identifier aus PROJ-6).
@@ -660,6 +660,8 @@ Jeder Projektleiter kann beliebig viele Einladungen an beliebige Adressen auslö
 - **BUG-9 (Low):** Welcome- und Kauf-Mail erwähnen das Erzählen per Sprachnachricht; erst mit PROJ-12 live korrekt.
 - **BUG-10 (Low):** Mengenbegrenzung für Einladungen → PROJ-17.
 - Einladung beim Geschenk ohne Käufer-Zugang läuft nach 14 Tagen ab, und niemand im Projekt kann eine neue erstellen. **Entscheidung 2026-10-14 (Jakob):** kein Hinweis in der Mail — Käufer melden sich in dem Fall ohnehin beim Kundenservice, der eine neue Einladung ausstellt.
+
+**Nachtrag 2026-10-14 — kein manuelles Teilen:** Auf Wunsch des Betreibers zeigt der Einladen-Dialog keinen Link und keinen „Link kopieren"-Button mehr; `createInvitationAction` gibt nur noch `{ ok: true }` zurück (Token verlässt den Server nicht). Unit-Test prüft Token-Stärke jetzt am gespeicherten Datensatz, Playwright AC-Modal-2 prüft, dass kein Link angezeigt wird (PROJ-9 7/7 grün).
 
 **Tests:** Vitest 246/246 grün (neu: `background.test.ts`, `send-welcome.test.ts`, `send-reminder.test.ts`; erweitert: Webhook-Mails für alle Kauf-Varianten, Cron-Nachholen und Secret-Präfix, Callback ohne Welcome für Bestandskonten, Client-Betreff und Production-Sperre, Marker-Freigabe, Geschenk-Vorlagen). `npx tsc --noEmit` und `npx next build` fehlerfrei. Playwright PROJ-9 (Einladungs-Flow, Chromium) 7/7 grün; der Versand läuft dabei über `after()` und meldet lokal erwartungsgemäß den fehlenden `RESEND_API_KEY`.
 

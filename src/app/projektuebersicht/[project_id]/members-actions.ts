@@ -55,9 +55,11 @@ const INVITATION_VALIDITY_DAYS = 14;
 
 // ─── createInvitationAction ──────────────────────────────────────────────────
 
+// Die Einladung geht ausschließlich per Mail an die eingeladene Adresse
+// (Entscheidung 2026-10-14: kein manuelles Teilen des Links). Token und
+// Link verlassen den Server deshalb nicht — die Antwort meldet nur Erfolg.
 export async function createInvitationAction(formData: FormData): Promise<{
-  token?: string;
-  acceptUrl?: string;
+  ok?: true;
   error?: string;
 }> {
   const parsed = createInvitationSchema.safeParse({
@@ -130,12 +132,6 @@ export async function createInvitationAction(formData: FormData): Promise<{
     return { error: "Einladung konnte nicht erstellt werden." };
   }
 
-  // Origin für absoluten Link.
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
-    "https://app.narravit.de";
-  const acceptUrl = `${siteUrl}/einladung/${token}`;
-
   // PROJ-11: Einladungs-Mail nach der Antwort verschicken (an die Laufzeit
   // gebunden, siehe sendInBackground). Wir holen Projekt-Titel und
   // Einlader-Name nach, damit die Mail personalisiert ist. Bei Fetch-Fehler
@@ -157,7 +153,7 @@ export async function createInvitationAction(formData: FormData): Promise<{
   );
 
   revalidatePath(`/projektuebersicht/${projectId}`);
-  return { token, acceptUrl };
+  return { ok: true };
 }
 
 // ─── removeMemberAction ──────────────────────────────────────────────────────

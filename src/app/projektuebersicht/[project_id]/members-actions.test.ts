@@ -160,12 +160,13 @@ describe("createInvitationAction", () => {
     });
   });
 
-  it("creates invitation and returns acceptUrl on happy path", async () => {
+  it("creates invitation with a strong token and does not return the link", async () => {
     const client = makeMockClient();
+    const invitationInsert = makeBuilder();
     client.from
       .mockReturnValueOnce(makeBuilder({ data: [{ user_id: PL_USER_ID, role: "projektleiter" }] }))
       .mockReturnValueOnce(makeBuilder({ data: [] }))
-      .mockReturnValueOnce(makeBuilder()) // invitations insert
+      .mockReturnValueOnce(invitationInsert) // invitations insert
       // PROJ-11: nach dem invitation-insert holt der Action den Projekt-
       // Titel + das Inviter-Profil für die Mail-Personalisierung (fire-
       // and-forget). Beide Reads dürfen leer zurückkommen — die Mail
@@ -175,11 +176,13 @@ describe("createInvitationAction", () => {
     vi.mocked(createClient).mockResolvedValue(client as never);
 
     const result = await createInvitationAction(fd());
-    expect(result.error).toBeUndefined();
-    expect(result.token).toBeTruthy();
-    expect(result.token!.length).toBeGreaterThanOrEqual(40);
-    expect(result.acceptUrl).toMatch(
-      /^https:\/\/stage-app\.narravit\.de\/einladung\/[A-Za-z0-9_-]+$/,
+    // Entscheidung 2026-10-14: Einladung nur per Mail, kein Link in der Antwort.
+    expect(result).toEqual({ ok: true });
+    expect(invitationInsert.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: "neu@example.com",
+        token: expect.stringMatching(/^[A-Za-z0-9_-]{40,}$/),
+      }),
     );
   });
 });

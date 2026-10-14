@@ -68,13 +68,11 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
 
   // Add-User-Modal-State
   const [addOpen, setAddOpen] = useState(false);
-  const [addStep, setAddStep] = useState<"input" | "link">("input");
+  const [addStep, setAddStep] = useState<"input" | "sent">("input");
   const [addEmail, setAddEmail] = useState("");
   const [addRole, setAddRole] = useState<MemberDisplay["role"]>("co_author");
   const [addError, setAddError] = useState<string | null>(null);
-  const [addedLink, setAddedLink] = useState<string | null>(null);
   const [addPending, startAddTransition] = useTransition();
-  const [linkCopied, setLinkCopied] = useState(false);
 
   // Confirm-Modale
   const [confirmRemove, setConfirmRemove] = useState<MemberDisplay | null>(null);
@@ -86,8 +84,6 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
     setAddEmail("");
     setAddRole("co_author");
     setAddError(null);
-    setAddedLink(null);
-    setLinkCopied(false);
     setAddOpen(true);
   };
 
@@ -101,25 +97,13 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
     fd.set("role", addRole);
     startAddTransition(async () => {
       const res = await createInvitationAction(fd);
-      if (res.error || !res.acceptUrl) {
+      if (res.error || !res.ok) {
         setAddError(res.error ?? "Einladung fehlgeschlagen.");
         return;
       }
-      setAddedLink(res.acceptUrl);
-      setAddStep("link");
+      setAddStep("sent");
       router.refresh();
     });
-  };
-
-  const copyLink = async () => {
-    if (!addedLink) return;
-    try {
-      await navigator.clipboard.writeText(addedLink);
-      setLinkCopied(true);
-      toast.success("Link in die Zwischenablage kopiert.");
-    } catch {
-      toast.error("Kopieren fehlgeschlagen — bitte manuell markieren.");
-    }
   };
 
   const handleRemoveConfirmed = () => {
@@ -268,9 +252,7 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
               </h3>
               <p className="text-base leading-7 text-[#535252] sm:text-lg">
                 Tragen Sie die E-Mail-Adresse der Person ein und wählen Sie ihre Rolle.
-                Wir verschicken die Einladung automatisch per Mail — Sie können
-                den Link bei Bedarf zusätzlich manuell teilen (z. B. per
-                WhatsApp).
+                Wir verschicken die Einladung automatisch per Mail.
               </p>
               <label className="flex flex-col gap-2">
                 <span className="text-sm font-bold text-[#3E3831]">E-Mail-Adresse</span>
@@ -326,29 +308,17 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
                 Einladung erstellt
               </h3>
               <p className="text-base leading-7 text-[#535252] sm:text-lg">
-                Die Einladung für{" "}
-                <span className="font-semibold">{addEmail}</span> ist unterwegs
-                — wir verschicken sie automatisch per Mail. Sie können den
-                folgenden Link bei Bedarf zusätzlich manuell teilen; er ist
-                14 Tage gültig.
+                Wir haben die Einladung per Mail an{" "}
+                <span className="font-semibold">{addEmail}</span> geschickt.
+                Sie ist 14 Tage gültig.
               </p>
-              <div className="flex flex-col gap-2 break-all border border-[#e0dcd5] bg-[#FAF8F6] p-3 text-sm text-[#535252] sm:text-base">
-                {addedLink}
-              </div>
               <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-4">
                 <button
                   type="button"
                   onClick={closeAdd}
-                  className="h-12 border border-[#e0dcd5] bg-white px-5 text-base font-semibold text-[#3E3831] transition-colors hover:bg-[#f5f3f0] sm:text-lg"
-                >
-                  Schließen
-                </button>
-                <button
-                  type="button"
-                  onClick={copyLink}
                   className="h-12 bg-[#D0BCA6] px-5 text-base font-bold text-[#0a0909] transition-colors hover:bg-[#c0ad98] sm:text-lg"
                 >
-                  {linkCopied ? "Kopiert ✓" : "Link kopieren"}
+                  Schließen
                 </button>
               </div>
             </>

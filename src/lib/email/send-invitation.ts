@@ -34,8 +34,8 @@ function subjectFor(input: SendInvitationInput): string {
  * Idempotenz: braucht KEINEN mail_log-Marker, weil pro Invitation-Row
  * höchstens einmal aufgerufen wird (die invitations.token-UNIQUE-Spalte
  * verhindert Doppel-Invitations). Bei Resend-Fehler erfolgt KEIN
- * automatischer Retry — der UI-Step-2-Modal zeigt dem PL den Link, damit
- * er ihn notfalls manuell teilt.
+ * automatischer Retry; der Fehler landet im Server-Log. Einen manuell
+ * teilbaren Link gibt es bewusst nicht (Entscheidung 2026-10-14).
  */
 export async function sendInvitationMail(
   input: SendInvitationInput,
