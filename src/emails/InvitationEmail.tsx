@@ -70,17 +70,7 @@ export function InvitationEmail({
 
         <MailInlineFallbackLink href={acceptUrl} />
 
-        <MailParagraph>
-          Der Link ist 14 Tage gültig. Sollte er abgelaufen sein, schreiben
-          Sie uns an{" "}
-          <a
-            href="mailto:kontakt@narravit.de"
-            style={{ color: "#3E3831", textDecoration: "underline" }}
-          >
-            kontakt@narravit.de
-          </a>{" "}
-          — wir schicken Ihnen gern einen neuen.
-        </MailParagraph>
+        <MailParagraph>Der Link ist 14 Tage gültig.</MailParagraph>
       </Layout>
     );
   }
