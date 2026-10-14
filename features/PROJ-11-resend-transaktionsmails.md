@@ -663,6 +663,8 @@ Jeder Projektleiter kann beliebig viele Einladungen an beliebige Adressen auslö
 
 **Nachtrag 2026-10-14 — kein manuelles Teilen:** Auf Wunsch des Betreibers zeigt der Einladen-Dialog keinen Link und keinen „Link kopieren"-Button mehr; `createInvitationAction` gibt nur noch `{ ok: true }` zurück (Token verlässt den Server nicht). Unit-Test prüft Token-Stärke jetzt am gespeicherten Datensatz, Playwright AC-Modal-2 prüft, dass kein Link angezeigt wird (PROJ-9 7/7 grün).
 
+**Nachtrag 2026-10-14 — Live-Vorschau für Vorlagen:** `npm run email` startet die React-Email-Vorschau (Dev-Abhängigkeiten `react-email`, `@react-email/ui` 6.11.1) auf http://localhost:3001. Pro Mail liegt in `src/emails/preview/` eine Datei mit Beispieldaten (11 Varianten inkl. der beiden Supabase-Vorlagen); Änderungen an `src/emails/*.tsx` erscheinen ohne Neuladen. Supabase-Vorlagen nach dem Bearbeiten mit `UPDATE_AUTH_TEMPLATES=1 npx vitest run src/emails/auth` nach `supabase/templates/` erzeugen und im Supabase-Dashboard einfügen. Absender-Name der App-Mails jetzt `NARRAVIT` (Großbuchstaben).
+
 **Tests:** Vitest 246/246 grün (neu: `background.test.ts`, `send-welcome.test.ts`, `send-reminder.test.ts`; erweitert: Webhook-Mails für alle Kauf-Varianten, Cron-Nachholen und Secret-Präfix, Callback ohne Welcome für Bestandskonten, Client-Betreff und Production-Sperre, Marker-Freigabe, Geschenk-Vorlagen). `npx tsc --noEmit` und `npx next build` fehlerfrei. Playwright PROJ-9 (Einladungs-Flow, Chromium) 7/7 grün; der Versand läuft dabei über `after()` und meldet lokal erwartungsgemäß den fehlenden `RESEND_API_KEY`.
 
 ## Deployment

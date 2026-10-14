@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:all": "vitest run && playwright test"
+    "test:all": "vitest run && playwright test",
+    "email": "email dev --dir src/emails/preview --port 3001"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -72,6 +73,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "@react-email/ui": "^6.11.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^20",
@@ -84,6 +86,7 @@
     "eslint-config-next": "16.1.1",
     "jsdom": "^29.0.1",
     "postcss": "^8",
+    "react-email": "^6.11.1",
     "tailwindcss": "^3.4.1",
     "typescript": "^5",
     "vitest": "^4.1.2"
