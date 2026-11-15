@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { AcceptInvitationButton } from "./AcceptInvitationButton";
+import { isPast } from "@/lib/dates";
 
 // PROJ-9 — Einladungs-Annahme-Seite.
 //
@@ -96,7 +97,7 @@ export default async function EinladungAcceptPage({
   }
 
   // Variante 1d: abgelaufen.
-  if (new Date(lookup.expires_at).getTime() < Date.now()) {
+  if (isPast(lookup.expires_at)) {
     return (
       <CenteredCard>
         <h1 className="[font-family:var(--font-merriweather)] text-2xl text-[#3E3831] sm:text-3xl">

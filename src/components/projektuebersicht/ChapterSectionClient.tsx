@@ -453,13 +453,18 @@ export function ChapterSectionClient({
 
   // ─── Effects ──────────────────────────────────────────────────────────────
 
+  // Nur die ID als Abhängigkeit: Countdown und Fokus sollen pro geöffnetem
+  // Ziel einmal starten, nicht bei jeder neuen Objekt-Identität.
+  const deleteTargetId = deleteTarget?.id;
+  const editTargetId = editTarget?.id;
+
   useEffect(() => {
-    if (!deleteTarget) return;
+    if (!deleteTargetId) return;
     const id = window.setInterval(() => {
       setDeleteCountdown((s) => (s <= 1 ? 0 : s - 1));
     }, 1000);
     return () => window.clearInterval(id);
-  }, [deleteTarget?.id]);
+  }, [deleteTargetId]);
 
   useEffect(() => {
     if (!deleteTarget && !editTarget && !addOpen && !impulseOpen) return;
@@ -482,13 +487,13 @@ export function ChapterSectionClient({
   }, [deleteTarget, editTarget, addOpen, impulseOpen, closeDeleteModal, closeEditModal, closeAddModal, closeImpulseModal]);
 
   useEffect(() => {
-    if (!editTarget) return;
+    if (!editTargetId) return;
     const frame = requestAnimationFrame(() => {
       editInputRef.current?.focus();
       editInputRef.current?.select();
     });
     return () => cancelAnimationFrame(frame);
-  }, [editTarget?.id]);
+  }, [editTargetId]);
 
   useEffect(() => {
     if (!addOpen) return;

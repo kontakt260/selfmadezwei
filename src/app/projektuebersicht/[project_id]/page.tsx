@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Navbar } from "@/components/Navbar";
 import { ChapterListSection } from "@/components/projektuebersicht/ChapterListSection";
 import { PaywallStats } from "@/components/projektuebersicht/PaywallStats";
+import { daysUntil } from "@/lib/dates";
 import { ProjectUsersSection } from "@/components/projektuebersicht/ProjectUsersSection";
 import type { MemberDisplay } from "@/components/projektuebersicht/ProjectUsersClient";
 import { CheckoutCancelToast } from "@/components/CheckoutCancelToast";
@@ -178,6 +179,10 @@ export default async function ProjektuebersichtPage({
     .limit(1);
   const hasInitialPayment = (payments ?? []).length > 0;
   const portalExpiresAt = hasInitialPayment ? accessRow?.expires_at ?? null : null;
+  // Restlaufzeit serverseitig berechnen: die Client-Karte liest keine Uhr
+  // (sonst Hydration-Abweichung, wenn Server und Client um Mitternacht
+  // unterschiedliche Tage sehen).
+  const portalDaysLeft = portalExpiresAt === null ? null : daysUntil(portalExpiresAt);
 
   const { data: rawChapters } = await supabase
     .from("chapters")
@@ -319,6 +324,7 @@ export default async function ProjektuebersichtPage({
           <PaywallStats
             projectId={project_id}
             portalExpiresAt={portalExpiresAt}
+            daysLeft={portalDaysLeft}
           />
 
           {/* PROJ-9: Mitgliederverwaltung */}

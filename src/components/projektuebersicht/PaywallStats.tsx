@@ -19,14 +19,18 @@ type Props = {
   projectId: string;
   // ISO-String der Ablaufzeit, ODER null wenn noch nicht aktiviert.
   portalExpiresAt: string | null;
+  // Verbleibende volle Tage, serverseitig berechnet (`daysUntil`);
+  // null, wenn noch nicht aktiviert.
+  daysLeft: number | null;
 };
 
-export function PaywallStats({ projectId, portalExpiresAt }: Props) {
+export function PaywallStats({ projectId, portalExpiresAt, daysLeft }: Props) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:gap-6">
       <PortalAccessStat
         projectId={projectId}
         expiresAt={portalExpiresAt}
+        daysLeft={daysLeft}
       />
     </div>
   );
@@ -35,31 +39,24 @@ export function PaywallStats({ projectId, portalExpiresAt }: Props) {
 function PortalAccessStat({
   projectId,
   expiresAt,
+  daysLeft,
 }: {
   projectId: string;
   expiresAt: string | null;
+  daysLeft: number | null;
 }) {
-  const daysLeft =
-    expiresAt === null
-      ? null
-      : Math.max(
-          0,
-          Math.floor(
-            (new Date(expiresAt).getTime() - Date.now()) / 86_400_000,
-          ),
-        );
   return (
     <StatCard
       icon={<IconCalendar />}
       label="NARRAVIT-Projektzugang endet in"
       value={daysLeft === null ? "—" : `${daysLeft} Tagen`}
       hint={
-        daysLeft === null
+        daysLeft === null || expiresAt === null
           ? "Wird nach abgeschlossener Zahlung angezeigt (PROJ-6)"
           : daysLeft < 30
             ? "Verlängern Sie jetzt, damit Ihr Zugang ohne Unterbrechung weiterläuft."
             : "Bezahlt bis " +
-              new Date(expiresAt!).toLocaleDateString("de-DE", {
+              new Date(expiresAt).toLocaleDateString("de-DE", {
                 day: "2-digit",
                 month: "long",
                 year: "numeric",

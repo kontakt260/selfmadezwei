@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { GripVertical, ImagePlus, Trash2, Plus } from "lucide-react";
 import {
   DndContext,
@@ -40,6 +40,10 @@ import {
 } from "@/lib/kapiteleditor/types";
 import { ImageUploadDialog, type UploadedImage } from "./ImageUploadDialog";
 
+// Leeres Abonnement für das Hydration-Gate: der Wert ändert sich nie,
+// React muss nichts beobachten.
+const subscribeToNothing = () => () => {};
+
 export function ImageSection({
   data,
   onChange,
@@ -58,8 +62,13 @@ export function ImageSection({
   // kann der Counter differieren → React Hydration-Mismatch. Lösung: DnD-
   // Sortable-Slots erst NACH Mount rendern; pre-mount ist die Sektion leer
   // (kurzer SSR-Frame, danach client-side hydrated mit DnD).
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  // `useSyncExternalStore` liefert beim Server-Render und während der
+  // Hydration `false`, danach `true` — ohne setState in einem Effekt.
+  const mounted = useSyncExternalStore(
+    subscribeToNothing,
+    () => true,
+    () => false,
+  );
   const sectionRef = useRef<HTMLDivElement>(null);
   // Word-/Docs-Verhalten: nach jeder Image-Mutation soll der bearbeitete
   // Bereich im Viewport sichtbar sein (Spec 2026-05-18 vom Nutzer:

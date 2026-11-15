@@ -192,9 +192,14 @@ export function Navbar() {
     router.refresh();
   }, [router]);
 
-  useEffect(() => {
+  // Mobiles Menü bei Routenwechsel schließen. Bewusst als Zustandsabgleich
+  // während des Renderns statt per Effekt (React-Muster „Zustand aus Props
+  // ableiten"): kein zusätzlicher Render-Durchlauf mit offenem Menü.
+  const [menuPathname, setMenuPathname] = useState(pathname);
+  if (pathname !== menuPathname) {
+    setMenuPathname(pathname);
     setOpen(false);
-  }, [pathname]);
+  }
 
   useEffect(() => {
     if (!open && !logoutOpen) return;
