@@ -525,7 +525,7 @@ export function ChapterSectionClient({
     ? modalShell(
         <>
           <h2 id={titleId} className="[font-family:var(--font-pt-serif)] text-2xl leading-9 text-[#3E3831] sm:text-3xl sm:leading-10">
-            Kapitel „{deleteTarget.title}" löschen?
+            Kapitel „{deleteTarget.title}&quot; löschen?
           </h2>
           <div id={descId} className="mt-5 space-y-3 text-base leading-relaxed text-[#535252] sm:text-lg">
             <p>Alle geschriebenen Texte gehen verloren.</p>

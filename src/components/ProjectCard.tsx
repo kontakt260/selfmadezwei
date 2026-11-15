@@ -169,7 +169,7 @@ export function ProjectCard({ project, deleteProjectAction }: Props) {
                   <div id={step1DescId} className="mt-5 space-y-4 text-base leading-relaxed text-[#535252] sm:text-lg">
                     <p>
                       Sie sind dabei, das Projekt{" "}
-                      <span className="font-semibold text-[#3E3831]">„{project.title}"</span>{" "}
+                      <span className="font-semibold text-[#3E3831]">„{project.title}&quot;</span>{" "}
                       <strong className="text-[#3E3831]">unwiderruflich und endgültig</strong> zu
                       entfernen. Alle zugehörigen Inhalte (z.&nbsp;B. Kapitel, Entwürfe und Metadaten)
                       gehen verloren — eine Wiederherstellung ist danach nicht möglich.

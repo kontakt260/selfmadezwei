@@ -289,7 +289,7 @@ function SecuritySection({
         {isEmailProvider ? (
           <>
             <p className="[font-family:var(--font-lato)] max-w-4xl text-lg font-semibold leading-8 text-[#3E3831] sm:text-xl sm:leading-9">
-              Mit dem Klick auf „Passwort zurücksetzen" erhalten Sie eine E-Mail
+              Mit dem Klick auf „Passwort zurücksetzen&quot; erhalten Sie eine E-Mail
               von uns mit einem sicheren Link, über den Sie ein neues Passwort
               vergeben können.
             </p>
@@ -304,7 +304,7 @@ function SecuritySection({
             {hasPassword ? (
               <p className="[font-family:var(--font-lato)] max-w-4xl text-lg font-semibold leading-8 text-[#3E3831] sm:text-xl sm:leading-9">
                 Sie melden sich über {providerLabel} an und haben zusätzlich
-                ein Passwort festgelegt. Mit dem Klick auf „Passwort ändern"
+                ein Passwort festgelegt. Mit dem Klick auf „Passwort ändern&quot;
                 erhalten Sie eine E-Mail von uns mit einem sicheren Link, über
                 den Sie ein neues Passwort vergeben können.
               </p>

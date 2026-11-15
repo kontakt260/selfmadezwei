@@ -84,7 +84,7 @@ export function InvitationEmail({
       <MailHeading>Sie wurden eingeladen</MailHeading>
       <MailParagraph>
         <strong>{inviterDisplay}</strong> hat Sie zum Projekt{" "}
-        <strong>„{projectName}"</strong> eingeladen — als{" "}
+        <strong>„{projectName}&quot;</strong> eingeladen — als{" "}
         <strong>{ROLE_LABEL[role]}</strong>.
       </MailParagraph>
       <MailParagraph>

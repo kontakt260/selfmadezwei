@@ -55,7 +55,7 @@ export const PageBreakNode = Node.create({
           const paragraphType = schema.nodes.paragraph;
           if (!pageBreakType || !paragraphType) return false;
 
-          const { $from, $to } = selection;
+          const { $from } = selection;
           if (!selection.empty) {
             // Bei Range-Selektion: Range löschen, dann am Caret einfügen.
             // ProseMirror's deleteSelection wandelt $from/$to in eine Empty-Sel.

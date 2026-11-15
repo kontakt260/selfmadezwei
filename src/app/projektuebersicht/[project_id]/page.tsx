@@ -54,15 +54,6 @@ function IconPhoneHandset() {
   );
 }
 
-function IconUsers() {
-  return (
-    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx={9} cy={8} r={4} stroke="#96B897" strokeWidth={2} />
-      <path d="M2 21c0-3.5 3-6 7-6s7 2.5 7 6M17 11a4 4 0 0 0 0-8M22 21c0-3-2-5-5-5.5" stroke="#96B897" strokeWidth={2} strokeLinecap="square" />
-    </svg>
-  );
-}
-
 // ─── Layout helpers ───────────────────────────────────────────────────────────
 
 function SectionShell({ children }: { children: ReactNode }) {

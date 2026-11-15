@@ -206,7 +206,7 @@ export default async function EinladungAcceptPage({
       </h1>
       {preview}
       <p className="text-base leading-7 text-[#535252] sm:text-lg">
-        Wenn Sie auf „Annehmen" klicken, werden Sie als Mitglied hinzugefügt
+        Wenn Sie auf „Annehmen&quot; klicken, werden Sie als Mitglied hinzugefügt
         und landen direkt in der Projektübersicht.
       </p>
       <AcceptInvitationButton token={token} projectId={lookup.project_id} />
