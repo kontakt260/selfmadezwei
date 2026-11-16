@@ -3,6 +3,7 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { isRecentSignup, maybeSendWelcomeMail } from "@/lib/email/send-welcome";
 import { sendInBackground } from "@/lib/email/background";
+import { hasPendingClaim, isDefaultLandingTarget } from "@/lib/purchases/pending-claim";
 
 function safeNext(next: string | null): string {
   if (!next || typeof next !== "string") return "/";
@@ -80,6 +81,12 @@ export async function GET(request: NextRequest) {
           fullName: profile?.full_name ?? undefined,
         }),
       );
+    }
+    // Kauf ohne Konto: Wartet ein bezahlter Kauf auf dieses Konto (frisch
+    // bestätigte E-Mail-Adresse oder Einlöse-Geheimnis im Browser), wird
+    // er zugeordnet, bevor es in die App geht.
+    if (user && isDefaultLandingTarget(next) && (await hasPendingClaim(user))) {
+      return NextResponse.redirect(`${origin}/kauf-einloesen`);
     }
     return NextResponse.redirect(`${origin}${next}`);
   }

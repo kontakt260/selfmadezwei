@@ -5,8 +5,10 @@ import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { sendPortalPurchaseMail } from "@/lib/email/send-portal-purchase";
 import { sendRenewalMail } from "@/lib/email/send-renewal";
 import { sendInvitationMail } from "@/lib/email/send-invitation";
+import { sendGuestPurchaseMail } from "@/lib/email/send-guest-purchase";
 import { formatEur, formatGermanDate } from "@/lib/email/format";
-import crypto from "node:crypto";
+import { fulfillInitialPurchase, PROJECT_DEFAULT_TITLE } from "@/lib/purchases/fulfill-initial";
+import { isGuestSession, recordGuestPurchase } from "@/lib/purchases/guest-purchase";
 
 // PROJ-11: Die Mails werden hier abgewartet, nicht im Hintergrund
 // gestartet. Der Webhook ist ein Server-zu-Server-Aufruf (niemand wartet
@@ -80,9 +82,6 @@ export const dynamic = "force-dynamic";
 
 const TWELVE_MONTHS_MS = 365 * 24 * 60 * 60 * 1000;
 
-/** Titel neuer Projekte; der Projektleiter kann ihn später ändern. */
-const PROJECT_DEFAULT_TITLE = "Lebensgeschichten";
-
 // 3-Linien-Verteidigung (siehe Tech-Design Sektion C):
 //   1. Signatur-Verifikation (Stripe-Secret).
 //   2. Idempotenz-Check (payments.stripe_session_id UNIQUE).
@@ -133,6 +132,32 @@ export async function POST(req: NextRequest) {
   const meta = session.metadata ?? {};
   const productType = meta.product_type as ProductType | "vapi" | undefined;
   const userId = meta.user_id as string | undefined;
+
+  // Kauf ohne Konto (2026-11-16): Die Zahlung ist da, aber es gibt noch
+  // niemanden, dem das Projekt gehören könnte. Wir halten den Kauf als
+  // offenen Anspruch fest und bitten per Mail, das Konto anzulegen. Das
+  // Projekt entsteht beim Einlösen (/kauf-einloesen).
+  if (isGuestSession(session)) {
+    try {
+      const recorded = await recordGuestPurchase(supabase, session);
+      if (recorded === "invalid") {
+        return NextResponse.json(
+          { received: true, error: "invalid_guest_metadata" },
+          { status: 200 },
+        );
+      }
+      if (recorded === "duplicate") {
+        return NextResponse.json({ received: true, duplicate: true });
+      }
+    } catch (err) {
+      // DB-Fehler → 500, Stripe wiederholt den Aufruf.
+      const msg = err instanceof Error ? err.message : String(err);
+      return new NextResponse(`Internal error: ${msg}`, { status: 500 });
+    }
+    await sendGuestConfirmation(session, meta);
+    return NextResponse.json({ received: true, processed: "guest_initial" });
+  }
+
   if (!productType || !userId) {
     // Metadata fehlt — kein State-Update möglich. Wir loggen aber
     // antworten 200, sonst retried Stripe ewig.
@@ -182,117 +207,31 @@ async function handleInitial(
   meta: Record<string, string>,
   userId: string,
 ) {
-  const isGift = meta.is_gift === "1";
-  const giftMode = meta.gift_mode as "phone-only" | "phone-plus-computer" | undefined;
-  const recipientEmail = meta.gift_recipient_email?.trim() || null;
-  const recipientRole =
-    (meta.gift_recipient_role as "projektleiter" | "co_author" | undefined) ?? "co_author";
-  const buyerRetainsAccess = meta.buyer_retains_access === "1";
-
-  // 1. Projekt anlegen.
-  const { data: project, error: projErr } = await supabase
-    .from("projects")
-    .insert({
-      title: PROJECT_DEFAULT_TITLE,
-      owner_id: userId,
-    })
-    .select("id")
-    .single();
-  if (projErr || !project) throw new Error(projErr?.message ?? "project insert failed");
-  const projectId = project.id;
-
-  // 2. project_access setzen (12 Monate ab jetzt).
-  const expiresAt = new Date(Date.now() + TWELVE_MONTHS_MS).toISOString();
-  const { error: accessErr } = await supabase
-    .from("project_access")
-    .insert({ project_id: projectId, expires_at: expiresAt });
-  if (accessErr) throw new Error(accessErr.message);
-
-  // 3. project_members befüllen je nach Geschenk-Variante:
-  //    - „Für mich selbst": Käufer = projektleiter.
-  //    - „Geschenk — Nur erzählen" (gift_mode phone-only): Käufer =
-  //      projektleiter (Empfänger erzählt nur per Sprachnachricht; kein
-  //      Portal-Login).
-  //    - „Geschenk — Auch Computer", Käufer behält Zugang: Käufer = projektleiter
-  //      + invitation für Empfänger (co_author).
-  //    - „Geschenk — Auch Computer", Käufer verzichtet auf Zugang: KEIN
-  //      project_members-Eintrag für Käufer; invitation für Empfänger
-  //      (projektleiter).
-  let buyerIsMember = true;
-  let buyerRole: "projektleiter" | "co_author" = "projektleiter";
-  let inviteRecipient = false;
-  let inviteRole: "projektleiter" | "co_author" = "co_author";
-
-  if (!isGift) {
-    buyerIsMember = true;
-    buyerRole = "projektleiter";
-  } else if (giftMode === "phone-only") {
-    buyerIsMember = true;
-    buyerRole = "projektleiter";
-  } else if (giftMode === "phone-plus-computer") {
-    if (buyerRetainsAccess) {
-      buyerIsMember = true;
-      buyerRole = "projektleiter";
-      inviteRecipient = true;
-      inviteRole = recipientRole;
-    } else {
-      buyerIsMember = false;
-      inviteRecipient = true;
-      inviteRole = "projektleiter";
-    }
-  }
-
-  if (buyerIsMember) {
-    const { error: memErr } = await supabase
-      .from("project_members")
-      .insert({ project_id: projectId, user_id: userId, role: buyerRole });
-    if (memErr) throw new Error(memErr.message);
-  }
-
-  let invitationToken: string | null = null;
-  if (inviteRecipient && recipientEmail) {
-    const inviteExpiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-    const token = generateInviteToken();
-    const { error: invErr } = await supabase
-      .from("invitations")
-      .insert({
-        project_id: projectId,
-        email: recipientEmail.toLowerCase(),
-        role: inviteRole,
-        token,
-        expires_at: inviteExpiresAt,
-      });
-    if (invErr) throw new Error(invErr.message);
-    invitationToken = token;
-  }
-
-  // 4. payments-Eintrag (idempotenz-tragend via UNIQUE stripe_session_id).
-  const { error: payErr } = await supabase.from("payments").insert({
-    project_id: projectId,
-    user_id: userId,
-    stripe_session_id: session.id,
-    type: PRODUCTS.initial.paymentType,
-    amount_cents: session.amount_total ?? PRODUCTS.initial.amountCents,
-    currency: (session.currency ?? PRODUCTS.initial.currency).toLowerCase(),
-    status: "completed",
+  // Projekt, Zugang, Mitgliedschaft, Einladung und Zahlungs-Eintrag —
+  // dieselbe Erfüllung wie beim Einlösen eines Kaufs ohne Konto.
+  const { expiresAt, buyerIsMember, invitation } = await fulfillInitialPurchase(supabase, {
+    userId,
+    stripeSessionId: session.id,
+    amountCents: session.amount_total,
+    currency: session.currency,
+    meta,
   });
-  if (payErr) throw new Error(payErr.message);
 
-  // 5. PROJ-11: Einladung an die beschenkte Person + Kauf-Bestätigung an
-  //    den Käufer (auch ohne eigenen Zugang, dann als Geschenk-Variante).
+  // PROJ-11: Einladung an die beschenkte Person + Kauf-Bestätigung an
+  // den Käufer (auch ohne eigenen Zugang, dann als Geschenk-Variante).
   try {
     const buyer = await resolveBuyerEmail(supabase, session, userId);
     const mails: Array<Promise<void>> = [];
 
-    if (invitationToken && recipientEmail) {
+    if (invitation) {
       mails.push(
         sendInvitationMail({
-          to: recipientEmail,
+          to: invitation.email,
           inviterName: buyer.fullName ?? "",
           inviterEmail: buyer.email ?? "",
           projectName: PROJECT_DEFAULT_TITLE,
-          role: inviteRole,
-          token: invitationToken,
+          role: invitation.role,
+          token: invitation.token,
           isGift: true,
         }),
       );
@@ -310,7 +249,7 @@ async function handleInitial(
           paymentDateFormatted: formatGermanDate(Date.now()),
           expiresAtFormatted: formatGermanDate(expiresAt),
           invoiceUrl: await resolveInvoiceUrl(session),
-          giftRecipientEmail: invitationToken ? recipientEmail ?? undefined : undefined,
+          giftRecipientEmail: invitation ? invitation.email : undefined,
           buyerHasAccess: buyerIsMember,
         }),
       );
@@ -320,6 +259,37 @@ async function handleInitial(
   } catch (err) {
     console.error(
       `[stripe-webhook] purchase mails failed for session ${session.id}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+// ─── Kauf ohne Konto: Bitte um Konto-Anlage ───────────────────────────
+
+async function sendGuestConfirmation(
+  session: Stripe.Checkout.Session,
+  meta: Record<string, string>,
+) {
+  try {
+    const to =
+      session.customer_details?.email?.trim() || session.customer_email?.trim() || null;
+    if (!to) {
+      console.error(`[stripe-webhook] guest session ${session.id} has no buyer email`);
+      return;
+    }
+    await sendGuestPurchaseMail({
+      to,
+      fullName: meta.full_name?.trim() || undefined,
+      amountFormatted: formatEur(
+        session.amount_total ?? PRODUCTS.initial.amountCents,
+        (session.currency ?? PRODUCTS.initial.currency).toUpperCase(),
+      ),
+      paymentDateFormatted: formatGermanDate(Date.now()),
+      isGift: meta.is_gift === "1",
+      invoiceUrl: await resolveInvoiceUrl(session),
+    });
+  } catch (err) {
+    console.error(
+      `[stripe-webhook] guest mail failed for session ${session.id}: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 }
@@ -393,8 +363,4 @@ async function handleRenewal(
       `[stripe-webhook] renewal mail failed for session ${session.id}: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
-}
-
-function generateInviteToken(): string {
-  return crypto.randomBytes(32).toString("base64url");
 }

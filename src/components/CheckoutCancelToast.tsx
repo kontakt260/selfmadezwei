@@ -24,11 +24,22 @@ export function CheckoutCancelToast({
   const pathname = usePathname();
 
   useEffect(() => {
-    if (searchParams.get("checkout") !== "cancelled") return;
-    toast.info(message, { duration: 6000 });
+    const cancelled = searchParams.get("checkout") === "cancelled";
+    // `?kauf=nicht-zugeordnet` setzt /kauf-einloesen, wenn eine Zahlung
+    // gefunden wurde, die Zuordnung zum Konto aber technisch scheiterte.
+    const unassigned = searchParams.get("kauf") === "nicht-zugeordnet";
+    if (!cancelled && !unassigned) return;
+    if (cancelled) toast.info(message, { duration: 6000 });
+    if (unassigned) {
+      toast.error(
+        "Ihre Zahlung ist eingegangen, konnte Ihrem Konto aber noch nicht zugeordnet werden. Bitte laden Sie die Seite in einer Minute neu oder schreiben Sie uns an kontakt@narravit.de.",
+        { duration: 15000 },
+      );
+    }
     // Query-Parameter wegputzen, damit Reload nicht erneut feuert.
     const next = new URLSearchParams(searchParams.toString());
     next.delete("checkout");
+    next.delete("kauf");
     const qs = next.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }, [searchParams, router, pathname, message]);

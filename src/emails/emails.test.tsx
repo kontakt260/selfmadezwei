@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import { render } from "@react-email/render";
 import type { ReactElement } from "react";
 import {
+  GuestPurchaseEmail,
   InvitationEmail,
   PortalPurchaseEmail,
   RenewalEmail,
@@ -42,6 +43,25 @@ const templates: Array<{ name: string; element: ReactElement; mustContain: strin
     }),
     // „Betrag 249,00 €": Bezeichnung und Wert getrennt (Klartext-Fassung)
     mustContain: ["Betrag 249,00 €", "13. Oktober 2027"],
+  },
+  {
+    name: "GuestPurchaseEmail",
+    element: GuestPurchaseEmail({
+      fullName: "Maria Muster",
+      buyerEmail: "maria@example.test",
+      amountFormatted: "249,00 €",
+      paymentDateFormatted: "16. November 2026",
+      siteUrl,
+    }),
+    // Kauf ohne Konto: Zahlung bestätigt, Konto-Anlage als nächster Schritt,
+    // mit der Adresse aus dem Checkout (nur so wird der Kauf zugeordnet).
+    mustContain: [
+      "Betrag 249,00 €",
+      "Konto anlegen",
+      "maria@example.test",
+      `${siteUrl}/registrieren?next=%2Fkauf-einloesen`,
+      `${siteUrl}/anmelden?next=%2Fkauf-einloesen`,
+    ],
   },
   {
     name: "RenewalEmail",

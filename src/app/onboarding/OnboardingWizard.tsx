@@ -42,12 +42,18 @@ export function OnboardingWizard({
   initialForWhom,
   backUrl = "https://www.narravit.de",
   showAccountDeleteLink = false,
+  isGuest = false,
 }: {
   defaultFullName: string;
   buyerEmail: string;
   initialForWhom?: ForWhom | null;
   backUrl?: string;
   showAccountDeleteLink?: boolean;
+  /**
+   * Nicht angemeldet (Kauf ohne Konto, 2026-11-16): Der Checkout läuft
+   * zuerst, das Konto wird direkt danach angelegt.
+   */
+  isGuest?: boolean;
 }) {
   const [state, setState] = useState<WizardState>({
     ...INITIAL_STATE,
@@ -206,7 +212,7 @@ export function OnboardingWizard({
                 onChangeBuyerAccess={(v) => update("buyerWantsAccess", v)}
               />
             )}
-            {currentStep === "purchase" && <StepPurchase state={state} />}
+            {currentStep === "purchase" && <StepPurchase state={state} isGuest={isGuest} />}
           </div>
 
           {error && (
@@ -253,6 +259,18 @@ export function OnboardingWizard({
               </Button>
             )}
           </div>
+
+          {isGuest && (
+            <p className="mt-8 border-t border-[#e0dcd5] pt-6 text-center text-sm text-[#848484]">
+              Sie haben bereits ein Konto?{" "}
+              <a
+                href="/anmelden?next=%2Fonboarding"
+                className="text-[#3E3831] underline underline-offset-4 hover:no-underline"
+              >
+                Anmelden
+              </a>
+            </p>
+          )}
 
           {showAccountDeleteLink && (
             <p className="mt-8 border-t border-[#e0dcd5] pt-6 text-center text-sm text-[#848484]">
@@ -477,7 +495,7 @@ function StepGiftComputer({
   );
 }
 
-function StepPurchase({ state }: { state: WizardState }) {
+function StepPurchase({ state, isGuest }: { state: WizardState; isGuest: boolean }) {
   const summary: { label: string; value: string }[] = [
     { label: "Name", value: state.fullName },
     {
@@ -511,7 +529,9 @@ function StepPurchase({ state }: { state: WizardState }) {
     <div>
       <h2 className="heading-style-h3 mb-3">Bereit zum Start?</h2>
       <p className="mb-6 text-[#535252]">
-        Mit dem Kauf schalten wir Ihr Projekt frei und Sie können sofort loslegen.
+        {isGuest
+          ? "Nach der Zahlung legen Sie in einem kurzen Schritt Ihr Konto an — danach können Sie sofort loslegen."
+          : "Mit dem Kauf schalten wir Ihr Projekt frei und Sie können sofort loslegen."}
       </p>
 
       <dl className="mb-8 grid gap-4 border border-[#e0dcd5] bg-white p-4 sm:gap-3 sm:p-6">

@@ -2,6 +2,59 @@
 
 > ℹ️ **Rückbau umgesetzt und geprüft (2026-10-13):** Das Erzählzeit-Kontingent ist entfernt (Vapi → Audio-Sprachnachrichten, Erzählen im Portal-Zugang enthalten). Siehe „Refinement 2026-10-13" direkt unten inkl. QA-Ergebnis. Alle Vapi-/Sprechzeit-Kriterien weiter unten im Dokument sind damit überholt.
 
+> ℹ️ **Kauf ohne Konto (2026-11-16):** Der Erstkauf braucht keine Anmeldung mehr — Checkout zuerst, Konto danach. Siehe „Refinement 2026-11-16" direkt unten. Die Kriterien weiter unten, nach denen `/onboarding` angemeldeten Nutzern vorbehalten ist und anonyme Aufrufe auf `/registrieren?next=/onboarding` umgeleitet werden (Einstiegspunkte, Tech Design D, Test-Strategie L Punkt 4), sind damit überholt.
+
+## Refinement 2026-11-16 — Kauf ohne Konto (Checkout vor Login/Registrierung)
+**Anlass (Betreiber, 2026-11-16):** Wer auf der Landingpage „Jetzt kaufen" klickt, soll sich nicht erst anmelden müssen. Zuerst der Checkout, danach Anmelden oder Registrieren.
+
+### Ablauf
+1. **Landingpage → `/onboarding`** ist ohne Anmeldung erreichbar. Der Kauf-Assistent fragt wie bisher nach Name und Geschenk-Variante; der letzte Schritt nennt für Gäste den nächsten Schritt („Nach der Zahlung legen Sie … Ihr Konto an").
+2. **„Jetzt kaufen"** startet die Stripe-Checkout-Session ohne Konto. Die E-Mail-Adresse gibt der Gast im Checkout ein.
+3. **Nach der Zahlung** zeigt `/kauf-erfolgreich` „Zahlung eingegangen — jetzt Konto anlegen" mit den Wegen „Konto erstellen" und „Ich habe bereits ein Konto" (E-Mail vorbelegt). Zusätzlich geht eine Mail „bitte legen Sie Ihr Konto an" an die Checkout-Adresse.
+4. **Nach Registrierung bzw. Anmeldung** wird der Kauf über `/kauf-einloesen` dem Konto zugeordnet. Erst dann entstehen Projekt, 12-Monats-Zugang, Mitgliedschaft und ggf. die Einladung an die beschenkte Person. Danach folgt die gewohnte Bestätigungsseite.
+
+Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet). Die Verlängerung bleibt angemeldeten Projekt-Mitgliedern vorbehalten.
+
+### Acceptance Criteria (Kauf ohne Konto)
+- [x] `/onboarding` und `/kauf-erfolgreich` sind öffentliche Routen; der Assistent rendert für Gäste ohne Umleitung auf die Registrierung.
+- [x] Gäste können ausschließlich den Erstkauf starten; „Verlängern" ohne Anmeldung wird serverseitig abgelehnt.
+- [x] Die Angaben aus dem Assistenten werden serverseitig geprüft (Zod, Längen, E-Mail-Format der beschenkten Person).
+- [x] Für Gäste trägt die Stripe-Session keine `user_id`, sondern `guest: "1"` und den SHA-256-Hash eines Einlöse-Geheimnisses (256 Bit Zufall). Das Geheimnis selbst liegt nur in einem httpOnly-Cookie (`nv_kauf`, SameSite=Lax, in Production `Secure`) im Browser des Käufers.
+- [x] Der Webhook legt für bezahlte Gast-Käufe eine Zeile in `purchase_claims` an (idempotent über `stripe_session_id`) und verschickt die Mail „Konto anlegen". Es entsteht **kein** Projekt, kein Zugang, keine Einladung.
+- [x] Einlösen darf nur, wer (a) mit der **bestätigten** E-Mail-Adresse des Checkouts angemeldet ist oder (b) das Einlöse-Geheimnis aus dem Käufer-Browser vorlegt. Alle Prüfungen laufen serverseitig über die Service-Role.
+- [x] Ein Kauf wird genau einmal erfüllt (atomare Sperre `UPDATE … WHERE claimed_at IS NULL`, zusätzlich `payments.stripe_session_id UNIQUE`).
+- [x] Scheitert die Erfüllung, bleibt der Anspruch offen, ein halb angelegtes Projekt wird entfernt, und der Nutzer sieht einen Hinweis statt einer Fehlerseite.
+- [x] Trifft der Webhook später ein als der Käufer (Stripe garantiert keine Reihenfolge), prüft `/kauf-einloesen` die Session direkt bei Stripe und erfasst den Kauf selbst.
+- [x] Konten ohne Projekt laufen nach der Anmeldung automatisch über `/kauf-einloesen`; gibt es nichts einzulösen, geht es wie bisher zum Assistenten. Bestandskunden mit offenem Kauf werden bei der Anmeldung ebenfalls dorthin geleitet.
+- [x] `/kauf-einloesen` verlangt eine Anmeldung und merkt sich das Ziel (`/anmelden?next=/kauf-einloesen`).
+- [ ] **Stage-Datenbank:** Migration `20261116100000_proj6_purchase_claims.sql` eingespielt (siehe „Offen").
+- [ ] **Live-Durchlauf auf Stage** mit Stripe-Testmodus: Gast-Kauf → Mail → Registrierung → Projekt vorhanden (siehe „Offen").
+
+### Entscheidungen
+| Thema | Entscheidung | Begründung |
+|---|---|---|
+| Wann entsteht das Projekt? | Beim Einlösen, nicht bei der Zahlung | `projects.owner_id` ist Pflicht; ohne Konto gibt es keinen Eigentümer. Kein Eingriff in bestehende Tabellen oder RLS-Policies. |
+| Ab wann laufen die 12 Monate? | Ab dem Einlösen (Konto-Anlage) | Der Käufer verliert keine Zeit, wenn er das Konto erst später anlegt. Die Mail nennt deshalb „12 Monate ab Einrichtung Ihres Kontos". |
+| Geschenk-Einladung | Geht erst beim Einlösen raus | Vorher gibt es kein Projekt, dem die beschenkte Person beitreten könnte. Erfolgsseite und Mail sagen das ausdrücklich. |
+| Zuordnung per E-Mail | Nur mit bestätigter Adresse | Sonst könnte jemand ein Konto mit fremder Adresse anlegen und den Kauf an sich ziehen. |
+| Zuordnung per Browser-Geheimnis | Zusätzlich zur E-Mail | Deckt den Fall ab, dass im Checkout eine andere Adresse steht als im Konto (z. B. PayPal-Adresse). |
+| Neue Tabelle statt Spalten | `purchase_claims`, RLS ohne Policies | Zahlungsbezug und E-Mail-Adressen von Personen ohne Konto; nur der Server liest und schreibt (Muster wie `project_access`, `mail_log`). |
+
+### Implementation Notes (2026-11-16)
+- **Migration:** `supabase/migrations/20261116100000_proj6_purchase_claims.sql` — Tabelle `purchase_claims` (RLS an, keine Policies), Teil-Indizes für offene Ansprüche.
+- **Neu:** `src/lib/purchases/claim-token.ts` (Geheimnis, Hash, Cookie-Format), `fulfill-initial.ts` (Erfüllung eines Erstkaufs — aus dem Webhook ausgelagert, räumt bei Fehlern das Projekt wieder ab), `guest-purchase.ts` (Erfassen und Einlösen), `pending-claim.ts` (Vorprüfung bei der Anmeldung); Route `src/app/kauf-einloesen/route.ts`; Mail `src/emails/GuestPurchaseEmail.tsx` + `src/lib/email/send-guest-purchase.ts` + Vorschau `kauf-ohne-konto`.
+- **Geändert:** `src/app/checkout/actions.ts` (Gast-Pfad), Webhook (Gast-Pfad, gemeinsame Erfüllung), `src/app/kauf-erfolgreich/page.tsx` (Konto-Schritt für Gäste), `src/lib/supabase/middleware.ts` (öffentliche Routen, Konten ohne Projekt → `/kauf-einloesen`, angemeldete Nutzer auf `/anmelden?next=…` werden direkt zum Ziel geleitet), `anmelden/actions.ts` und `auth/callback/route.ts` (offenen Kauf erkennen), Assistent und Auth-Formulare (`next` wird an OAuth und Querlinks weitergereicht).
+- **Tests:** Vitest 312/312 — neu `src/lib/purchases/*.test.ts` (23), `src/app/checkout/actions.test.ts` (8, enthält die zwei bisherigen Fälle), 4 Webhook-Fälle für Gast-Käufe, Mail-Inhaltsprüfung. Playwright (Chromium) PROJ-6 + PROJ-2: 36 bestanden — neu AC-Guest-1 bis -4, AC-Claim-1/-2; der frühere Test AC-Auth-1 (Umleitung auf die Registrierung) ist ersetzt.
+- **Kein neuer Env-Wert.**
+
+### Offen
+- **Migration auf Stage einspielen.** Die Supabase-Anbindung des Assistenten ist nur lesend; `apply_migration` wurde abgelehnt. Bis dahin findet `/kauf-einloesen` keine Käufe (fängt den Fehler ab und leitet weiter), und der Webhook antwortet für Gast-Käufe mit 500 — Stripe wiederholt den Aufruf, sobald die Tabelle existiert.
+- **Live-Durchlauf auf Stage** (Stripe-Testmodus): Kauf als Gast, Mail, Registrierung mit derselben und mit abweichender Adresse, Geschenk-Variante, Anmeldung als Bestandskunde.
+- **Landingpage:** Der Button „Jetzt kaufen" muss auf `<App-URL>/onboarding` zeigen (optional `?for=self` bzw. `?for=gift`), nicht auf `/registrieren`.
+- **Missbrauchsschutz:** Checkout-Sessions lassen sich jetzt ohne Konto anlegen. Rate-Limit für den Checkout-Start in PROJ-17 aufnehmen.
+- **Nicht eingelöste Käufe:** Wer bezahlt und nie ein Konto anlegt, bekommt derzeit genau eine Mail. Eine Erinnerung (Cron) und eine Übersicht für den Kundenservice fehlen noch.
+- **Datenschutz:** Für Käufer ohne Konto wird die Checkout-E-Mail-Adresse gespeichert; das Cookie `nv_kauf` ist technisch notwendig. In die Datenschutzerklärung aufnehmen.
+
 ## Refinement 2026-10-13 — Rückbau Erzählzeit-Kontingent
 **Anlass:** Vapi wird durch Audio-Sprachnachrichten ersetzt ([PROJ-12](PROJ-12-audio-erzaehlpipeline.md)). Erzählen ist im Portal-Zugang enthalten; es gibt kein Zeit-Kontingent und kein Nachkauf-Produkt mehr. PROJ-6 umfasst damit nur noch **Portal-Zugang Initial (249 €)** und **Verlängerung (99 €)**.
 
@@ -79,7 +132,7 @@
 
 ---
 
-## Status: Approved
+## Status: In Progress
 **Created:** 2026-05-15
 **Last Updated:** 2026-10-13
 

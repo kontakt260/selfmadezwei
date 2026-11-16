@@ -4,6 +4,8 @@
 **Created:** 2026-05-15
 **Last Updated:** 2026-05-16
 
+> ℹ️ **Kauf ohne Konto (2026-11-16, PROJ-6):** `/onboarding` und `/kauf-erfolgreich` sind öffentliche Routen. Eingeloggte Konten ohne Projekt („Zustand 2") werden zuerst auf `/kauf-einloesen` geleitet, das einen bezahlten Kauf ohne Konto zuordnet und sonst zu `/onboarding` weiterführt. Angemeldete Nutzer, die `/anmelden` oder `/registrieren` mit `?next=` aufrufen, landen direkt auf dem Ziel. Details: [PROJ-6, Refinement 2026-11-16](PROJ-6-stripe-zahlungen.md).
+
 ## Dependencies
 - Requires: PROJ-1 (Supabase-Datenmodell & RLS) — für `profiles`, `project_members`, `portal_access_expires_at`
 - Achtung: PROJ-1 muss via `/refine PROJ-1` angepasst werden: `project_members.role` ENUM von `(owner, editor)` auf `(projektleiter, co_author)` ändern

@@ -57,17 +57,90 @@ test.describe("PROJ-6 — Webhook (HTTP)", () => {
   });
 });
 
-// ─── Onboarding-Auth-Gate ──────────────────────────────────────────────────
+// ─── Kauf ohne Konto (Checkout vor Login/Registrierung, 2026-11-16) ────────
 
-test.describe("PROJ-6 — Onboarding-Gating", () => {
-  test("AC-Auth-1: Anonymer Aufruf von /onboarding → Redirect auf /registrieren?next=/onboarding", async ({
+test.describe("PROJ-6 — Kauf ohne Konto", () => {
+  test("AC-Guest-1: /onboarding ist ohne Anmeldung erreichbar (kein Umweg über die Registrierung)", async ({
     page,
     context,
   }) => {
     // Frischer Context ohne Auth-Storage (storageState NICHT gesetzt).
     await context.clearCookies();
     await page.goto("/onboarding");
-    await expect(page).toHaveURL(/\/registrieren\?next=%2Fonboarding/);
+    await expect(page).toHaveURL(/\/onboarding$/);
+    await expect(
+      page.getByRole("heading", { name: "Für wen ist das Lebensbuch?" }),
+    ).toBeVisible();
+    // Wer schon ein Konto hat, kann sich von hier aus anmelden.
+    await expect(page.getByRole("link", { name: "Anmelden" })).toHaveAttribute(
+      "href",
+      "/anmelden?next=%2Fonboarding",
+    );
+  });
+
+  test("AC-Guest-2: Gast kommt bis zum Kauf-Schritt und erfährt, dass das Konto danach angelegt wird", async ({
+    page,
+    context,
+  }) => {
+    await context.clearCookies();
+    await page.goto("/onboarding");
+    await page.getByRole("button", { name: /Für mich selbst/ }).click();
+    await page.getByRole("button", { name: "Weiter" }).click();
+    await page.getByLabel("Vollständiger Name").fill("Gerda Gast");
+    await page.getByRole("button", { name: "Weiter" }).click();
+
+    await expect(page.getByRole("heading", { name: "Bereit zum Start?" })).toBeVisible();
+    await expect(
+      page.getByText(/Nach der Zahlung legen Sie in einem kurzen Schritt Ihr Konto an/),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /Jetzt kaufen — 249 €/ })).toBeEnabled();
+  });
+
+  test("AC-Guest-3: /kauf-einloesen verlangt eine Anmeldung und merkt sich das Ziel", async ({
+    page,
+    context,
+  }) => {
+    await context.clearCookies();
+    await page.goto("/kauf-einloesen");
+    await expect(page).toHaveURL(/\/anmelden\?next=%2Fkauf-einloesen$/);
+  });
+
+  test("AC-Guest-4: /kauf-erfolgreich ist öffentlich, zeigt ohne gültige Stripe-Session aber nichts", async ({
+    page,
+    context,
+  }) => {
+    await context.clearCookies();
+    await page.goto("/kauf-erfolgreich?session_id=cs_test_invalid_xyz_does_not_exist");
+    await expect(page).not.toHaveURL(/kauf-erfolgreich/);
+  });
+});
+
+test.describe("PROJ-6 — Kauf einlösen (angemeldet)", () => {
+  test.use({ storageState: "tests/.auth/user.json" });
+
+  test("AC-Claim-1: ohne offenen Kauf führt /kauf-einloesen ein Konto mit Projekt zur Startseite", async ({
+    page,
+  }) => {
+    await page.goto("/kauf-einloesen");
+    await expect(page).toHaveURL(/localhost:3000\/$/);
+  });
+
+  test("AC-Claim-3: `next` leitet nie auf eine fremde Seite (kein Open Redirect)", async ({
+    page,
+  }) => {
+    // `/\\host` liest der URL-Parser wie `//host` — beides muss abgewiesen werden.
+    for (const next of ["%2F%5Cevil.example", "%2F%2Fevil.example", "https%3A%2F%2Fevil.example"]) {
+      await page.goto(`/anmelden?next=${next}`);
+      await expect(page, next).toHaveURL(/^http:\/\/localhost:3000\//);
+    }
+  });
+
+  test("AC-Claim-2: angemeldet auf /anmelden?next=/kauf-einloesen → kein erneutes Anmelden nötig", async ({
+    page,
+  }) => {
+    await page.goto("/anmelden?next=%2Fkauf-einloesen");
+    // Middleware leitet zum Ziel, /kauf-einloesen findet nichts → Startseite.
+    await expect(page).toHaveURL(/localhost:3000\/$/);
   });
 });
 

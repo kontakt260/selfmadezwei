@@ -1,8 +1,17 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getStripe, getPriceId, getSiteUrl } from "@/lib/stripe/server";
+import {
+  CLAIM_COOKIE,
+  CLAIM_COOKIE_MAX_AGE_SECONDS,
+  encodeClaimCookie,
+  generateClaimToken,
+  hashClaimToken,
+} from "@/lib/purchases/claim-token";
 
 // Stripe-Checkout-Initiator (PROJ-6 Backend).
 //
@@ -10,6 +19,16 @@ import { getStripe, getPriceId, getSiteUrl } from "@/lib/stripe/server";
 // echte Stripe-Checkout-Session und liefert die `session.url` zurück
 // (Client redirected dorthin). Auth + Eingabe-Validierung unverändert
 // gegenüber Frontend-Phase.
+//
+// Kauf ohne Konto (2026-11-16): Der ERSTKAUF braucht keine Anmeldung mehr.
+// Wer von der Landingpage auf „Jetzt kaufen" klickt, geht direkt durch den
+// Checkout und legt sein Konto erst danach an. Für Gäste gilt:
+//   - Die Stripe-Session trägt statt `user_id` die Kennung `guest: "1"`
+//     und den Hash eines Einlöse-Geheimnisses (`claim_hash`).
+//   - Das Geheimnis selbst liegt nur in einem httpOnly-Cookie im Browser
+//     des Käufers — damit ordnet er den Kauf nach der Registrierung seinem
+//     Konto zu (siehe src/lib/purchases/guest-purchase.ts).
+//   - Die Verlängerung bleibt angemeldeten Projekt-Mitgliedern vorbehalten.
 //
 // Wichtig:
 //   - Diese Action läuft serverseitig — der Stripe-Secret-Key bleibt im
@@ -39,6 +58,21 @@ export type StartCheckoutResult =
   | { ok: true; checkoutUrl: string }
   | { ok: false; error: string };
 
+// Laufzeit-Prüfung der Angaben aus dem Kauf-Assistenten. Die Action ist
+// ohne Anmeldung aufrufbar — Längen sind deshalb begrenzt (Stripe erlaubt
+// pro Metadata-Wert ohnehin höchstens 500 Zeichen).
+const initialMetadataSchema = z.object({
+  fullName: z.string().max(120),
+  isGift: z.boolean(),
+  giftRecipientName: z.string().max(120).optional(),
+  giftRecipientEmail: z.string().max(254).optional(),
+  giftMode: z.enum(["phone-only", "phone-plus-computer"]).optional(),
+  giftRecipientRole: z.enum(["projektleiter", "co_author"]).optional(),
+  buyerRetainsAccess: z.boolean().optional(),
+});
+
+const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
 export async function startCheckoutAction(
   input: StartCheckoutInput,
 ): Promise<StartCheckoutResult> {
@@ -46,7 +80,6 @@ export async function startCheckoutAction(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Nicht eingeloggt." };
 
   // Server-Actions sind von außen aufrufbar — Typen schützen zur Laufzeit
   // nicht. Nur die zwei kaufbaren Produkte zulassen (das frühere
@@ -58,6 +91,10 @@ export async function startCheckoutAction(
 
   // Eingabe-Validierung pro Produkt-Typ.
   if (input.productType === "initial") {
+    const parsed = initialMetadataSchema.safeParse(input.metadata);
+    if (!parsed.success) {
+      return { ok: false, error: "Bitte prüfen Sie Ihre Angaben." };
+    }
     if (!input.metadata.fullName?.trim()) {
       return { ok: false, error: "Name fehlt." };
     }
@@ -66,12 +103,18 @@ export async function startCheckoutAction(
         return { ok: false, error: "Name der beschenkten Person fehlt." };
       }
       if (input.metadata.giftMode === "phone-plus-computer") {
-        if (!input.metadata.giftRecipientEmail?.trim()) {
+        const recipientEmail = input.metadata.giftRecipientEmail?.trim() ?? "";
+        if (!recipientEmail) {
           return { ok: false, error: "E-Mail der beschenkten Person fehlt." };
+        }
+        if (!EMAIL_PATTERN.test(recipientEmail)) {
+          return { ok: false, error: "Bitte eine gültige E-Mail-Adresse angeben." };
         }
       }
     }
   } else {
+    // Verlängern kann nur, wer angemeldet und Mitglied des Projekts ist.
+    if (!user) return { ok: false, error: "Nicht eingeloggt." };
     if (!input.projectId?.trim()) {
       return { ok: false, error: "Projekt-ID fehlt." };
     }
@@ -114,9 +157,17 @@ export async function startCheckoutAction(
   // Metadata-Aufbau für den Webhook.
   // String-Werte zwingend: Stripe-Metadata akzeptiert nur strings.
   const metadata: Record<string, string> = {
-    user_id: user.id,
     product_type: input.productType,
   };
+  // Angemeldet: Kauf direkt dem Konto zuordnen. Gast: Einlöse-Geheimnis
+  // erzeugen — Stripe und Datenbank sehen nur den Hash.
+  const claimToken = user ? null : generateClaimToken();
+  if (user) {
+    metadata.user_id = user.id;
+  } else if (claimToken) {
+    metadata.guest = "1";
+    metadata.claim_hash = hashClaimToken(claimToken);
+  }
   if (input.productType === "initial") {
     metadata.full_name = input.metadata.fullName;
     metadata.is_gift = input.metadata.isGift ? "1" : "0";
@@ -137,9 +188,9 @@ export async function startCheckoutAction(
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: successUrl,
       cancel_url: cancelUrl,
-      // Buyer-Email vorbelegen für UX (Stripe akzeptiert auch ohne, aber
-      // dann muss der User sie erneut eintippen).
-      customer_email: user.email ?? undefined,
+      // Buyer-Email vorbelegen für UX. Gäste geben sie im Checkout ein —
+      // an diese Adresse geht danach die Bitte, das Konto anzulegen.
+      customer_email: user?.email ?? undefined,
       allow_promotion_codes: true,
       // Metadata wird vom Webhook gelesen, um die richtige DB-Aktion
       // auszuführen (Projekt anlegen / Renewal).
@@ -150,6 +201,24 @@ export async function startCheckoutAction(
     });
     if (!session.url) {
       return { ok: false, error: "Stripe lieferte keine Checkout-URL." };
+    }
+    if (claimToken) {
+      // Einlöse-Geheimnis nur im Browser des Käufers ablegen: httpOnly
+      // (kein Zugriff per JavaScript), SameSite=Lax (wird bei der
+      // Rückleitung von Stripe und beim Klick auf den Bestätigungs-Link
+      // aus der Mail mitgeschickt).
+      const cookieStore = await cookies();
+      cookieStore.set(
+        CLAIM_COOKIE,
+        encodeClaimCookie({ sessionId: session.id, token: claimToken }),
+        {
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+          path: "/",
+          maxAge: CLAIM_COOKIE_MAX_AGE_SECONDS,
+        },
+      );
     }
     return { ok: true, checkoutUrl: session.url };
   } catch (err) {

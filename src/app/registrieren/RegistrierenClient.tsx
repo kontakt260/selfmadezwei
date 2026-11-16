@@ -141,12 +141,15 @@ export function RegistrierenClient({
           <Separator className="flex-1" />
         </div>
 
-        <OAuthButtons mode="registrieren" redirectPath={onboardingPath} />
+        <OAuthButtons mode="registrieren" redirectPath={initialNext || onboardingPath} />
       </form>
 
       <div className="mt-6 flex justify-center gap-x-1 text-center text-sm">
         <p className="text-[#848484]">Bereits ein Konto?</p>
-        <Link href="/anmelden" className="underline underline-offset-4 transition-colors hover:text-[#96B897]">
+        <Link
+          href={initialNext ? `/anmelden?next=${encodeURIComponent(initialNext)}` : "/anmelden"}
+          className="underline underline-offset-4 transition-colors hover:text-[#96B897]"
+        >
           Anmelden
         </Link>
       </div>

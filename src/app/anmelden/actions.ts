@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { hasPendingClaim, isDefaultLandingTarget } from "@/lib/purchases/pending-claim";
 
 const schema = z.object({
   email: z.string().email("Bitte eine gültige E-Mail-Adresse angeben."),
@@ -40,7 +41,7 @@ export async function loginAction(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
   });
@@ -49,7 +50,14 @@ export async function loginAction(
     return { error: "E-Mail oder Passwort falsch." };
   }
 
-  redirect(safeNext(parsed.data.next));
+  // Kauf ohne Konto: Wartet ein bezahlter Kauf auf dieses Konto, wird er
+  // jetzt zugeordnet — auch bei Bestandskunden, die schon ein Projekt haben.
+  const target = safeNext(parsed.data.next);
+  if (data.user && isDefaultLandingTarget(target) && (await hasPendingClaim(data.user))) {
+    redirect("/kauf-einloesen");
+  }
+
+  redirect(target);
 }
 
 const resendSchema = z.object({

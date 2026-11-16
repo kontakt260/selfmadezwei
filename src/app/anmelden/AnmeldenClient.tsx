@@ -175,7 +175,10 @@ export function AnmeldenClient({ initialEmail, initialNext, showExpiredLink }: P
 
       <div className="mt-3 flex justify-center gap-x-1 text-center text-sm">
         <p className="text-[#848484]">Noch kein Konto?</p>
-        <Link href="/registrieren" className="underline underline-offset-4 transition-colors hover:text-[#96B897]">
+        <Link
+          href={initialNext ? `/registrieren?next=${encodeURIComponent(initialNext)}` : "/registrieren"}
+          className="underline underline-offset-4 transition-colors hover:text-[#96B897]"
+        >
           Jetzt registrieren
         </Link>
       </div>

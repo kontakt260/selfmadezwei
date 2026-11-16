@@ -55,6 +55,10 @@ vi.mock("@/lib/email/send-portal-purchase", () => ({
 vi.mock("@/lib/email/send-renewal", () => ({
   sendRenewalMail: (input: Record<string, unknown>) => sendRenewalMailMock(input),
 }));
+const sendGuestPurchaseMailMock = vi.fn(async (_input: Record<string, unknown>) => undefined);
+vi.mock("@/lib/email/send-guest-purchase", () => ({
+  sendGuestPurchaseMail: (input: Record<string, unknown>) => sendGuestPurchaseMailMock(input),
+}));
 
 // ─── Mock Supabase Service-Role-Client ───────────────────────────────
 //
@@ -71,6 +75,8 @@ type FakeRows = {
   // (resolveBuyerEmail). Der Test braucht das nicht zu bestücken — ein
   // leeres Array reicht, damit maybeSingle null zurückgibt.
   profiles: Array<Record<string, unknown>>;
+  // Kauf ohne Konto (2026-11-16): offene Ansprüche aus Gast-Checkouts.
+  purchase_claims: Array<Record<string, unknown>>;
 };
 
 let fakeDb: FakeRows;
@@ -80,6 +86,18 @@ let fakeDb: FakeRows;
 // direkten await-Variante ODER beim Aufruf von .single().
 function makeInsertBuilder(table: keyof FakeRows, row: Record<string, unknown> | Record<string, unknown>[]) {
   const r = Array.isArray(row) ? row[0] : row;
+  // Wie in Postgres: zweite Zeile mit derselben Session → unique_violation.
+  if (
+    table === "purchase_claims" &&
+    fakeDb.purchase_claims.some((c) => c.stripe_session_id === r.stripe_session_id)
+  ) {
+    const error = { code: "23505", message: "duplicate key value" };
+    return {
+      select: () => ({ single: async () => ({ data: null, error }) }),
+      then: (resolve: (v: { data: null; error: typeof error }) => unknown) =>
+        Promise.resolve({ data: null, error }).then(resolve),
+    };
+  }
   let pushed = false;
   const push = () => {
     if (pushed) return null;
@@ -148,9 +166,11 @@ function makeSession(
     metadata: Record<string, string>;
     amount_total: number;
     currency: string;
+    customer_details: { email: string };
   }> = {},
 ) {
   return {
+    customer_details: overrides.customer_details,
     id: overrides.id ?? "cs_test_123",
     payment_status: overrides.payment_status ?? "paid",
     status: "complete" as const,
@@ -186,11 +206,13 @@ beforeEach(() => {
       { id: "user-1", email: "user@example.com", full_name: "Test User" },
       { id: "buyer-1", email: "buyer@example.com", full_name: "Bea Buyer" },
     ],
+    purchase_claims: [],
   };
   constructEventMock.mockReset();
   sendInvitationMailMock.mockClear();
   sendPortalPurchaseMailMock.mockClear();
   sendRenewalMailMock.mockClear();
+  sendGuestPurchaseMailMock.mockClear();
 });
 
 // ─── Tests ───────────────────────────────────────────────────────────
@@ -512,5 +534,105 @@ describe("Stripe webhook — retired vapi product (PROJ-6-Rückbau)", () => {
     expect(fakeDb.projects.length).toBe(0);
     expect(fakeDb.project_access.length).toBe(0);
     expect(fakeDb.project_members.length).toBe(0);
+  });
+});
+
+// ─── Kauf ohne Konto (Checkout vor Login/Registrierung) ──────────────
+
+describe("Stripe webhook — guest purchase (no account yet)", () => {
+  const CLAIM_HASH = "a".repeat(64);
+
+  function guestSession(meta: Record<string, string> = {}) {
+    return makeSession({
+      id: "cs_guest_1",
+      customer_details: { email: "Gast@Example.com" },
+      metadata: {
+        product_type: "initial",
+        guest: "1",
+        claim_hash: CLAIM_HASH,
+        full_name: "Gerda Gast",
+        is_gift: "0",
+        ...meta,
+      },
+    });
+  }
+
+  it("stores an open claim and asks the buyer to create an account — no project yet", async () => {
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: { object: guestSession() },
+    });
+
+    const res = await callPost("body", "valid-sig");
+    expect(res.status).toBe(200);
+    expect((await res.json()).processed).toBe("guest_initial");
+
+    expect(fakeDb.purchase_claims).toHaveLength(1);
+    expect(fakeDb.purchase_claims[0]).toMatchObject({
+      stripe_session_id: "cs_guest_1",
+      buyer_email: "gast@example.com",
+      claim_token_hash: CLAIM_HASH,
+      amount_cents: 24900,
+    });
+    // Ohne Konto entsteht weder Projekt noch Zugang noch Zahlungs-Eintrag.
+    expect(fakeDb.projects).toHaveLength(0);
+    expect(fakeDb.project_access).toHaveLength(0);
+    expect(fakeDb.project_members).toHaveLength(0);
+    expect(fakeDb.payments).toHaveLength(0);
+
+    expect(sendGuestPurchaseMailMock).toHaveBeenCalledTimes(1);
+    expect(sendGuestPurchaseMailMock.mock.calls[0][0]).toMatchObject({
+      to: "Gast@Example.com",
+      fullName: "Gerda Gast",
+      isGift: false,
+    });
+    expect(sendPortalPurchaseMailMock).not.toHaveBeenCalled();
+    expect(sendInvitationMailMock).not.toHaveBeenCalled();
+  });
+
+  it("gift purchase as guest: invitation is NOT sent before the account exists", async () => {
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: guestSession({
+          is_gift: "1",
+          gift_mode: "phone-plus-computer",
+          gift_recipient_email: "oma@example.com",
+          buyer_retains_access: "1",
+        }),
+      },
+    });
+
+    await callPost("body", "valid-sig");
+    expect(fakeDb.invitations).toHaveLength(0);
+    expect(sendInvitationMailMock).not.toHaveBeenCalled();
+    expect(sendGuestPurchaseMailMock.mock.calls[0][0]).toMatchObject({ isGift: true });
+  });
+
+  it("is idempotent: a repeated webhook neither duplicates the claim nor re-sends the mail", async () => {
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: { object: guestSession() },
+    });
+    await callPost("body", "valid-sig");
+    const res = await callPost("body", "valid-sig");
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).duplicate).toBe(true);
+    expect(fakeDb.purchase_claims).toHaveLength(1);
+    expect(sendGuestPurchaseMailMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects guest sessions without a valid claim hash (no state change, no retry loop)", async () => {
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: { object: guestSession({ claim_hash: "not-a-hash" }) },
+    });
+    const res = await callPost("body", "valid-sig");
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).error).toBe("invalid_guest_metadata");
+    expect(fakeDb.purchase_claims).toHaveLength(0);
+    expect(sendGuestPurchaseMailMock).not.toHaveBeenCalled();
   });
 });

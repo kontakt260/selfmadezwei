@@ -133,9 +133,10 @@ test.describe("PROJ-2 — Form validation (Zod, server actions)", () => {
 });
 
 test.describe("PROJ-2 — Onboarding wizard", () => {
-  // Seit PROJ-6 ist /onboarding auth-gated — anonyme Aufrufe werden auf
-  // /registrieren?next=/onboarding umgeleitet. Wir laden hier den
-  // qa-test-User-State, damit der Wizard tatsächlich rendert.
+  // Diese Suite prüft den Wizard im angemeldeten Zustand (qa-test-User).
+  // Seit dem Kauf ohne Konto (2026-11-16) ist /onboarding auch für Gäste
+  // erreichbar — der Gast-Weg ist in tests/PROJ-6-stripe-zahlungen.spec.ts
+  // abgedeckt.
   test.use({ storageState: "tests/.auth/user.json" });
 
   // Serial: /onboarding makes a Supabase auth call on every request; concurrent hits

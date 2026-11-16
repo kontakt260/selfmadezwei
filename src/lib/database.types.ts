@@ -411,6 +411,66 @@ export type Database = {
           },
         ]
       }
+      purchase_claims: {
+        Row: {
+          amount_cents: number
+          buyer_email: string | null
+          claim_token_hash: string
+          claimed_at: string | null
+          claimed_by: string | null
+          created_at: string
+          currency: string
+          id: string
+          metadata: Json
+          paid_at: string
+          project_id: string | null
+          stripe_session_id: string
+        }
+        Insert: {
+          amount_cents: number
+          buyer_email?: string | null
+          claim_token_hash: string
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          metadata?: Json
+          paid_at?: string
+          project_id?: string | null
+          stripe_session_id: string
+        }
+        Update: {
+          amount_cents?: number
+          buyer_email?: string | null
+          claim_token_hash?: string
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          metadata?: Json
+          paid_at?: string
+          project_id?: string | null
+          stripe_session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_claims_claimed_by_fkey"
+            columns: ["claimed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_claims_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       voice_sessions: {
         Row: {
           chapter_id: string | null

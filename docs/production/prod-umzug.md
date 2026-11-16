@@ -62,7 +62,8 @@ Stage = Projekt-Ref `kdjhxqitfxnsavhiafdn`. Production = Haupt-Projekt (`main`) 
 
 ### Datenbank
 
-- [ ] Alle Migrationen aus `supabase/migrations/` in Production angewendet (Stand 2026-10-14: 14 Dateien, letzte `20260525190000_proj11_mail_log.sql`). Mit `list_migrations` bzw. im Dashboard gegen das Repo abgleichen.
+- [ ] Alle Migrationen aus `supabase/migrations/` in Production angewendet (Stand 2026-11-16: 15 Dateien, letzte `20261116100000_proj6_purchase_claims.sql`). Mit `list_migrations` bzw. im Dashboard gegen das Repo abgleichen.
+- [ ] **Auch auf Stage noch offen (Stand 2026-11-16):** `20261116100000_proj6_purchase_claims.sql` (Tabelle `purchase_claims` für Käufe ohne Konto, RLS ohne Policies). Ohne sie werden Gast-Käufe nicht erfasst; der Stripe-Webhook antwortet dann mit 500 und Stripe wiederholt den Aufruf.
 - [ ] Seed `supabase/seed.sql` (15 Erzähl-Impulse) in Production eingespielt; Leitfragen kommen aus der Migration `proj8_impulse_leading_questions`.
 - [ ] Storage-Buckets aus `20260515200002_storage_buckets.sql` vorhanden (4 private Buckets).
 - [ ] Testdaten **nicht** übernehmen: QA-Konto `qa-test@narravit.de`, Test-Projekte, Test-Zahlungen bleiben auf Stage.
@@ -135,6 +136,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] `app.narravit.de` → Vercel (Production).
 - [ ] `stage-app.narravit.de` bleibt auf Stage.
 - [ ] Website `narravit.de` / `www.narravit.de`: liefert Stand 2026-10-14 überall 404 (Webflow nicht veröffentlicht). Vor Go-live muss sie erreichbar sein, falls Mails oder App dorthin verlinken.
+- [ ] Landingpage: Button „Jetzt kaufen" verlinkt auf `https://app.narravit.de/onboarding` (optional `?for=self` / `?for=gift`) — **nicht** auf `/registrieren`. Der Kauf läuft ohne Anmeldung; das Konto wird nach dem Checkout angelegt (PROJ-6, 2026-11-16). Auf Stage entsprechend `https://stage-app.narravit.de/onboarding`.
 
 ---
 
@@ -142,6 +144,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 - [ ] Impressum — Seite `/impressum` in der App (PROJ-11 BUG-1; der Footer jeder Mail verlinkt `<SITE_URL>/impressum`). Angaben vom Betreiber offen.
 - [ ] Datenschutzerklärung (auch für Facebook-App und Stripe-Checkout nötig).
+- [ ] Datenschutzerklärung nennt den Kauf ohne Konto: Speicherung der Checkout-E-Mail-Adresse bis zur Konto-Anlage (`purchase_claims`) und das technisch notwendige Cookie `nv_kauf` (Zuordnung des Kaufs, 60 Tage).
 - [ ] AGB und Widerrufsbelehrung für den Kauf.
 - [ ] Pflichtangaben in den Supabase-Mail-Vorlagen (Abschnitt 3).
 - [ ] Kein Abmelde-Link in Erzähl-Aufforderungen (Produktentscheidung) — rechtlich prüfen lassen (PROJ-12).
@@ -163,7 +166,9 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] Anmeldung mit Google und mit Facebook.
 - [ ] „Passwort vergessen" für ein E-Mail-Konto und für ein Google-Konto.
 - [ ] Echter Kauf (kleiner Betrag per Promotion-Code oder sofortige Erstattung): Projekt entsteht, Kauf-Mail kommt, Webhook in Stripe als zugestellt markiert.
+- [ ] Kauf **ohne Konto** von der Landingpage: Checkout ohne Anmeldung, Mail „Konto anlegen" kommt an, nach der Registrierung ist das Projekt da. Zusätzlich einmal mit abweichender E-Mail-Adresse im selben Browser und einmal über den Mail-Link auf einem anderen Gerät.
 - [ ] Geschenk-Kauf „Auch am Computer schreiben": Einladung an die beschenkte Person kommt an.
+- [ ] Geschenk-Kauf **ohne Konto**: Einladung an die beschenkte Person kommt an, sobald der Käufer sein Konto angelegt hat.
 - [ ] Einladung über „Nutzer hinzufügen" kommt an.
 - [ ] Cron `/api/cron/reminders` nach dem ersten Lauf in den Vercel-Logs mit 200.
 - [ ] Mail-Links zeigen auf `app.narravit.de`, nicht auf `stage-app`.
@@ -174,6 +179,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
+| 2026-11-16 | Kauf ohne Konto (PROJ-6): neue Migration `20261116100000_proj6_purchase_claims.sql` (auf Stage noch einzuspielen), Landingpage-Button muss auf `/onboarding` zeigen, Datenschutz-Hinweis zu Checkout-Adresse und Cookie `nv_kauf`, zwei neue Smoke-Tests. Kein neuer Env-Wert. |
 | 2026-10-14 | Absender-Name überall `NARRAVIT` in Großbuchstaben (App-Mails im Code; Supabase-SMTP auf Stage und Production manuell). |
 | 2026-10-14 | Test-Empfänger-Sperre hängt an der Site-URL statt an `VERCEL_ENV` (Stage kann in Vercel als „Production" laufen); offene Frage zur Vercel-Umgebung von Stage ergänzt. |
 | 2026-10-14 | Datei angelegt mit dem Stand aus PROJ-1, -2, -6, -11 (Env-Variablen, Supabase-Auth, Stripe, Resend, Rechtliches). Stage-Mail-Variablen `RESEND_API_KEY`, `CRON_SECRET`, `EMAIL_TEST_RECIPIENT` werden eingerichtet. |

@@ -8,11 +8,16 @@ const PUBLIC_ROUTES = [
   "/passwort-vergessen",
   "/passwort-zuruecksetzen",
   "/email-bestaetigen",
-  // /onboarding ist NICHT mehr public (PROJ-6 Frontend-Phase, Vibe-
-  // Security-Audit 2026-05-16 Medium-Finding #5): anonyme Aufrufe
-  // werden auf /registrieren?next=/onboarding umgeleitet, sonst
-  // könnte ein nicht-authentifizierter User einen Stripe-Checkout
-  // starten und der Webhook hätte keine `user_id`-Zuordnung.
+  // Kauf ohne Konto (2026-11-16): /onboarding und /kauf-erfolgreich sind
+  // wieder öffentlich — wer auf der Landingpage „Jetzt kaufen" klickt,
+  // geht direkt durch den Checkout und legt sein Konto erst danach an.
+  // Die frühere Sperre (Vibe-Security-Audit 2026-05-16, Finding #5)
+  // sollte verhindern, dass eine Zahlung ohne `user_id` niemandem
+  // zugeordnet werden kann. Das löst jetzt der Einlöse-Weg: Gast-Käufe
+  // landen in `purchase_claims` und werden nach der Anmeldung über
+  // /kauf-einloesen dem Konto zugeordnet.
+  "/onboarding",
+  "/kauf-erfolgreich",
   "/zugang-abgelaufen",
   // Konto-Bereich umgeht die „kein-Projekt → Onboarding"-Weiterleitung,
   // damit Nutzer ihr Konto auch nach Projekt-Löschung erreichen können.
@@ -34,7 +39,9 @@ const AUTH_ONLY_ROUTES = ["/anmelden", "/registrieren"];
 // PROJ-9: /einladung gehört dazu, sonst kollidiert die „kein-Projekt →
 // /onboarding"-Weiterleitung mit dem Accept-Flow für frisch registrierte
 // Eingeladene (haben per Definition noch kein Projekt).
-const NO_PAYMENT_BYPASS = ["/onboarding", "/kauf-erfolgreich", "/einladung"];
+// /kauf-einloesen ordnet einen Kauf ohne Konto zu — dort gibt es per
+// Definition noch kein Projekt.
+const NO_PAYMENT_BYPASS = ["/onboarding", "/kauf-erfolgreich", "/kauf-einloesen", "/einladung"];
 
 function isPublic(pathname: string): boolean {
   if (pathname === "/") return false;
@@ -44,6 +51,21 @@ function isPublic(pathname: string): boolean {
 
 function isAuthOnly(pathname: string): boolean {
   return AUTH_ONLY_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+}
+
+// Sicheres Weiterleitungsziel aus `?next=`: nur Pfade der eigenen Seite
+// (kein Open Redirect). Neben `//host` muss auch `/\host` abgewiesen
+// werden — der URL-Parser liest Backslashes wie Schrägstriche. Zusätzlich
+// wird das Ergebnis gegen den eigenen Origin geprüft.
+function safeNextPath(next: string | null, origin: string): string | null {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return null;
+  if (/[\\\u0000-\u001f]/.test(next)) return null;
+  try {
+    if (new URL(next, origin).origin !== origin) return null;
+  } catch {
+    return null;
+  }
+  return next;
 }
 
 function bypassesPaymentCheck(pathname: string): boolean {
@@ -81,21 +103,22 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (user && isAuthOnly(pathname)) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    return NextResponse.redirect(url);
+    // Schon angemeldet: direkt zum gewünschten Ziel (z. B. /kauf-einloesen
+    // aus der Kauf-Mail), sonst zur Startseite.
+    const { origin } = request.nextUrl;
+    const next = safeNextPath(request.nextUrl.searchParams.get("next"), origin);
+    const target = next && !isAuthOnly(next.split("?")[0]) ? next : "/";
+    return NextResponse.redirect(new URL(target, origin));
   }
 
   if (!user && !isPublic(pathname)) {
     const url = request.nextUrl.clone();
-    // /onboarding-Spezialfall: anonyme Nutzer landen auf der Registrieren-
-    // Seite (nicht Anmelden), mit `next=/onboarding` für den Redirect
-    // nach erfolgreicher Registrierung. PROJ-6 AC.
-    if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) {
-      url.pathname = "/registrieren";
-      url.searchParams.set("next", "/onboarding");
-    } else {
-      url.pathname = "/anmelden";
+    url.pathname = "/anmelden";
+    // /kauf-einloesen: nach der Anmeldung dorthin zurück, damit der Kauf
+    // zugeordnet wird.
+    if (pathname === "/kauf-einloesen") {
+      url.search = "";
+      url.searchParams.set("next", "/kauf-einloesen");
     }
     return NextResponse.redirect(url);
   }
@@ -123,8 +146,12 @@ export async function updateSession(request: NextRequest) {
       );
 
     if (hasNeverPaid) {
+      // Kein Projekt: erst prüfen, ob ein Kauf ohne Konto auf dieses Konto
+      // wartet. /kauf-einloesen löst ihn ein oder leitet — wenn es keinen
+      // gibt — zum Kauf-Assistenten (/onboarding) weiter.
       const url = request.nextUrl.clone();
-      url.pathname = "/onboarding";
+      url.pathname = "/kauf-einloesen";
+      url.search = "";
       return NextResponse.redirect(url);
     }
 

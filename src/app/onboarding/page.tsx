@@ -63,6 +63,7 @@ export default async function OnboardingPage({
       <OnboardingWizard
         defaultFullName={defaultFullName}
         buyerEmail={user?.email ?? ""}
+        isGuest={!user}
         initialForWhom={initialForWhom}
         backUrl={user ? "/" : "https://www.narravit.de"}
         showAccountDeleteLink={showAccountDeleteLink}

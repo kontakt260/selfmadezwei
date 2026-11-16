@@ -11,6 +11,9 @@ export type { InvitationEmailProps } from "./InvitationEmail";
 export { PortalPurchaseEmail } from "./PortalPurchaseEmail";
 export type { PortalPurchaseEmailProps } from "./PortalPurchaseEmail";
 
+export { GuestPurchaseEmail } from "./GuestPurchaseEmail";
+export type { GuestPurchaseEmailProps } from "./GuestPurchaseEmail";
+
 export { WelcomeEmail } from "./WelcomeEmail";
 export type { WelcomeEmailProps } from "./WelcomeEmail";
 
