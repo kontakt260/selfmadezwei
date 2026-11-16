@@ -13,7 +13,7 @@ export function PhoneNotice({ projectId }: { projectId: string }) {
             Editor auf dem Smartphone nicht verfügbar
           </h1>
           <p className="text-base leading-7 text-[#535252]">
-            Der Kapitel-Editor ist auf dem Smartphone nicht verfügbar — öffne NARRAVIT auf einem
+            Der Kapitel-Editor ist auf dem Smartphone nicht verfügbar — öffnen Sie NARRAVIT auf einem
             Tablet oder Desktop-Computer.
           </p>
         </div>

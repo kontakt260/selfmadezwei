@@ -396,20 +396,24 @@
 
 .a5-stack blockquote,
 .a5-page blockquote {
-  border-left: 3px solid #222121;
+  --a5-blockquote-rule-color: #222121;
+  --a5-blockquote-rule-width: 3px;
+  border-left: var(--a5-blockquote-rule-width) solid var(--a5-blockquote-rule-color);
   padding-left: 0.8em;
   margin: 0.8em 0;
   font-style: italic;
   color: #4a4540;
 }
 
-/* Blockquote-Border in Seitenzwischenräumen ausblenden: keine visuelle
- * Overlay-Maske mehr (siehe CLAUDE.md „Keine visuellen Overlay-Hacks").
- * Stattdessen setzt die Pagination-Engine (PaginationDecorations.ts) eine
- * `mask-image`-Node-Decoration direkt auf das `<blockquote>` mit harten
- * Transparent-Schwellen an den Spacer-Y-Bereichen. Dadurch wird die Border
- * im Page-Gap, in den Margins und in Widow-Zonen sauber entfernt — nicht
- * überdeckt. */
+/* Blockquote-Border in Seitenzwischenräumen aussparen: kein visuelles
+ * Overlay (siehe CLAUDE.md „Keine visuellen Overlay-Hacks") und keine Maske
+ * über dem Text. Die Pagination-Engine (PaginationDecorations.ts) setzt für
+ * Blockquotes, die über eine Seitengrenze laufen, eine Node-Decoration: die
+ * Border-Farbe wird transparent, und der Rand wird als Verlauf mit harten
+ * Lücken an den Spacer-Y-Bereichen in die Border-Box gezeichnet (Farbe und
+ * Breite aus den Variablen oben). Text wird dabei nie beschnitten — eine
+ * frühere `mask-image`-Lösung kappte kursive Buchstaben an der rechten
+ * Box-Kante. */
 
 /* Aufzählungen: Tailwind-Preflight nullt list-style — explizit zurückholen */
 .a5-stack ul,

@@ -1,4 +1,4 @@
-import { expect, type Browser } from "@playwright/test";
+import { expect, type Browser, type Page } from "@playwright/test";
 
 // Gemeinsame Konstanten + Helfer für das QA-Testprojekt in der Stage-DB.
 // Alle E2E-Suites teilen sich dieses eine Projekt — wer daran etwas
@@ -30,4 +30,34 @@ export async function restoreQaProjectTitle(browser: Browser) {
   } finally {
     await ctx.close();
   }
+}
+
+// Löscht Kapitel des QA-Projekts über die Projektübersicht — alle, oder nur
+// die mit dem angegebenen Titel.
+//
+// Wartet pro Kapitel auf die Antwort der Lösch-Anfrage. Ohne dieses Warten
+// verschwindet die Zeile zwar sofort aus der Liste, aber ein direkt danach
+// geschlossener Browser-Kontext bricht die Anfrage ab — das Kapitel bleibt
+// in der Datenbank und verfälscht nachfolgende Suites (z. B. die
+// Seitenzahl-Erwartung in PROJ-7).
+export async function deleteQaChapters(page: Page, title?: string): Promise<void> {
+  const name = title ? `Kapitel „${title}" löschen` : /Kapitel „.*" löschen/;
+  for (let guard = 0; guard < 30; guard++) {
+    await page.goto(`/projektuebersicht/${QA_PROJECT_ID}`);
+    await page.waitForLoadState("networkidle");
+    const trigger = page.getByRole("button", { name });
+    if ((await trigger.count()) === 0) return;
+    await trigger.first().click();
+    const confirm = page.getByRole("button", { name: /Endgültig löschen/ });
+    await expect(confirm).toBeEnabled({ timeout: 10_000 }); // 3-s-Countdown
+    const deleted = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.request().headers()["next-action"] !== undefined,
+      { timeout: 15_000 },
+    );
+    await confirm.click();
+    await deleted;
+  }
+  throw new Error("QA-Kapitel ließen sich nicht löschen.");
 }

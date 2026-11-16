@@ -30,7 +30,16 @@ export const HyphenationOnLoad = Extension.create({
     if (!editor) return;
     const { state } = editor;
     const tr = state.tr;
-    let touched = false;
+    // Ersetzungen erst sammeln, dann von HINTEN nach vorne anwenden.
+    // `descendants` liefert Positionen des ursprünglichen Dokuments;
+    // jede Ersetzung verändert aber die Dokumentlänge (Soft-Hyphens
+    // kommen hinzu). Vorwärts angewendet zeigten die Positionen späterer
+    // Textknoten auf falsche Stellen — der Ersetzungsbereich überdeckte
+    // dann die Absatzgrenze davor, und `insertText` verschmolz zwei
+    // Absätze zu einem (Bug 2026-11-15: bei jedem Öffnen eines Kapitels
+    // gingen Absatzumbrüche verloren, 13 → 2 → 1 Absätze). Rückwärts
+    // bleiben alle noch nicht bearbeiteten Positionen gültig.
+    const replacements: Array<{ from: number; to: number; text: string }> = [];
     state.doc.descendants((node, pos, parent) => {
       if (!node.isText || !node.text) return;
       // Überschriften überspringen — typografisch dürfen Titel nicht
@@ -44,10 +53,15 @@ export const HyphenationOnLoad = Extension.create({
       if (parentName === "blockquote") return;
       const hyphenated = hyphenateText(node.text);
       if (hyphenated === node.text) return;
-      tr.insertText(hyphenated, pos, pos + node.nodeSize);
-      touched = true;
+      replacements.push({ from: pos, to: pos + node.nodeSize, text: hyphenated });
     });
-    if (!touched) return;
+    if (replacements.length === 0) return;
+    for (let i = replacements.length - 1; i >= 0; i--) {
+      const { from, to, text } = replacements[i];
+      // Marks des ersetzten Textknotens explizit übernehmen.
+      const marks = state.doc.resolve(from).marksAcross(state.doc.resolve(to)) ?? [];
+      tr.replaceWith(from, to, state.schema.text(text, marks));
+    }
     // Soft-Hyphens dürfen nicht in der Undo-History landen — sie sind
     // rein typografisch und sollen für den User unsichtbar bleiben.
     tr.setMeta("addToHistory", false);

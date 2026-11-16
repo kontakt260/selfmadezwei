@@ -1297,3 +1297,56 @@ Status PROJ-5 bleibt **Approved** (re-bestätigt nach Sanierungs-Roadmap).
    PD-Inline-Decoration angehen — kein Blocker.
 2. Cross-Browser-Smoke-Test (Firefox + Safari) vor `/deploy`.
 3. PROJ-5 ist bereit für Production-Deploy auf den nächsten Stage-Run.
+
+---
+
+## Implementation Notes — Umbruch-Sanierung (2026-11-16)
+
+**Anlass:** Betreiber-Meldung „Umbrüche sind oft buggy". Der Editor wurde in
+echtem Chromium (Playwright) systematisch vermessen: jede Textzeile und jede
+Bildreihe gegen den Inhaltsbereich ihrer A5-Seite, dazu Tastatur- und
+Maus-Bedienung an Seitengrenzen. Der Spec-Status bleibt unverändert; die
+Fixes liegen auf `stage` und sind noch nicht in Production.
+
+### Behobene Fehler
+
+| # | Fehler | Ursache | Fix |
+| :--- | :--- | :--- | :--- |
+| 1 | Jede Folgeseite begann eine Zeile tiefer als die vorige (Seite 2: 23 px, Seite 7: 136 px); Text lief unten aus der Seite und in den Zwischenraum | Der Soft-Break-Spacer besteht seit dem Caret-Fix vom 2026-05-21 aus Trigger-Zeile + Gap-Block. Die Trigger-Zeile ist eine eigene Zeile in Absatzhöhe, die Engine rechnete sie nicht ein | `PaginationDecorations.ts`: Gap-Höhe = Verschiebung − Zeilenhöhe (`lineBoxHeight`) |
+| 2 | Bei jedem Öffnen eines Kapitels verschmolzen Absätze (13 → 2 → 1) | `HyphenationOnLoad` ersetzte Textknoten vorwärts mit Positionen des Ursprungsdokuments; jede Ersetzung verlängert das Dokument, spätere Bereiche überdeckten Absatzgrenzen | `Hyphenation.ts`: Ersetzungen sammeln und von hinten nach vorne anwenden, Marks explizit übernehmen |
+| 3 | Listen-Marker („•", „1.") blieb allein auf der alten Seite | Der Spacer saß im Absatz des Listenpunkts; der Marker hängt an dessen erster Zeile | Ganzer Listenpunkt wird per Block-Push **vor** dem `<li>` verschoben; aufgehobenes Margin-Collapsing wird ausgeglichen (`uncollapsedMargin`) |
+| 4 | Kursive Buchstaben im Blockzitat rechts abgeschnitten, sobald das Zitat über eine Seitengrenze lief | Die `mask-image` zum Aussparen des Rands lag auf der ganzen Blockquote und kappte Glyphen-Überhang | Rand wird als Verlauf mit Lücken in die Border-Box gezeichnet (Variablen `--a5-blockquote-rule-color/-width`), keine Maske mehr |
+| 5 | „Seitenumbruch" bei markiertem Text löschte nur die Markierung; der Umbruch kam erst beim zweiten Klick | Befehl endete nach `deleteSelection` | Löschen + Einfügen in einer Transaktion (ein Undo-Schritt) |
+| 6 | Umbruch mitten im Blockzitat: der Rest blieb hinter dem Umbruch ein Zitat | `slice(…, true)` nahm die Blockquote-Hülle mit | `slice` ohne `includeParents` |
+| 7 | Nach „Seitenumbruch" am Dokumentende lag der Cursor außerhalb des sichtbaren Bereichs | `keepCursorInView` maß, bevor die neue Seite existierte | Zusätzlicher Nachlauf-Check nach 350 ms |
+| 8 | „Pfeil runter" in der letzten Zeile einer Seite sprang ans Dokumentende | Browser findet die Zeile hinter dem nicht editierbaren Spacer nicht | Eigene Zeilen-Navigation über Soft-Breaks (`verticalMoveAcrossSoftBreak`), auch mit Shift |
+| 9 | Klick in Seitenrand oder Zwischenraum warf den Cursor an Dokumentanfang oder -ende; Weißraum unter dem Text reagierte nicht | Keine Textposition in der „toten Zone"; Handler hing nur am Vordergrund-Layer | Neu `tiptap/caretPlacement.ts`: Cursor in die nächstgelegene Zeile der angeklickten Seite, unter dem Text ans Ende |
+| 10 | Phantomseite am Kapitelende; falscher `page_count` verschob die buchweiten Seitenzahlen der Folgekapitel (PROJ-7) | Der leere „Bild hinzufügen"-Platzhalter wurde wie Inhalt paginiert und gezählt | Platzhalter nimmt nicht an der Pagination teil; Seitenzahl aus dem letzten echten Inhalt |
+| 11 | Bildreihe ragte in den unteren Seitenrand (bis ~10 px) | (a) Reihe bekam die Mindest-Skala, obwohl sie selbst damit nicht passte; (b) Grow-Pass rechnete die Abstände zwischen Reihen als mitskalierend | Rechnung in `src/lib/kapiteleditor/imageRowLayout.ts` ausgelagert (`planRowGroups`, `maxGroupScale`) und korrigiert |
+| 12 | Änderungen der letzten 2 Sekunden gingen verloren, wenn die Seite verlassen wurde; Status zeigte derweil „Gespeichert" | Auto-Save-Debounce ohne Flush, Status erst beim Start des Speicherns aktualisiert | `useAutoSave`: Status aus „Wert ≠ gespeicherter Wert" abgeleitet, Flush bei Unmount und `pagehide`, Browser-Rückfrage bei `beforeunload` solange etwas aussteht; `page_count` wird erst nach dem Einschwingen gemeldet |
+| 13 | Smartphone-Hinweis in Du-Form | — | „öffnen Sie NARRAVIT …" |
+
+### Tests
+
+- **Neu, Playwright** `tests/PROJ-5-kapitel-editor.spec.ts` (20 Tests, Chromium;
+  auf dem Smartphone-Projekt übersprungen) mit Mess-Helfer
+  `tests/helpers/editor-audit.ts`: Zero-Overflow für Fließtext, Listen,
+  Zitate, Zeilenabstände, harte Umbrüche, Zoom; Absatz-Erhalt über Neuladen;
+  manueller Umbruch (Mitte, Markierung, Ende, Leerseite); Pfeiltasten und
+  Klicks an der Seitengrenze; Seitenzahl ohne Phantomseite; Speichern beim
+  Verlassen.
+- **Neu, Vitest:** `tiptap/editorCommands.test.ts` (Silbentrennung,
+  Seitenumbruch-Befehl; Gegenprobe gegen den alten Code schlägt fehl),
+  `lib/kapiteleditor/imageRowLayout.test.ts`, `hooks/useAutoSave.test.ts`.
+- Zusätzlich einmalig per Skript geprüft: Sweep „0–30 Textzeilen × drei
+  Schlussbilder" (31/31 ohne Verstoß) und zeilenweises Durchlaufen ganzer
+  Dokumente mit den Pfeiltasten.
+
+### Bekannte Grenzen
+
+- Bei UI-Zoom ≠ 100 % kann eine Zeile rundungsbedingt bis ~1 px vom
+  Inhaltsbereich abweichen (nicht sichtbar, im Test toleriert).
+- Firefox und Safari wurden in diesem Durchgang nicht vermessen.
+- Die Pagination besteht weiterhin aus zwei kooperierenden Engines
+  (Decorations für Text, `usePagination` für Bilder und Umbruch-Höhen). Die
+  im Tech Design Refresh skizzierte Zusammenlegung bleibt offen.

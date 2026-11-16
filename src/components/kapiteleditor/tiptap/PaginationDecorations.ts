@@ -1,6 +1,7 @@
 import { Extension } from "@tiptap/core";
-import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
+import { isInDeadZone, placeCaretNearPoint } from "./caretPlacement";
 
 // Spec PROJ-5 — Acceptance „Zeilenweiser Soft-Break in langen Absätzen":
 // wenn ein Absatz nicht vollständig auf die laufende Seite passt, fließen
@@ -41,6 +42,42 @@ export const PaginationDecorations = Extension.create({
         props: {
           decorations(state) {
             return KEY.getState(state) ?? null;
+          },
+          // Pfeil hoch/runter über einen Soft-Break hinweg. Der Spacer ist
+          // ein nicht editierbarer Block mitten im Absatz; die native
+          // Zeilen-Navigation des Browsers findet die Zeile dahinter nicht
+          // und springt ans Absatzende (Bug 2026-11-16: „Pfeil runter" in
+          // der letzten Zeile einer Seite landete am Dokumentende). Wir
+          // setzen den Cursor selbst in die Nachbarzeile jenseits der
+          // Seitengrenze, an dieselbe horizontale Position.
+          // Klick in die tote Zone zwischen zwei Seiten (Seitenrand,
+          // Zwischenraum, Seitenumbruch): Cursor in die nächstgelegene
+          // Zeile der angeklickten Seite setzen — siehe caretPlacement.ts.
+          handleDOMEvents: {
+            mousedown(view, event) {
+              if (event.button !== 0 || event.detail > 1) return false;
+              if (!isInDeadZone(view, event.clientY)) return false;
+              if (!placeCaretNearPoint(view, event.clientX, event.clientY, event.shiftKey)) {
+                return false;
+              }
+              event.preventDefault();
+              return true;
+            },
+          },
+          handleKeyDown(view, event) {
+            if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return false;
+            if (event.metaKey || event.ctrlKey || event.altKey) return false;
+            const target = verticalMoveAcrossSoftBreak(view, event.key === "ArrowDown");
+            if (target === null) return false;
+            const { selection, doc } = view.state;
+            const anchor = event.shiftKey ? selection.anchor : target;
+            view.dispatch(
+              view.state.tr
+                .setSelection(TextSelection.create(doc, anchor, target))
+                .scrollIntoView(),
+            );
+            event.preventDefault();
+            return true;
           },
         },
 
@@ -168,6 +205,60 @@ export const PaginationDecorations = Extension.create({
   },
 });
 
+// Zielposition für Pfeil hoch/runter, wenn die Nachbarzeile hinter einem
+// Soft-Break-Spacer desselben Absatzes liegt; sonst null (Browser-Standard).
+//
+// Aufbau im DOM: … Textzeile │ Trigger-Zeile (leer, Zeilenhöhe) │ Gap-Block
+// │ Textzeile …  Die Zeile VOR dem Spacer endet eine Zeilenhöhe über der
+// Gap-Oberkante, die Zeile DANACH beginnt an der Gap-Unterkante.
+function verticalMoveAcrossSoftBreak(view: EditorView, down: boolean): number | null {
+  const { $head, head } = view.state.selection;
+  if (!$head.parent.isTextblock) return null;
+  const blockDom = view.nodeDOM($head.before());
+  if (!(blockDom instanceof HTMLElement)) return null;
+  const gaps = blockDom.querySelectorAll<HTMLElement>(".a5-soft-break-spacer__gap");
+  if (gaps.length === 0) return null;
+
+  let caret: { top: number; bottom: number; left: number };
+  try {
+    caret = view.coordsAtPos(head);
+  } catch {
+    return null;
+  }
+  const stack = blockDom.closest(".a5-stack") as HTMLElement | null;
+  const zoom = stack
+    ? parseFloat(getComputedStyle(stack).getPropertyValue("--ui-zoom") || "1") || 1
+    : 1;
+  // Zeilenhöhe in Bildschirm-Pixeln (Rects sind mit dem UI-Zoom skaliert).
+  const lineHeight = lineBoxHeight(blockDom, caret.bottom - caret.top) * zoom;
+  const caretMid = (caret.top + caret.bottom) / 2;
+
+  for (const gap of gaps) {
+    const rect = gap.getBoundingClientRect();
+    let targetY: number | null = null;
+    if (down) {
+      // Cursor steht in der Zeile direkt über der Trigger-Zeile.
+      const lineAboveMid = rect.top - 1.5 * lineHeight;
+      if (Math.abs(caretMid - lineAboveMid) < lineHeight / 2) {
+        targetY = rect.bottom + lineHeight / 2;
+      }
+    } else {
+      // Cursor steht in der ersten Zeile nach dem Gap.
+      const lineBelowMid = rect.bottom + lineHeight / 2;
+      if (Math.abs(caretMid - lineBelowMid) < lineHeight / 2) {
+        targetY = rect.top - 1.5 * lineHeight;
+      }
+    }
+    if (targetY === null) continue;
+    const found = view.posAtCoords({ left: caret.left, top: targetY });
+    if (!found) return null;
+    // Nur innerhalb desselben Absatzes springen.
+    if (found.pos < $head.start() || found.pos > $head.end()) return null;
+    return found.pos;
+  }
+  return null;
+}
+
 function recompute(view: EditorView) {
   const dom = view.dom as HTMLElement;
   const fg = dom.closest(".a5-stack__fg") as HTMLElement | null;
@@ -252,7 +343,7 @@ function computeDecorations(
   let interParaShift = 0;
   // Pro Blockquote: gesammelte Spacer-Y-Bereiche in Blockquote-lokalen,
   // POST-Render-Koordinaten. Nach der Traversierung wird daraus eine
-  // `mask-image`-Decoration auf der Blockquote gebaut, die die Border
+  // Node-Decoration auf der Blockquote gebaut, die die Border
   // genau in diesen Y-Bereichen ausblendet — ohne visuelles Overlay
   // (siehe CLAUDE.md „Keine visuellen Overlay-Hacks").
   type BqInfo = {
@@ -273,7 +364,7 @@ function computeDecorations(
 
     // Prüfen ob dieser Textblock in einer Blockquote sitzt — wenn ja,
     // sammeln wir die Y-Bereiche aller Spacer pro Blockquote, um nach der
-    // Traversierung eine `mask-image`-Decoration auf der Blockquote zu
+    // Traversierung eine Rand-Decoration auf der Blockquote zu
     // setzen (Border wird in diesen Bereichen sauber ausgeblendet).
     const $pos = view.state.doc.resolve(pos);
     const parentIsBlockquote =
@@ -297,6 +388,19 @@ function computeDecorations(
           });
         }
       }
+    }
+
+    // Listenpunkt: Ist dieser Textblock der erste Absatz eines Listenpunkts,
+    // muss ein Push des GANZEN Absatzes vor dem `<li>` ansetzen, nicht im
+    // Absatz. Der Marker („•" / „1.") hängt an der ersten Zeile des
+    // Listenpunkts — ein Spacer im Absatz ließe ihn allein auf der alten
+    // Seite zurück, während der Text auf die neue Seite wandert
+    // (Bug 2026-11-16).
+    let listItemPush: { pos: number; dom: HTMLElement } | null = null;
+    if ($pos.depth > 0 && $pos.parent.type.name === "listItem" && $pos.index() === 0) {
+      const liPos = $pos.before($pos.depth);
+      const liDom = view.nodeDOM(liPos);
+      if (liDom instanceof HTMLElement) listItemPush = { pos: liPos, dom: liDom };
     }
 
     const blockRect = nodeDom.getBoundingClientRect();
@@ -327,7 +431,14 @@ function computeDecorations(
         const nextContentTop = (startFrameIdx + 1) * geom.stride + geom.marginTop;
         const delta = nextContentTop - blockTop;
         if (delta > 0.5) {
-          decorations.push(buildBlockPushDecoration(pos, delta));
+          decorations.push(
+            listItemPush
+              ? buildBlockPushDecoration(
+                  listItemPush.pos,
+                  delta - uncollapsedMargin(listItemPush.dom),
+                )
+              : buildBlockPushDecoration(pos, delta),
+          );
           // Bei Blockquote: Block-Push-Spacer (für leere Absätze) auch
           // in die Mask-Gaps aufnehmen, sonst zeigt die Border weiter
           // im Page-Gap (Bug 2026-05-20: Enter-Drücken in Blockquote
@@ -393,6 +504,24 @@ function computeDecorations(
         const nextContentTop = (currentFrameIdx + 1) * geom.stride + geom.marginTop;
         const delta = nextContentTop - pushedEffectiveTop;
 
+        if (delta > 0.5 && pushIdx === 0 && listItemPush) {
+          // Ganzer erster Absatz eines Listenpunkts wandert auf die
+          // Folgeseite → Block-Push VOR dem `<li>`, damit der Marker
+          // mitwandert (siehe listItemPush oben).
+          decorations.push(
+            buildBlockPushDecoration(
+              listItemPush.pos,
+              delta - uncollapsedMargin(listItemPush.dom),
+            ),
+          );
+          cumulativeShift += delta;
+          thisParaSpacerHeight += delta;
+          currentFrameIdx++;
+          i = pushIdx + 1;
+          if (currentFrameIdx > endFrameIdx + 1) break;
+          continue;
+        }
+
         if (delta > 0.5) {
           const coord = view.posAtCoords({
             left: pushedLine.left + 1,
@@ -439,8 +568,18 @@ function computeDecorations(
                 ),
               );
             }
+            // Der Spacer besteht aus Trigger-Zeile + Gap-Block (siehe
+            // buildSpacerDecoration). Die Trigger-Zeile ist eine eigene
+            // Line-Box mit der Strut-Höhe des Absatzes (= line-height):
+            // sie schiebt den Folgetext bereits um eine Zeilenhöhe nach
+            // unten. Der Gap-Block darf deshalb nur den Rest von `delta`
+            // einnehmen — sonst beginnt jede Folgeseite eine Zeile zu tief
+            // und der Versatz summiert sich über die Seiten (Bug
+            // 2026-11-15: Seite n startet n−1 Zeilen unter dem
+            // Content-Top, Text läuft unten aus der Seite).
+            const triggerLineHeight = lineBoxHeight(nodeDom, pushedLine.height / zoom);
             decorations.push(
-              buildSpacerDecoration(insertPos, delta, {
+              buildSpacerDecoration(insertPos, delta, triggerLineHeight, {
                 inBlockquote: parentIsBlockquote,
               }),
             );
@@ -489,32 +628,41 @@ function computeDecorations(
   });
 
   // Nach der Traversierung: Pro Blockquote mit Spacer-Bereichen eine
-  // Node-Decoration mit `mask-image` emittieren, die die Border in
-  // diesen Y-Bereichen sauber ausblendet — KEIN visueller Overlay
-  // (CLAUDE.md „Keine visuellen Overlay-Hacks"). Die Mask reicht von
-  // schwarz (sichtbar) → transparent (ausgeblendet) → schwarz, mit
+  // Node-Decoration emittieren, die den linken Rand in diesen Y-Bereichen
+  // ausspart — KEIN visueller Overlay (CLAUDE.md „Keine visuellen
+  // Overlay-Hacks"): der Rand selbst wird mit Lücken gezeichnet, mit
   // hartem Übergang an den Spacer-Grenzen.
   for (const info of bqInfo.values()) {
     if (info.gaps.length === 0) continue;
     info.gaps.sort((a, b) => a.start - b.start);
-    const stops: string[] = ["#000 0px"];
+    // Der Rand wird als Verlauf mit Lücken GEZEICHNET (Hintergrund in der
+    // Border-Box, die echte Border-Farbe ist für diese Blockquote
+    // transparent). Früher lag eine `mask-image` auf der ganzen
+    // Blockquote — die schnitt aber auch den Text an der Box-Kante ab:
+    // kursive Buchstaben ragen rechts leicht über die Box hinaus und
+    // wurden gekappt (Bug 2026-11-16: „Sonnenaufgang", „Duft").
+    const rule = "var(--a5-blockquote-rule-color)";
+    const stops: string[] = [`${rule} 0px`];
     for (const g of info.gaps) {
       const a = g.start.toFixed(2);
       const b = g.end.toFixed(2);
-      stops.push(`#000 ${a}px`);
+      stops.push(`${rule} ${a}px`);
       stops.push(`transparent ${a}px`);
       stops.push(`transparent ${b}px`);
-      stops.push(`#000 ${b}px`);
+      stops.push(`${rule} ${b}px`);
     }
-    stops.push("#000 100%");
+    stops.push(`${rule} 100%`);
     const grad = `linear-gradient(to bottom, ${stops.join(", ")})`;
-    const style = `-webkit-mask-image:${grad};mask-image:${grad};-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-size:100% 100%;mask-size:100% 100%;`;
+    const style =
+      `border-left-color:transparent;background-image:${grad};` +
+      "background-repeat:no-repeat;background-origin:border-box;background-clip:border-box;" +
+      "background-position:left top;background-size:var(--a5-blockquote-rule-width) 100%;";
     decorations.push(
       Decoration.node(
         info.bqStart,
         info.bqEnd,
         { style },
-        { key: `bq-mask@${info.bqStart}@${info.gaps.length}` },
+        { key: `bq-rule@${info.bqStart}@${info.gaps.map((g) => `${Math.round(g.start)}-${Math.round(g.end)}`).join("_")}` },
       ),
     );
   }
@@ -526,7 +674,25 @@ type SpacerOpts = {
   inBlockquote: boolean;
 };
 
-function buildSpacerDecoration(pos: number, height: number, opts: SpacerOpts): Decoration {
+// Höhe der Line-Box, die der Trigger-Span im Absatz `block` belegt: die
+// Zeile enthält nur den Strut des Absatzes (font-size × line-height) und
+// den 0 px hohen Inline-Block, ist also genau so hoch wie eine Textzeile.
+// getComputedStyle liefert für line-height den aufgelösten px-Wert; fällt
+// das aus (z. B. „normal"), nehmen wir die gemessene Höhe der Textzeile.
+function lineBoxHeight(block: HTMLElement, fallback: number): number {
+  const lh = parseFloat(getComputedStyle(block).lineHeight);
+  return Number.isFinite(lh) && lh > 0 ? lh : fallback;
+}
+
+function buildSpacerDecoration(
+  pos: number,
+  // Gesamtverschiebung des Folgetexts (Trigger-Zeile + Gap-Block).
+  totalShift: number,
+  // Höhe, die die Trigger-Zeile davon bereits einnimmt.
+  triggerLineHeight: number,
+  opts: SpacerOpts,
+): Decoration {
+  const gapHeight = Math.max(0, totalShift - triggerLineHeight);
   return Decoration.widget(
     pos,
     () => {
@@ -546,9 +712,11 @@ function buildSpacerDecoration(pos: number, height: number, opts: SpacerOpts): D
       //      auch auf die letzte sichtbare Zeile auf der Seite).
       //      Höhe 0 → Line-Box bleibt natürliche Textzeilen-Höhe → Caret
       //      hat normale Größe.
-      //   2. Gap-Span: display:block; height = page-gap. Sitzt als
-      //      Block-Element auf seiner eigenen Zeile, nimmt den Platz
-      //      ein, ohne die vorhergehende Line-Box zu beeinflussen.
+      //   2. Gap-Span: display:block; height = Gesamtverschiebung minus
+      //      Trigger-Zeile (die Trigger-Zeile selbst ist eine Line-Box in
+      //      Absatz-Zeilenhöhe, siehe lineBoxHeight). Sitzt als Block-
+      //      Element auf seiner eigenen Zeile, nimmt den Platz ein, ohne
+      //      die vorhergehende Line-Box zu beeinflussen.
       //      Da Widget-Decorations standardmäßig contenteditable=false
       //      sind, kann der Caret hier nicht reinklicken.
       const wrap = document.createElement("span");
@@ -571,7 +739,7 @@ function buildSpacerDecoration(pos: number, height: number, opts: SpacerOpts): D
 
       const gap = document.createElement("span");
       gap.className = "a5-soft-break-spacer__gap";
-      gap.style.cssText = `display:block;height:${height}px;line-height:0;margin:0;padding:0;user-select:none;pointer-events:none;`;
+      gap.style.cssText = `display:block;height:${gapHeight}px;line-height:0;margin:0;padding:0;user-select:none;pointer-events:none;`;
       wrap.appendChild(gap);
 
       return wrap;
@@ -579,9 +747,32 @@ function buildSpacerDecoration(pos: number, height: number, opts: SpacerOpts): D
     {
       side: -1,
       ignoreSelection: true,
-      key: `soft-break@${pos}@${Math.round(height)}@${opts.inBlockquote ? "bq" : ""}`,
+      key: `soft-break@${pos}@${Math.round(totalShift)}@${Math.round(gapHeight)}@${opts.inBlockquote ? "bq" : ""}`,
     },
   );
+}
+
+// Ein Block-Push-Spacer zwischen zwei Blöcken hebt deren Margin-Collapsing
+// auf: vorher teilten sich Vorgänger-Unterrand und eigener Oberrand den
+// größeren der beiden Werte, mit dem Spacer dazwischen zählen beide voll.
+// Der Block rutscht dadurch um den KLEINEREN der beiden Ränder zusätzlich
+// nach unten. Diese Funktion liefert genau diesen Betrag, damit die
+// Spacer-Höhe ihn abziehen kann und die erste Zeile exakt am Content-Top
+// der Folgeseite landet. Ist der Block das erste Kind, kollabiert sein
+// Oberrand mit dem des Elternelements (z. B. `<ul>`).
+function uncollapsedMargin(el: HTMLElement): number {
+  const own = parseFloat(getComputedStyle(el).marginTop) || 0;
+  if (own <= 0) return 0;
+  let prev = el.previousElementSibling;
+  while (prev && prev.classList.contains("a5-block-push-spacer")) {
+    prev = prev.previousElementSibling;
+  }
+  const other = prev
+    ? parseFloat(getComputedStyle(prev).marginBottom) || 0
+    : el.parentElement
+      ? parseFloat(getComputedStyle(el.parentElement).marginTop) || 0
+      : 0;
+  return Math.max(0, Math.min(own, other));
 }
 
 // Block-Push-Spacer (Fix 2026-05-19): wird VOR einem Block eingesetzt, dessen
@@ -589,7 +780,8 @@ function buildSpacerDecoration(pos: number, height: number, opts: SpacerOpts): D
 // in der Page-Gap oder auf Folgeseite überläuft. Wir schieben den GANZEN Block
 // auf die nächste Seite. Wird als Block-Widget gerendert (display:block, eigene
 // Höhe), das vor dem Block einfügt und nicht editierbar ist.
-function buildBlockPushDecoration(pos: number, height: number): Decoration {
+function buildBlockPushDecoration(pos: number, rawHeight: number): Decoration {
+  const height = Math.max(0, rawHeight);
   return Decoration.widget(
     pos,
     () => {

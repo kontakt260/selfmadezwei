@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { editorExtensions } from "./tiptap/extensions";
+import { placeCaretNearPoint } from "./tiptap/caretPlacement";
 import { EditorToolbar } from "./EditorToolbar";
 import { FirstPageHeader } from "./FirstPageTemplate";
 import { ImageSection } from "./ImageSection";
@@ -14,6 +15,7 @@ import { ImpulseHintBanner } from "./ImpulseHintBanner";
 import { ZoomControl, DEFAULT_ZOOM, type ZoomLevel } from "./ZoomControl";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { countWordsFromBody } from "@/lib/kapiteleditor/countWords";
+import { maxGroupScale, planRowGroups } from "@/lib/kapiteleditor/imageRowLayout";
 import {
   EMPTY_IMAGE_SECTIONS,
   type ChapterDraft,
@@ -126,9 +128,13 @@ export function EditorClient({
       body,
       imageSections,
       colorPageCount: estimateColorPages(imageSections),
-      pageCount,
+      // Erst melden, wenn die Pagination eingeschwungen ist. Während des
+      // Ladens läuft pageCount über Zwischenwerte (1 → … → Endwert); ein
+      // Speichern in diesem Moment — etwa der Flush beim sofortigen
+      // Verlassen der Seite — würde einen falschen page_count festschreiben.
+      pageCount: editorReady ? pageCount : undefined,
     }),
-    [title, body, imageSections, pageCount],
+    [title, body, imageSections, pageCount, editorReady],
   );
 
   const saveDraft = useCallback(
@@ -249,6 +255,23 @@ export function EditorClient({
     [projectId, chapterId],
   );
 
+  // Klick auf leere Fläche einer Seite (Seitenränder, Weißraum unter dem
+  // letzten Absatz, Lücken zwischen Bild-Sektion und Text): Cursor in die
+  // nächstgelegene Zeile setzen, horizontal an der Klickposition — wie in
+  // Word/Docs. Früher sprang der Cursor immer ans Dokumentende (auch bei
+  // einem Klick in den Seitenrand neben Seite 1), und der Weißraum unter
+  // dem Text reagierte gar nicht, weil er nicht zum Vordergrund-Layer
+  // gehört. `e.target === e.currentTarget` filtert Klicks auf Kinder aus
+  // (Editor, Bild-Sektion, Kopf behalten ihre eigene Klick-Logik); der
+  // Handler hängt deshalb an Stack UND Vordergrund-Layer.
+  const handleBlankAreaMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget || !editor || e.button !== 0) return;
+    e.preventDefault();
+    if (!placeCaretNearPoint(editor.view, e.clientX, e.clientY, e.shiftKey)) {
+      editor.commands.focus("end");
+    }
+  };
+
   return (
     <div
       className="a5-desk [font-family:var(--font-lato)] flex min-h-[100dvh] flex-col"
@@ -340,6 +363,7 @@ export function EditorClient({
           data-chapter-id={chapterId}
           data-ready={editorReady ? "1" : "0"}
           ref={stackRef}
+          onMouseDown={handleBlankAreaMouseDown}
           style={{
             // bg-Layer (absolute) stapelt N Frames + Gaps; ohne min-height
             // ragt der bg-Layer unter den .a5-stack-Container und damit
@@ -359,21 +383,7 @@ export function EditorClient({
           <div
             className="a5-stack__fg"
             ref={fgRef}
-            onMouseDown={(e) => {
-              // Klick auf leere Weiß-Fläche (Padding der FG, Bereich
-              // unterhalb des letzten Absatzes, Klick zwischen Bild-Sektion
-              // und nächstem Element) soll den Cursor auf das Dokument-Ende
-              // setzen — wie in Word/Docs. Audit Bug 8: Heute reagiert der
-              // Editor an dieser Stelle gar nicht, weil ProseMirror den
-              // weißen Bereich physisch nicht ausfüllt.
-              // `e.target === e.currentTarget` filtert Bubble-Klicks von
-              // Kindern aus (Editor, Image-Section, Header behalten ihre
-              // eigene Klick-Logik).
-              if (e.target === e.currentTarget && editor) {
-                e.preventDefault();
-                editor.commands.focus("end");
-              }
-            }}
+            onMouseDown={handleBlankAreaMouseDown}
           >
             <FirstPageHeader title={title} />
             <ImageSection
@@ -498,7 +508,18 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
         ".tiptap-editor > *:not(.a5-page-break):not(.a5-block-push-spacer):not(.a5-soft-break-spacer)",
       ),
     );
-    const imageRows = Array.from(fg.querySelectorAll<HTMLElement>("[data-paginate-row]"));
+    // Nur Reihen mit echten Bildern nehmen an der Pagination teil. Der
+    // leere „Bild hinzufügen"-Platzhalter ist Editor-Bedienelement und
+    // steht nicht im Druck: er wird nie auf eine neue Seite geschoben und
+    // zählt nicht zur Seitenzahl. Passt er nicht mehr in den Inhaltsbereich,
+    // ragt er in den unteren Seitenrand (er ist kleiner als der Rand).
+    // Vorher erzeugte er eine Phantomseite, sobald der Text die Seite fast
+    // füllte — und diese Seite wurde als page_count gespeichert, womit die
+    // buchweiten Seitenzahlen der Folgekapitel um eins verrutschten
+    // (Bug 2026-11-16).
+    const imageRows = Array.from(
+      fg.querySelectorAll<HTMLElement>("[data-paginate-row]:not(.image-section-empty)"),
+    );
 
     // PASS 0 — Reset alle bisherigen Push-Margins/Höhen, damit wir den
     // natürlichen Flow messen (Spec PROJ-5 „SHRINK-Case": wenn Inhalt
@@ -584,7 +605,6 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
     //   skaliert, um auf die aktuelle Seite zu passen — aber nur solange
     //   Skala ≥ MIN_SCALE bleibt. Restliche Reihen fließen ungeskaliert
     //   via Block-Push auf die Folgeseite.
-    const MIN_SCALE = 0.65;
     const mmToPxLocal = (mm: number) => (mm / 25.4) * 96;
     const cmToPxLocal = (cm: number) => (cm / 2.54) * 96;
     const sectionContentWidth = mmToPxLocal(148) - cmToPxLocal(2) - cmToPxLocal(2.5);
@@ -615,42 +635,25 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
       const startFrameContentBottom = startFrameIdx * stridePx + pageContentHeight;
       const availableOnCurrentPage = Math.max(0, startFrameContentBottom - firstRowTop);
 
+      // Reine Rechnung in `imageRowLayout.ts` (dort auch die Regeln und
+      // Tests): passt auf den Restplatz nicht einmal eine Reihe mit
+      // Mindest-Skala, bleibt die Seite ohne Bild — PASS 1b schiebt die
+      // Reihen dann unskaliert auf die nächste Seite.
+      const groups = planRowGroups({
+        rows: rows1Col.length,
+        availableOnCurrentPage,
+        pageContentHeight,
+        rowHeight: naturalRowH1Col,
+        rowGap: sectionRowGap,
+      });
       let cursor = 0;
-      let avail = availableOnCurrentPage;
-      while (cursor < rows1Col.length) {
-        const remaining = rows1Col.length - cursor;
-        let groupCount = 0;
-        let groupScale = 1;
-        for (let k = remaining; k >= 1; k--) {
-          const naturalH = k * naturalRowH1Col + (k - 1) * sectionRowGap;
-          if (naturalH <= avail + 0.5) {
-            groupCount = k;
-            groupScale = 1;
-            break;
-          }
-          const scaleNeeded =
-            (avail - (k - 1) * sectionRowGap) / (k * naturalRowH1Col);
-          if (scaleNeeded >= MIN_SCALE) {
-            groupCount = k;
-            groupScale = scaleNeeded;
-            break;
+      for (const group of groups) {
+        if (group.scale < 1) {
+          for (let i = cursor; i < cursor + group.count; i++) {
+            rows1Col[i].style.setProperty("--row-image-scale", group.scale.toFixed(4));
           }
         }
-        // Sicherheits-Fallback: passt nicht einmal eine Reihe → packe 1 mit
-        // MIN_SCALE und gehe weiter (PASS 1 pusht ggf. zur nächsten Seite).
-        if (groupCount === 0) {
-          groupCount = 1;
-          groupScale = MIN_SCALE;
-        }
-        if (groupScale < 1) {
-          for (let i = cursor; i < cursor + groupCount; i++) {
-            rows1Col[i].style.setProperty("--row-image-scale", groupScale.toFixed(4));
-          }
-        }
-        cursor += groupCount;
-        // Ab der zweiten Gruppe sitzt die Gruppe oben auf einer frischen
-        // Seite und hat volle pageContentHeight zur Verfügung.
-        avail = pageContentHeight;
+        cursor += group.count;
       }
     }
     // Reflow nach Scale-Änderungen, damit die anschließenden
@@ -876,15 +879,21 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
           (r) => r.getAttribute("data-layout") === "1-spaltig",
         );
         if (oneCol.length === 0) continue;
-        // Max-Skala = (page_content_bottom - first_row_top) / total_natural_h
-        // wobei total_natural_h = N * naturalRowH1Col + (N-1) * sectionRowGap
+        // Max-Skala: nur die Bildhöhen skalieren, die Abstände zwischen den
+        // Reihen bleiben fest — dieselbe Rechnung wie in PASS A
+        // (`maxGroupScale` in imageRowLayout.ts).
+        // Früher wurden die Abstände mitskaliert gerechnet; bei drei
+        // Reihen auf einer Seite wuchs die Gruppe dadurch ~10 px über den
+        // Inhaltsbereich hinaus in den unteren Seitenrand (Bug 2026-11-16).
         const firstTop = inFgContent(oneCol[0]);
         const pageContentBottom = pageIdx * stridePx + pageContentHeight;
         const available = pageContentBottom - firstTop;
-        const naturalTotalH =
-          oneCol.length * naturalRowH1Col + (oneCol.length - 1) * sectionRowGap;
-        if (naturalTotalH <= 0) continue;
-        const maxScale = Math.min(1, available / naturalTotalH);
+        const maxScale = maxGroupScale(
+          oneCol.length,
+          available,
+          naturalRowH1Col,
+          sectionRowGap,
+        );
         // Aktuelle Skala der Gruppe (alle Reihen auf einer Seite haben
         // nach PASS Z dieselbe). Wenn Max > aktuell + 1 %, hochskalieren.
         const currentScale =
@@ -902,9 +911,24 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
       }
     }
 
-    // Page-Count = ceil((fg-Höhe) / Stride).
-    const fgH = fg.getBoundingClientRect().height / zoom;
-    const needed = Math.max(1, Math.ceil(fgH / stridePx));
+    // Page-Count aus dem letzten ECHTEN Inhalt: Kopf der ersten Seite,
+    // Editor-Text (inkl. leerer Absätze und manueller Umbrüche) und
+    // Bildreihen mit Bildern. Leere Bild-Platzhalter und der Außenabstand
+    // des letzten Absatzes zählen nicht (siehe imageRows oben). Der Inhalt
+    // liegt nach der Pagination immer im Inhaltsbereich einer Seite — die
+    // Seite, in der seine Unterkante liegt, ist die letzte.
+    void fg.offsetHeight;
+    const fgTopFinal = fg.getBoundingClientRect().top;
+    let lastContentBottom = 0;
+    const contentEls = [
+      ...Array.from(fg.querySelectorAll<HTMLElement>("[data-first-page-header], .tiptap-editor")),
+      ...imageRows,
+    ];
+    for (const el of contentEls) {
+      const bottom = (el.getBoundingClientRect().bottom - fgTopFinal) / zoom;
+      if (bottom > lastContentBottom) lastContentBottom = bottom;
+    }
+    const needed = Math.max(1, Math.ceil((lastContentBottom - 0.5) / stridePx));
     setPageCount((prev) => (prev !== needed ? needed : prev));
   }, [fgRef, stackRef]);
 
@@ -1052,35 +1076,50 @@ function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }:
 // den Viewport-Boden geschoben hat), Viewport sanft so verschieben, dass
 // der Cursor wieder bequem im Lesebereich landet. Greift NICHT, wenn der
 // User in einer Bild-Sektion arbeitet — die hat keinen Editor-Cursor.
+let cursorFollowTimer: ReturnType<typeof setTimeout> | null = null;
+
 function keepCursorInView(editor: Editor) {
-  // Auf dem nächsten Frame messen (warten bis Pagination-Spacer applied sind)
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      try {
-        const view = editor.view;
-        if (!view || !view.hasFocus()) return;
-        const coords = view.coordsAtPos(view.state.selection.head);
-        const toolbar = document.querySelector(".editor-chrome") as HTMLElement | null;
-        const toolbarBottom = toolbar ? toolbar.getBoundingClientRect().bottom : 0;
-        const margin = 80; // Komfortzone unter Toolbar / über Fußleiste
-        const viewportTop = toolbarBottom + margin;
-        const viewportBottom = window.innerHeight - margin;
-        if (coords.top < viewportTop) {
-          window.scrollBy({
-            top: coords.top - viewportTop,
-            behavior: "smooth",
-          });
-        } else if (coords.bottom > viewportBottom) {
-          window.scrollBy({
-            top: coords.bottom - viewportBottom,
-            behavior: "smooth",
-          });
-        }
-      } catch {
-        // ignore — coordsAtPos kann werfen, wenn DOM noch nicht synchronisiert
+  const check = () => {
+    try {
+      if (editor.isDestroyed) return;
+      const view = editor.view;
+      if (!view || !view.hasFocus()) return;
+      const coords = view.coordsAtPos(view.state.selection.head);
+      const toolbar = document.querySelector(".editor-chrome") as HTMLElement | null;
+      const toolbarBottom = toolbar ? toolbar.getBoundingClientRect().bottom : 0;
+      const margin = 80; // Komfortzone unter Toolbar / über Fußleiste
+      const viewportTop = toolbarBottom + margin;
+      const viewportBottom = window.innerHeight - margin;
+      if (coords.top < viewportTop) {
+        window.scrollBy({
+          top: coords.top - viewportTop,
+          behavior: "smooth",
+        });
+      } else if (coords.bottom > viewportBottom) {
+        window.scrollBy({
+          top: coords.bottom - viewportBottom,
+          behavior: "smooth",
+        });
       }
-    });
+    } catch {
+      // ignore — coordsAtPos kann werfen, wenn DOM noch nicht synchronisiert
+    }
+  };
+  // Auf dem übernächsten Frame messen (Soft-Break-Spacer sind dann gesetzt).
+  requestAnimationFrame(() => {
+    requestAnimationFrame(check);
   });
+  // Nachlauf: Die Pagination konvergiert über mehrere Frames (Höhe eines
+  // manuellen Seitenumbruchs, Folge-Pass der Soft-Breaks, neue Seiten-
+  // Frames). Der Cursor kann danach noch einmal deutlich wandern — z. B.
+  // springt er nach „Seitenumbruch einfügen" am Dokumentende auf die neue
+  // Seite, die beim ersten Messen noch gar nicht existierte (Bug
+  // 2026-11-16: Cursor landete außerhalb des sichtbaren Bereichs).
+  if (cursorFollowTimer) clearTimeout(cursorFollowTimer);
+  cursorFollowTimer = setTimeout(() => {
+    cursorFollowTimer = null;
+    check();
+  }, 350);
 }
 
 function cssLengthToPx(value: string, rootFontPx: number): number {

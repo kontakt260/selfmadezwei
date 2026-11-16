@@ -51,6 +51,7 @@ export type ChapterDraft = {
   // PROJ-7: lokale A5-Seitenzahl dieses Kapitels — von der Pagination-
   // Engine nach jedem Settle gemeldet. Server persistiert das als
   // chapters.page_count; DB-Trigger berechnet daraus start_page der
-  // Folge-Kapitel neu.
-  pageCount: number;
+  // Folge-Kapitel neu. `undefined`, solange die Pagination nach dem Laden
+  // noch einschwingt — der Server lässt page_count dann unverändert.
+  pageCount?: number;
 };

@@ -2,7 +2,7 @@ import Image from "next/image";
 
 export function FirstPageHeader({ title }: { title: string }) {
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center" data-first-page-header>
       <Image
         src="/logo.svg"
         alt=""

@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { deleteQaChapters } from "./helpers/qa-project";
 
 // PROJ-7 — Buchweite Seitenzahl, Browser-Smoke gegen Stage-DB.
 //
@@ -36,28 +37,12 @@ async function createTestChapter(page: import("@playwright/test").Page) {
   await page.waitForURL(/kapiteleditor/, { timeout: 15_000 });
 }
 
-// Löscht ALLE Kapitel im QA-Projekt, egal wie sie heißen — gleiches
-// Muster wie PROJ-4 beforeAll. Macht die Test-Reihenfolge order-
-// independent (PROJ-4 läuft i. d. R. davor und hinterlässt ggf.
-// „QA-Testkapitel (umbenannt)").
-async function wipeAllChaptersInQaProject(
-  p: import("@playwright/test").Page,
-) {
-  await p.goto(QA_PROJECT_URL);
-  await p.waitForLoadState("networkidle");
-  // Alle „Kapitel „…" löschen"-Buttons sind delete-Trigger.
-  const anyDelete = p.getByRole("button", { name: /Kapitel „.*" löschen/ });
-  let count = await anyDelete.count();
-  while (count > 0) {
-    await anyDelete.first().click();
-    await p.waitForTimeout(3_500); // Countdown-Dialog freigeben
-    const confirm = p.getByRole("button", { name: /Endgültig löschen/ });
-    if (!(await confirm.isVisible().catch(() => false))) break;
-    await confirm.click();
-    await p.waitForLoadState("networkidle");
-    count = await anyDelete.count();
-  }
-}
+// Löscht ALLE Kapitel im QA-Projekt, egal wie sie heißen. Macht die
+// Test-Reihenfolge order-independent (PROJ-4/PROJ-5 laufen i. d. R. davor).
+// Der gemeinsame Helfer wartet auf die Lösch-Anfrage — sonst überlebt das
+// letzte Kapitel, wenn der Kontext direkt danach geschlossen wird, und
+// AC-Display-1 rechnet mit einem falschen Buch-Offset.
+const wipeAllChaptersInQaProject = (p: import("@playwright/test").Page) => deleteQaChapters(p);
 
 test.beforeAll(async ({ browser }) => {
   test.setTimeout(120_000);

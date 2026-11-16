@@ -1,5 +1,5 @@
 import { Node, mergeAttributes } from "@tiptap/core";
-import { Fragment } from "@tiptap/pm/model";
+import { Fragment, type Node as PMNode } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
 
 declare module "@tiptap/core" {
@@ -49,7 +49,7 @@ export const PageBreakNode = Node.create({
     return {
       insertPageBreak:
         () =>
-        ({ state, dispatch, view }) => {
+        ({ state, dispatch, view, chain }) => {
           const { selection, schema } = state;
           const pageBreakType = schema.nodes.pageBreak;
           const paragraphType = schema.nodes.paragraph;
@@ -57,12 +57,13 @@ export const PageBreakNode = Node.create({
 
           const { $from } = selection;
           if (!selection.empty) {
-            // Bei Range-Selektion: Range löschen, dann am Caret einfügen.
-            // ProseMirror's deleteSelection wandelt $from/$to in eine Empty-Sel.
-            // Wir delegieren auf einen frischen Versuch mit empty Selection.
-            const tr = state.tr.deleteSelection();
-            if (dispatch) dispatch(tr);
-            return true;
+            // Markierter Text (Word-/Docs-Verhalten): Markierung löschen
+            // und den Umbruch an der entstandenen Cursor-Position einfügen
+            // — beides in EINER Transaktion (ein Undo-Schritt). Die Kette
+            // teilt sich die Transaktion; der zweite Aufruf sieht die
+            // bereits geleerte Markierung. Vorher wurde nur gelöscht, der
+            // Umbruch erschien erst beim zweiten Klick (Bug 2026-11-16).
+            return chain().deleteSelection().insertPageBreak().run();
           }
 
           // PROJ-5 Bug 2026-05-21: PageBreak innerhalb eines Blockquote.
@@ -112,35 +113,23 @@ export const PageBreakNode = Node.create({
               // Nach: blockquote(...para_left, para_cursor[A]), pageBreak,
               //       para_cursor[B], para_right..., (Cursor am Anfang von [B])
               //
-              // Schritt 1: rechte Slice aus dem Zitat als Fragment einsammeln.
-              const rightSlice = state.doc.slice($from.pos, bqEnd, true);
+              // Schritt 1: rechte Hälfte einsammeln. `slice` OHNE
+              // includeParents liefert den Inhalt relativ zum gemeinsamen
+              // Elternknoten — hier das Zitat. Das Ergebnis sind also die
+              // nackten Absätze (erster ab der Cursor-Position), ohne
+              // Blockquote-Hülle. Mit includeParents=true kam die Hülle
+              // mit, und der Rest blieb hinter dem Umbruch ein Zitat
+              // (Bug 2026-11-16).
+              const rightSlice = state.doc.slice($from.pos, bqEnd);
+              const liftedNodes: PMNode[] = [];
+              rightSlice.content.forEach((child) => liftedNodes.push(child));
 
               // Schritt 2: rechten Bereich INNERHALB des Zitats löschen.
               tr = tr.delete($from.pos, bqEnd);
 
-              // Schritt 3: nach dem Zitat einfügen — pageBreak + die Inhalte
-              // des rightSlice (ohne blockquote-Wrapper, weil wir den
-              // Slice innerhalb des Zitats genommen haben).
-              //
-              // rightSlice.content ist eine Fragment-Liste mit
-              // openStart > 0 (Cut innerhalb eines Absatzes). Wir bauen
-              // ein neues Fragment, in dem die erste Inhalts-Sequenz in
-              // einen neuen Paragraph eingeschlossen wird, gefolgt von
-              // den vollständigen restlichen Paragraphen.
+              // Schritt 3: nach dem Zitat einfügen — pageBreak + die
+              // herausgelösten Absätze.
               const newAfter = tr.mapping.map(bqAfter);
-              const childCount = rightSlice.content.childCount;
-              const liftedNodes = [];
-              for (let i = 0; i < childCount; i++) {
-                const child = rightSlice.content.child(i);
-                if (i === 0 && rightSlice.openStart > 0) {
-                  // child ist hier ein bereits-offen-gestarteter Paragraph
-                  // (PM gibt ihn als Wrapping-Node zurück, dessen Inhalt
-                  // erst ab dem Cut-Punkt beginnt). Wir übernehmen ihn 1:1.
-                  liftedNodes.push(child);
-                } else {
-                  liftedNodes.push(child);
-                }
-              }
               tr = tr.insert(
                 newAfter,
                 Fragment.from([pageBreakType.create(), ...liftedNodes]),
