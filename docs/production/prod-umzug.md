@@ -142,7 +142,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 ## 8. Rechtliches
 
-- [ ] Impressum — Seite `/impressum` in der App (PROJ-11 BUG-1; der Footer jeder Mail verlinkt `<SITE_URL>/impressum`). Angaben vom Betreiber offen.
+- [ ] Impressum — liegt auf der Webflow-Website unter `https://www.narravit.de/impressum`. Der Footer jeder Mail (App-Mails und Supabase-Vorlagen) verlinkt **fest** dorthin, auf Stage wie in Production; die Seite muss also erreichbar und vollständig sein (PROJ-11 BUG-1).
 - [ ] Datenschutzerklärung (auch für Facebook-App und Stripe-Checkout nötig).
 - [ ] Datenschutzerklärung nennt den Kauf ohne Konto: Speicherung der Checkout-E-Mail-Adresse bis zur Konto-Anlage (`purchase_claims`) und das technisch notwendige Cookie `nv_kauf` (Zuordnung des Kaufs, 60 Tage).
 - [ ] AGB und Widerrufsbelehrung für den Kauf.
@@ -179,6 +179,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
+| 2026-11-18 | Impressum-Link in allen Mails fest auf `https://www.narravit.de/impressum` (Webflow) statt `<SITE_URL>/impressum`; die Supabase-Vorlagen in `supabase/templates/` enthalten ihn jetzt auch und müssen beim Einsetzen in der neuen Fassung verwendet werden. Kein neuer Env-Wert. |
 | 2026-11-16 | Kauf ohne Konto (PROJ-6): neue Migration `20261116100000_proj6_purchase_claims.sql` (auf Stage noch einzuspielen), Landingpage-Button muss auf `/onboarding` zeigen, Datenschutz-Hinweis zu Checkout-Adresse und Cookie `nv_kauf`, zwei neue Smoke-Tests. Kein neuer Env-Wert. |
 | 2026-10-14 | Absender-Name überall `NARRAVIT` in Großbuchstaben (App-Mails im Code; Supabase-SMTP auf Stage und Production manuell). |
 | 2026-10-14 | Test-Empfänger-Sperre hängt an der Site-URL statt an `VERCEL_ENV` (Stage kann in Vercel als „Production" laufen); offene Frage zur Vercel-Umgebung von Stage ergänzt. |

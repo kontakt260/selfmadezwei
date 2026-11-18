@@ -81,7 +81,6 @@ export function PortalPurchaseEmail({
       <Layout
         preview="Vielen Dank — Ihr narravit-Geschenk ist unterwegs."
         headerEyebrow="Geschenk"
-        siteUrl={siteUrl}
       >
         <MailHeading>Ihr Geschenk ist unterwegs</MailHeading>
         <MailParagraph>{greeting}</MailParagraph>
@@ -108,7 +107,6 @@ export function PortalPurchaseEmail({
     <Layout
       preview="Ihr narravit-Portal-Zugang ist freigeschaltet."
       headerEyebrow="Willkommen"
-      siteUrl={siteUrl}
     >
       <MailHeading>Ihr Portal-Zugang ist freigeschaltet</MailHeading>
       <MailParagraph>{greeting}</MailParagraph>

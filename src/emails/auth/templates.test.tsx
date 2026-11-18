@@ -55,6 +55,10 @@ describe.each(templates)("Supabase-Vorlage $file", ({ file, element, linkType })
     const html = await render(element);
     expect(html).toMatch(/\{\{\/\* Pflichtangaben[^}]*\*\/\}\}/);
     expect(html).toContain("kontakt@narravit.de");
-    expect(html).not.toContain("/impressum");
+  });
+
+  it("links the Impressum on the website, which needs no app URL", async () => {
+    const html = await render(element);
+    expect(html).toContain('href="https://www.narravit.de/impressum"');
   });
 });

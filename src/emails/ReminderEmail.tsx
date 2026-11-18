@@ -96,7 +96,6 @@ export function ReminderEmail({
     <Layout
       preview={PREVIEW[variant](projectName, expiresAtFormatted, daysLeft)}
       headerEyebrow={EYEBROW[variant]}
-      siteUrl={siteUrl}
     >
       <MailHeading>{HEADINGS[variant](daysLeft)}</MailHeading>
       <MailParagraph>{greeting}</MailParagraph>

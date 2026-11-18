@@ -1,6 +1,6 @@
 import { ReminderEmail } from "../ReminderEmail";
 
-const siteUrl = "https://stage-app.narravit.de";
+const siteUrl = "https://app.narravit.de";
 
 export default function Preview() {
   return (

@@ -184,7 +184,9 @@ describe.each(templates)("$name", ({ element, mustContain }) => {
 
   it("has the footer with Impressum link and support address", async () => {
     const html = await render(element);
-    expect(html).toContain(`${siteUrl}/impressum`);
+    // Das Impressum liegt auf der Website (Webflow), nicht in der App.
+    expect(html).toContain('href="https://www.narravit.de/impressum"');
+    expect(html).not.toContain(`${siteUrl}/impressum`);
     expect(html).toContain("kontakt@narravit.de");
   });
 });

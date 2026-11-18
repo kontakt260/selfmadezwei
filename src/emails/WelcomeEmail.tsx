@@ -29,7 +29,6 @@ export function WelcomeEmail({ fullName, siteUrl }: WelcomeEmailProps) {
     <Layout
       preview="Willkommen bei narravit — schön, dass Sie da sind."
       headerEyebrow="Willkommen"
-      siteUrl={siteUrl}
     >
       <MailHeading>Schön, dass Sie da sind</MailHeading>
       <MailParagraph>{greeting}</MailParagraph>

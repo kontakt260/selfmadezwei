@@ -44,7 +44,6 @@ export function RenewalEmail({
     <Layout
       preview={`Ihr narravit-Portal-Zugang wurde um 12 Monate verlängert. Neu gültig bis ${newExpiresAtFormatted}.`}
       headerEyebrow="Verlängerung"
-      siteUrl={siteUrl}
     >
       <MailHeading>Ihr Portal-Zugang wurde verlängert</MailHeading>
       <MailParagraph>{greeting}</MailParagraph>

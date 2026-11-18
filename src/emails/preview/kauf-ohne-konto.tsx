@@ -1,6 +1,6 @@
 import { GuestPurchaseEmail } from "../GuestPurchaseEmail";
 
-const siteUrl = "https://stage-app.narravit.de";
+const siteUrl = "https://app.narravit.de";
 
 export default function Preview() {
   return (

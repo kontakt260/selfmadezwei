@@ -49,6 +49,13 @@ const SANS =
 // Bereich, schmaler auf Mobile.
 const CONTAINER_WIDTH = 600;
 
+/**
+ * Das Impressum liegt auf der Webflow-Website, nicht in der App. Der Link ist
+ * deshalb fest und auf Stage wie in Production gleich — so funktioniert er
+ * auch in den Supabase-Vorlagen, die keine App-Adresse kennen.
+ */
+export const IMPRESSUM_URL = "https://www.narravit.de/impressum";
+
 type Props = {
   /** Preview-Text (erscheint in Mailbox-Vorschau direkt nach dem Betreff) */
   preview: string;
@@ -57,15 +64,8 @@ type Props = {
   /** Optionales kleines Label im Header über dem Wordmark (z. B. "Bestätigung") */
   headerEyebrow?: string;
   /**
-   * Site-URL für absolute Links + Impressum. Wenn nicht angegeben, wird
-   * `NEXT_PUBLIC_SITE_URL` aus der Server-Umgebung gelesen (Server-Render-
-   * Time-Resolution). Wir nehmen den Param an als Default-Fallback.
-   */
-  siteUrl?: string;
-  /**
-   * Ersetzt den Impressum-Link im Footer durch eigenen Inhalt (z. B. die
-   * Pflichtangaben direkt im Text). Wird von den Supabase-Auth-Vorlagen
-   * genutzt, die keinen App-Link ins Impressum setzen können.
+   * Zusätzliche Zeile unter dem Impressum-Hinweis im Footer (z. B. die
+   * Pflichtangaben). Wird von den Supabase-Auth-Vorlagen genutzt.
    */
   footerLegal?: ReactNode;
 };
@@ -74,12 +74,8 @@ export function Layout({
   preview,
   children,
   headerEyebrow,
-  siteUrl,
   footerLegal,
 }: Props) {
-  const baseUrl =
-    siteUrl ?? process.env.NEXT_PUBLIC_SITE_URL ?? "https://narravit.de";
-  const impressumUrl = `${baseUrl}/impressum`;
   const kontaktEmail = "kontakt@narravit.de";
 
   return (
@@ -234,17 +230,13 @@ export function Layout({
                 opacity: 0.7,
               }}
             >
-              {footerLegal === undefined ? (
-                <>
-                  <Link
-                    href={impressumUrl}
-                    style={{ color: COLORS.ink, textDecoration: "underline" }}
-                  >
-                    Impressum
-                  </Link>
-                  {" · "}
-                </>
-              ) : null}
+              <Link
+                href={IMPRESSUM_URL}
+                style={{ color: COLORS.ink, textDecoration: "underline" }}
+              >
+                Impressum
+              </Link>
+              {" · "}
               Dies ist eine Transaktions-E-Mail. Antworten landen nicht im
               Posteingang.
               {footerLegal !== undefined ? (

@@ -1,6 +1,6 @@
 import { RenewalEmail } from "../RenewalEmail";
 
-const siteUrl = "https://stage-app.narravit.de";
+const siteUrl = "https://app.narravit.de";
 
 export default function Preview() {
   return (

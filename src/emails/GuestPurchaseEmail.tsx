@@ -50,7 +50,6 @@ export function GuestPurchaseEmail({
     <Layout
       preview="Ihre Zahlung ist eingegangen — bitte legen Sie jetzt Ihr narravit-Konto an."
       headerEyebrow="Bestätigung"
-      siteUrl={siteUrl}
     >
       <MailHeading>Nur noch ein Schritt: Ihr Konto</MailHeading>
       <MailParagraph>{greeting}</MailParagraph>

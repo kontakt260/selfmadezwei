@@ -473,6 +473,7 @@ Keine User-direkte Interaktion mit `mail_log` — Spalte wird ausschließlich se
 **Symptom:** Footer enthält `<Link href={impressumUrl}>` mit `impressumUrl = ${baseUrl}/impressum`. Route `src/app/impressum/` existiert NICHT → Click führt zu Next.js-404.
 **Reproduce:** Klick auf „Impressum" in beliebiger PROJ-11-Mail.
 **Fix-Vorschlag:** Entweder `/impressum`-Route anlegen (Static-Page mit gesetzlich notwendigen Angaben) ODER Footer-Link auf eine externe URL umstellen (z. B. `https://narravit.de/impressum`, falls die Marketing-Site das hostet).
+**Behoben 2026-11-18:** Footer verlinkt fest `https://www.narravit.de/impressum` (Webflow-Website, Vorgabe Jakob) — in allen App-Mails und jetzt auch in den Supabase-Vorlagen. Abgesichert in `emails.test.tsx` und `auth/templates.test.tsx`. Offen bleibt nur, dass die Webflow-Seite vollständig ist (`docs/production/prod-umzug.md`, Abschnitt 8).
 
 #### BUG-2 (Low) — Subject-Zeilen strippen keine Newlines aus User-Daten
 

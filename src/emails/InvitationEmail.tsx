@@ -50,7 +50,6 @@ export function InvitationEmail({
       <Layout
         preview={`${inviterDisplay} schenkt Ihnen ein Lebensbuch bei narravit.`}
         headerEyebrow="Ein Geschenk für Sie"
-        siteUrl={siteUrl}
       >
         <MailHeading>Ihr Lebensbuch wartet auf Sie</MailHeading>
         <MailParagraph>
@@ -79,7 +78,6 @@ export function InvitationEmail({
     <Layout
       preview={`${inviterDisplay} hat Sie zum Projekt „${projectName}" eingeladen.`}
       headerEyebrow="Einladung"
-      siteUrl={siteUrl}
     >
       <MailHeading>Sie wurden eingeladen</MailHeading>
       <MailParagraph>
