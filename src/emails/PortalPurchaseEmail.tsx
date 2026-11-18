@@ -94,7 +94,9 @@ export function PortalPurchaseEmail({
         <MailDetailsList items={details} />
 
         <MailParagraph>
-          Die Einladung ist 14 Tage gültig. Wie gewünscht haben Sie selbst
+          Die Einladung bleibt gültig, solange der Portal-Zugang läuft — die
+          beschenkte Person kann sie also auch später in Ruhe annehmen. Wie
+          gewünscht haben Sie selbst
           keinen Zugang zum Projekt — die beschenkte Person kann Sie später
           jederzeit als Co-Autorin oder Co-Autor dazuholen.
           <InvoiceHint invoiceUrl={invoiceUrl} />
@@ -122,7 +124,7 @@ export function PortalPurchaseEmail({
       {giftRecipientEmail ? (
         <MailParagraph>
           Die Einladung an <strong>{giftRecipientEmail}</strong> ist
-          unterwegs. Sie ist 14 Tage gültig.
+          unterwegs. Sie bleibt gültig, solange der Portal-Zugang läuft.
         </MailParagraph>
       ) : null}
 

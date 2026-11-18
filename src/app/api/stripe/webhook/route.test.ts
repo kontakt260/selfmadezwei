@@ -307,6 +307,8 @@ describe("Stripe webhook — initial purchase (5 gift variants)", () => {
     expect(fakeDb.invitations.length).toBe(1);
     expect(fakeDb.invitations[0].email).toBe("oma@example.com");
     expect(fakeDb.invitations[0].role).toBe("co_author");
+    // Geschenk-Einladungen gelten so lange wie der Portal-Zugang.
+    expect(fakeDb.invitations[0].expires_at).toBe(fakeDb.project_access[0].expires_at);
   });
 
   it("gift 'Auch Computer', buyer skip -> NO member + invitation projektleiter", async () => {
@@ -332,6 +334,12 @@ describe("Stripe webhook — initial purchase (5 gift variants)", () => {
     expect(fakeDb.project_members.length).toBe(0);
     expect(fakeDb.invitations.length).toBe(1);
     expect(fakeDb.invitations[0].role).toBe("projektleiter");
+    // Ohne Mitglied könnte niemand eine abgelaufene Einladung erneuern —
+    // deshalb gilt sie bis zum Ende des Portal-Zugangs (~12 Monate).
+    expect(fakeDb.invitations[0].expires_at).toBe(fakeDb.project_access[0].expires_at);
+    const validForDays =
+      (new Date(fakeDb.invitations[0].expires_at as string).getTime() - Date.now()) / 86_400_000;
+    expect(validForDays).toBeGreaterThan(360);
   });
 });
 

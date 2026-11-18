@@ -316,7 +316,7 @@ function InitialGiftPhoneComputerContent({
         <span className="font-semibold">
           {recipientEmail || "die angegebene Adresse"}
         </span>
-        . Die Einladung ist 14 Tage gültig.
+        . Die Einladung bleibt gültig, solange der Portal-Zugang läuft.
       </p>
       <p className="text-base leading-7 text-[#535252]">
         {buyerRetainsAccess ? (

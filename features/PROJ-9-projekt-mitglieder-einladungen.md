@@ -190,7 +190,7 @@ invitations
 +-- email             E-Mail-Adresse der eingeladenen Person (auch ohne Account)
 +-- token             Opaque, kryptografisch sicherer Zufallswert (≥ 128 Bit Entropie)
 +-- role              Rolle, die der Eingeladene bekommt
-+-- expires_at        Ablauf-Zeitpunkt (Standard: created_at + 14 Tage)
++-- expires_at        Ablauf-Zeitpunkt (Standard: created_at + 14 Tage; Geschenk-Einladungen aus PROJ-6: Ende des Portal-Zugangs, Entscheidung 2026-11-18)
 +-- accepted_at       NULL solange ausstehend; gesetzt beim Annehmen (Single-Use-Marker)
 +-- created_at        Erstellzeitpunkt der Einladung
 ```

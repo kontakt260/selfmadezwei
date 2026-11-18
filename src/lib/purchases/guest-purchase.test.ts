@@ -291,6 +291,8 @@ describe("claimGuestPurchases — Fehler und Geschenk", () => {
     expect(outcome.claimed).toHaveLength(1);
     expect(db.invitations).toHaveLength(1);
     expect(db.invitations[0]).toMatchObject({ email: "oma@example.com", role: "co_author" });
+    // Geschenk-Einladungen gelten so lange wie der Portal-Zugang.
+    expect(db.invitations[0].expires_at).toBe(db.project_access[0].expires_at);
     expect(sendInvitationMailMock).toHaveBeenCalledTimes(1);
     expect(sendInvitationMailMock.mock.calls[0][0]).toMatchObject({
       to: "Oma@Example.com",

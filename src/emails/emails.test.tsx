@@ -125,7 +125,7 @@ const templates: Array<{ name: string; element: ReactElement; mustContain: strin
     mustContain: [
       "Lena Muster schenkt Ihnen ein Lebensbuch",
       `${siteUrl}/einladung/tok_gift`,
-      "14 Tage",
+      "auch später",
       "Geschenk annehmen",
     ],
   },
@@ -139,7 +139,11 @@ const templates: Array<{ name: string; element: ReactElement; mustContain: strin
       siteUrl,
       giftRecipientEmail: "oma@example.test",
     }),
-    mustContain: ["Portal-Zugang ist freigeschaltet", "Die Einladung an oma@example.test"],
+    mustContain: [
+      "Portal-Zugang ist freigeschaltet",
+      "Die Einladung an oma@example.test",
+      "solange der Portal-Zugang läuft",
+    ],
   },
   {
     name: "PortalPurchaseEmail (Geschenk ohne eigenen Zugang)",
@@ -152,7 +156,12 @@ const templates: Array<{ name: string; element: ReactElement; mustContain: strin
       giftRecipientEmail: "oma@example.test",
       buyerHasAccess: false,
     }),
-    mustContain: ["Ihr Geschenk ist unterwegs", "oma@example.test", "Betrag 249,00 €"],
+    mustContain: [
+      "Ihr Geschenk ist unterwegs",
+      "oma@example.test",
+      "Betrag 249,00 €",
+      "solange der Portal-Zugang läuft",
+    ],
   },
   {
     name: "WelcomeEmail",
@@ -188,5 +197,14 @@ describe.each(templates)("$name", ({ element, mustContain }) => {
     expect(html).toContain('href="https://www.narravit.de/impressum"');
     expect(html).not.toContain(`${siteUrl}/impressum`);
     expect(html).toContain("kontakt@narravit.de");
+  });
+});
+
+// Geschenk-Einladungen gelten so lange wie der Portal-Zugang (2026-11-18).
+// Die 14 Tage gelten nur für normale Einladungen an Co-Autoren.
+describe.each(templates.filter((t) => t.name.includes("Geschenk")))("$name", ({ element }) => {
+  it("does not promise the 14-day limit of regular invitations", async () => {
+    const text = await render(element, { plainText: true });
+    expect(text).not.toContain("14 Tage");
   });
 });

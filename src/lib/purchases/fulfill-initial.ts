@@ -16,7 +16,12 @@ import { PRODUCTS } from "@/lib/stripe/server";
 // Aufrufer — er weiß, welche schon unterwegs sind.
 
 const TWELVE_MONTHS_MS = 365 * 24 * 60 * 60 * 1000;
-const INVITATION_VALIDITY_MS = 14 * 24 * 60 * 60 * 1000;
+
+// Geschenk-Einladungen gelten so lange wie der Portal-Zugang des Projekts
+// (Entscheidung 2026-11-18) — nicht 14 Tage wie normale Einladungen
+// (PROJ-9). Geschenke werden oft lange vor der Übergabe gekauft, und
+// verzichtet der Käufer auf eigenen Zugang, gibt es niemanden, der eine
+// abgelaufene Einladung neu verschicken könnte.
 
 /** Titel neuer Projekte; der Projektleiter kann ihn später ändern. */
 export const PROJECT_DEFAULT_TITLE = "Lebensgeschichten";
@@ -40,7 +45,7 @@ export type InitialPurchaseResult = {
   expiresAt: string;
   /** false = Geschenk, bei dem der Käufer auf eigenen Zugang verzichtet. */
   buyerIsMember: boolean;
-  /** Einladung an die beschenkte Person, falls eine angelegt wurde. */
+  /** Einladung an die beschenkte Person, falls eine angelegt wurde — gültig bis `expiresAt`. */
   invitation: { token: string; email: string; role: MemberRole } | null;
 };
 
@@ -113,7 +118,7 @@ export async function fulfillInitialPurchase(
         email,
         role: inviteRole,
         token,
-        expires_at: new Date(Date.now() + INVITATION_VALIDITY_MS).toISOString(),
+        expires_at: expiresAt,
       });
       if (invErr) throw new Error(invErr.message);
       invitation = { token, email: recipientEmail, role: inviteRole };

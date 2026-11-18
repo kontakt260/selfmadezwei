@@ -69,7 +69,10 @@ export function InvitationEmail({
 
         <MailInlineFallbackLink href={acceptUrl} />
 
-        <MailParagraph>Der Link ist 14 Tage gültig.</MailParagraph>
+        <MailParagraph>
+          Der Link bleibt gültig — Sie können das Geschenk also auch später
+          in Ruhe annehmen.
+        </MailParagraph>
       </Layout>
     );
   }
