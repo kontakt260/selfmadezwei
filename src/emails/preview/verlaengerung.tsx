@@ -6,10 +6,12 @@ export default function Preview() {
   return (
     <RenewalEmail
       fullName="Maria Muster"
+      projectName="Omas Lebensbuch"
       amountFormatted="99,00 €"
       paymentDateFormatted="14. Oktober 2026"
       newExpiresAtFormatted="14. Oktober 2028"
       siteUrl={siteUrl}
+      projectId="beispiel"
     />
   );
 }

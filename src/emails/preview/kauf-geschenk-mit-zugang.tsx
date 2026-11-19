@@ -10,6 +10,7 @@ export default function Preview() {
       paymentDateFormatted="14. Oktober 2026"
       expiresAtFormatted="14. Oktober 2027"
       siteUrl={siteUrl}
+      projectId="beispiel"
       giftRecipientEmail="oma@example.de"
     />
   );

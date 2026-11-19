@@ -22,10 +22,15 @@ let accessRows: FakeRow[] = [];
 let memberRows: FakeRow[] = [];
 let projectRow: FakeRow | null = null;
 let profileRow: FakeRow | null = null;
+/** Filter, die auf project_members angewendet wurden. */
+let memberFilters: Array<[string, unknown]> = [];
 
-function chainable(result: { data: unknown; error?: unknown }) {
-  return {
-    eq: vi.fn().mockReturnThis(),
+function chainable(result: { data: unknown; error?: unknown }, filters?: Array<[string, unknown]>) {
+  const chain = {
+    eq: vi.fn((col: string, val: unknown) => {
+      filters?.push([col, val]);
+      return chain;
+    }),
     in: vi.fn().mockReturnThis(),
     gte: vi.fn().mockReturnThis(),
     lt: vi.fn().mockReturnThis(),
@@ -34,6 +39,7 @@ function chainable(result: { data: unknown; error?: unknown }) {
     maybeSingle: vi.fn().mockResolvedValue(result),
     then: (cb: (v: typeof result) => unknown) => Promise.resolve(cb(result)),
   };
+  return chain;
 }
 
 vi.mock("@/lib/supabase/serviceRole", () => ({
@@ -46,7 +52,7 @@ vi.mock("@/lib/supabase/serviceRole", () => ({
       }
       if (table === "project_members") {
         return {
-          select: vi.fn().mockReturnValue(chainable({ data: memberRows })),
+          select: vi.fn(() => chainable({ data: memberRows }, memberFilters)),
         };
       }
       if (table === "projects") {
@@ -82,6 +88,7 @@ beforeEach(() => {
   memberRows = [];
   projectRow = null;
   profileRow = null;
+  memberFilters = [];
   nextSendResult = { sent: true };
 });
 
@@ -187,7 +194,29 @@ describe("/api/cron/reminders — happy path", () => {
     expect(json.skipped).toBeGreaterThanOrEqual(1);
   });
 
-  it("skips projects with no PL", async () => {
+  it("reminds every project member, not only the Projektleiter", async () => {
+    // Verlängern kann jedes Mitglied — z. B. die beschenkte Person als
+    // Co-Autorin (Jakob, 2026-11-19).
+    const inThirtyDays = new Date(
+      Date.now() + 29.5 * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    accessRows = [{ project_id: "proj-1", expires_at: inThirtyDays }];
+    memberRows = [{ user_id: "user-pl" }, { user_id: "user-co" }];
+    projectRow = { title: "Omas Lebensbuch" };
+    profileRow = { email: "member@example.com", full_name: "Mitglied" };
+
+    await GET(makeRequest({ "x-cron-secret": "test_cron_secret_123" }));
+
+    const thirtyDayRecipients = sendCalls
+      .filter((c) => (c as { variant: string }).variant === "30")
+      .map((c) => (c as { userId: string }).userId);
+    expect(thirtyDayRecipients).toEqual(["user-pl", "user-co"]);
+    // Keine Einschränkung auf die Rolle mehr.
+    expect(memberFilters.some(([col]) => col === "role")).toBe(false);
+    expect(memberFilters).toContainEqual(["project_id", "proj-1"]);
+  });
+
+  it("skips projects without members", async () => {
     const inSevenDays = new Date(
       Date.now() + 6.5 * 24 * 60 * 60 * 1000,
     ).toISOString();

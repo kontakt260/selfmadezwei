@@ -62,13 +62,13 @@ Stage = Projekt-Ref `kdjhxqitfxnsavhiafdn`. Production = Haupt-Projekt (`main`) 
 
 ### Datenbank
 
-- [ ] Alle Migrationen aus `supabase/migrations/` in Production angewendet (Stand 2026-11-16: 15 Dateien, letzte `20261116100000_proj6_purchase_claims.sql`). Mit `list_migrations` bzw. im Dashboard gegen das Repo abgleichen.
-- [ ] **Auch auf Stage noch offen (Stand 2026-11-16):** `20261116100000_proj6_purchase_claims.sql` (Tabelle `purchase_claims` für Käufe ohne Konto, RLS ohne Policies). Ohne sie werden Gast-Käufe nicht erfasst; der Stripe-Webhook antwortet dann mit 500 und Stripe wiederholt den Aufruf.
+- [ ] Alle Migrationen aus `supabase/migrations/` in Production angewendet (Stand 2026-11-19: 17 Dateien, letzte `20261119210000_lookup_invitation_service_role_only.sql`). Mit `list_migrations` bzw. im Dashboard gegen das Repo abgleichen.
+- [x] Stage: `20261116100000_proj6_purchase_claims.sql` am 2026-11-19 über den SQL-Editor eingespielt und in `supabase_migrations.schema_migrations` vermerkt (Version `20261116100000`). In Production genauso: Datei im SQL-Editor ausführen, dann `insert into supabase_migrations.schema_migrations (version, name) values ('20261116100000', 'proj6_purchase_claims');` — ohne die Tabelle werden Gast-Käufe nicht erfasst (Webhook antwortet 500).
 - [ ] Seed `supabase/seed.sql` (15 Erzähl-Impulse) in Production eingespielt; Leitfragen kommen aus der Migration `proj8_impulse_leading_questions`.
 - [ ] Storage-Buckets aus `20260515200002_storage_buckets.sql` vorhanden (4 private Buckets).
 - [ ] Testdaten **nicht** übernehmen: QA-Konto `qa-test@narravit.de`, Test-Projekte, Test-Zahlungen bleiben auf Stage.
-- [ ] Migration `20261119200000_security_advisor_function_hardening.sql` (fester `search_path` für die Zeitstempel-Trigger, Trigger-Funktionen ohne RPC-Recht; Stage: Stand 2026-11-19 noch einzuspielen). Ohne Abhängigkeit zum Code, kann jederzeit eingespielt werden: Datei im SQL-Editor ausführen, dann `insert into supabase_migrations.schema_migrations (version, name) values ('20261119200000', 'security_advisor_function_hardening');`.
-- [ ] Migration `20261119210000_lookup_invitation_service_role_only.sql` (`lookup_invitation_by_token` nur noch für `service_role`; Stage: Stand 2026-11-19 noch einzuspielen). **Erst einspielen, wenn der Code mit dem Service-Role-Lookup ausgeliefert ist** — auf Stage nach abgeschlossenem Deploy von stage-app, in Production nach dem Merge `stage` → `main` und abgeschlossenem Deploy. Andersherum zeigt `/einladung/<token>` „Einladung nicht gefunden“, und Einladungen lassen sich nicht annehmen. Datei im SQL-Editor ausführen, dann `insert into supabase_migrations.schema_migrations (version, name) values ('20261119210000', 'lookup_invitation_service_role_only');`. Smoke-Test: Einladungslink abgemeldet öffnen (Vorschau mit Projekttitel) und angemeldet annehmen. Nach beiden Migrationen Dashboard → Advisors → Security: gewollt sind nur `rls_enabled_no_policy` (`mail_log`, `purchase_claims`), `anon_`/`authenticated_security_definer_function_executable` für die RLS-Hilfsfunktionen `get_my_project_ids`, `am_i_pl_of`, `is_member_of` und `auth_leaked_password_protection` (Dashboard-Schalter unter Auth). Jeder andere Hinweis ist neu und vor dem Go-live zu klären.
+- [ ] Migration `20261119200000_security_advisor_function_hardening.sql` (fester `search_path` für die Zeitstempel-Trigger, Trigger-Funktionen ohne RPC-Recht; Stage: am 2026-11-19 eingespielt und vermerkt — dabei versehentlich in einer Zwischenfassung, die auch die Rechte aus der nächsten Migration schon enthielt). Ohne Abhängigkeit zum Code, kann jederzeit eingespielt werden: Datei im SQL-Editor ausführen, dann `insert into supabase_migrations.schema_migrations (version, name) values ('20261119200000', 'security_advisor_function_hardening');`.
+- [ ] Migration `20261119210000_lookup_invitation_service_role_only.sql` (`lookup_invitation_by_token` nur noch für `service_role`; Stage: Rechte wirken schon seit 2026-11-19, die Datei nach dem Deploy trotzdem einmal ausführen — harmlos — und die Version vermerken). **Erst einspielen, wenn der Code mit dem Service-Role-Lookup ausgeliefert ist** — auf Stage nach abgeschlossenem Deploy von stage-app, in Production nach dem Merge `stage` → `main` und abgeschlossenem Deploy. Andersherum zeigt `/einladung/<token>` „Einladung nicht gefunden“, und Einladungen lassen sich nicht annehmen. Datei im SQL-Editor ausführen, dann `insert into supabase_migrations.schema_migrations (version, name) values ('20261119210000', 'lookup_invitation_service_role_only');`. Smoke-Test: Einladungslink abgemeldet öffnen (Vorschau mit Projekttitel) und angemeldet annehmen. Nach beiden Migrationen Dashboard → Advisors → Security: gewollt sind nur `rls_enabled_no_policy` (`mail_log`, `purchase_claims`), `anon_`/`authenticated_security_definer_function_executable` für die RLS-Hilfsfunktionen `get_my_project_ids`, `am_i_pl_of`, `is_member_of` und `auth_leaked_password_protection` (Dashboard-Schalter unter Auth). Jeder andere Hinweis ist neu und vor dem Go-live zu klären.
 
 ### Auth → URL Configuration
 
@@ -81,9 +81,14 @@ Stage = Projekt-Ref `kdjhxqitfxnsavhiafdn`. Production = Haupt-Projekt (`main`) 
 - [ ] Absender-Name **`NARRAVIT`** (Großbuchstaben, wie die App-Mails), Absender-Adresse wie auf Stage (auf `mail.narravit.de`).
 - [ ] Mail-Rate-Limit unter Auth → Rate Limits passend setzen (mit eigenem SMTP frei wählbar).
 
+### Auth → Passwort-Sicherheit
+
+- [ ] „Leaked password protection" einschalten (Abgleich mit HaveIBeenPwned). Auf Stage laut Supabase-Advisor am 2026-11-19 aus.
+
 ### Auth → Email Templates
 
-- [ ] „Confirm signup" und „Reset password" aus `supabase/templates/` einsetzen (erzeugt aus `src/emails/auth/`). **Stand:** auf Stage noch nicht eingesetzt, Design wird überarbeitet (Backlog).
+- [ ] „Confirm signup" und „Reset password" aus `supabase/templates/` einsetzen (erzeugt aus `src/emails/auth/`). **Stand 2026-11-19 (abends):** Das Mail-Design aus Figma ist im Code, die Vorlagen sind neu erzeugt und können jetzt auf Stage eingesetzt werden (Jakob setzt sie selbst). Nach jeder Änderung an `src/emails/` mit `UPDATE_AUTH_TEMPLATES=1 npx vitest run src/emails/auth` neu erzeugen und neu einsetzen.
+- [ ] Die Vorlagen laden das Logo von `https://app.narravit.de/images/mail/` (siehe Abschnitt 5) — auf Stage erscheint es erst, wenn Production live ist.
 - [ ] Platzhalter für Pflichtangaben in den Vorlagen (`LEGAL_PLACEHOLDER`) durch echte Angaben ersetzen.
 - [ ] Ohne diese Vorlagen funktionieren Mail-Links nur im selben Browser (PKCE-Code statt Token-Hash) — für Production Pflicht.
 
@@ -91,7 +96,7 @@ Stage = Projekt-Ref `kdjhxqitfxnsavhiafdn`. Production = Haupt-Projekt (`main`) 
 
 - [ ] **Google:** Provider aktiv; im Google-Cloud-OAuth-Client die Callback-URL des Production-Projekts (`https://<prod-ref>.supabase.co/auth/v1/callback`) als autorisierte Weiterleitungs-URI eintragen; OAuth-Zustimmungsbildschirm veröffentlicht („In production"), sonst nur Testnutzer.
 - [ ] **Facebook:** Provider aktiv; in der Meta-App die Production-Callback-URL eintragen; App in den Live-Modus schalten (verlangt Datenschutz-URL und Datenlöschungs-URL).
-- [ ] **Apple:** noch nicht gebaut (eigenes Ticket); später hier ergänzen.
+- [ ] **Apple:** noch nicht gebaut (eigenes Ticket); später hier ergänzen. Die Vorlage „Reset password" nennt seit 2026-11-19 bereits „Apple, Google oder Facebook" — ohne Apple-Anmeldung zum Go-live den Satz anpassen.
 
 ---
 
@@ -117,6 +122,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] Eigener Schlüssel für Supabase-SMTP in Production (Abschnitt 3).
 - [ ] Stage-Schlüssel bleiben auf Stage; beim Umzug nicht wiederverwenden.
 - [ ] Suppression-Liste prüfen: Adressen aus Tests (z. B. `qa-test@narravit.de`) stehen dort; echte Kundenadressen dürfen nicht darauf landen.
+- [ ] **Bilder in Mails** (Logo im Kopf jeder Mail, Strandfoto in der Willkommens-Mail) liegen in `public/images/mail/` und werden **immer** von `https://app.narravit.de/images/mail/…` geladen (`MAIL_ASSETS_URL` in `src/emails/Layout.tsx`), auch in Stage-Mails und Supabase-Vorlagen. Grund: Stage ist per Vercel-Deployment-Protection gesperrt, Mail-Programme kämen dort nicht an die Bilder. **Stand 2026-11-19:** `app.narravit.de` liefert diese App noch nicht aus (`/images/…` → 404), deshalb zeigen Mails bis zum Go-live keine Bilder (das Layout bleibt intakt, der Schriftzug „NARRAVIT" steht als Text da). Nach dem Umzug prüfen: `https://app.narravit.de/images/mail/narravit-logo.png` und `…/willkommen-strand.jpg` liefern 200.
 
 ---
 
@@ -144,7 +150,9 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 ## 8. Rechtliches
 
-- [ ] Impressum — liegt auf der Webflow-Website unter `https://www.narravit.de/impressum`. Der Footer jeder Mail (App-Mails und Supabase-Vorlagen) verlinkt **fest** dorthin, auf Stage wie in Production; die Seite muss also erreichbar und vollständig sein (PROJ-11 BUG-1).
+- [ ] Impressum — liegt auf der Webflow-Website unter `https://www.narravit.de/impressum`. Der Footer jeder Mail (App-Mails und Supabase-Vorlagen) verlinkt **fest** dorthin, auf Stage wie in Production; die Seite muss also erreichbar und vollständig sein (PROJ-11 BUG-1). **Stand 2026-11-19:** liefert noch 404.
+- [ ] Pflichtangaben in Mails klären: Ist NARRAVIT im Handelsregister eingetragen (z. B. e. K., UG, GmbH), gehören Firma, Rechtsform, Sitz, Registergericht, Registernummer und ggf. Geschäftsführung in **jede** geschäftliche Mail — App-Mails und Supabase-Vorlagen —, ein Impressum-Link reicht dann nicht. Ohne Registereintrag genügt der Impressum-Link, dann den Platzhalter `LEGAL_PLACEHOLDER` entfernen. Rechtsform-Entscheidung steht aus (Jakob, 2026-11-19).
+- [ ] Erinnerungs-Mails 08/09 versprechen „Ihre Inhalte bleiben noch 90 weitere Tage erhalten". Es gibt dafür noch keine Lösch- oder Sperrlogik und keine Regel in AGB/Datenschutz — vor Go-live festlegen und umsetzen oder den Satz anpassen.
 - [ ] Datenschutzerklärung (auch für Facebook-App und Stripe-Checkout nötig).
 - [ ] Datenschutzerklärung nennt den Kauf ohne Konto: Speicherung der Checkout-E-Mail-Adresse bis zur Konto-Anlage (`purchase_claims`) und das technisch notwendige Cookie `nv_kauf` (Zuordnung des Kaufs, 60 Tage).
 - [ ] AGB und Widerrufsbelehrung für den Kauf.
@@ -159,6 +167,8 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] PROJ-19 Production-Hardening (Security-Header, Env-Prüfung beim Start).
 - [ ] PROJ-12 Audio-Erzählen live, sonst Mail-Texte zum „Erzählen per Sprachnachricht" anpassen (PROJ-11 BUG-9). Bringt SMS-Anbieter (seven.io) und Transkriptions-/LLM-Schlüssel mit — dann hier ergänzen.
 - [ ] PROJ-13 Fehler-Monitoring (Sentry) — dann `SENTRY_DSN` o. ä. hier ergänzen.
+- [ ] PROJ-12 Paket „Erzähl-Einstellungen": Onboarding-Schritt „Wie soll [Name] die wöchentlichen Erzähl-Impulse erhalten? — Telefon, E-Mail oder beides" samt Kontaktdaten und Einverständnis, plus Sektion in der Projektübersicht. Ohne ihn fehlen bei Geschenk-Käufen die Kontaktdaten der erzählenden Person (Jakob, 2026-11-19).
+- [x] Mail-Design aus Figma (Datei „NARRAVIT Mails") in `src/emails/` übertragen; Logo dafür hosten. Erledigt 2026-11-19 (Bilder siehe Abschnitt 5).
 
 ---
 
@@ -174,6 +184,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] Einladung über „Nutzer hinzufügen" kommt an.
 - [ ] Cron `/api/cron/reminders` nach dem ersten Lauf in den Vercel-Logs mit 200.
 - [ ] Mail-Links zeigen auf `app.narravit.de`, nicht auf `stage-app`.
+- [ ] Logo und Willkommens-Foto werden in den Mails angezeigt (Abschnitt 5).
 
 ---
 
@@ -181,8 +192,10 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
-| 2026-11-18 | Impressum-Link in allen Mails fest auf `https://www.narravit.de/impressum` (Webflow) statt `<SITE_URL>/impressum`; die Supabase-Vorlagen in `supabase/templates/` enthalten ihn jetzt auch und müssen beim Einsetzen in der neuen Fassung verwendet werden. Kein neuer Env-Wert. |
+| 2026-11-19 | Mail-Design und -Texte aus Figma im Code. Neu: Bilder in Mails, fest von `https://app.narravit.de/images/mail/` geladen (Stage ist geschützt) — vor dem Go-live ohne Bilder. Supabase-Vorlagen neu erzeugt, können auf Stage eingesetzt werden. Offene Rechtsfragen ergänzt: Pflichtangaben je nach Rechtsform, 90-Tage-Aussage in den Erinnerungen; Impressum liefert weiter 404. Kein neuer Env-Wert. |
+| 2026-11-19 | Go-live-Blocker ergänzt: PROJ-12 Erzähl-Einstellungen (Onboarding + Projektübersicht), Mail-Design aus Figma. Kaufbestätigung „nur erzählen" am selben Tag erledigt (Mail 03 mit Namen). Geschenk ohne eigenen Zugang bleibt wie gebaut (kein Blocker). Supabase-Vorlagen setzt Jakob selbst nach der Design-Übertragung. Migration `purchase_claims` auf Stage eingespielt; Anleitung für Production ergänzt. „Leaked password protection" für Production aufgenommen. Kein neuer Env-Wert. |
 | 2026-11-19 | Security-Advisor (Funktionen): Migration `20261119200000_security_advisor_function_hardening.sql` legt den `search_path` der Zeitstempel-Trigger fest und sperrt die drei SECURITY-DEFINER-Trigger-Funktionen für RPC-Aufrufe. Migration `20261119210000_lookup_invitation_service_role_only.sql` gibt `lookup_invitation_by_token` nur noch für `service_role` frei; Einladungsseite und Einladungs-Annahme lesen dafür über den Service-Role-Client. Die zweite Migration erst nach dem Code-Deploy einspielen (Stage und Production). Gewollte Advisor-Hinweise: Abschnitt Datenbank. Kein neuer Env-Wert. |
+| 2026-11-18 | Impressum-Link in allen Mails fest auf `https://www.narravit.de/impressum` (Webflow) statt `<SITE_URL>/impressum`; die Supabase-Vorlagen in `supabase/templates/` enthalten ihn jetzt auch und müssen beim Einsetzen in der neuen Fassung verwendet werden. Kein neuer Env-Wert. |
 | 2026-11-16 | Kauf ohne Konto (PROJ-6): neue Migration `20261116100000_proj6_purchase_claims.sql` (auf Stage noch einzuspielen), Landingpage-Button muss auf `/onboarding` zeigen, Datenschutz-Hinweis zu Checkout-Adresse und Cookie `nv_kauf`, zwei neue Smoke-Tests. Kein neuer Env-Wert. |
 | 2026-10-14 | Absender-Name überall `NARRAVIT` in Großbuchstaben (App-Mails im Code; Supabase-SMTP auf Stage und Production manuell). |
 | 2026-10-14 | Test-Empfänger-Sperre hängt an der Site-URL statt an `VERCEL_ENV` (Stage kann in Vercel als „Production" laufen); offene Frage zur Vercel-Umgebung von Stage ergänzt. |

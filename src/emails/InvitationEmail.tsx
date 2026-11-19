@@ -48,31 +48,27 @@ export function InvitationEmail({
   if (isGift) {
     return (
       <Layout
-        preview={`${inviterDisplay} schenkt Ihnen ein Lebensbuch bei narravit.`}
+        preview={`${inviterDisplay} schenkt Ihnen ein Buch-Projekt bei NARRAVIT.`}
         headerEyebrow="Ein Geschenk für Sie"
       >
         <MailHeading>Ihr Lebensbuch wartet auf Sie</MailHeading>
         <MailParagraph>
-          <strong>{inviterDisplay}</strong> schenkt Ihnen ein Lebensbuch bei
-          narravit. Darin halten Sie Ihre Lebensgeschichte fest — Kapitel für
+          <strong>{inviterDisplay}</strong> schenkt Ihnen ein Buch-Projekt bei
+          NARRAVIT. Darin können Sie Ihre Geschichten festhalten — Kapitel für
           Kapitel, in Ruhe und in Ihrem eigenen Tempo. Am Ende entsteht daraus
           ein gedrucktes Buch.
         </MailParagraph>
         <MailParagraph>
           Mit einem Klick auf den Button nehmen Sie das Geschenk an. Falls
-          Sie noch kein narravit-Konto haben, legen Sie dabei eines an.
+          Sie noch kein NARRAVIT-Konto haben, legen Sie dabei eines an.
           Danach können Sie Ihre Geschichten direkt am Computer oder Tablet
           aufschreiben.
         </MailParagraph>
+        <MailParagraph>Wir unterstützen Sie dabei.</MailParagraph>
 
         <MailCtaButton href={acceptUrl}>Geschenk annehmen</MailCtaButton>
 
         <MailInlineFallbackLink href={acceptUrl} />
-
-        <MailParagraph>
-          Der Link bleibt gültig — Sie können das Geschenk also auch später
-          in Ruhe annehmen.
-        </MailParagraph>
       </Layout>
     );
   }
@@ -85,12 +81,11 @@ export function InvitationEmail({
       <MailHeading>Sie wurden eingeladen</MailHeading>
       <MailParagraph>
         <strong>{inviterDisplay}</strong> hat Sie zum Projekt{" "}
-        <strong>„{projectName}&quot;</strong> eingeladen — als{" "}
+        <strong>„{projectName}“</strong> eingeladen — als{" "}
         <strong>{ROLE_LABEL[role]}</strong>.
       </MailParagraph>
       <MailParagraph>
-        Mit einem Klick auf den Button öffnen Sie die Einladungs-Vorschau
-        und können sie anschließend mit Ihrem narravit-Konto annehmen.
+        Mit einem Klick auf den Button können Sie die Einladung annehmen.
       </MailParagraph>
 
       <MailCtaButton href={acceptUrl}>Einladung öffnen</MailCtaButton>

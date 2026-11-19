@@ -68,7 +68,7 @@ export async function maybeSendWelcomeMail(
   const siteUrl = getSiteUrl();
   const result = await sendEmail({
     to: input.to,
-    subject: "Willkommen bei narravit",
+    subject: "Willkommen bei NARRAVIT",
     react: WelcomeEmail({
       fullName: input.fullName,
       siteUrl,

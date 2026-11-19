@@ -9,6 +9,7 @@
 // Eine Komponente, zwei Varianten — gesteuert per `variant`-Prop.
 // Beide Mails verlinken auf den Verlängerungs-Stripe-Checkout (PROJ-6).
 
+import type { ReactNode } from "react";
 import {
   Layout,
   MailHeading,
@@ -42,14 +43,21 @@ function daysDative(daysLeft: number): string {
   return daysLeft === 1 ? "einem Tag" : `${daysLeft} Tagen`;
 }
 
+// Texte: Figma-Frames 08 und 09 (Jakob, 2026-11-19).
 const HEADINGS: Record<ReminderVariant, (daysLeft: number) => string> = {
-  "30": (d) => `Ihr Portal-Zugang läuft in ${daysDative(d)} ab`,
-  "7": (d) => `Nur noch ${daysNominative(d)} Portal-Zugang`,
+  "30": (d) => `Ihr Projekt-Zugang läuft in ${daysDative(d)} ab`,
+  "7": (d) => `Nur noch ${daysNominative(d)} Projekt-Zugang`,
 };
 
-const TONE: Record<ReminderVariant, (daysLeft: number) => string> = {
-  "30": (d) =>
-    `ein freundlicher Hinweis: Ihr Portal-Zugang für dieses Projekt läuft in ${daysDative(d)} ab. Falls Sie weiter schreiben möchten, können Sie den Zugang jetzt um 12 Monate verlängern — es eilt aber noch nicht.`,
+const TONE: Record<ReminderVariant, (daysLeft: number, projectName: string) => ReactNode> = {
+  "30": (d, projectName) => (
+    <>
+      ein freundlicher Hinweis: Ihr Portal-Zugang für{" "}
+      <strong>„{projectName}“</strong> läuft in {daysDative(d)} ab. Falls Sie
+      weiter schreiben möchten, können Sie den Zugang jetzt um 12 Monate
+      verlängern.
+    </>
+  ),
   "7": (d) =>
     `nur noch ${daysNominative(d)}: Ihr Portal-Zugang läuft am unten genannten Datum ab. Wenn Sie weiter am Projekt arbeiten möchten, verlängern Sie den Zugang bitte rechtzeitig, sonst verlieren Sie kurzzeitig den Zugriff.`,
 };
@@ -69,7 +77,7 @@ const PREVIEW: Record<
   (project: string, date: string, daysLeft: number) => string
 > = {
   "30": (project, date) =>
-    `Ihr narravit-Portal-Zugang für „${project}" läuft am ${date} ab.`,
+    `Ihr NARRAVIT-Portal-Zugang für „${project}" läuft am ${date} ab.`,
   "7": (project, date, d) =>
     `Nur noch ${daysNominative(d)}: Portal-Zugang für „${project}" läuft am ${date} ab.`,
 };
@@ -99,7 +107,7 @@ export function ReminderEmail({
     >
       <MailHeading>{HEADINGS[variant](daysLeft)}</MailHeading>
       <MailParagraph>{greeting}</MailParagraph>
-      <MailParagraph>{TONE[variant](daysLeft)}</MailParagraph>
+      <MailParagraph>{TONE[variant](daysLeft, projectName)}</MailParagraph>
 
       <MailDetailsList items={details} />
 
@@ -108,8 +116,8 @@ export function ReminderEmail({
       <MailParagraph>
         Falls Sie das Projekt nicht weiterführen möchten, müssen Sie nichts
         unternehmen — der Zugang läuft dann einfach aus, Ihre Inhalte
-        bleiben erhalten und können bei einer späteren Verlängerung wieder
-        bearbeitet werden.
+        bleiben noch 90 weitere Tage erhalten und können bei einer späteren
+        Verlängerung wieder bearbeitet werden.
       </MailParagraph>
     </Layout>
   );

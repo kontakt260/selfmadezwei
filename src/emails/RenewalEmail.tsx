@@ -1,7 +1,15 @@
-// PROJ-11 — Verlängerungs-Bestätigung (12-Monate-Renewal).
+// PROJ-11 — Verlängerung des Portal-Zugangs (12-Monate-Renewal).
 //
 // Trigger: Stripe-Webhook checkout.session.completed mit
 // payment_type = renewal_portal_access (PROJ-6).
+//
+// Zwei Fassungen (Anforderung Jakob 2026-11-19 — verlängern kann jedes
+// Projektmitglied, die Information muss in beide Richtungen fließen;
+// Texte: Figma-Frames 10 und 10b):
+//   - Bestätigung an die Person, die bezahlt hat: Projekt, Betrag, Datum,
+//     neues Ablaufdatum, Rechnung.
+//   - Info an alle anderen Mitglieder (`renewedBy` gesetzt): wer verlängert
+//     hat und bis wann der Zugang jetzt gilt — ohne Betrag und Rechnung.
 
 import {
   Layout,
@@ -9,63 +17,105 @@ import {
   MailParagraph,
   MailCtaButton,
   MailDetailsList,
+  mailLinkStyle,
 } from "./Layout";
 
-export type RenewalEmailProps = {
+type CommonProps = {
   fullName?: string;
-  amountFormatted: string;
-  paymentDateFormatted: string;
+  /** Projekttitel — erste Zeile der Detail-Box */
+  projectName: string;
+  /** Ziel des Buttons „Zur Projektübersicht" */
+  projectId?: string;
   /** Neues Ablauf-Datum, z. B. „22. Mai 2027" */
   newExpiresAtFormatted: string;
-  invoiceUrl?: string;
   siteUrl: string;
 };
 
-export function RenewalEmail({
-  fullName,
-  amountFormatted,
-  paymentDateFormatted,
-  newExpiresAtFormatted,
-  invoiceUrl,
-  siteUrl,
-}: RenewalEmailProps) {
-  const greeting = fullName?.trim()
-    ? `Hallo ${fullName.trim()},`
-    : "Hallo,";
-  const personalAreaUrl = `${siteUrl}/`;
+type ConfirmationProps = CommonProps & {
+  renewedBy?: undefined;
+  amountFormatted: string;
+  paymentDateFormatted: string;
+  invoiceUrl?: string;
+};
 
+type InfoProps = CommonProps & {
+  /** Name der Person, die verlängert hat */
+  renewedBy: string;
+};
+
+export type RenewalEmailProps = ConfirmationProps | InfoProps;
+
+export function RenewalEmail(props: RenewalEmailProps) {
+  const { fullName, projectName, projectId, newExpiresAtFormatted, siteUrl } = props;
+  const greeting = fullName?.trim() ? `Hallo ${fullName.trim()},` : "Hallo,";
+  const projectUrl = projectId
+    ? `${siteUrl}/projektuebersicht/${encodeURIComponent(projectId)}`
+    : `${siteUrl}/`;
+
+  // 10b — Info an die anderen Projektmitglieder
+  if (props.renewedBy !== undefined) {
+    const renewedBy = props.renewedBy.trim() || "Ein Projektmitglied";
+    return (
+      <Layout
+        preview={`${renewedBy} hat den Portal-Zugang für „${projectName}“ verlängert. Neu gültig bis ${newExpiresAtFormatted}.`}
+        headerEyebrow="Verlängerung"
+      >
+        <MailHeading>Ihr Projekt wurde verlängert</MailHeading>
+        <MailParagraph>{greeting}</MailParagraph>
+        <MailParagraph>
+          <strong>{renewedBy}</strong> hat den Portal-Zugang für das Projekt{" "}
+          <strong>„{projectName}“</strong> um weitere{" "}
+          <strong>12 Monate</strong> verlängert. Sie können wie gewohnt weiter
+          schreiben und erzählen — für Sie ist nichts weiter zu tun.
+        </MailParagraph>
+
+        <MailDetailsList
+          items={[
+            { label: "Projekt", value: projectName },
+            { label: "Neuer Zugang gültig bis", value: newExpiresAtFormatted },
+          ]}
+        />
+
+        <MailCtaButton href={projectUrl}>Zur Projektübersicht</MailCtaButton>
+      </Layout>
+    );
+  }
+
+  // 10 — Bestätigung an die Person, die bezahlt hat
   const details: Array<{ label: string; value: string }> = [
-    { label: "Betrag", value: amountFormatted },
-    { label: "Zahlungs-Datum", value: paymentDateFormatted },
+    { label: "Projekt", value: projectName },
+    { label: "Betrag", value: props.amountFormatted },
+    { label: "Zahlungs-Datum", value: props.paymentDateFormatted },
     { label: "Neuer Zugang gültig bis", value: newExpiresAtFormatted },
   ];
 
   return (
     <Layout
-      preview={`Ihr narravit-Portal-Zugang wurde um 12 Monate verlängert. Neu gültig bis ${newExpiresAtFormatted}.`}
+      preview={`Ihr NARRAVIT-Portal-Zugang wurde um 12 Monate verlängert. Neu gültig bis ${newExpiresAtFormatted}.`}
       headerEyebrow="Verlängerung"
     >
-      <MailHeading>Ihr Portal-Zugang wurde verlängert</MailHeading>
+      <MailHeading>Ihr Projekt wurde verlängert</MailHeading>
       <MailParagraph>{greeting}</MailParagraph>
       <MailParagraph>
-        vielen Dank — Ihr narravit-Portal-Zugang ist um weitere{" "}
-        <strong>12 Monate</strong> verlängert. Sie können wie gewohnt
-        weiter schreiben, einladen und erzählen.
+        vielen Dank — Ihr NARRAVIT-Projekt-Zugang ist um weitere{" "}
+        <strong>12 Monate</strong> verlängert. Sie können wie gewohnt weiter
+        schreiben, einladen und erzählen.
       </MailParagraph>
 
       <MailDetailsList items={details} />
 
-      <MailCtaButton href={personalAreaUrl}>
-        Zum persönlichen Bereich
-      </MailCtaButton>
+      {/* Steht immer da — die anderen Mitglieder bekommen Mail 10b. */}
+      <MailParagraph>
+        Falls es im Projekt noch weitere Mitglieder gibt, wurden sie per
+        E-Mail über die Verlängerung informiert.
+      </MailParagraph>
 
-      {invoiceUrl ? (
+      <MailCtaButton href={projectUrl}>Zur Projektübersicht</MailCtaButton>
+
+      {props.invoiceUrl ? (
         <MailParagraph>
           Ihre Rechnung finden Sie{" "}
-          <a
-            href={invoiceUrl}
-            style={{ color: "#3E3831", textDecoration: "underline" }}
-          >
+          <a href={props.invoiceUrl} style={mailLinkStyle}>
             hier
           </a>
           .

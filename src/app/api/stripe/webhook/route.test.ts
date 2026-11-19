@@ -46,6 +46,7 @@ vi.mock("stripe", () => {
 const sendInvitationMailMock = vi.fn(async (_input: Record<string, unknown>) => undefined);
 const sendPortalPurchaseMailMock = vi.fn(async (_input: Record<string, unknown>) => undefined);
 const sendRenewalMailMock = vi.fn(async (_input: Record<string, unknown>) => undefined);
+const sendRenewalInfoMailMock = vi.fn(async (_input: Record<string, unknown>) => undefined);
 vi.mock("@/lib/email/send-invitation", () => ({
   sendInvitationMail: (input: Record<string, unknown>) => sendInvitationMailMock(input),
 }));
@@ -54,6 +55,7 @@ vi.mock("@/lib/email/send-portal-purchase", () => ({
 }));
 vi.mock("@/lib/email/send-renewal", () => ({
   sendRenewalMail: (input: Record<string, unknown>) => sendRenewalMailMock(input),
+  sendRenewalInfoMail: (input: Record<string, unknown>) => sendRenewalInfoMailMock(input),
 }));
 const sendGuestPurchaseMailMock = vi.fn(async (_input: Record<string, unknown>) => undefined);
 vi.mock("@/lib/email/send-guest-purchase", () => ({
@@ -132,6 +134,12 @@ const supabaseMock = {
           );
           return { data: found ?? null, error: null };
         },
+        limit: async (n: number) => ({
+          data: fakeDb[table]
+            .filter((r) => (r as Record<string, unknown>)[col] === val)
+            .slice(0, n),
+          error: null,
+        }),
       }),
     }),
     insert: (row: Record<string, unknown> | Record<string, unknown>[]) =>
@@ -212,6 +220,7 @@ beforeEach(() => {
   sendInvitationMailMock.mockClear();
   sendPortalPurchaseMailMock.mockClear();
   sendRenewalMailMock.mockClear();
+  sendRenewalInfoMailMock.mockClear();
   sendGuestPurchaseMailMock.mockClear();
 });
 
@@ -375,7 +384,10 @@ describe("Stripe webhook — purchase mails (PROJ-11)", () => {
       amountFormatted: expect.stringContaining("249,00"),
       buyerHasAccess: true,
       giftRecipientEmail: undefined,
+      giftRecipientName: undefined,
       invoiceUrl: undefined,
+      // Button „Zur Projektübersicht" führt ins neu angelegte Projekt.
+      projectId: fakeDb.projects[0].id,
     });
   });
 
@@ -431,10 +443,16 @@ describe("Stripe webhook — purchase mails (PROJ-11)", () => {
     });
   });
 
-  it("gift 'Nur per Sprachnachricht': no portal invitation, buyer keeps access", async () => {
+  it("gift 'Nur per Sprachnachricht': no portal invitation, buyer keeps access, mail names the recipient", async () => {
     constructEventMock.mockReturnValue({
       type: "checkout.session.completed",
-      data: { object: giftSession({ gift_mode: "phone-only" }) },
+      data: {
+        object: giftSession({
+          gift_mode: "phone-only",
+          gift_recipient_email: "",
+          gift_recipient_name: " Oma Erna ",
+        }),
+      },
     });
     await callPost("body", "valid-sig");
 
@@ -442,6 +460,26 @@ describe("Stripe webhook — purchase mails (PROJ-11)", () => {
     expect(sendPortalPurchaseMailMock.mock.calls[0][0]).toMatchObject({
       buyerHasAccess: true,
       giftRecipientEmail: undefined,
+      giftRecipientName: "Oma Erna",
+    });
+  });
+
+  it("gift with invitation does not add the name — the mail names the address", async () => {
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: giftSession({
+          gift_mode: "phone-plus-computer",
+          buyer_retains_access: "1",
+          gift_recipient_name: "Oma Erna",
+        }),
+      },
+    });
+    await callPost("body", "valid-sig");
+
+    expect(sendPortalPurchaseMailMock.mock.calls[0][0]).toMatchObject({
+      giftRecipientEmail: "Oma@Example.com",
+      giftRecipientName: undefined,
     });
   });
 
@@ -480,7 +518,49 @@ describe("Stripe webhook — purchase mails (PROJ-11)", () => {
     expect(sendRenewalMailMock.mock.calls[0][0]).toMatchObject({
       to: "user@example.com",
       amountFormatted: expect.stringContaining("99,00"),
+      projectName: expect.any(String),
     });
+    expect(sendRenewalInfoMailMock).not.toHaveBeenCalled();
+  });
+
+  it("renewal by the gifted person: buyer and every other member get the info (Jakob, 2026-11-19)", async () => {
+    // Beschenkte Person (user-1) verlängert; Käuferin (buyer-1) ist
+    // ebenfalls Mitglied und muss davon erfahren.
+    fakeDb.projects.push({ id: "proj-1", title: "Omas Lebensbuch" });
+    fakeDb.project_members.push(
+      { project_id: "proj-1", user_id: "user-1", role: "projektleiter" },
+      { project_id: "proj-1", user_id: "buyer-1", role: "co_author" },
+      { project_id: "proj-2", user_id: "someone-else", role: "projektleiter" },
+    );
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: makeSession({
+          metadata: { product_type: "renewal", user_id: "user-1", project_id: "proj-1" },
+          amount_total: 9900,
+        }),
+      },
+    });
+    await callPost("body", "valid-sig");
+
+    expect(sendRenewalMailMock).toHaveBeenCalledTimes(1);
+    expect(sendRenewalMailMock.mock.calls[0][0]).toMatchObject({
+      to: "user@example.com",
+      projectName: "Omas Lebensbuch",
+      projectId: "proj-1",
+    });
+    expect(sendRenewalInfoMailMock).toHaveBeenCalledTimes(1);
+    expect(sendRenewalInfoMailMock.mock.calls[0][0]).toMatchObject({
+      to: "buyer@example.com",
+      fullName: "Bea Buyer",
+      renewedBy: "Test User",
+      projectName: "Omas Lebensbuch",
+      projectId: "proj-1",
+      newExpiresAtFormatted: expect.any(String),
+    });
+    // Info-Mail enthält weder Betrag noch Rechnung.
+    expect(sendRenewalInfoMailMock.mock.calls[0][0]).not.toHaveProperty("amountFormatted");
+    expect(sendRenewalInfoMailMock.mock.calls[0][0]).not.toHaveProperty("invoiceUrl");
   });
 });
 

@@ -48,8 +48,8 @@ export function GuestPurchaseEmail({
 
   return (
     <Layout
-      preview="Ihre Zahlung ist eingegangen — bitte legen Sie jetzt Ihr narravit-Konto an."
-      headerEyebrow="Bestätigung"
+      preview="Ihre Zahlung ist eingegangen — bitte legen Sie jetzt Ihr NARRAVIT-Konto an."
+      headerEyebrow="Kaufbestätigung"
     >
       <MailHeading>Nur noch ein Schritt: Ihr Konto</MailHeading>
       <MailParagraph>{greeting}</MailParagraph>
@@ -58,12 +58,12 @@ export function GuestPurchaseEmail({
         {isGift ? (
           <>
             Damit wir Ihr Geschenk einrichten können, legen Sie bitte jetzt
-            Ihr narravit-Konto an.
+            Ihr NARRAVIT-Konto an.
           </>
         ) : (
           <>
             Damit Sie mit Ihrem Lebensbuch beginnen können, legen Sie bitte
-            jetzt Ihr narravit-Konto an.
+            jetzt Ihr NARRAVIT-Konto an.
           </>
         )}
       </MailParagraph>

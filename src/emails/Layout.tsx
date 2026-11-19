@@ -1,25 +1,25 @@
 // PROJ-11 — Layout-Wrapper für alle Transaktionsmails.
 //
-// Aufbau:
-//   1. Header-Banner mit narravit-Wordmark + Tagline (Sand-Hintergrund).
-//   2. Body-Container (cremiger Hintergrund) mit weißer Inhalts-Karte.
-//   3. Footer-Band (Sand-Hintergrund) mit Impressum + Kontakt-Hinweis.
+// Design: Figma-Datei „NARRAVIT Mails" (Jakob, 2026-11-18/19). Aufbau:
+//   1. Kopf: Baum-Logo, Schriftzug „NARRAVIT", darunter die Kategorie-Zeile.
+//   2. Weiße Inhalts-Karte mit Rahmen, optional mit Bild am oberen Rand.
+//   3. Fuß: Kontakt-Hinweis, Impressum, Hinweis auf die Transaktions-Mail.
+// Alles auf dem hellen Grund #FAF8F6.
 //
-// Wir verwenden React-Email-Komponenten (Container, Section, Heading, etc.)
-// statt klassischer HTML-Tags — die rendern automatisch tabellenbasiertes
-// Email-HTML mit inline-Styles für Outlook-Kompatibilität. Wir greifen
-// NIEMALS auf Tailwind/CSS-Klassen zurück — alle Styles inline.
+// Wir verwenden React-Email-Komponenten (Container, Section, Text, …) statt
+// klassischer HTML-Tags — die rendern tabellenbasiertes Email-HTML mit
+// inline-Styles für Outlook-Kompatibilität. Keine Tailwind-/CSS-Klassen.
 //
-// Visueller Stil: Sand (#D0BCA6) als Marken-Akzent, Cream (#F5EFE6) als
-// Body-BG, klassische Serif-Heading (Merriweather/system fallback),
-// Sans-Serif-Body (Lato/system fallback).
+// Schriften: Mail-Programme laden keine Web-Fonts zuverlässig. Wir nennen die
+// Figma-Schriften zuerst und fallen auf Systemschriften zurück (PT Serif ist
+// auf dem Mac vorinstalliert, sonst Georgia).
 
 import {
   Body,
   Container,
   Head,
-  Hr,
   Html,
+  Img,
   Link,
   Preview,
   Section,
@@ -27,12 +27,13 @@ import {
 } from "@react-email/components";
 import type { ReactNode } from "react";
 
-// Marken-Farben (1:1 aus globals.css)
+// Marken-Farben (globals.css + Figma)
 export const COLORS = {
   sand: "#D0BCA6",
   sandHover: "#C0AD98",
   cream: "#F5EFE6",
   paper: "#FAF8F6",
+  forest: "#2D372D",
   ink: "#3E3831",
   inkSecondary: "#535252",
   inkMuted: "#848484",
@@ -41,7 +42,8 @@ export const COLORS = {
   greenAccent: "#96B897",
 } as const;
 
-const SERIF = "Merriweather, 'Times New Roman', Georgia, serif";
+const SERIF_HEADING = "'PT Serif', Georgia, 'Times New Roman', serif";
+const SERIF_WORDMARK = "Merriweather, Georgia, 'Times New Roman', serif";
 const SANS =
   "Lato, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif";
 
@@ -56,13 +58,41 @@ const CONTAINER_WIDTH = 600;
  */
 export const IMPRESSUM_URL = "https://www.narravit.de/impressum";
 
+/**
+ * Bilder in Mails brauchen eine öffentlich erreichbare Adresse. Sie liegen in
+ * `public/images/mail/` und werden immer von der Production-App geladen:
+ * Stage ist per Vercel-Deployment-Protection gesperrt, dort kämen Mail-
+ * Programme nicht an die Bilder. Folge: Vor dem Go-live zeigen auch
+ * Stage-Mails die Bilder erst, wenn app.narravit.de diese App ausliefert
+ * (siehe docs/production/prod-umzug.md).
+ */
+export const MAIL_ASSETS_URL = "https://app.narravit.de/images/mail";
+
+const LOGO = {
+  src: `${MAIL_ASSETS_URL}/narravit-logo.png`,
+  width: 110,
+  height: 97,
+};
+
+/** Breite der Inhalts-Karte innen (600 − 2 × 24 Rand − 2 × 1 Rahmen). */
+export const CARD_INNER_WIDTH = 550;
+
+export type MailCardImage = {
+  src: string;
+  alt: string;
+  /** Anzeige-Höhe bei voller Kartenbreite (550 px) */
+  height: number;
+};
+
 type Props = {
   /** Preview-Text (erscheint in Mailbox-Vorschau direkt nach dem Betreff) */
   preview: string;
   /** Inhalt der Karte zwischen Header und Footer */
   children: ReactNode;
-  /** Optionales kleines Label im Header über dem Wordmark (z. B. "Bestätigung") */
+  /** Kategorie-Zeile im Kopf unter dem Schriftzug (z. B. „Willkommen") */
   headerEyebrow?: string;
+  /** Optionales Bild am oberen Rand der Inhalts-Karte, volle Kartenbreite */
+  cardImage?: MailCardImage;
   /**
    * Zusätzliche Zeile unter dem Impressum-Hinweis im Footer (z. B. die
    * Pflichtangaben). Wird von den Supabase-Auth-Vorlagen genutzt.
@@ -74,6 +104,7 @@ export function Layout({
   preview,
   children,
   headerEyebrow,
+  cardImage,
   footerLegal,
 }: Props) {
   const kontaktEmail = "kontakt@narravit.de";
@@ -101,111 +132,108 @@ export function Layout({
             maxWidth: CONTAINER_WIDTH,
             margin: "0 auto",
             padding: 0,
-            backgroundColor: COLORS.cream,
+            backgroundColor: COLORS.paper,
           }}
         >
-          {/* ─── Header-Banner ────────────────────────────────────── */}
+          {/* ─── Kopf ─────────────────────────────────────────────── */}
           <Section
             style={{
-              backgroundColor: COLORS.sand,
-              padding: "32px 24px",
+              backgroundColor: COLORS.paper,
+              padding: "32px 24px 8px",
               textAlign: "center",
             }}
           >
+            {/* Leerer Alt-Text: Der Schriftzug darunter nennt den Namen. */}
+            <Img
+              src={LOGO.src}
+              width={LOGO.width}
+              height={LOGO.height}
+              alt=""
+              style={{ display: "block", margin: "0 auto" }}
+            />
+            <Text
+              style={{
+                margin: 0,
+                paddingTop: 8,
+                fontFamily: SERIF_WORDMARK,
+                fontSize: 26,
+                fontWeight: 300,
+                lineHeight: "36px",
+                color: COLORS.forest,
+              }}
+            >
+              NARRAVIT
+            </Text>
             {headerEyebrow ? (
               <Text
                 style={{
                   margin: 0,
-                  marginBottom: 8,
+                  marginTop: 4,
                   fontFamily: SANS,
                   fontSize: 13,
+                  fontWeight: 500,
+                  lineHeight: "24px",
                   letterSpacing: "0.12em",
                   textTransform: "uppercase",
-                  color: COLORS.ink,
-                  opacity: 0.7,
+                  color: COLORS.forest,
                 }}
               >
                 {headerEyebrow}
               </Text>
             ) : null}
-            <Text
-              style={{
-                margin: 0,
-                fontFamily: SERIF,
-                fontSize: 32,
-                fontWeight: 500,
-                letterSpacing: "0.06em",
-                color: COLORS.ink,
-                lineHeight: 1.1,
-              }}
-            >
-              NARRAVIT
-            </Text>
-            <Text
-              style={{
-                margin: 0,
-                marginTop: 6,
-                fontFamily: SANS,
-                fontSize: 14,
-                color: COLORS.ink,
-                opacity: 0.85,
-              }}
-            >
-              Lebensgeschichten zum Buch
-            </Text>
           </Section>
 
           {/* ─── Inhalts-Karte ───────────────────────────────────── */}
           <Section
             style={{
-              padding: "32px 24px",
-              backgroundColor: COLORS.cream,
+              padding: "8px 24px 24px",
+              backgroundColor: COLORS.paper,
             }}
           >
             <Container
               style={{
                 width: "100%",
                 backgroundColor: COLORS.cardWhite,
-                padding: "32px 28px",
                 border: `1px solid ${COLORS.border}`,
               }}
             >
-              {children}
+              {cardImage ? (
+                <Img
+                  src={cardImage.src}
+                  width={CARD_INNER_WIDTH}
+                  height={cardImage.height}
+                  alt={cardImage.alt}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    maxWidth: CARD_INNER_WIDTH,
+                    height: "auto",
+                  }}
+                />
+              ) : null}
+              <Section style={{ padding: "32px 28px" }}>{children}</Section>
             </Container>
           </Section>
 
-          {/* ─── Footer-Band ─────────────────────────────────────── */}
+          {/* ─── Fuß ─────────────────────────────────────────────── */}
           <Section
             style={{
-              backgroundColor: COLORS.sand,
-              padding: "20px 24px",
+              backgroundColor: COLORS.paper,
+              padding: "8px 24px 48px",
               textAlign: "center",
             }}
           >
             <Text
               style={{
                 margin: 0,
-                marginBottom: 4,
-                fontFamily: SERIF,
-                fontSize: 16,
-                fontWeight: 500,
-                letterSpacing: "0.04em",
-                color: COLORS.ink,
-              }}
-            >
-              narravit
-            </Text>
-            <Text
-              style={{
-                margin: 0,
                 fontFamily: SANS,
                 fontSize: 12,
+                lineHeight: "18px",
                 color: COLORS.ink,
                 opacity: 0.85,
-                lineHeight: 1.5,
               }}
             >
-              Fragen oder Wünsche? Schreiben Sie uns an{" "}
+              Fragen oder Wünsche? Kontaktieren Sie uns unter{" "}
               <Link
                 href={`mailto:${kontaktEmail}`}
                 style={{ color: COLORS.ink, textDecoration: "underline" }}
@@ -214,18 +242,13 @@ export function Layout({
               </Link>
               .
             </Text>
-            <Hr
-              style={{
-                borderColor: "rgba(62,56,49,0.18)",
-                margin: "12px auto",
-                width: "60%",
-              }}
-            />
             <Text
               style={{
                 margin: 0,
+                marginTop: 12,
                 fontFamily: SANS,
                 fontSize: 11,
+                lineHeight: "18px",
                 color: COLORS.ink,
                 opacity: 0.7,
               }}
@@ -237,8 +260,8 @@ export function Layout({
                 Impressum
               </Link>
               {" · "}
-              Dies ist eine Transaktions-E-Mail. Antworten landen nicht im
-              Posteingang.
+              Dies ist eine Transaktions-E-Mail. Antworten Sie nicht auf diese
+              Mail.
               {footerLegal !== undefined ? (
                 <>
                   <br />
@@ -255,20 +278,16 @@ export function Layout({
 
 // ─── Wiederverwendbare Sub-Komponenten ─────────────────────────────────────
 
-/**
- * Standard-Anrede + Body-Block-Wrapper. Verwendet die marken-typischen
- * Schriftgrößen/-farben für den Mail-Body.
- */
 export function MailHeading({ children }: { children: ReactNode }) {
   return (
     <Text
       style={{
         margin: 0,
         marginBottom: 16,
-        fontFamily: SERIF,
+        fontFamily: SERIF_HEADING,
         fontSize: 24,
-        fontWeight: 500,
-        lineHeight: 1.25,
+        fontWeight: 400,
+        lineHeight: "30px",
         color: COLORS.ink,
       }}
     >
@@ -285,7 +304,7 @@ export function MailParagraph({ children }: { children: ReactNode }) {
         marginBottom: 16,
         fontFamily: SANS,
         fontSize: 15,
-        lineHeight: 1.6,
+        lineHeight: "24px",
         color: COLORS.inkSecondary,
       }}
     >
@@ -293,6 +312,12 @@ export function MailParagraph({ children }: { children: ReactNode }) {
     </Text>
   );
 }
+
+/** Link im Fließtext (Mail-Adresse, Rechnung, Anmelden). */
+export const mailLinkStyle = {
+  color: COLORS.ink,
+  textDecoration: "underline",
+} as const;
 
 /**
  * Schlüssel-Wert-Liste für Zahlungs-/Detail-Blöcke. Wird tabellarisch
@@ -343,8 +368,9 @@ export function MailDetailsList({
 }
 
 /**
- * Primärer CTA-Button (Sand-Hintergrund). Verwendet `<Button>` von React-
- * Email für korrektes VML-Rendering in Outlook.
+ * Primärer CTA-Button (Sand-Hintergrund), gebaut als Link statt
+ * @react-email/components <Button>, um konsistente Farben zu garantieren und
+ * keine Library-Default-Styles zu erben.
  */
 export function MailCtaButton({
   href,
@@ -353,9 +379,6 @@ export function MailCtaButton({
   href: string;
   children: ReactNode;
 }) {
-  // Wir bauen den Button manuell als Tabelle-mit-Text-Link statt
-  // @react-email/components <Button>, um konsistente Farben zu garantieren
-  // und keine Library-Default-Styles zu erben.
   return (
     <Container style={{ margin: "24px 0", textAlign: "center" }}>
       <Link

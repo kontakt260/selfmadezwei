@@ -21,7 +21,7 @@ export type SendGuestPurchaseInput = {
 export async function sendGuestPurchaseMail(input: SendGuestPurchaseInput): Promise<void> {
   const result = await sendEmail({
     to: input.to,
-    subject: "Ihre Zahlung ist eingegangen — bitte legen Sie Ihr narravit-Konto an",
+    subject: "Ihre Zahlung ist eingegangen — bitte legen Sie Ihr NARRAVIT-Konto an",
     react: GuestPurchaseEmail({
       fullName: input.fullName,
       buyerEmail: input.to,

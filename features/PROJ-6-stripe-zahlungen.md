@@ -27,7 +27,7 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 - [x] Trifft der Webhook später ein als der Käufer (Stripe garantiert keine Reihenfolge), prüft `/kauf-einloesen` die Session direkt bei Stripe und erfasst den Kauf selbst.
 - [x] Konten ohne Projekt laufen nach der Anmeldung automatisch über `/kauf-einloesen`; gibt es nichts einzulösen, geht es wie bisher zum Assistenten. Bestandskunden mit offenem Kauf werden bei der Anmeldung ebenfalls dorthin geleitet.
 - [x] `/kauf-einloesen` verlangt eine Anmeldung und merkt sich das Ziel (`/anmelden?next=/kauf-einloesen`).
-- [ ] **Stage-Datenbank:** Migration `20261116100000_proj6_purchase_claims.sql` eingespielt (siehe „Offen").
+- [x] **Stage-Datenbank:** Migration `20261116100000_proj6_purchase_claims.sql` eingespielt (2026-11-19 von Jakob über den SQL-Editor; geprüft: Tabelle mit RLS vorhanden, in der Migrations-Historie vermerkt).
 - [ ] **Live-Durchlauf auf Stage** mit Stripe-Testmodus: Gast-Kauf → Mail → Registrierung → Projekt vorhanden (siehe „Offen").
 
 ### Entscheidungen
@@ -36,6 +36,8 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 | Wann entsteht das Projekt? | Beim Einlösen, nicht bei der Zahlung | `projects.owner_id` ist Pflicht; ohne Konto gibt es keinen Eigentümer. Kein Eingriff in bestehende Tabellen oder RLS-Policies. |
 | Ab wann laufen die 12 Monate? | Ab dem Einlösen (Konto-Anlage) | Der Käufer verliert keine Zeit, wenn er das Konto erst später anlegt. Die Mail nennt deshalb „12 Monate ab Einrichtung Ihres Kontos". |
 | Geschenk-Einladung | Geht erst beim Einlösen raus | Vorher gibt es kein Projekt, dem die beschenkte Person beitreten könnte. Erfolgsseite und Mail sagen das ausdrücklich. |
+| Kaufbestätigung bei Geschenk „Nur per Sprachnachricht erzählen" (2026-11-19, Jakob) | Dieselbe Mail wie beim Geschenk mit eigenem Zugang (Figma Mail 03), nur mit dem **Namen** der beschenkten Person statt ihrer Adresse: „Das Geschenk an [Name] ist unterwegs." Erfolgsseite nennt ebenfalls den Namen. | In diesem Pfad gibt es keine Einladung und noch keinen Kontaktweg — der wird erst mit PROJ-12 abgefragt. Der Käufer ist Projektleiter (Druckauftrag, Verwaltung). Umgesetzt im Webhook (`giftRecipientName` aus `gift_recipient_name`), in `PortalPurchaseEmail` und `/kauf-erfolgreich`; Figma-Variante „03b". |
+| Geschenk ohne eigenen Zugang (2026-11-19, Jakob) | Bleibt wie gebaut: Der Käufer hat ein Konto, ist aber kein Projektmitglied; bis die beschenkte Person die Einladung annimmt, ist niemand Projektleiter. Keine eigene Seite für den Käufer, kein Button in der Kaufbestätigung. | Der Käufer hat bewusst auf Zugang verzichtet; die Mail informiert nur, dass das Geschenk unterwegs ist. Meldet er sich trotzdem an, landet er (ohne Projekt) im Kauf-Assistenten — akzeptiert. Die Einladung gilt bis zum Zugangsende, das Projekt geht also nicht verloren. |
 | Gültigkeit der Geschenk-Einladung (2026-11-18) | So lange wie der Portal-Zugang des Projekts (`project_access.expires_at`), nicht 14 Tage | Geschenke werden oft lange vor der Übergabe gekauft. Verzichtet der Käufer auf eigenen Zugang, ist niemand Mitglied, der eine abgelaufene Einladung erneuern könnte. Das Risiko bleibt klein: 256-Bit-Token, Annahme nur mit genau der eingeladenen Adresse. Gilt für angemeldete Käufe und eingelöste Gast-Käufe (`fulfill-initial.ts`). Mails und Erfolgsseite nennen keine 14 Tage mehr. |
 | Zuordnung per E-Mail | Nur mit bestätigter Adresse | Sonst könnte jemand ein Konto mit fremder Adresse anlegen und den Kauf an sich ziehen. |
 | Zuordnung per Browser-Geheimnis | Zusätzlich zur E-Mail | Deckt den Fall ab, dass im Checkout eine andere Adresse steht als im Konto (z. B. PayPal-Adresse). |
@@ -49,7 +51,6 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 - **Kein neuer Env-Wert.**
 
 ### Offen
-- **Migration auf Stage einspielen.** Die Supabase-Anbindung des Assistenten ist nur lesend; `apply_migration` wurde abgelehnt. Bis dahin findet `/kauf-einloesen` keine Käufe (fängt den Fehler ab und leitet weiter), und der Webhook antwortet für Gast-Käufe mit 500 — Stripe wiederholt den Aufruf, sobald die Tabelle existiert.
 - **Live-Durchlauf auf Stage** (Stripe-Testmodus): Kauf als Gast, Mail, Registrierung mit derselben und mit abweichender Adresse, Geschenk-Variante, Anmeldung als Bestandskunde.
 - **Landingpage:** Der Button „Jetzt kaufen" muss auf `<App-URL>/onboarding` zeigen (optional `?for=self` bzw. `?for=gift`), nicht auf `/registrieren`.
 - **Missbrauchsschutz:** Checkout-Sessions lassen sich jetzt ohne Konto anlegen. Rate-Limit für den Checkout-Start in PROJ-17 aufnehmen.

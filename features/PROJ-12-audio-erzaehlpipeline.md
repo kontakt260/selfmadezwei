@@ -6,6 +6,14 @@
 
 > **Neufassung 2026-10-13.** Ersetzt die frühere „Vapi-Pipeline" (Telefon-Assistent) vollständig. Die alte Spec liegt nur noch zur Referenz unter [archive/PROJ-12-vapi-pipeline.md](archive/PROJ-12-vapi-pipeline.md) und wird **nicht** umgesetzt. Das frühere Tech-Design ist damit hinfällig — `/architecture` muss neu laufen.
 
+> **Bestätigung + TODO 2026-11-19 (Jakob).** Der neue Onboarding-Schritt „Wie erreichen wir [Name]?" (siehe Onboarding-Umbau) ist gewollt, besonders für das Geschenk „Nur per Sprachnachricht erzählen". Gewünschte Führung: erst die Frage **„Wie soll [Name] die wöchentlichen Erzähl-Impulse erhalten?" — Telefon (SMS), E-Mail oder beides**, danach genau die passenden Felder. Das präzisiert das Kriterium „mindestens ein Kontaktweg, daraus ergibt sich der Kanal". Ebenso als TODO gesetzt: die komplette Logik in der Projektübersicht (Sektion „Erzählen per Sprachnachricht", ändern, Status). Zeitpunkt: als eigenes Paket „Erzähl-Einstellungen" (Tabelle + Onboarding-Schritt + Projektübersicht-Sektion) **vor dem Go-live**, siehe Umsetzungs-Reihenfolge Schritt 6.
+
+> **Neue Wünsche 2026-11-19 (Jakob) — beim nächsten `/refine PROJ-12` entscheiden.**
+> - **Datenbank:** Die Erzähl-Einstellungen (Kanal, Kontaktwege, Rhythmus, Einverständnis) brauchen eine eigene Tabelle (Datenmodell B.1) — Onboarding speichert dort, die Projektübersicht liest und ändert dort.
+> - **Rhythmus einstellbar:** In der Projektübersicht lässt sich die Frequenz der Erzähl-Impulse einstellen, z. B. „alle 7 Tage" / „alle 14 Tage", eventuell mit einem kleinen Kalender für den nächsten Termin (Idee, Ausgestaltung offen).
+> - **Von Hand auslösen:** Der Projektleiter kann in der Projektübersicht jederzeit eine Erzähl-Aufforderung sofort auslösen.
+> - **Achtung, Widerspruch zu festen Entscheidungen:** Beides ändert bisher gesetzte Punkte — „wöchentlich" und „kein manueller Versand" (CLAUDE.md „Feste Produktentscheidungen", PRD-Constraints, hier das Kriterium „Es gibt keinen Button zum manuellen Versenden einer Aufforderung"). Wenn Jakob das beim `/refine` bestätigt, dort und in CLAUDE.md/PRD nachziehen. Zu klären: Missbrauchs- und Kostenschutz beim Auslösen von Hand (SMS-Kosten, z. B. höchstens eine Aufforderung pro Tag), und ob es dann auch nur für noch leere Kapitel gilt.
+
 ## Kurzbeschreibung
 Die erzählende Person bekommt automatisch einmal pro Woche per Mail und/oder SMS eine Erzähl-Aufforderung zu einem Kapitel. Über einen persönlichen, nicht erratbaren Link öffnet sie eine Aufnahmeseite im Browser (ohne Login) und erzählt ihre Geschichte als Monolog. NARRAVIT verschriftlicht die Aufnahme und formuliert daraus intern einen flüssigen Kapiteltext in Ich-Form, der im Kapitel landet und im Editor weiterbearbeitet werden kann. Zusätzlich kann im Portal jederzeit direkt zu einem noch leeren Kapitel erzählt werden.
 

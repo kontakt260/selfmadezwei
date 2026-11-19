@@ -21,8 +21,8 @@ export function ConfirmSignupTemplate() {
       <MailParagraph>Guten Tag,</MailParagraph>
       <MailParagraph>
         vielen Dank für Ihre Registrierung bei NARRAVIT. Bitte bestätigen Sie
-        kurz Ihre E-Mail-Adresse — danach können Sie direkt beginnen, Ihre
-        Erinnerungen festzuhalten.
+        kurz Ihre E-Mail-Adresse — danach können Sie direkt unser Portal
+        erkunden.
       </MailParagraph>
 
       <MailCtaButton href={link}>E-Mail-Adresse bestätigen</MailCtaButton>

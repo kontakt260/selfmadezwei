@@ -3,13 +3,15 @@
 // Trigger: Stripe-Webhook checkout.session.completed mit
 // payment_type = initial_portal_access (PROJ-6).
 //
-// Drei Fälle:
-//   - Kauf für sich selbst bzw. Geschenk mit eigenem Zugang: „Ihr
-//     Portal-Zugang ist freigeschaltet" (+ Hinweis auf die Einladung an die
-//     beschenkte Person, falls eine verschickt wurde).
-//   - Geschenk ohne eigenen Zugang (`buyerHasAccess = false`): Der Käufer ist
-//     kein Projektmitglied — die Mail bestätigt Zahlung und Geschenk, ohne
-//     auf einen Portal-Zugang zu verweisen.
+// Vier Fassungen (Texte: Figma-Frames 02, 03, 03b, 04 — Jakob, 2026-11-19):
+//   - 02 Kauf für sich selbst: „Ihr Portal-Zugang ist freigeschaltet".
+//   - 03 Geschenk mit eigenem Zugang, Einladung an die beschenkte Person:
+//     „Ihr Geschenk ist unterwegs", nennt die Adresse.
+//   - 03b Geschenk „Nur per Sprachnachricht erzählen": keine Einladung,
+//     nennt die beschenkte Person beim Namen (Kontaktweg kommt mit PROJ-12).
+//   - 04 Geschenk ohne eigenen Zugang (`buyerHasAccess = false`): Der Käufer
+//     ist kein Projektmitglied — die Mail bestätigt Zahlung und Geschenk,
+//     ohne Button ins Portal.
 
 import {
   Layout,
@@ -17,6 +19,7 @@ import {
   MailParagraph,
   MailCtaButton,
   MailDetailsList,
+  mailLinkStyle,
 } from "./Layout";
 
 export type PortalPurchaseEmailProps = {
@@ -31,8 +34,15 @@ export type PortalPurchaseEmailProps = {
   /** Optional: Link zur Stripe-Rechnung */
   invoiceUrl?: string;
   siteUrl: string;
+  /** Neu angelegtes Projekt — Ziel des Buttons „Zur Projektübersicht" */
+  projectId?: string;
   /** Adresse der beschenkten Person, an die eine Einladung ging */
   giftRecipientEmail?: string;
+  /**
+   * Name der beschenkten Person beim Geschenk „Nur per Sprachnachricht
+   * erzählen" (keine Einladung, deshalb keine Adresse).
+   */
+  giftRecipientName?: string;
   /** false = Geschenk ohne eigenen Portal-Zugang des Käufers */
   buyerHasAccess?: boolean;
 };
@@ -43,10 +53,7 @@ function InvoiceHint({ invoiceUrl }: { invoiceUrl?: string }) {
     <>
       {" "}
       Ihre Rechnung finden Sie{" "}
-      <a
-        href={invoiceUrl}
-        style={{ color: "#3E3831", textDecoration: "underline" }}
-      >
+      <a href={invoiceUrl} style={mailLinkStyle}>
         hier
       </a>
       .
@@ -61,13 +68,17 @@ export function PortalPurchaseEmail({
   expiresAtFormatted,
   invoiceUrl,
   siteUrl,
+  projectId,
   giftRecipientEmail,
+  giftRecipientName,
   buyerHasAccess = true,
 }: PortalPurchaseEmailProps) {
   const greeting = fullName?.trim()
     ? `Hallo ${fullName.trim()},`
     : "Hallo,";
-  const personalAreaUrl = `${siteUrl}/`;
+  const projectUrl = projectId
+    ? `${siteUrl}/projektuebersicht/${encodeURIComponent(projectId)}`
+    : `${siteUrl}/`;
 
   const details: Array<{ label: string; value: string }> = [
     { label: "Betrag", value: amountFormatted },
@@ -75,62 +86,107 @@ export function PortalPurchaseEmail({
     { label: "Zugang gültig bis", value: expiresAtFormatted },
   ];
 
+  // 04 — Geschenk ohne eigenen Zugang
   if (!buyerHasAccess) {
     const recipient = giftRecipientEmail ?? "die beschenkte Person";
     return (
       <Layout
-        preview="Vielen Dank — Ihr narravit-Geschenk ist unterwegs."
+        preview="Vielen Dank — Ihr NARRAVIT-Geschenk ist unterwegs."
         headerEyebrow="Geschenk"
       >
         <MailHeading>Ihr Geschenk ist unterwegs</MailHeading>
         <MailParagraph>{greeting}</MailParagraph>
         <MailParagraph>
-          vielen Dank für Ihren Kauf. Ihre Zahlung ist eingegangen, und wir
-          haben <strong>{recipient}</strong> eine Einladung geschickt. Mit
-          dem Link darin nimmt die beschenkte Person das Lebensbuch an und
-          kann sofort mit dem Erzählen beginnen.
+          vielen Dank für Ihren Kauf. Ihre Zahlung ist eingegangen und wir
+          haben das Geschenk an <strong>{recipient}</strong> gesendet. Mit dem
+          Link darin erhält die beschenkte Person Zugang zum Projekt und kann
+          sofort mit dem Erzählen beginnen.
         </MailParagraph>
 
         <MailDetailsList items={details} />
 
         <MailParagraph>
-          Die Einladung bleibt gültig, solange der Portal-Zugang läuft — die
-          beschenkte Person kann sie also auch später in Ruhe annehmen. Wie
-          gewünscht haben Sie selbst
-          keinen Zugang zum Projekt — die beschenkte Person kann Sie später
-          jederzeit als Co-Autorin oder Co-Autor dazuholen.
+          Wie bei der Bestellung gewünscht wurde, erhalten Sie selbst keinen
+          Zugang zum Projekt und sehen nicht, was erzählt wird — die
+          beschenkte Person kann Sie jedoch jederzeit als Co-Autorin oder
+          Co-Autor dazuholen.
           <InvoiceHint invoiceUrl={invoiceUrl} />
         </MailParagraph>
       </Layout>
     );
   }
 
+  const recipientName = giftRecipientName?.trim();
+  const isGift = Boolean(giftRecipientEmail || recipientName);
+
+  // 02 — Kauf für sich selbst
+  if (!isGift) {
+    return (
+      <Layout
+        preview="Ihr NARRAVIT-Portal-Zugang ist freigeschaltet."
+        headerEyebrow="Willkommen"
+      >
+        <MailHeading>Ihr Portal-Zugang ist freigeschaltet</MailHeading>
+        <MailParagraph>{greeting}</MailParagraph>
+        <MailParagraph>
+          herzlich willkommen bei NARRAVIT. Vielen Dank für Ihr Vertrauen.
+          Ihre Zahlung ist eingegangen — ab sofort können Sie Ihre
+          Lebensgeschichte schreiben oder per Sprachnachricht erzählen.
+        </MailParagraph>
+
+        <MailDetailsList items={details} />
+
+        <MailCtaButton href={projectUrl}>Zur Projektübersicht</MailCtaButton>
+
+        <MailParagraph>
+          Ihr Portal-Zugang ist <strong>12 Monate</strong> gültig. Vor Ablauf
+          erinnern wir Sie rechtzeitig an die Verlängerung.
+          <InvoiceHint invoiceUrl={invoiceUrl} />
+        </MailParagraph>
+      </Layout>
+    );
+  }
+
+  // 03 / 03b — Geschenk mit eigenem Zugang
   return (
     <Layout
-      preview="Ihr narravit-Portal-Zugang ist freigeschaltet."
+      preview="Vielen Dank — Ihr NARRAVIT-Geschenk ist unterwegs."
       headerEyebrow="Willkommen"
     >
-      <MailHeading>Ihr Portal-Zugang ist freigeschaltet</MailHeading>
+      <MailHeading>Ihr Geschenk ist unterwegs</MailHeading>
       <MailParagraph>{greeting}</MailParagraph>
-      <MailParagraph>
-        herzlich willkommen bei narravit. Ihre Zahlung ist eingegangen — ab
-        sofort können Sie Ihre Lebensgeschichte schreiben oder per
-        Sprachnachricht erzählen lassen. <strong>Das Erzählen</strong> ist in
-        Ihrem Zugang bereits enthalten.
-      </MailParagraph>
+      {giftRecipientEmail ? (
+        <MailParagraph>
+          herzlich willkommen bei NARRAVIT. Vielen Dank für Ihr Vertrauen.
+          Ihre Zahlung ist eingegangen und Ihr Geschenk ist unterwegs — vorab
+          können Sie schon einmal einen Blick ins Projekt werfen oder selbst
+          mit dem Erzählen beginnen.
+        </MailParagraph>
+      ) : (
+        <>
+          <MailParagraph>
+            herzlich willkommen bei NARRAVIT. Vielen Dank für Ihr Vertrauen.
+            Ihre Zahlung ist eingegangen und Ihr Geschenk ist unterwegs — von
+            nun an erinnern wir die von Ihnen beschenkte Person mithilfe von
+            tiefgehenden Fragen und spannenden Erinnerungshilfen wöchentlich
+            an das Erzählen der Geschichte (per Mail oder SMS).
+          </MailParagraph>
+          <MailParagraph>
+            In der Projektübersicht können Sie jederzeit Änderungen vornehmen,
+            z. B. an der Frequenz der Erinnerungshilfen. Dort verwalten Sie
+            zusätzlich das Projekt und geben den finalen Druckauftrag.
+          </MailParagraph>
+        </>
+      )}
 
       <MailDetailsList items={details} />
 
-      {giftRecipientEmail ? (
-        <MailParagraph>
-          Die Einladung an <strong>{giftRecipientEmail}</strong> ist
-          unterwegs. Sie bleibt gültig, solange der Portal-Zugang läuft.
-        </MailParagraph>
-      ) : null}
+      <MailParagraph>
+        Das Geschenk an <strong>{giftRecipientEmail ?? recipientName}</strong>{" "}
+        ist unterwegs.
+      </MailParagraph>
 
-      <MailCtaButton href={personalAreaUrl}>
-        Zum persönlichen Bereich
-      </MailCtaButton>
+      <MailCtaButton href={projectUrl}>Zur Projektübersicht</MailCtaButton>
 
       <MailParagraph>
         Ihr Portal-Zugang ist <strong>12 Monate</strong> gültig. Rechtzeitig

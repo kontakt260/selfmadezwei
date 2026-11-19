@@ -25,7 +25,9 @@ type Variant =
   | { type: "initial-self" }
   // Geschenk, gift_mode = "phone-only": Käufer bleibt Projektleiter,
   // beschenkte Person erzählt per Sprachnachricht, kein Portal-Login für sie.
-  | { type: "initial-gift-phone-only"; recipientEmail: string }
+  // Kontaktweg der Person wird erst mit PROJ-12 abgefragt — deshalb nur
+  // ihr Name.
+  | { type: "initial-gift-phone-only"; recipientName: string }
   // Geschenk, gift_mode = "phone-plus-computer" (beide Sub-Varianten —
   // mit oder ohne buyer_retains_access). Für den Empfänger wurde eine
   // Einladungs-Mail verschickt; die Bestätigung hebt das hervor.
@@ -63,7 +65,8 @@ async function verifyStripeSession(sessionId: string): Promise<VerifiedSession |
         const recipientEmail = meta.gift_recipient_email ?? "";
         const giftMode = meta.gift_mode;
         if (giftMode === "phone-only") {
-          return { ...base, variant: { type: "initial-gift-phone-only", recipientEmail } };
+          const recipientName = meta.gift_recipient_name?.trim() ?? "";
+          return { ...base, variant: { type: "initial-gift-phone-only", recipientName } };
         }
         // gift_mode === "phone-plus-computer" — beide Sub-Modi auf
         // einer gemeinsamen Bestätigungsseite, die das Mail-Versenden
@@ -149,7 +152,7 @@ export default async function KaufErfolgreichPage({
         <SuccessIcon />
         {variant.type === "initial-self" && <InitialSelfContent />}
         {variant.type === "initial-gift-phone-only" && (
-          <InitialGiftPhoneOnlyContent recipientEmail={variant.recipientEmail} />
+          <InitialGiftPhoneOnlyContent recipientName={variant.recipientName} />
         )}
         {variant.type === "initial-gift-phone-computer" && (
           <InitialGiftPhoneComputerContent
@@ -254,9 +257,9 @@ function InitialSelfContent() {
 }
 
 function InitialGiftPhoneOnlyContent({
-  recipientEmail,
+  recipientName,
 }: {
-  recipientEmail: string;
+  recipientName: string;
 }) {
   return (
     <>
@@ -269,12 +272,11 @@ function InitialGiftPhoneOnlyContent({
         Geschichten Ihrer beschenkten Person im Portal lesen.
       </p>
       <p className="border border-[#96B897]/40 bg-[#96B897]/10 p-4 text-base text-[#3E3831]">
-        {recipientEmail ? (
+        {recipientName ? (
           <>
-            Ihre beschenkte Person (
-            <span className="font-semibold">{recipientEmail}</span>) erzählt
-            ihre Geschichten per Sprachnachricht — ein eigener
-            Portal-Zugang ist für sie nicht nötig.
+            <span className="font-semibold">{recipientName}</span> erzählt
+            die Geschichten per Sprachnachricht — ein eigener Portal-Zugang
+            ist dafür nicht nötig.
           </>
         ) : (
           <>

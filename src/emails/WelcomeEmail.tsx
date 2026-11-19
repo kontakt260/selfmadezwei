@@ -6,12 +6,16 @@
 //
 // Abgrenzung: Diese Mail kommt NICHT direkt nach Sign-up — die
 // Verifikations-Mail von Supabase Auth ist eine separate Mail.
+//
+// Texte und Bild: Figma „05 Willkommen" (Jakob, 2026-11-19).
 
 import {
   Layout,
+  MAIL_ASSETS_URL,
   MailHeading,
   MailParagraph,
   MailCtaButton,
+  mailLinkStyle,
 } from "./Layout";
 
 export type WelcomeEmailProps = {
@@ -23,41 +27,43 @@ export function WelcomeEmail({ fullName, siteUrl }: WelcomeEmailProps) {
   const greeting = fullName?.trim()
     ? `Hallo ${fullName.trim()},`
     : "Hallo,";
-  const personalAreaUrl = `${siteUrl}/`;
+  const startUrl = `${siteUrl}/`;
 
   return (
     <Layout
-      preview="Willkommen bei narravit — schön, dass Sie da sind."
+      preview="Willkommen bei NARRAVIT — schön, dass Sie da sind."
       headerEyebrow="Willkommen"
+      cardImage={{
+        src: `${MAIL_ASSETS_URL}/willkommen-strand.jpg`,
+        alt: "Zwei Menschen gehen auf einem Holzsteg durch die Dünen zum Meer",
+        height: 300,
+      }}
     >
       <MailHeading>Schön, dass Sie da sind</MailHeading>
       <MailParagraph>{greeting}</MailParagraph>
       <MailParagraph>
-        Ihr narravit-Konto ist bestätigt. Sie können jetzt loslegen — egal,
+        Ihr NARRAVIT-Konto ist bestätigt. Sie können jetzt loslegen — egal,
         ob Sie selbst schreiben oder per Sprachnachricht erzählen möchten:
       </MailParagraph>
       <MailParagraph>
-        — Legen Sie Ihr <strong>Lebensbuch-Projekt</strong> an und gestalten
-        Sie das Cover.
+        — Beginnen Sie Ihr <strong>Buch-Projekt</strong> und gestalten Sie das
+        Cover.
         <br />— Laden Sie <strong>Familienmitglieder</strong> als
         Co-Autorinnen oder Projektleiter:innen ein.
         <br />— Erzählen Sie Ihre Geschichten per{" "}
-        <strong>Sprachnachricht</strong>{" "}
-        oder schreiben Sie sie selbst im <strong>A5-Editor</strong>.
-        <br />— Lassen Sie sich von <strong>Erzähl-Impulsen</strong>{" "}
-        inspirieren.
+        <strong>Sprachnachricht</strong> oder schreiben Sie sie im{" "}
+        <strong>A5-Editor</strong>, unsere selektierten{" "}
+        <strong>Leitfragen</strong> helfen dabei.
+        <br />— Lassen Sie sich von regelmäßigen{" "}
+        <strong>Erzähl-Impulsen</strong> und{" "}
+        <strong>tiefgehenden Leitfragen</strong> inspirieren.
       </MailParagraph>
 
-      <MailCtaButton href={personalAreaUrl}>
-        Zum persönlichen Bereich
-      </MailCtaButton>
+      <MailCtaButton href={startUrl}>Jetzt eigenes Buch beginnen</MailCtaButton>
 
       <MailParagraph>
         Wenn Sie Fragen haben oder etwas hakt, schreiben Sie uns einfach an{" "}
-        <a
-          href="mailto:kontakt@narravit.de"
-          style={{ color: "#3E3831", textDecoration: "underline" }}
-        >
+        <a href="mailto:kontakt@narravit.de" style={mailLinkStyle}>
           kontakt@narravit.de
         </a>{" "}
         — wir helfen gern weiter.

@@ -3,7 +3,7 @@ import type Stripe from "stripe";
 import { getStripe, PRODUCTS, type ProductType } from "@/lib/stripe/server";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { sendPortalPurchaseMail } from "@/lib/email/send-portal-purchase";
-import { sendRenewalMail } from "@/lib/email/send-renewal";
+import { sendRenewalInfoMail, sendRenewalMail } from "@/lib/email/send-renewal";
 import { sendInvitationMail } from "@/lib/email/send-invitation";
 import { sendGuestPurchaseMail } from "@/lib/email/send-guest-purchase";
 import { formatEur, formatGermanDate } from "@/lib/email/format";
@@ -37,6 +37,33 @@ async function resolveInvoiceUrl(
     );
     return undefined;
   }
+}
+
+/**
+ * Alle anderen Mitglieder eines Projekts mit Mail-Adresse — Empfänger der
+ * Info-Mail, wenn jemand den Zugang verlängert hat.
+ */
+async function resolveOtherMembers(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  projectId: string,
+  exceptUserId: string,
+): Promise<Array<{ email: string; fullName: string | null }>> {
+  const { data: members } = await supabase
+    .from("project_members")
+    .select("user_id")
+    .eq("project_id", projectId)
+    .limit(50);
+  const result: Array<{ email: string; fullName: string | null }> = [];
+  for (const member of members ?? []) {
+    if (member.user_id === exceptUserId) continue;
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("email, full_name")
+      .eq("id", member.user_id)
+      .maybeSingle();
+    if (profile?.email) result.push({ email: profile.email, fullName: profile.full_name ?? null });
+  }
+  return result;
 }
 
 async function resolveBuyerEmail(
@@ -209,7 +236,7 @@ async function handleInitial(
 ) {
   // Projekt, Zugang, Mitgliedschaft, Einladung und Zahlungs-Eintrag —
   // dieselbe Erfüllung wie beim Einlösen eines Kaufs ohne Konto.
-  const { expiresAt, buyerIsMember, invitation } = await fulfillInitialPurchase(supabase, {
+  const { projectId, expiresAt, buyerIsMember, invitation } = await fulfillInitialPurchase(supabase, {
     userId,
     stripeSessionId: session.id,
     amountCents: session.amount_total,
@@ -249,7 +276,14 @@ async function handleInitial(
           paymentDateFormatted: formatGermanDate(Date.now()),
           expiresAtFormatted: formatGermanDate(expiresAt),
           invoiceUrl: await resolveInvoiceUrl(session),
+          projectId,
           giftRecipientEmail: invitation ? invitation.email : undefined,
+          // Geschenk „Nur per Sprachnachricht erzählen": keine Einladung,
+          // die Mail nennt die beschenkte Person beim Namen (wie Mail 03).
+          giftRecipientName:
+            meta.is_gift === "1" && !invitation
+              ? meta.gift_recipient_name?.trim() || undefined
+              : undefined,
           buyerHasAccess: buyerIsMember,
         }),
       );
@@ -342,22 +376,56 @@ async function handleRenewal(
   });
   if (payErr) throw new Error(payErr.message);
 
-  // PROJ-11: Verlängerungs-Bestätigung.
+  // PROJ-11: Bestätigung an die Person, die verlängert hat, und Info an
+  // alle anderen Projektmitglieder (Jakob, 2026-11-19: verlängern kann
+  // jedes Mitglied, z. B. die beschenkte Person — die Information muss in
+  // beide Richtungen fließen).
   try {
     const buyer = await resolveBuyerEmail(supabase, session, userId);
+    const others = await resolveOtherMembers(supabase, projectId, userId);
+    const newExpiresAtFormatted = formatGermanDate(newExpiresAt);
+    // Beide Fassungen nennen das Projekt in der Detail-Box (wie Mail 09).
+    const { data: project } = await supabase
+      .from("projects")
+      .select("title")
+      .eq("id", projectId)
+      .maybeSingle();
+    const projectName = project?.title?.trim() || PROJECT_DEFAULT_TITLE;
+    const mails: Array<Promise<void>> = [];
+
     if (buyer.email) {
-      await sendRenewalMail({
-        to: buyer.email,
-        fullName: buyer.fullName ?? undefined,
-        amountFormatted: formatEur(
-          session.amount_total ?? PRODUCTS.renewal.amountCents,
-          (session.currency ?? PRODUCTS.renewal.currency).toUpperCase(),
-        ),
-        paymentDateFormatted: formatGermanDate(Date.now()),
-        newExpiresAtFormatted: formatGermanDate(newExpiresAt),
-        invoiceUrl: await resolveInvoiceUrl(session),
-      });
+      mails.push(
+        sendRenewalMail({
+          to: buyer.email,
+          fullName: buyer.fullName ?? undefined,
+          projectName,
+          projectId,
+          amountFormatted: formatEur(
+            session.amount_total ?? PRODUCTS.renewal.amountCents,
+            (session.currency ?? PRODUCTS.renewal.currency).toUpperCase(),
+          ),
+          paymentDateFormatted: formatGermanDate(Date.now()),
+          newExpiresAtFormatted,
+          invoiceUrl: await resolveInvoiceUrl(session),
+        }),
+      );
     }
+
+    const renewedBy = buyer.fullName?.trim() || buyer.email || "Ein Projektmitglied";
+    for (const member of others) {
+      mails.push(
+        sendRenewalInfoMail({
+          to: member.email,
+          fullName: member.fullName ?? undefined,
+          renewedBy,
+          projectName,
+          projectId,
+          newExpiresAtFormatted,
+        }),
+      );
+    }
+
+    await Promise.all(mails);
   } catch (err) {
     console.error(
       `[stripe-webhook] renewal mail failed for session ${session.id}: ${err instanceof Error ? err.message : String(err)}`,

@@ -33,10 +33,10 @@ export function ResetPasswordTemplate() {
         <br />
         Der Link ist aus Sicherheitsgründen nur begrenzt gültig und kann nur
         einmal verwendet werden. Sollte er abgelaufen sein, fordern Sie über
-        „Passwort vergessen?&quot; einfach einen neuen an.
+        „Passwort vergessen?“ einfach einen neuen an.
       </MailParagraph>
       <MailParagraph>
-        Melden Sie sich sonst mit Google oder Facebook an? Das funktioniert
+        Melden Sie sich sonst mit Apple, Google oder Facebook an? Das funktioniert
         weiterhin wie gewohnt — ein Passwort brauchen Sie dafür nicht.
       </MailParagraph>
       <MailParagraph>

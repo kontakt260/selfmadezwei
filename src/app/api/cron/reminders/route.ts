@@ -18,8 +18,10 @@ import { formatGermanDate } from "@/lib/email/format";
 //      bewusst breiter als ein Tag: Fällt ein Lauf aus oder schlägt ein
 //      Versand fehl, holt der nächste Lauf die Erinnerung nach. Doppelte
 //      Mails verhindert der mail_log-Marker.
-//   3. Pro Match: PL des Projekts auflösen, mail_log-Reservierung
-//      versuchen, bei Erfolg Reminder versenden.
+//   3. Pro Match: alle Mitglieder des Projekts auflösen (Projektleiter UND
+//      Co-Autoren — verlängern kann jedes Mitglied, z. B. auch die
+//      beschenkte Person; Jakob, 2026-11-19), mail_log-Reservierung pro
+//      Person versuchen, bei Erfolg Reminder versenden.
 //
 // Antwort: JSON mit `processed`, `sent`, `skipped` für Monitoring.
 
@@ -126,16 +128,14 @@ export async function GET(req: NextRequest) {
       processed += 1;
       if (!row.expires_at) continue;
 
-      // 2. PL des Projekts auflösen (es kann mehrere PL geben — wir
-      //    schicken an alle).
-      const { data: pls } = await supabase
+      // 2. Alle Mitglieder des Projekts auflösen, unabhängig von der Rolle.
+      const { data: members } = await supabase
         .from("project_members")
         .select("user_id")
         .eq("project_id", row.project_id)
-        .eq("role", "projektleiter")
-        .limit(20);
+        .limit(50);
 
-      if (!pls || pls.length === 0) continue;
+      if (!members || members.length === 0) continue;
 
       // 3. Projekt-Titel laden.
       const { data: projectRow } = await supabase
@@ -150,12 +150,12 @@ export async function GET(req: NextRequest) {
       //    Bereich, von wo der User den Verlängern-Button findet.
       const renewUrl = `${siteUrl}/projektuebersicht/${row.project_id}`;
 
-      for (const pl of pls) {
+      for (const member of members) {
         // 5. Empfänger-Adresse + Name auflösen.
         const { data: profile } = await supabase
           .from("profiles")
           .select("email, full_name")
-          .eq("id", pl.user_id)
+          .eq("id", member.user_id)
           .maybeSingle();
         if (!profile?.email) {
           skipped += 1;
@@ -164,7 +164,7 @@ export async function GET(req: NextRequest) {
 
         const r = await maybeSendReminderMail({
           to: profile.email,
-          userId: pl.user_id,
+          userId: member.user_id,
           projectId: row.project_id,
           variant: task.variant,
           fullName: profile.full_name ?? undefined,

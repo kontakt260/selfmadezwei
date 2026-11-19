@@ -16,8 +16,12 @@ export type SendPortalPurchaseInput = {
   paymentDateFormatted: string;
   expiresAtFormatted: string;
   invoiceUrl?: string;
+  /** Neu angelegtes Projekt — Ziel des Buttons „Zur Projektübersicht" */
+  projectId?: string;
   /** Adresse der beschenkten Person, an die eine Einladung ging */
   giftRecipientEmail?: string;
+  /** Name der beschenkten Person beim Geschenk „Nur per Sprachnachricht erzählen" */
+  giftRecipientName?: string;
   /** false = Geschenk ohne eigenen Portal-Zugang des Käufers */
   buyerHasAccess?: boolean;
 };
@@ -31,8 +35,8 @@ export async function sendPortalPurchaseMail(
   const result = await sendEmail({
     to: input.to,
     subject: buyerHasAccess
-      ? "Ihr narravit-Portal-Zugang ist freigeschaltet"
-      : "Ihr narravit-Geschenk ist unterwegs",
+      ? "Ihr NARRAVIT-Portal-Zugang ist freigeschaltet"
+      : "Ihr NARRAVIT-Geschenk ist unterwegs",
     react: PortalPurchaseEmail({
       fullName: input.fullName,
       amountFormatted: input.amountFormatted,
@@ -40,7 +44,9 @@ export async function sendPortalPurchaseMail(
       expiresAtFormatted: input.expiresAtFormatted,
       invoiceUrl: input.invoiceUrl,
       siteUrl,
+      projectId: input.projectId,
       giftRecipientEmail: input.giftRecipientEmail,
+      giftRecipientName: input.giftRecipientName,
       buyerHasAccess,
     }),
     tags: [{ name: "type", value: "portal_purchase" }],

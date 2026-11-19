@@ -10,6 +10,7 @@ import {
   ReminderEmail,
   WelcomeEmail,
 } from "./index";
+import { MAIL_ASSETS_URL } from "./Layout";
 
 // PROJ-11 QA — Inhalts-Regression für alle Transaktionsmails.
 //
@@ -67,12 +68,22 @@ const templates: Array<{ name: string; element: ReactElement; mustContain: strin
     name: "RenewalEmail",
     element: RenewalEmail({
       fullName: "Maria Muster",
+      projectName: "Omas Lebensbuch",
+      projectId: "p1",
       amountFormatted: "99,00 €",
       paymentDateFormatted: "13. Oktober 2026",
       newExpiresAtFormatted: "13. Oktober 2028",
       siteUrl,
     }),
-    mustContain: ["99,00 €", "13. Oktober 2028"],
+    // Projekt als erste Zeile der Box (wie Mail 09), Hinweis auf Mail 10b.
+    mustContain: [
+      "Projekt Omas Lebensbuch",
+      "Zur Projektübersicht",
+      `${siteUrl}/projektuebersicht/p1`,
+      "99,00 €",
+      "13. Oktober 2028",
+      "Falls es im Projekt noch weitere Mitglieder gibt, wurden sie per E-Mail über die Verlängerung informiert.",
+    ],
   },
   {
     name: "ReminderEmail (30)",
@@ -109,7 +120,7 @@ const templates: Array<{ name: string; element: ReactElement; mustContain: strin
       renewUrl: `${siteUrl}/projektuebersicht/p1`,
       siteUrl,
     }),
-    mustContain: ["Nur noch 1 Tag Portal-Zugang", "14. Oktober 2026"],
+    mustContain: ["Nur noch 1 Tag Projekt-Zugang", "14. Oktober 2026"],
   },
   {
     name: "InvitationEmail (Geschenk)",
@@ -123,10 +134,25 @@ const templates: Array<{ name: string; element: ReactElement; mustContain: strin
       isGift: true,
     }),
     mustContain: [
-      "Lena Muster schenkt Ihnen ein Lebensbuch",
+      "Lena Muster schenkt Ihnen ein Buch-Projekt",
       `${siteUrl}/einladung/tok_gift`,
-      "auch später",
       "Geschenk annehmen",
+    ],
+  },
+  {
+    name: "PortalPurchaseEmail (Kauf für sich selbst, mit Projekt)",
+    element: PortalPurchaseEmail({
+      fullName: "Maria Muster",
+      amountFormatted: "249,00 €",
+      paymentDateFormatted: "13. Oktober 2026",
+      expiresAtFormatted: "13. Oktober 2027",
+      siteUrl,
+      projectId: "p1",
+    }),
+    mustContain: [
+      "Ihr Portal-Zugang ist freigeschaltet",
+      "Zur Projektübersicht",
+      `${siteUrl}/projektuebersicht/p1`,
     ],
   },
   {
@@ -137,12 +163,30 @@ const templates: Array<{ name: string; element: ReactElement; mustContain: strin
       paymentDateFormatted: "14. Oktober 2026",
       expiresAtFormatted: "14. Oktober 2027",
       siteUrl,
+      projectId: "p1",
       giftRecipientEmail: "oma@example.test",
     }),
     mustContain: [
-      "Portal-Zugang ist freigeschaltet",
-      "Die Einladung an oma@example.test",
-      "solange der Portal-Zugang läuft",
+      "Ihr Geschenk ist unterwegs",
+      "einen Blick ins Projekt werfen",
+      "Das Geschenk an oma@example.test ist unterwegs.",
+      `${siteUrl}/projektuebersicht/p1`,
+    ],
+  },
+  {
+    name: "PortalPurchaseEmail (Geschenk nur per Sprachnachricht)",
+    element: PortalPurchaseEmail({
+      fullName: "Lena Muster",
+      amountFormatted: "249,00 €",
+      paymentDateFormatted: "14. Oktober 2026",
+      expiresAtFormatted: "14. Oktober 2027",
+      siteUrl,
+      giftRecipientName: "Oma Erna",
+    }),
+    mustContain: [
+      "Ihr Geschenk ist unterwegs",
+      "den finalen Druckauftrag",
+      "Das Geschenk an Oma Erna ist unterwegs.",
     ],
   },
   {
@@ -158,15 +202,30 @@ const templates: Array<{ name: string; element: ReactElement; mustContain: strin
     }),
     mustContain: [
       "Ihr Geschenk ist unterwegs",
-      "oma@example.test",
+      "das Geschenk an oma@example.test gesendet",
       "Betrag 249,00 €",
-      "solange der Portal-Zugang läuft",
+      "erhalten Sie selbst keinen Zugang zum Projekt",
+    ],
+  },
+  {
+    name: "RenewalEmail (Info an andere Mitglieder)",
+    element: RenewalEmail({
+      fullName: "Lena Muster",
+      renewedBy: "Maria Muster",
+      projectName: "Omas Lebensbuch",
+      newExpiresAtFormatted: "14. Oktober 2028",
+      siteUrl,
+    }),
+    mustContain: [
+      "Maria Muster hat den Portal-Zugang für das Projekt „Omas Lebensbuch“ um weitere 12 Monate verlängert",
+      "Projekt Omas Lebensbuch",
+      "Neuer Zugang gültig bis 14. Oktober 2028",
     ],
   },
   {
     name: "WelcomeEmail",
     element: WelcomeEmail({ fullName: "Maria Muster", siteUrl }),
-    mustContain: ["Maria"],
+    mustContain: ["Maria", "Jetzt eigenes Buch beginnen"],
   },
 ];
 
@@ -197,6 +256,29 @@ describe.each(templates)("$name", ({ element, mustContain }) => {
     expect(html).toContain('href="https://www.narravit.de/impressum"');
     expect(html).not.toContain(`${siteUrl}/impressum`);
     expect(html).toContain("kontakt@narravit.de");
+    expect(html).toContain("Kontaktieren Sie uns");
+    expect(html).toContain("Antworten Sie nicht auf diese Mail.");
+  });
+
+  it("loads the logo from the production app (Stage is access-protected)", async () => {
+    const html = await render(element);
+    expect(html).toContain(`src="${MAIL_ASSETS_URL}/narravit-logo.png"`);
+    expect(MAIL_ASSETS_URL).toBe("https://app.narravit.de/images/mail");
+  });
+});
+
+describe("WelcomeEmail image", () => {
+  it("shows the beach photo at the top of the card with alt text", async () => {
+    const html = await render(WelcomeEmail({ fullName: "Maria Muster", siteUrl }));
+    expect(html).toContain(`src="${MAIL_ASSETS_URL}/willkommen-strand.jpg"`);
+    expect(html).toMatch(/alt="[^"]*Holzsteg[^"]*"/);
+  });
+
+  it("is the only mail with a card image", async () => {
+    for (const t of templates.filter((t) => t.name !== "WelcomeEmail")) {
+      const html = await render(t.element);
+      expect(html).not.toContain("willkommen-strand.jpg");
+    }
   });
 });
 

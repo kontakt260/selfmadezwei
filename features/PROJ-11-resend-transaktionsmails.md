@@ -2,9 +2,21 @@
 
 > ℹ️ **Anpassung 2026-10-13:** Vapi entfällt ([PROJ-12](PROJ-12-audio-erzaehlpipeline.md)). „Mail 3 — Vapi-Paket-Kauf-Bestätigung" (Template, Helper, Webhook-Hook) wurde mit dem PROJ-6-Rückbau entfernt; die Portal-Kauf-Mail und die Welcome-Mail nennen jetzt „per Sprachnachricht erzählen" statt Telefon/10 Stunden. Alle Vapi-Passagen weiter unten sind damit überholt. Die neuen Mails (Erzähl-Aufforderung, Erinnerung, „neues Kapitel erzählt") gehören zu PROJ-12 und nutzen die hier gebaute Infrastruktur.
 
+> ℹ️ **Anpassung 2026-11-19 (Jakob) — Ablauf und Verlängerung an alle Mitglieder.** Verlängern kann jedes Projektmitglied, z. B. auch die beschenkte Person statt der Käuferin. Deshalb muss die Information in beide Richtungen fließen:
+> - **Erinnerungen 30 / 7 Tage vor Ablauf** gehen an **alle** Mitglieder des Projekts (Projektleiter und Co-Autoren), nicht mehr nur an Projektleiter (`src/app/api/cron/reminders/route.ts`; Marker in `mail_log` weiter pro Person).
+> - **Nach einer Verlängerung** bekommt die Person, die bezahlt hat, die Bestätigung mit Betrag und Rechnung plus den Satz, dass die anderen informiert wurden. **Alle anderen Mitglieder** bekommen eine Info-Mail („[Name] hat den Portal-Zugang für das Projekt „[Projekt]“ um weitere 12 Monate verlängert", neues Ablaufdatum) — ohne Betrag und Rechnung (`RenewalEmail` mit `renewedBy`, `sendRenewalInfoMail`, Webhook `handleRenewal`).
+> - Nicht-Mitglieder bekommen nichts: die Käuferin eines Geschenks ohne eigenen Zugang und die erzählende Person ohne Konto (PROJ-12).
+> - Figma: Mail 10 um den Hinweissatz ergänzt, neue Mail „10b Verlängerung Info an Mitglieder".
+
+> ℹ️ **Anpassung 2026-11-19 (abends) — Mail-Design und -Texte aus Figma im Code.** Quelle: Figma-Datei „NARRAVIT Mails" (Jakobs Stand ca. 23:30).
+> - **Layout** (`src/emails/Layout.tsx`): heller Grund `#FAF8F6` überall, Kopf mit Baum-Logo, Schriftzug „NARRAVIT" (Merriweather Light 26) und Kategorie-Zeile in Versalien; Überschriften PT Serif 24/30; Fuß ohne Schriftzug und Trennlinie, mit „Fragen oder Wünsche? Kontaktieren Sie uns unter kontakt@narravit.de." und „Impressum · Dies ist eine Transaktions-E-Mail. Antworten Sie nicht auf diese Mail." Schriften mit System-Fallback (keine Web-Fonts geladen).
+> - **Bilder:** Logo und Willkommens-Foto (`public/images/mail/`) werden immer von `https://app.narravit.de/images/mail/` geladen (`MAIL_ASSETS_URL`), weil Stage per Vercel geschützt ist — vor dem Go-live erscheinen sie deshalb nicht (siehe prod-umzug.md, Abschnitt 5). Die Willkommens-Mail zeigt das Foto in voller Kartenbreite über dem Text (`cardImage`).
+> - **Texte** 1:1 aus Figma (01–12, 03b, 10b), u. a.: Kaufbestätigung „Zur Projektübersicht" mit Link ins neue Projekt (Webhook gibt `projectId` weiter); Geschenk-Mails 03/03b/04 neu formuliert, Einladung „Buch-Projekt"; Erinnerungen „Projekt-Zugang" und „noch 90 weitere Tage"; Verlängerung 10/10b mit **Projekt als erster Zeile der Box** und Button „Zur Projektübersicht"; der Hinweis auf informierte Mitglieder steht in Mail 10 jetzt immer („Falls es im Projekt noch weitere Mitglieder gibt, …"), `othersInformed` entfällt. Kleine Korrekturen gegenüber Figma (in Figma nachgezogen): Tippfehler „Projekübersicht", Komma in Mail 10, „— von nun an" und „z. B. an der Frequenz" in 03b, deutsche Anführungszeichen, doppelte Leerzeichen, Fett-Bereiche in 05, „Kontaktieren Sie uns **unter** …".
+> - **Offen:** Pflichtangaben je nach Rechtsform (Platzhalter in den Supabase-Vorlagen bleibt bis zur Klärung); Impressum-Seite liefert weiter 404 (BUG-1); die 90-Tage-Aussage hat noch keine Lösch-/Sperrlogik; die Reset-Mail nennt Apple, obwohl die Apple-Anmeldung noch archiviert ist; 03b verspricht die Frequenz-Einstellung aus PROJ-12.
+
 ## Status: In Progress
 **Created:** 2026-05-22
-**Last Updated:** 2026-10-14
+**Last Updated:** 2026-11-19
 
 ## Dependencies
 - Requires **PROJ-2** (Auth + SSR) — User-Profile mit E-Mail-Adressen als Empfänger; Verifikations-Status als Voraussetzung für Welcome-Mail
