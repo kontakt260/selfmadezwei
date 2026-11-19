@@ -5,7 +5,7 @@ import {
   MailInlineFallbackLink,
   MailParagraph,
 } from "../Layout";
-import { LEGAL_PLACEHOLDER, authLink } from "./shared";
+import { authLink } from "./shared";
 
 // Supabase-Vorlage „Confirm signup" — wird nach der Registrierung verschickt.
 export function ConfirmSignupTemplate() {
@@ -15,7 +15,6 @@ export function ConfirmSignupTemplate() {
     <Layout
       preview="Nur noch ein Klick, dann können Sie mit Ihrem Lebensbuch beginnen."
       headerEyebrow="Willkommen"
-      footerLegal={LEGAL_PLACEHOLDER}
     >
       <MailHeading>Schön, dass Sie da sind</MailHeading>
       <MailParagraph>Guten Tag,</MailParagraph>

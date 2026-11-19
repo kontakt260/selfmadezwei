@@ -93,11 +93,6 @@ type Props = {
   headerEyebrow?: string;
   /** Optionales Bild am oberen Rand der Inhalts-Karte, volle Kartenbreite */
   cardImage?: MailCardImage;
-  /**
-   * Zusätzliche Zeile unter dem Impressum-Hinweis im Footer (z. B. die
-   * Pflichtangaben). Wird von den Supabase-Auth-Vorlagen genutzt.
-   */
-  footerLegal?: ReactNode;
 };
 
 export function Layout({
@@ -105,7 +100,6 @@ export function Layout({
   children,
   headerEyebrow,
   cardImage,
-  footerLegal,
 }: Props) {
   const kontaktEmail = "kontakt@narravit.de";
 
@@ -262,12 +256,6 @@ export function Layout({
               {" · "}
               Dies ist eine Transaktions-E-Mail. Antworten Sie nicht auf diese
               Mail.
-              {footerLegal !== undefined ? (
-                <>
-                  <br />
-                  {footerLegal}
-                </>
-              ) : null}
             </Text>
           </Section>
         </Container>

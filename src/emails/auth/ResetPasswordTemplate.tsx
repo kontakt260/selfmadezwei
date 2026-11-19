@@ -5,7 +5,7 @@ import {
   MailInlineFallbackLink,
   MailParagraph,
 } from "../Layout";
-import { LEGAL_PLACEHOLDER, authLink } from "./shared";
+import { authLink } from "./shared";
 
 // Supabase-Vorlage „Reset password" — wird nach „Passwort vergessen"
 // verschickt.
@@ -16,7 +16,6 @@ export function ResetPasswordTemplate() {
     <Layout
       preview="Über den Link in dieser E-Mail legen Sie ein neues Passwort fest."
       headerEyebrow="Ihr Konto"
-      footerLegal={LEGAL_PLACEHOLDER}
     >
       <MailHeading>Neues Passwort festlegen</MailHeading>
       <MailParagraph>Guten Tag,</MailParagraph>

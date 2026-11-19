@@ -89,7 +89,6 @@ Stage = Projekt-Ref `kdjhxqitfxnsavhiafdn`. Production = Haupt-Projekt (`main`) 
 
 - [ ] „Confirm signup" und „Reset password" aus `supabase/templates/` einsetzen (erzeugt aus `src/emails/auth/`). **Stand 2026-11-19 (abends):** Das Mail-Design aus Figma ist im Code, die Vorlagen sind neu erzeugt und können jetzt auf Stage eingesetzt werden (Jakob setzt sie selbst). Nach jeder Änderung an `src/emails/` mit `UPDATE_AUTH_TEMPLATES=1 npx vitest run src/emails/auth` neu erzeugen und neu einsetzen.
 - [ ] Die Vorlagen laden das Logo von `https://app.narravit.de/images/mail/` (siehe Abschnitt 5) — auf Stage erscheint es erst, wenn Production live ist.
-- [ ] Platzhalter für Pflichtangaben in den Vorlagen (`LEGAL_PLACEHOLDER`) durch echte Angaben ersetzen.
 - [ ] Ohne diese Vorlagen funktionieren Mail-Links nur im selben Browser (PKCE-Code statt Token-Hash) — für Production Pflicht.
 
 ### Auth → Providers
@@ -151,12 +150,11 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 ## 8. Rechtliches
 
 - [ ] Impressum — liegt auf der Webflow-Website unter `https://www.narravit.de/impressum`. Der Footer jeder Mail (App-Mails und Supabase-Vorlagen) verlinkt **fest** dorthin, auf Stage wie in Production; die Seite muss also erreichbar und vollständig sein (PROJ-11 BUG-1). **Stand 2026-11-19:** liefert noch 404.
-- [ ] Pflichtangaben in Mails klären: Ist NARRAVIT im Handelsregister eingetragen (z. B. e. K., UG, GmbH), gehören Firma, Rechtsform, Sitz, Registergericht, Registernummer und ggf. Geschäftsführung in **jede** geschäftliche Mail — App-Mails und Supabase-Vorlagen —, ein Impressum-Link reicht dann nicht. Ohne Registereintrag genügt der Impressum-Link, dann den Platzhalter `LEGAL_PLACEHOLDER` entfernen. Rechtsform-Entscheidung steht aus (Jakob, 2026-11-19).
+- [x] Pflichtangaben in Mails: NARRAVIT ist **nicht** im Handelsregister eingetragen (Jakob, 2026-11-19). Die Geschäftsbrief-Pflichtangaben (§ 37a HGB, § 35a GmbHG) gelten damit nicht, der Impressum-Link im Fuß jeder Mail genügt; der Platzhalter ist aus den Supabase-Vorlagen entfernt. **Neu prüfen, falls sich die Rechtsform ändert** (Eintragung, UG/GmbH) — dann gehören Firma, Rechtsform, Sitz, Registergericht, Registernummer und ggf. Geschäftsführung in **jede** geschäftliche Mail (`src/emails/Layout.tsx`).
 - [ ] Erinnerungs-Mails 08/09 versprechen „Ihre Inhalte bleiben noch 90 weitere Tage erhalten". Es gibt dafür noch keine Lösch- oder Sperrlogik und keine Regel in AGB/Datenschutz — vor Go-live festlegen und umsetzen oder den Satz anpassen.
 - [ ] Datenschutzerklärung (auch für Facebook-App und Stripe-Checkout nötig).
 - [ ] Datenschutzerklärung nennt den Kauf ohne Konto: Speicherung der Checkout-E-Mail-Adresse bis zur Konto-Anlage (`purchase_claims`) und das technisch notwendige Cookie `nv_kauf` (Zuordnung des Kaufs, 60 Tage).
 - [ ] AGB und Widerrufsbelehrung für den Kauf.
-- [ ] Pflichtangaben in den Supabase-Mail-Vorlagen (Abschnitt 3).
 - [ ] Kein Abmelde-Link in Erzähl-Aufforderungen (Produktentscheidung) — rechtlich prüfen lassen (PROJ-12).
 
 ---
@@ -192,6 +190,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
+| 2026-11-19 | Kein Handelsregistereintrag → keine Pflichtangaben in Mails, Impressum-Link genügt. Platzhalter aus den Supabase-Vorlagen entfernt, Vorlagen neu erzeugt (vor dem Einsetzen auf Stage die neue Fassung nehmen). Kein neuer Env-Wert. |
 | 2026-11-19 | Mail-Design und -Texte aus Figma im Code. Neu: Bilder in Mails, fest von `https://app.narravit.de/images/mail/` geladen (Stage ist geschützt) — vor dem Go-live ohne Bilder. Supabase-Vorlagen neu erzeugt, können auf Stage eingesetzt werden. Offene Rechtsfragen ergänzt: Pflichtangaben je nach Rechtsform, 90-Tage-Aussage in den Erinnerungen; Impressum liefert weiter 404. Kein neuer Env-Wert. |
 | 2026-11-19 | Go-live-Blocker ergänzt: PROJ-12 Erzähl-Einstellungen (Onboarding + Projektübersicht), Mail-Design aus Figma. Kaufbestätigung „nur erzählen" am selben Tag erledigt (Mail 03 mit Namen). Geschenk ohne eigenen Zugang bleibt wie gebaut (kein Blocker). Supabase-Vorlagen setzt Jakob selbst nach der Design-Übertragung. Migration `purchase_claims` auf Stage eingespielt; Anleitung für Production ergänzt. „Leaked password protection" für Production aufgenommen. Kein neuer Env-Wert. |
 | 2026-11-19 | Security-Advisor (Funktionen): Migration `20261119200000_security_advisor_function_hardening.sql` legt den `search_path` der Zeitstempel-Trigger fest und sperrt die drei SECURITY-DEFINER-Trigger-Funktionen für RPC-Aufrufe. Migration `20261119210000_lookup_invitation_service_role_only.sql` gibt `lookup_invitation_by_token` nur noch für `service_role` frei; Einladungsseite und Einladungs-Annahme lesen dafür über den Service-Role-Client. Die zweite Migration erst nach dem Code-Deploy einspielen (Stage und Production). Gewollte Advisor-Hinweise: Abschnitt Datenbank. Kein neuer Env-Wert. |

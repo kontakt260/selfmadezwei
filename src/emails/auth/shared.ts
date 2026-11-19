@@ -25,12 +25,9 @@ export function authLink(type: AuthLinkType): string {
   return `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=${type}`;
 }
 
-/**
- * Go-Template-Kommentar: wird beim Versand ersatzlos entfernt. Im
- * Supabase-Dashboard durch die Pflichtangaben für Geschäftsbriefe ersetzen.
- */
-export const LEGAL_PLACEHOLDER =
-  "{{/* Pflichtangaben hier eintragen: Firma und Rechtsform, Anschrift, Registergericht und Registernummer, Vertretungsberechtigte */}}";
+// Keine Pflichtangaben im Mail-Fuß: NARRAVIT ist nicht im Handelsregister
+// eingetragen (Jakob, 2026-11-19), damit gelten die Geschäftsbrief-Pflichten
+// aus HGB/GmbHG nicht — der Impressum-Link im Fuß jeder Mail genügt.
 
 export const AUTH_TEMPLATE_SUBJECTS = {
   "confirm-signup": "Bitte bestätigen Sie Ihre E-Mail-Adresse",

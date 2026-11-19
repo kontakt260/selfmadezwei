@@ -51,9 +51,12 @@ describe.each(templates)("Supabase-Vorlage $file", ({ file, element, linkType })
     expect(text).toMatch(/\b(Sie|Ihr|Ihre|Ihren|Ihrem|Ihnen)\b/);
   });
 
-  it("keeps the legal placeholder as a Go template comment (invisible when sent)", async () => {
+  // Kein Handelsregistereintrag (2026-11-19): keine Pflichtangaben im Fuß,
+  // der Impressum-Link genügt.
+  it("has no legal placeholder, only contact and Impressum in the footer", async () => {
     const html = await render(element);
-    expect(html).toMatch(/\{\{\/\* Pflichtangaben[^}]*\*\/\}\}/);
+    expect(html).not.toContain("Pflichtangaben");
+    expect(html).not.toMatch(/\{\{\/\*/);
     expect(html).toContain("kontakt@narravit.de");
   });
 
