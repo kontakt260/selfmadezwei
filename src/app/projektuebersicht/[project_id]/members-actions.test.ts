@@ -23,14 +23,27 @@ const serviceRoleMockState: {
   inserts: Array<{ table: string; payload: Record<string, unknown> }>;
   updates: Array<{ table: string; payload: Record<string, unknown> }>;
   nextInsertError: { code?: string } | null;
+  rpcCalls: Array<{ name: string; args: Record<string, unknown> }>;
+  lookupRow: Record<string, unknown> | null;
 } = {
   inserts: [],
   updates: [],
   nextInsertError: null,
+  rpcCalls: [],
+  lookupRow: null,
 };
 
 vi.mock("@/lib/supabase/serviceRole", () => ({
   createServiceRoleClient: () => ({
+    // lookup_invitation_by_token ist nur für service_role freigegeben
+    // (Migration 20261119210000_lookup_invitation_service_role_only).
+    rpc: (name: string, args: Record<string, unknown>) => {
+      serviceRoleMockState.rpcCalls.push({ name, args });
+      return {
+        maybeSingle: () =>
+          Promise.resolve({ data: serviceRoleMockState.lookupRow, error: null }),
+      };
+    },
     from: (table: string) => ({
       insert: (payload: Record<string, unknown>) => {
         serviceRoleMockState.inserts.push({ table, payload });
@@ -106,6 +119,8 @@ beforeEach(() => {
   serviceRoleMockState.inserts = [];
   serviceRoleMockState.updates = [];
   serviceRoleMockState.nextInsertError = null;
+  serviceRoleMockState.rpcCalls = [];
+  serviceRoleMockState.lookupRow = null;
 });
 
 // ─── createInvitationAction ──────────────────────────────────────────────────
@@ -267,10 +282,9 @@ describe("acceptInvitationAction", () => {
     return f;
   }
 
-  function mockRpc(client: ReturnType<typeof makeMockClient>, lookupRow: Record<string, unknown> | null) {
-    client.rpc.mockImplementation(() => ({
-      maybeSingle: vi.fn().mockResolvedValue({ data: lookupRow, error: null }),
-    }));
+  // Der Lookup läuft über den Service-Role-Client, nicht über die Session.
+  function mockRpc(_client: ReturnType<typeof makeMockClient>, lookupRow: Record<string, unknown> | null) {
+    serviceRoleMockState.lookupRow = lookupRow;
   }
 
   it("rejects when not authenticated", async () => {
@@ -344,6 +358,11 @@ describe("acceptInvitationAction", () => {
 
     const result = await acceptInvitationAction(fd());
     expect(result).toEqual({ projectId: PROJECT_ID });
+    // Lookup lief über service_role, nicht über den Session-Client.
+    expect(serviceRoleMockState.rpcCalls).toEqual([
+      { name: "lookup_invitation_by_token", args: { p_token: "tok-1234567890abcdef" } },
+    ]);
+    expect(client.rpc).not.toHaveBeenCalled();
     // Service-role mock hat 1 INSERT auf project_members + 1 UPDATE auf invitations gesehen.
     expect(serviceRoleMockState.inserts).toHaveLength(1);
     expect(serviceRoleMockState.inserts[0].table).toBe("project_members");

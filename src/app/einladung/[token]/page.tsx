@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { AcceptInvitationButton } from "./AcceptInvitationButton";
 import { isPast } from "@/lib/dates";
@@ -9,6 +10,9 @@ import { isPast } from "@/lib/dates";
 // Token ist die Authentifizierung. Der Lookup läuft über die
 // SECURITY-DEFINER-Postgres-Funktion `lookup_invitation_by_token` —
 // nicht-Mitglieder haben per RLS keinen Lese-Zugriff auf invitations.
+// Aufruf über den Service-Role-Client: die Funktion ist seit Migration
+// 20261119210000_lookup_invitation_service_role_only nicht mehr für
+// anon/authenticated freigegeben (kein öffentlicher RPC).
 //
 // 4 Varianten je nach Lookup + Auth-Status:
 //   1. Token ungültig / abgelaufen / bereits angenommen / Projekt gelöscht
@@ -45,7 +49,7 @@ export default async function EinladungAcceptPage({
   const { token } = await params;
 
   const supabase = await createClient();
-  const { data: lookup } = await supabase
+  const { data: lookup } = await createServiceRoleClient()
     .rpc("lookup_invitation_by_token", { p_token: token })
     .maybeSingle<LookupRow>();
 

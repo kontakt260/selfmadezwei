@@ -278,8 +278,13 @@ export async function acceptInvitationAction(formData: FormData): Promise<{
   } = await supabase.auth.getUser();
   if (!user) return { error: "Bitte zuerst anmelden." };
 
-  // Token-Lookup über SECURITY DEFINER-Function (umgeht RLS sauber).
-  const { data: lookup, error: lookupErr } = await supabase
+  // Service-Role für Lookup + Schreibvorgänge. Der Lookup läuft über die
+  // SECURITY-DEFINER-Function, die seit Migration
+  // 20261119210000_lookup_invitation_service_role_only nur noch
+  // service_role ausführen darf (kein öffentlicher RPC).
+  const serviceRole = createServiceRoleClient();
+
+  const { data: lookup, error: lookupErr } = await serviceRole
     .rpc("lookup_invitation_by_token", { p_token: token })
     .maybeSingle();
   if (lookupErr || !lookup) {
@@ -307,7 +312,6 @@ export async function acceptInvitationAction(formData: FormData): Promise<{
 
   // Write via Service-Role: INSERT project_members + UPDATE invitations
   // in einer Transaktion-ähnlichen Sequenz.
-  const serviceRole = createServiceRoleClient();
 
   // 1. Mitgliedschaft anlegen.
   const { error: memberInsertErr } = await serviceRole
