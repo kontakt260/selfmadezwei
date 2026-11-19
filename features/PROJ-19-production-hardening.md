@@ -2,7 +2,7 @@
 
 ## Status: Planned
 **Created:** 2026-05-16
-**Last Updated:** 2026-05-16
+**Last Updated:** 2026-11-19
 **Priority:** P1 (vor Public-Launch erforderlich, nicht zwingend vor Stage)
 **Trigger:** Vibe-Security-Audit 2026-05-16 — Medium- und Low-Findings #3, #4, #6
 
@@ -56,6 +56,14 @@ Drei Befunde aus dem Vibe-Security-Audit, die isoliert betrachtet jeweils Medium
 - [ ] Alle Server Actions importieren `env` statt direkt auf `process.env.NEXT_PUBLIC_SITE_URL` mit `??`-Fallback zuzugreifen → Single Source of Truth
 - [ ] `.env.local.example` ist die kanonische Referenz für das Schema; ein README-Abschnitt erklärt: *"Wenn du eine neue Env-Var brauchst → erst in `src/lib/env.ts` + `.env.local.example` eintragen, dann verwenden"*
 
+### D) Supabase-Advisor: `lookup_invitation_by_token` erneut prüfen (Vermerk 2026-11-19)
+Der Security-Advisor meldet `anon_security_definer_function_executable` und `authenticated_security_definer_function_executable` für `public.lookup_invitation_by_token(text)`. Mit der Migration `20261119200000_security_advisor_function_hardening.sql` blieb die Funktion bewusst unverändert (Entscheidung Jakob, 2026-11-19). Bis zur Prüfung hier gilt der Hinweis als gewollt.
+
+- Heute: Die Funktion ist über `/rest/v1/rpc/lookup_invitation_by_token` für jeden mit dem Anon-Key aufrufbar. Wer einen gültigen Token kennt, bekommt Projekttitel, eingeladene E-Mail-Adresse, Rolle, Ablaufdatum und den Namen der einladenden Person. Der Token hat 32 Zufallsbytes (`generateInviteToken`), Raten ist praktisch ausgeschlossen. Das App-Rate-Limiting (PROJ-17) greift beim direkten RPC-Aufruf aber nicht.
+- Aufrufer: [`src/app/einladung/[token]/page.tsx`](../src/app/einladung/[token]/page.tsx) und `acceptInvitationAction` in [`members-actions.ts`](../src/app/projektuebersicht/[project_id]/members-actions.ts) — beide serverseitig, mit dem Session-Client (abgemeldet = `anon`).
+- [ ] Entscheiden: (a) so lassen und den Hinweis dauerhaft als gewollt führen, oder (b) beide Aufrufer auf `createServiceRoleClient()` umstellen und per Migration `REVOKE EXECUTE ON FUNCTION public.lookup_invitation_by_token(TEXT) FROM PUBLIC, anon, authenticated` (service_role behält das Recht).
+- [ ] Bei (b): erst den Code deployen, dann die Migration einspielen — sonst zeigt `/einladung/<token>` „Einladung nicht gefunden“. Unit-Test-Mock in `members-actions.test.ts` auf den Service-Role-Client umziehen. Einladungslink abgemeldet (Vorschau) und angemeldet (Annehmen) testen; Eintrag in `docs/production/prod-umzug.md`.
+
 ### Dokumentation & Tests
 - [ ] `tests/PROJ-19-production-hardening.spec.ts` (Playwright): drei Tests
   - [ ] Header-Test: Hauptseite laden, alle 5 Pflicht-Headers via Playwright-`response.headers()` prüfen
@@ -76,7 +84,7 @@ Drei Befunde aus dem Vibe-Security-Audit, die isoliert betrachtet jeweils Medium
 - **B) Cookie:** `httpOnly: true`, `secure: true` (in Prod), `sameSite: 'lax'`, `maxAge: 300` (5 min); Wert-Schema: `<status>.<unix-timestamp>.<hmac>` — Timestamp im Cookie ermöglicht Cache-Ablauf-Check auch wenn Browser den Cookie nicht von selbst löscht
 - **C) Env-Failsafe:** Validation läuft beim ersten Import von `src/lib/env.ts` — d.h. beim Boot der Next.js-Server-Runtime. Production-Boot scheitert sofort sichtbar (Vercel-Build-Log) statt erst zur ersten Request-Time.
 - **Reihenfolge der Umsetzung**: A → C → B (A und C sind trivial; B braucht etwas mehr Sorgfalt mit Webhook-Integration in PROJ-6)
-- **Nichts davon braucht eine Datenbank-Migration** → kein Supabase-Stage-Branch-Touch nötig
+- **A–C brauchen keine Datenbank-Migration** → kein Supabase-Stage-Branch-Touch nötig. Nur D braucht bei Variante (b) eine Migration.
 
 ---
 <!-- Sections below are added by subsequent skills -->
