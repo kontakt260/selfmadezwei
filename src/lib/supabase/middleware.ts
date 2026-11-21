@@ -19,6 +19,9 @@ const PUBLIC_ROUTES = [
   // /kauf-einloesen dem Konto zugeordnet.
   "/onboarding",
   "/kauf-erfolgreich",
+  // Link aus der Kauf-Mail: legt nur das Geheimnis als Cookie ab und leitet
+  // zur Anmeldung bzw. Registrierung weiter.
+  "/kauf-zuordnen",
   "/zugang-abgelaufen",
   // Konto-Bereich umgeht die „kein-Projekt → Onboarding"-Weiterleitung,
   // damit Nutzer ihr Konto auch nach Projekt-Löschung erreichen können.

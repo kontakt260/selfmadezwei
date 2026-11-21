@@ -118,6 +118,7 @@ export type Database = {
           email: string
           expires_at: string
           id: string
+          is_gift: boolean
           project_id: string
           role: Database["public"]["Enums"]["member_role"]
           token: string
@@ -129,6 +130,7 @@ export type Database = {
           email: string
           expires_at: string
           id?: string
+          is_gift?: boolean
           project_id: string
           role?: Database["public"]["Enums"]["member_role"]
           token: string
@@ -140,6 +142,7 @@ export type Database = {
           email?: string
           expires_at?: string
           id?: string
+          is_gift?: boolean
           project_id?: string
           role?: Database["public"]["Enums"]["member_role"]
           token?: string
@@ -381,7 +384,7 @@ export type Database = {
           created_at: string
           id: string
           logo_url: string | null
-          owner_id: string
+          owner_id: string | null
           title: string
           updated_at: string
         }
@@ -389,7 +392,7 @@ export type Database = {
           created_at?: string
           id?: string
           logo_url?: string | null
-          owner_id: string
+          owner_id?: string | null
           title: string
           updated_at?: string
         }
@@ -397,7 +400,7 @@ export type Database = {
           created_at?: string
           id?: string
           logo_url?: string | null
-          owner_id?: string
+          owner_id?: string | null
           title?: string
           updated_at?: string
         }
@@ -421,6 +424,7 @@ export type Database = {
           created_at: string
           currency: string
           id: string
+          mail_token_hash: string | null
           metadata: Json
           paid_at: string
           project_id: string | null
@@ -435,6 +439,7 @@ export type Database = {
           created_at?: string
           currency?: string
           id?: string
+          mail_token_hash?: string | null
           metadata?: Json
           paid_at?: string
           project_id?: string | null
@@ -449,6 +454,7 @@ export type Database = {
           created_at?: string
           currency?: string
           id?: string
+          mail_token_hash?: string | null
           metadata?: Json
           paid_at?: string
           project_id?: string | null

@@ -4,6 +4,7 @@ import {
   encodeClaimCookie,
   generateClaimToken,
   hashClaimToken,
+  isClaimToken,
   isClaimTokenHash,
   parseClaimCookie,
 } from "./claim-token";
@@ -14,6 +15,13 @@ describe("Einlöse-Geheimnis", () => {
     const b = generateClaimToken();
     expect(a).not.toBe(b);
     expect(Buffer.from(a, "base64url")).toHaveLength(32);
+  });
+
+  it("erkennt nur gültig geformte Geheimnisse", () => {
+    expect(isClaimToken(generateClaimToken())).toBe(true);
+    expect(isClaimToken("zu-kurz")).toBe(false);
+    expect(isClaimToken(`${generateClaimToken()}x`)).toBe(false);
+    expect(isClaimToken(null)).toBe(false);
   });
 
   it("wird nur als SHA-256-Hash weitergegeben", () => {

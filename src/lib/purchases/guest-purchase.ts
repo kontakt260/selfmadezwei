@@ -10,6 +10,7 @@ import { sendPortalPurchaseMail } from "@/lib/email/send-portal-purchase";
 import {
   claimHashesEqual,
   hashClaimToken,
+  isClaimToken,
   isClaimTokenHash,
   type ClaimCookie,
 } from "./claim-token";
@@ -27,7 +28,10 @@ import { fulfillInitialPurchase, PROJECT_DEFAULT_TITLE } from "./fulfill-initial
 //
 // Einlösen darf, wer
 //   (a) mit der BESTÄTIGTEN E-Mail-Adresse aus dem Checkout angemeldet ist,
-//   (b) oder das Einlöse-Geheimnis aus dem Käufer-Browser vorlegt.
+//   (b) das Einlöse-Geheimnis aus dem Käufer-Browser vorlegt,
+//   (c) oder den persönlichen Link aus der Kauf-Mail geöffnet hat (die Mail
+//       ging an die Checkout-Adresse) — auch mit einem Konto unter anderer
+//       Adresse und auf einem anderen Gerät.
 // Alle Prüfungen laufen hier, serverseitig, über die Service-Role.
 
 type ServiceClient = SupabaseClient<Database>;
@@ -39,6 +43,23 @@ const MAX_CLAIMS_PER_RUN = 10;
 export function isGuestSession(session: Pick<Stripe.Checkout.Session, "metadata">): boolean {
   const meta = session.metadata ?? {};
   return meta.guest === "1" && meta.product_type === "initial" && !meta.user_id;
+}
+
+/**
+ * Geschenk ohne eigenen Zugang, ohne Anmeldung gekauft: Der Käufer braucht
+ * kein Konto, Projekt und Einladung entstehen direkt nach der Zahlung.
+ */
+export function isDirectGiftSession(session: Pick<Stripe.Checkout.Session, "metadata">): boolean {
+  const meta = session.metadata ?? {};
+  return (
+    meta.gift_direct === "1" &&
+    meta.product_type === "initial" &&
+    !meta.user_id &&
+    meta.is_gift === "1" &&
+    meta.gift_mode === "phone-plus-computer" &&
+    meta.buyer_retains_access !== "1" &&
+    !!meta.gift_recipient_email?.trim()
+  );
 }
 
 function buyerEmailOf(session: Stripe.Checkout.Session): string | null {
@@ -53,6 +74,8 @@ function buyerEmailOf(session: Stripe.Checkout.Session): string | null {
 export async function recordGuestPurchase(
   supabase: ServiceClient,
   session: Stripe.Checkout.Session,
+  /** Hash des Geheimnisses im Link der Kauf-Mail (nur beim Webhook). */
+  mailTokenHash?: string,
 ): Promise<"created" | "duplicate" | "invalid"> {
   const meta = session.metadata ?? {};
   if (!isGuestSession(session) || !isClaimTokenHash(meta.claim_hash)) return "invalid";
@@ -69,6 +92,7 @@ export async function recordGuestPurchase(
     stripe_session_id: session.id,
     buyer_email: buyerEmailOf(session),
     claim_token_hash: meta.claim_hash,
+    mail_token_hash: mailTokenHash ?? null,
     metadata: metadata as Json,
     amount_cents: session.amount_total ?? PRODUCTS.initial.amountCents,
     currency: (session.currency ?? PRODUCTS.initial.currency).toLowerCase(),
@@ -113,12 +137,16 @@ export type ClaimOutcome = {
    * eingelöst) — der Aufrufer löscht dann das Cookie.
    */
   cookieSpent: boolean;
+  /** Mail-Link geöffnet, sein Kauf ist aber nicht (mehr) offen. */
+  mailLinkUnavailable: boolean;
 };
 
 export type ClaimInput = {
   user: ClaimUser;
   /** Einlöse-Cookie aus dem Browser, falls vorhanden. */
   cookie: ClaimCookie | null;
+  /** Geheimnis aus dem Link der Kauf-Mail, falls geöffnet. */
+  mailToken?: string | null;
   /**
    * Holt eine Checkout-Session von Stripe. Wird nur gebraucht, wenn der
    * Webhook noch nicht eingetroffen ist (Stripe garantiert keine
@@ -129,7 +157,7 @@ export type ClaimInput = {
 
 export async function claimGuestPurchases(
   supabase: ServiceClient,
-  { user, cookie, retrieveSession }: ClaimInput,
+  { user, cookie, mailToken, retrieveSession }: ClaimInput,
 ): Promise<ClaimOutcome> {
   const tokenHash = cookie ? hashClaimToken(cookie.token) : null;
   // Checkout abgebrochen und bei Stripe verfallen → das Cookie ist wertlos.
@@ -159,7 +187,8 @@ export async function claimGuestPurchases(
     }
   }
 
-  // Offene Käufe sammeln: per bestätigter E-Mail und per Geheimnis.
+  // Offene Käufe sammeln: per bestätigter E-Mail, Browser-Geheimnis und
+  // Mail-Link.
   const candidates = new Map<string, ClaimRow>();
   const email = user.emailConfirmed ? user.email?.trim().toLowerCase() : null;
   if (email) {
@@ -184,7 +213,28 @@ export async function claimGuestPurchases(
     for (const row of data ?? []) candidates.set(row.id, row);
   }
 
-  const outcome: ClaimOutcome = { claimed: [], failed: 0, cookieSpent: false };
+  const mailTokenHash = isClaimToken(mailToken) ? hashClaimToken(mailToken) : null;
+  let mailLinkFound = false;
+  if (mailTokenHash) {
+    const { data, error } = await supabase
+      .from("purchase_claims")
+      .select("*")
+      .eq("mail_token_hash", mailTokenHash)
+      .is("claimed_at", null)
+      .limit(1);
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) {
+      candidates.set(row.id, row);
+      mailLinkFound = true;
+    }
+  }
+
+  const outcome: ClaimOutcome = {
+    claimed: [],
+    failed: 0,
+    cookieSpent: false,
+    mailLinkUnavailable: !!mailTokenHash && !mailLinkFound,
+  };
 
   for (const row of candidates.values()) {
     // Atomare Sperre: nur EIN Aufruf gewinnt (zwei Tabs, doppelter Klick,

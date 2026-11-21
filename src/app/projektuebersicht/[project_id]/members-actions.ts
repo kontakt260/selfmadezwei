@@ -342,6 +342,21 @@ export async function acceptInvitationAction(formData: FormData): Promise<{
     return { error: "Annahme konnte nicht persistiert werden." };
   }
 
+  // 3. Geschenk ohne Konto des Käufers: Das Projekt hatte bisher keinen
+  // Eigentümer, jetzt gehört es der beschenkten Person.
+  if (lookup.role === "projektleiter") {
+    const { error: ownerErr } = await serviceRole
+      .from("projects")
+      .update({ owner_id: user.id })
+      .eq("id", lookup.project_id)
+      .is("owner_id", null);
+    if (ownerErr) {
+      console.error(
+        `[invitation] owner update failed for project ${lookup.project_id}: ${ownerErr.message}`,
+      );
+    }
+  }
+
   revalidatePath(`/projektuebersicht/${lookup.project_id}`);
   return { projectId: lookup.project_id };
 }

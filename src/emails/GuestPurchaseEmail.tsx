@@ -7,7 +7,9 @@
 //
 // Der Kauf wird dem Konto automatisch zugeordnet, wenn es mit derselben
 // E-Mail-Adresse angelegt wird, an die diese Mail geht. Deshalb nennt die
-// Mail die Adresse ausdrücklich.
+// Mail die Adresse ausdrücklich. Die Links enthalten zusätzlich ein
+// persönliches Geheimnis (`claimCode`): Damit klappt die Zuordnung auch mit
+// einem Konto unter anderer Adresse und auf einem anderen Gerät.
 
 import {
   Layout,
@@ -28,6 +30,8 @@ export type GuestPurchaseEmailProps = {
   isGift?: boolean;
   /** Optional: Link zur Stripe-Rechnung */
   invoiceUrl?: string;
+  /** Geheimnis für den persönlichen Einlöse-Link */
+  claimCode?: string;
   siteUrl: string;
 };
 
@@ -40,11 +44,16 @@ export function GuestPurchaseEmail({
   paymentDateFormatted,
   isGift = false,
   invoiceUrl,
+  claimCode,
   siteUrl,
 }: GuestPurchaseEmailProps) {
   const greeting = fullName?.trim() ? `Hallo ${fullName.trim()},` : "Hallo,";
-  const registerUrl = `${siteUrl}/registrieren?next=%2Fkauf-einloesen`;
-  const loginUrl = `${siteUrl}/anmelden?next=%2Fkauf-einloesen`;
+  const registerUrl = claimCode
+    ? `${siteUrl}/kauf-zuordnen?code=${encodeURIComponent(claimCode)}&ziel=registrieren`
+    : `${siteUrl}/registrieren?next=%2Fkauf-einloesen`;
+  const loginUrl = claimCode
+    ? `${siteUrl}/kauf-zuordnen?code=${encodeURIComponent(claimCode)}&ziel=anmelden`
+    : `${siteUrl}/anmelden?next=%2Fkauf-einloesen`;
 
   return (
     <Layout
@@ -57,8 +66,8 @@ export function GuestPurchaseEmail({
         vielen Dank für Ihren Kauf — Ihre Zahlung ist eingegangen.{" "}
         {isGift ? (
           <>
-            Damit wir Ihr Geschenk einrichten können, legen Sie bitte jetzt
-            Ihr NARRAVIT-Konto an.
+            Damit wir Ihr Geschenk versenden und Sie das Projekt verwalten
+            können, legen Sie bitte jetzt Ihr NARRAVIT-Konto an.
           </>
         ) : (
           <>
@@ -81,7 +90,8 @@ export function GuestPurchaseEmail({
       <MailParagraph>
         Bitte verwenden Sie dabei die E-Mail-Adresse{" "}
         <strong>{buyerEmail}</strong> — so ordnen wir Ihren Kauf automatisch
-        Ihrem Konto zu. Sie haben bereits ein Konto? Dann{" "}
+        Ihrem Konto zu. Sie haben bereits ein Konto, auch mit einer anderen
+        E-Mail-Adresse? Dann{" "}
         <a href={loginUrl} style={linkStyle}>
           melden Sie sich hier an
         </a>

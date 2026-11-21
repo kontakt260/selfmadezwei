@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { AcceptInvitationButton } from "./AcceptInvitationButton";
+import { InvitationCard, InvitationHeading, InvitationPreview } from "./InvitationCard";
 import { isPast } from "@/lib/dates";
 
 // PROJ-9 — Einladungs-Annahme-Seite.
@@ -24,6 +25,9 @@ import { isPast } from "@/lib/dates";
 //      → Hinweis „bitte mit der korrekten Adresse anmelden" + Abmelden-Link.
 //   4. Token OK + User eingeloggt, Email == Einladung
 //      → Vorschau + „Annehmen"-Button (Client-Komponente mit Server-Action).
+//
+// Geschenk-Einladungen (`invitations.is_gift`) bekommen eigene Texte und
+// zeigen weder Projekttitel noch Rolle (Jakob, 2026-11-21).
 
 const ROLE_LABEL: Record<string, string> = {
   projektleiter: "Projektleiter:in",
@@ -49,69 +53,62 @@ export default async function EinladungAcceptPage({
   const { token } = await params;
 
   const supabase = await createClient();
-  const { data: lookup } = await createServiceRoleClient()
+  const serviceRole = createServiceRoleClient();
+  const { data: lookup } = await serviceRole
     .rpc("lookup_invitation_by_token", { p_token: token })
     .maybeSingle<LookupRow>();
 
   // Variante 1a: Token nicht gefunden.
   if (!lookup) {
     return (
-      <CenteredCard>
-        <h1 className="[font-family:var(--font-merriweather)] text-2xl text-[#3E3831] sm:text-3xl">
-          Einladung nicht gefunden
-        </h1>
+      <InvitationCard>
+        <InvitationHeading>Einladung nicht gefunden</InvitationHeading>
         <p className="text-base leading-7 text-[#535252] sm:text-lg">
           Dieser Einladungs-Link ist ungültig oder wurde widerrufen.
           Bitte erfragen Sie einen neuen Link bei Ihrem Projektleiter.
         </p>
         <HomeLink />
-      </CenteredCard>
+      </InvitationCard>
     );
   }
 
   // Variante 1b: Projekt existiert nicht mehr.
   if (!lookup.project_title || !lookup.project_id) {
     return (
-      <CenteredCard>
-        <h1 className="[font-family:var(--font-merriweather)] text-2xl text-[#3E3831] sm:text-3xl">
-          Projekt nicht mehr verfügbar
-        </h1>
+      <InvitationCard>
+        <InvitationHeading>Projekt nicht mehr verfügbar</InvitationHeading>
         <p className="text-base leading-7 text-[#535252] sm:text-lg">
           Dieses Projekt existiert nicht mehr und kann nicht mehr beigetreten werden.
         </p>
         <HomeLink />
-      </CenteredCard>
+      </InvitationCard>
     );
   }
 
   // Variante 1c: bereits angenommen.
   if (lookup.accepted_at !== null) {
     return (
-      <CenteredCard>
-        <h1 className="[font-family:var(--font-merriweather)] text-2xl text-[#3E3831] sm:text-3xl">
-          Diese Einladung wurde bereits angenommen
-        </h1>
+      <InvitationCard>
+        <InvitationHeading>Diese Einladung wurde bereits angenommen</InvitationHeading>
         <p className="text-base leading-7 text-[#535252] sm:text-lg">
           Wenn Sie Mitglied dieses Projekts sind, finden Sie es in Ihrer
           Projektliste auf der Startseite.
         </p>
         <HomeLink />
-      </CenteredCard>
+      </InvitationCard>
     );
   }
 
   // Variante 1d: abgelaufen.
   if (isPast(lookup.expires_at)) {
     return (
-      <CenteredCard>
-        <h1 className="[font-family:var(--font-merriweather)] text-2xl text-[#3E3831] sm:text-3xl">
-          Diese Einladung ist abgelaufen
-        </h1>
+      <InvitationCard>
+        <InvitationHeading>Diese Einladung ist abgelaufen</InvitationHeading>
         <p className="text-base leading-7 text-[#535252] sm:text-lg">
           Bitte erfragen Sie einen neuen Link bei Ihrem Projektleiter.
         </p>
         <HomeLink />
-      </CenteredCard>
+      </InvitationCard>
     );
   }
 
@@ -123,28 +120,20 @@ export default async function EinladungAcceptPage({
   const inviteEmail = lookup.email.trim().toLowerCase();
   const sessionEmail = (user?.email ?? "").trim().toLowerCase();
 
-  const preview = (
-    <div className="flex flex-col gap-2">
-      <p className="[font-family:var(--font-pt-serif)] text-xl text-[#3E3831] sm:text-2xl">
-        {lookup.project_title}
-      </p>
-      <dl className="grid grid-cols-1 gap-2 text-base leading-7 text-[#535252] sm:text-lg">
-        <div className="flex flex-row gap-3">
-          <dt className="w-28 shrink-0 font-semibold text-[#3E3831]">Rolle</dt>
-          <dd>{ROLE_LABEL[lookup.role] ?? lookup.role}</dd>
-        </div>
-        {lookup.inviter_full_name && (
-          <div className="flex flex-row gap-3">
-            <dt className="w-28 shrink-0 font-semibold text-[#3E3831]">Eingeladen von</dt>
-            <dd>{lookup.inviter_full_name}</dd>
-          </div>
-        )}
-        <div className="flex flex-row gap-3">
-          <dt className="w-28 shrink-0 font-semibold text-[#3E3831]">Für</dt>
-          <dd>{lookup.email}</dd>
-        </div>
-      </dl>
-    </div>
+  const { data: giftRow } = await serviceRole
+    .from("invitations")
+    .select("is_gift")
+    .eq("id", lookup.invitation_id)
+    .maybeSingle();
+  const isGift = giftRow?.is_gift === true;
+
+  const previewFor = (giftTitle: string) => (
+    <InvitationPreview
+      title={isGift ? giftTitle : lookup.project_title!}
+      role={isGift ? undefined : (ROLE_LABEL[lookup.role] ?? lookup.role)}
+      inviter={lookup.inviter_full_name || undefined}
+      email={lookup.email}
+    />
   );
 
   // Variante 2: nicht eingeloggt.
@@ -152,15 +141,15 @@ export default async function EinladungAcceptPage({
     const returnPath = `/einladung/${encodeURIComponent(token)}`;
     const emailParam = encodeURIComponent(lookup.email);
     return (
-      <CenteredCard>
-        <h1 className="[font-family:var(--font-merriweather)] text-2xl text-[#3E3831] sm:text-3xl">
-          Sie wurden zu einem Projekt eingeladen
-        </h1>
-        {preview}
+      <InvitationCard>
+        <InvitationHeading>
+          {isGift ? "Ihr Lebensbuch wartet auf Sie" : "Sie wurden zu einem Projekt eingeladen"}
+        </InvitationHeading>
+        {previewFor("Ihr Geschenk: Ein hochwertiges Buch")}
         <p className="text-base leading-7 text-[#535252] sm:text-lg">
           Bitte melden Sie sich mit Ihrer E-Mail-Adresse an oder erstellen Sie ein
-          neues Konto. Achten Sie darauf, exakt die eingeladene Adresse zu
-          verwenden — sonst können Sie die Einladung nicht annehmen.
+          neues Konto. Achten Sie darauf, exakt die hier zu sehende E-Mail-Adresse
+          zu verwenden.
         </p>
         <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
           <Link
@@ -176,17 +165,15 @@ export default async function EinladungAcceptPage({
             Konto erstellen
           </Link>
         </div>
-      </CenteredCard>
+      </InvitationCard>
     );
   }
 
   // Variante 3: eingeloggt, Email-Mismatch.
   if (sessionEmail !== inviteEmail) {
     return (
-      <CenteredCard>
-        <h1 className="[font-family:var(--font-merriweather)] text-2xl text-[#3E3831] sm:text-3xl">
-          Falsche E-Mail-Adresse
-        </h1>
+      <InvitationCard>
+        <InvitationHeading>Falsche E-Mail-Adresse</InvitationHeading>
         <p className="text-base leading-7 text-[#535252] sm:text-lg">
           Diese Einladung gilt für{" "}
           <span className="font-semibold">{lookup.email}</span>, Sie sind aber als{" "}
@@ -199,37 +186,34 @@ export default async function EinladungAcceptPage({
         <div className="self-start">
           <SignOutButton />
         </div>
-      </CenteredCard>
+      </InvitationCard>
     );
   }
 
   // Variante 4: eingeloggt, Email-Match. „Annehmen"-Pfad.
   return (
-    <CenteredCard>
-      <h1 className="[font-family:var(--font-merriweather)] text-2xl text-[#3E3831] sm:text-3xl">
-        Einladung annehmen
-      </h1>
-      {preview}
+    <InvitationCard>
+      <InvitationHeading>{isGift ? "Geschenk annehmen" : "Einladung annehmen"}</InvitationHeading>
+      {previewFor("Ihre Geschichte")}
       <p className="text-base leading-7 text-[#535252] sm:text-lg">
-        Wenn Sie auf „Annehmen&quot; klicken, werden Sie als Mitglied hinzugefügt
-        und landen direkt in der Projektübersicht.
+        {isGift ? (
+          <>
+            Mit dem Klick auf „Annehmen“ gelangen Sie direkt zum Projekt und können mit
+            dem Schreiben und Erzählen Ihrer persönlichen Erinnerungen beginnen.
+          </>
+        ) : (
+          <>
+            Wenn Sie auf „Annehmen&quot; klicken, werden Sie als Mitglied hinzugefügt
+            und landen direkt in der Projektübersicht.
+          </>
+        )}
       </p>
       <AcceptInvitationButton token={token} projectId={lookup.project_id} />
-    </CenteredCard>
+    </InvitationCard>
   );
 }
 
 // ─── Layout-Helper ─────────────────────────────────────────────────────────
-
-function CenteredCard({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="flex min-h-[100dvh] items-center justify-center bg-[#FAF8F6] px-4 py-12 sm:px-6 sm:py-16">
-      <div className="flex w-full max-w-xl flex-col gap-6 border border-[#e0dcd5] bg-white p-6 sm:gap-8 sm:p-10">
-        {children}
-      </div>
-    </main>
-  );
-}
 
 function HomeLink() {
   return (

@@ -86,7 +86,7 @@ test.describe("PROJ-6 — Kauf ohne Konto", () => {
     await page.goto("/onboarding");
     await page.getByRole("button", { name: /Für mich selbst/ }).click();
     await page.getByRole("button", { name: "Weiter" }).click();
-    await page.getByLabel("Vollständiger Name").fill("Gerda Gast");
+    await page.getByLabel("Vor- und Nachnamen").fill("Gerda Gast");
     await page.getByRole("button", { name: "Weiter" }).click();
 
     await expect(page.getByRole("heading", { name: "Bereit zum Start?" })).toBeVisible();
@@ -103,6 +103,24 @@ test.describe("PROJ-6 — Kauf ohne Konto", () => {
     await context.clearCookies();
     await page.goto("/kauf-einloesen");
     await expect(page).toHaveURL(/\/anmelden\?next=%2Fkauf-einloesen$/);
+  });
+
+  test("AC-Link-1: Link aus der Kauf-Mail führt zur Anmeldung, das Geheimnis liegt im httpOnly-Cookie", async ({
+    page,
+    context,
+  }) => {
+    await context.clearCookies();
+    const code = "A".repeat(43);
+    await page.goto(`/kauf-zuordnen?code=${code}&ziel=anmelden`);
+    await expect(page).toHaveURL(/\/anmelden\?next=%2Fkauf-einloesen$/);
+    expect(page.url()).not.toContain(code);
+    const cookie = (await context.cookies("http://localhost:3000/kauf-einloesen")).find(
+      (c) => c.name === "nv_kauf_link",
+    );
+    expect(cookie?.value).toBe(code);
+    expect(cookie?.httpOnly).toBe(true);
+    expect(cookie?.path).toBe("/kauf-einloesen");
+    expect(await page.evaluate(() => document.cookie)).not.toContain(code);
   });
 
   test("AC-Guest-4: /kauf-erfolgreich ist öffentlich, zeigt ohne gültige Stripe-Session aber nichts", async ({
@@ -123,6 +141,17 @@ test.describe("PROJ-6 — Kauf einlösen (angemeldet)", () => {
   }) => {
     await page.goto("/kauf-einloesen");
     await expect(page).toHaveURL(/localhost:3000\/$/);
+  });
+
+  test("AC-Link-2: unbekannter Link aus der Mail ordnet nichts zu und zeigt einen Hinweis", async ({
+    page,
+    context,
+  }) => {
+    await page.goto(`/kauf-zuordnen?code=${"B".repeat(43)}&ziel=anmelden`);
+    await expect(page.getByText(/bereits einem Konto zugeordnet/)).toBeVisible({ timeout: 15_000 });
+    await expect(page).toHaveURL(/localhost:3000\/$/);
+    const cookies = await context.cookies("http://localhost:3000/kauf-einloesen");
+    expect(cookies.find((c) => c.name === "nv_kauf_link")).toBeUndefined();
   });
 
   test("AC-Claim-3: `next` leitet nie auf eine fremde Seite (kein Open Redirect)", async ({

@@ -318,12 +318,9 @@ function StepName({
 }) {
   return (
     <div>
-      <h2 className="heading-style-h3 mb-3">Wie heißen Sie?</h2>
-      <p className="mb-6 text-[#535252]">
-        Ihr Name erscheint später in Ihrem Profil und im Buch.
-      </p>
+      <h2 className="heading-style-h3 mb-6">Wie heißen Sie?</h2>
       <div className="grid gap-2">
-        <Label htmlFor="fullName">Vollständiger Name</Label>
+        <Label htmlFor="fullName">Vor- und Nachnamen</Label>
         <Input
           id="fullName"
           type="text"
@@ -525,13 +522,22 @@ function StepPurchase({ state, isGuest }: { state: WizardState; isGuest: boolean
     }
   }
 
+  // Geschenk ohne eigenen Zugang: Ohne Anmeldung ist gar kein Konto nötig.
+  const isDirectGift =
+    isGuest &&
+    state.forWhom === "gift" &&
+    state.giftMode === "phone-plus-computer" &&
+    !state.buyerWantsAccess;
+
   return (
     <div>
       <h2 className="heading-style-h3 mb-3">Bereit zum Start?</h2>
       <p className="mb-6 text-[#535252]">
-        {isGuest
-          ? "Nach der Zahlung legen Sie in einem kurzen Schritt Ihr Konto an — danach können Sie sofort loslegen."
-          : "Mit dem Kauf schalten wir Ihr Projekt frei und Sie können sofort loslegen."}
+        {isDirectGift
+          ? "Nach der Zahlung senden wir das Geschenk direkt an die beschenkte Person. Ein Konto brauchen Sie dafür nicht."
+          : isGuest
+            ? "Nach der Zahlung legen Sie in einem kurzen Schritt Ihr Konto an — danach können Sie sofort loslegen."
+            : "Mit dem Kauf schalten wir Ihr Projekt frei und Sie können sofort loslegen."}
       </p>
 
       <dl className="mb-8 grid gap-4 border border-[#e0dcd5] bg-white p-4 sm:gap-3 sm:p-6">

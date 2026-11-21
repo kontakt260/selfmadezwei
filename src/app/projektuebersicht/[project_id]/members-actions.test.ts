@@ -58,7 +58,8 @@ vi.mock("@/lib/supabase/serviceRole", () => ({
       update: (payload: Record<string, unknown>) => ({
         eq: () => {
           serviceRoleMockState.updates.push({ table, payload });
-          return Promise.resolve({ data: null, error: null });
+          const done = Promise.resolve({ data: null, error: null });
+          return Object.assign(done, { is: () => done });
         },
       }),
     }),
@@ -294,6 +295,34 @@ describe("acceptInvitationAction", () => {
   it("rejects when not authenticated", async () => {
     vi.mocked(createClient).mockResolvedValue(makeMockClient({ user: null }) as never);
     expect(await acceptInvitationAction(fd())).toEqual({ error: "Bitte zuerst anmelden." });
+  });
+
+  const openInvitation = (role: string) => ({
+    invitation_id: INVITATION_ID,
+    project_id: PROJECT_ID,
+    email: PL_EMAIL,
+    role,
+    expires_at: new Date(Date.now() + 7 * 86400_000).toISOString(),
+    accepted_at: null,
+  });
+
+  it("Geschenk ohne Konto des Käufers: Projektleiter wird Eigentümer", async () => {
+    const client = makeMockClient();
+    mockRpc(client, openInvitation("projektleiter"));
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    expect((await acceptInvitationAction(fd())).projectId).toBe(PROJECT_ID);
+    expect(serviceRoleMockState.updates).toContainEqual({
+      table: "projects",
+      payload: { owner_id: PL_USER_ID },
+    });
+  });
+
+  it("Co-Autor wird nie Eigentümer", async () => {
+    const client = makeMockClient();
+    mockRpc(client, openInvitation("co_author"));
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    await acceptInvitationAction(fd());
+    expect(serviceRoleMockState.updates.some((u) => u.table === "projects")).toBe(false);
   });
 
   it("rejects when token not found in lookup", async () => {

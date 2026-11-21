@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Navbar } from "@/components/Navbar";
+import { CheckoutCancelToast } from "@/components/CheckoutCancelToast";
 import { ProjectCard, type ProjectCardData } from "@/components/ProjectCard";
 import { deleteProjectAction } from "@/app/projektuebersicht/[project_id]/actions";
 import { DEFAULT_COLOR_ID } from "@/lib/cover-colors";
@@ -120,6 +122,9 @@ export default async function HomePage() {
 
   return (
     <>
+      <Suspense fallback={null}>
+        <CheckoutCancelToast />
+      </Suspense>
       <Navbar />
       <main className="[font-family:var(--font-lato)] box-border min-h-full w-full min-w-0 flex-1 bg-[#FAF8F6] px-4 pb-16 pt-[calc(7.348rem+2rem)] sm:px-6 sm:pt-[calc(7.348rem+2.5rem)] md:px-8 md:pt-[calc(7.348rem+3rem)] xl:pl-[calc(11rem+2rem)] xl:pr-8 xl:pt-12">
         <div className="mx-auto flex w-full max-w-[1213px] flex-col gap-8 sm:gap-10 md:gap-12">

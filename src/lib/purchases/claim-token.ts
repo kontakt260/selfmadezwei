@@ -17,6 +17,14 @@ export const CLAIM_COOKIE = "nv_kauf";
 /** 60 Tage — länger als jede realistische Spanne zwischen Kauf und Konto. */
 export const CLAIM_COOKIE_MAX_AGE_SECONDS = 60 * 24 * 60 * 60;
 
+/**
+ * Geheimnis aus dem persönlichen Link der Kauf-Mail (/kauf-zuordnen). Kurze
+ * Laufzeit, damit es auf gemeinsam genutzten Geräten nicht liegen bleibt —
+ * der Link aus der Mail funktioniert danach weiterhin.
+ */
+export const CLAIM_LINK_COOKIE = "nv_kauf_link";
+export const CLAIM_LINK_COOKIE_MAX_AGE_SECONDS = 24 * 60 * 60;
+
 const TOKEN_BYTES = 32; // 256 Bit
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/; // 32 Byte als base64url
 const SESSION_ID_PATTERN = /^cs_[A-Za-z0-9_]{8,250}$/;
@@ -28,6 +36,10 @@ export function generateClaimToken(): string {
 
 export function hashClaimToken(token: string): string {
   return crypto.createHash("sha256").update(token, "utf8").digest("hex");
+}
+
+export function isClaimToken(value: unknown): value is string {
+  return typeof value === "string" && TOKEN_PATTERN.test(value);
 }
 
 export function isClaimTokenHash(value: unknown): value is string {

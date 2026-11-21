@@ -28,12 +28,21 @@ export function CheckoutCancelToast({
     // `?kauf=nicht-zugeordnet` setzt /kauf-einloesen, wenn eine Zahlung
     // gefunden wurde, die Zuordnung zum Konto aber technisch scheiterte.
     const unassigned = searchParams.get("kauf") === "nicht-zugeordnet";
-    if (!cancelled && !unassigned) return;
+    // `?kauf=link-verbraucht`: Der Link aus der Kauf-Mail wurde geöffnet, der
+    // Kauf gehört aber schon zu einem Konto.
+    const linkUsed = searchParams.get("kauf") === "link-verbraucht";
+    if (!cancelled && !unassigned && !linkUsed) return;
     if (cancelled) toast.info(message, { duration: 6000 });
     if (unassigned) {
       toast.error(
         "Ihre Zahlung ist eingegangen, konnte Ihrem Konto aber noch nicht zugeordnet werden. Bitte laden Sie die Seite in einer Minute neu oder schreiben Sie uns an kontakt@narravit.de.",
         { duration: 15000 },
+      );
+    }
+    if (linkUsed) {
+      toast.info(
+        "Dieser Kauf wurde bereits einem Konto zugeordnet. Falls Sie ihn hier nicht sehen, melden Sie sich mit dem anderen Konto an oder schreiben Sie uns an kontakt@narravit.de.",
+        { id: "kauf-link-verbraucht", duration: 15000 },
       );
     }
     // Query-Parameter wegputzen, damit Reload nicht erneut feuert.

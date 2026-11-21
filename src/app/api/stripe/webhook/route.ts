@@ -9,7 +9,12 @@ import { sendInvitationMail } from "@/lib/email/send-invitation";
 import { sendGuestPurchaseMail } from "@/lib/email/send-guest-purchase";
 import { formatEur, formatGermanDate } from "@/lib/email/format";
 import { fulfillInitialPurchase, PROJECT_DEFAULT_TITLE } from "@/lib/purchases/fulfill-initial";
-import { isGuestSession, recordGuestPurchase } from "@/lib/purchases/guest-purchase";
+import {
+  isDirectGiftSession,
+  isGuestSession,
+  recordGuestPurchase,
+} from "@/lib/purchases/guest-purchase";
+import { generateClaimToken, hashClaimToken } from "@/lib/purchases/claim-token";
 
 // PROJ-11: Die Mails werden hier abgewartet, nicht im Hintergrund
 // gestartet. Der Webhook ist ein Server-zu-Server-Aufruf (niemand wartet
@@ -165,13 +170,29 @@ export async function POST(req: NextRequest) {
   const productType = meta.product_type as ProductType | "vapi" | undefined;
   const userId = meta.user_id as string | undefined;
 
+  // Geschenk ohne eigenen Zugang, ohne Konto gekauft: Projekt und Einladung
+  // entstehen sofort, der Käufer muss nichts weiter tun.
+  if (isDirectGiftSession(session)) {
+    try {
+      await handleDirectGift(supabase, session, meta);
+    } catch (err) {
+      // DB-Fehler → 500, Stripe wiederholt. Die Erfüllung räumt halbe
+      // Projekte selbst wieder ab.
+      const msg = err instanceof Error ? err.message : String(err);
+      return new NextResponse(`Internal error: ${msg}`, { status: 500 });
+    }
+    return NextResponse.json({ received: true, processed: "direct_gift" });
+  }
+
   // Kauf ohne Konto (2026-11-16): Die Zahlung ist da, aber es gibt noch
   // niemanden, dem das Projekt gehören könnte. Wir halten den Kauf als
   // offenen Anspruch fest und bitten per Mail, das Konto anzulegen. Das
   // Projekt entsteht beim Einlösen (/kauf-einloesen).
   if (isGuestSession(session)) {
+    // Persönlicher Link für die Mail: In der Datenbank liegt nur der Hash.
+    const mailToken = generateClaimToken();
     try {
-      const recorded = await recordGuestPurchase(supabase, session);
+      const recorded = await recordGuestPurchase(supabase, session, hashClaimToken(mailToken));
       if (recorded === "invalid") {
         return NextResponse.json(
           { received: true, error: "invalid_guest_metadata" },
@@ -186,7 +207,7 @@ export async function POST(req: NextRequest) {
       const msg = err instanceof Error ? err.message : String(err);
       return new NextResponse(`Internal error: ${msg}`, { status: 500 });
     }
-    await sendGuestConfirmation(session, meta);
+    await sendGuestConfirmation(session, meta, mailToken);
     return NextResponse.json({ received: true, processed: "guest_initial" });
   }
 
@@ -302,11 +323,73 @@ async function handleInitial(
   }
 }
 
+// ─── Geschenk ohne eigenen Zugang und ohne Konto ──────────────────────
+
+async function handleDirectGift(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  session: Stripe.Checkout.Session,
+  meta: Record<string, string>,
+) {
+  const { projectId, expiresAt, invitation } = await fulfillInitialPurchase(supabase, {
+    userId: null,
+    stripeSessionId: session.id,
+    amountCents: session.amount_total,
+    currency: session.currency,
+    meta,
+  });
+
+  // Einladung an die beschenkte Person + Bestätigung an den Käufer (Mail 04).
+  // Ein Mail-Fehler ändert nichts daran, dass der Kauf erfüllt ist.
+  try {
+    const buyerEmail =
+      session.customer_details?.email?.trim() || session.customer_email?.trim() || null;
+    const buyerName = meta.full_name?.trim() || "";
+    const mails: Array<Promise<void>> = [];
+    if (invitation) {
+      mails.push(
+        sendInvitationMail({
+          to: invitation.email,
+          inviterName: buyerName,
+          inviterEmail: buyerEmail ?? "",
+          projectName: PROJECT_DEFAULT_TITLE,
+          role: invitation.role,
+          token: invitation.token,
+          isGift: true,
+        }),
+      );
+    }
+    if (buyerEmail) {
+      mails.push(
+        sendPortalPurchaseMail({
+          to: buyerEmail,
+          fullName: buyerName || undefined,
+          amountFormatted: formatEur(
+            session.amount_total ?? PRODUCTS.initial.amountCents,
+            (session.currency ?? PRODUCTS.initial.currency).toUpperCase(),
+          ),
+          paymentDateFormatted: formatGermanDate(Date.now()),
+          expiresAtFormatted: formatGermanDate(expiresAt),
+          invoiceUrl: await resolveInvoiceUrl(session),
+          projectId,
+          giftRecipientEmail: invitation?.email,
+          buyerHasAccess: false,
+        }),
+      );
+    }
+    await Promise.all(mails);
+  } catch (err) {
+    console.error(
+      `[stripe-webhook] gift mails failed for session ${session.id}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
 // ─── Kauf ohne Konto: Bitte um Konto-Anlage ───────────────────────────
 
 async function sendGuestConfirmation(
   session: Stripe.Checkout.Session,
   meta: Record<string, string>,
+  claimCode: string,
 ) {
   try {
     const to =
@@ -325,6 +408,7 @@ async function sendGuestConfirmation(
       paymentDateFormatted: formatGermanDate(Date.now()),
       isGift: meta.is_gift === "1",
       invoiceUrl: await resolveInvoiceUrl(session),
+      claimCode,
     });
   } catch (err) {
     console.error(

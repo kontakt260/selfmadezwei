@@ -16,6 +16,8 @@ export type SendGuestPurchaseInput = {
   paymentDateFormatted: string;
   isGift?: boolean;
   invoiceUrl?: string;
+  /** Geheimnis für den persönlichen Einlöse-Link in der Mail */
+  claimCode?: string;
 };
 
 export async function sendGuestPurchaseMail(input: SendGuestPurchaseInput): Promise<void> {
@@ -29,6 +31,7 @@ export async function sendGuestPurchaseMail(input: SendGuestPurchaseInput): Prom
       paymentDateFormatted: input.paymentDateFormatted,
       isGift: input.isGift,
       invoiceUrl: input.invoiceUrl,
+      claimCode: input.claimCode,
       siteUrl: getSiteUrl(),
     }),
     tags: [{ name: "type", value: "guest_purchase" }],

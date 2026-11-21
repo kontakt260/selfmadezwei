@@ -24,9 +24,11 @@ vi.mock("@/lib/email/send-portal-purchase", () => ({
 }));
 
 import { generateClaimToken, hashClaimToken } from "./claim-token";
+import { fulfillInitialPurchase } from "./fulfill-initial";
 import {
   claimGuestPurchases,
   hasOpenClaimForEmail,
+  isDirectGiftSession,
   isGuestSession,
   recordGuestPurchase,
   type ClaimUser,
@@ -85,6 +87,50 @@ describe("isGuestSession", () => {
     expect(isGuestSession(guestSession({}, { product_type: "renewal" }))).toBe(false);
     expect(isGuestSession(guestSession({}, { user_id: "u1" }))).toBe(false);
     expect(isGuestSession({ metadata: { product_type: "initial", user_id: "u1" } })).toBe(false);
+  });
+});
+
+describe("Geschenk ohne eigenen Zugang und ohne Konto", () => {
+  const meta = {
+    product_type: "initial",
+    gift_direct: "1",
+    is_gift: "1",
+    gift_mode: "phone-plus-computer",
+    gift_recipient_email: "oma@example.com",
+    buyer_retains_access: "0",
+  };
+
+  it("wird nur für genau diesen Fall erkannt", () => {
+    expect(isDirectGiftSession({ metadata: meta })).toBe(true);
+    expect(isDirectGiftSession({ metadata: { ...meta, buyer_retains_access: "1" } })).toBe(false);
+    expect(isDirectGiftSession({ metadata: { ...meta, gift_mode: "phone-only" } })).toBe(false);
+    expect(isDirectGiftSession({ metadata: { ...meta, user_id: "u1" } })).toBe(false);
+    expect(isDirectGiftSession({ metadata: { ...meta, gift_recipient_email: " " } })).toBe(false);
+    expect(isDirectGiftSession({ metadata: { ...meta, gift_direct: undefined } as never })).toBe(false);
+  });
+
+  it("ist kein Gast-Kauf: kann nie zusätzlich eingelöst werden", () => {
+    expect(isGuestSession({ metadata: meta })).toBe(false);
+  });
+
+  it("ohne Konto ist nur dieser Fall erlaubt, sonst entsteht kein Projekt", async () => {
+    for (const bad of [
+      { is_gift: "0" },
+      { is_gift: "1", gift_mode: "phone-only" },
+      { ...meta, buyer_retains_access: "1" },
+      { ...meta, gift_recipient_email: "" },
+    ]) {
+      await expect(
+        fulfillInitialPurchase(client(), {
+          userId: null,
+          stripeSessionId: "cs_x",
+          amountCents: 24900,
+          currency: "eur",
+          meta: bad,
+        }),
+      ).rejects.toThrow(/without account/);
+    }
+    expect(db.projects).toHaveLength(0);
   });
 });
 
@@ -254,7 +300,12 @@ describe("claimGuestPurchases — Webhook noch nicht eingetroffen", () => {
         throw new Error("network");
       },
     });
-    expect(outcome).toEqual({ claimed: [], failed: 0, cookieSpent: false });
+    expect(outcome).toEqual({
+      claimed: [],
+      failed: 0,
+      cookieSpent: false,
+      mailLinkUnavailable: false,
+    });
   });
 });
 
@@ -393,6 +444,69 @@ describe("claimGuestPurchases — Kaufbestätigung nach dem Einlösen (BUG-G4)",
     });
     expect(outcome.claimed).toHaveLength(1);
     expect(db.payments[0].amount_cents).toBe(0);
+  });
+});
+
+describe("claimGuestPurchases — persönlicher Link aus der Kauf-Mail (BUG-G12)", () => {
+  const mailToken = generateClaimToken();
+  const otherAccount: ClaimUser = {
+    id: "user-anderes-konto",
+    email: "privat@example.com",
+    emailConfirmed: true,
+  };
+
+  beforeEach(async () => {
+    db.profiles.push({ id: "user-anderes-konto", full_name: "Karla K." });
+    await recordGuestPurchase(client(), guestSession(), hashClaimToken(mailToken));
+  });
+
+  const claimWith = (user: ClaimUser, code: string | null) =>
+    claimGuestPurchases(client(), { user, cookie: null, mailToken: code, retrieveSession: noStripe });
+
+  it("speichert nur den Hash des Geheimnisses", () => {
+    expect(db.purchase_claims[0].mail_token_hash).toBe(hashClaimToken(mailToken));
+    expect(JSON.stringify(db.purchase_claims[0])).not.toContain(mailToken);
+  });
+
+  it("Konto unter anderer Adresse, anderes Gerät: Kauf wird zugeordnet", async () => {
+    const outcome = await claimWith(otherAccount, mailToken);
+    expect(outcome.claimed).toHaveLength(1);
+    expect(outcome.mailLinkUnavailable).toBe(false);
+    expect(db.projects[0].owner_id).toBe("user-anderes-konto");
+    expect(sendPortalPurchaseMailMock.mock.calls[0][0]).toMatchObject({ to: "privat@example.com" });
+  });
+
+  it("ohne Link bleibt das fremde Konto außen vor", async () => {
+    const outcome = await claimWith(otherAccount, null);
+    expect(outcome.claimed).toHaveLength(0);
+    expect(db.projects).toHaveLength(0);
+  });
+
+  it("falsches oder kaputtes Geheimnis: nichts wird zugeordnet", async () => {
+    for (const code of [generateClaimToken(), "kaputt"]) {
+      const outcome = await claimWith(otherAccount, code);
+      expect(outcome.claimed).toHaveLength(0);
+    }
+    expect(db.projects).toHaveLength(0);
+    expect((await claimWith(otherAccount, generateClaimToken())).mailLinkUnavailable).toBe(true);
+  });
+
+  it("der Link gilt nur einmal: ein zweites Konto bekommt den Kauf nicht", async () => {
+    await claimWith(otherAccount, mailToken);
+    db.profiles.push({ id: "user-dritter", full_name: "Dritte Person" });
+    const second = await claimWith(
+      { id: "user-dritter", email: "dritter@example.com", emailConfirmed: true },
+      mailToken,
+    );
+    expect(second.claimed).toHaveLength(0);
+    expect(second.mailLinkUnavailable).toBe(true);
+    expect(db.projects).toHaveLength(1);
+    expect(db.purchase_claims[0].claimed_by).toBe("user-anderes-konto");
+  });
+
+  it("funktioniert auch mit noch unbestätigter Konto-Adresse", async () => {
+    const outcome = await claimWith({ ...otherAccount, emailConfirmed: false }, mailToken);
+    expect(outcome.claimed).toHaveLength(1);
   });
 });
 

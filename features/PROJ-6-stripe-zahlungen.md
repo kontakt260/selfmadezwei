@@ -102,6 +102,20 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 - Korrigiert: Lange Werte in der Detail-Box der Mails bleiben eingerückt (feste Spalten, alle 9 Mails mit Box bei 600 und 340 px geprüft). Erfolgsseite „für mich selbst": „Ihr Zugang ist aktiv – Wir wünschen Ihnen viel Freude mit Ihrem Projekt".
 - Offen: Konto mit anderer Adresse (BUG-G12), Geschenk mit und ohne eigenen Zugang, Geschenk „nur erzählen", Verlängerung, 100-%-Code, Reminder-Cron, abgelaufenes Projekt.
 
+**Fix BUG-G12 (2026-11-21, von Jakob freigegeben): persönlicher Einlöse-Link**
+- Die Kauf-Mail enthält einen Link mit eigenem Geheimnis (256 Bit, in `purchase_claims.mail_token_hash` nur als SHA-256-Hash). Wer ihn öffnet, kann den Kauf jedem eigenen Konto zuordnen, auch unter anderer Adresse und auf einem anderen Gerät.
+- `/kauf-zuordnen` legt das Geheimnis nur in ein httpOnly-Cookie (Pfad `/kauf-einloesen`, 24 Stunden) und leitet auf eine saubere URL weiter. Mail-Scanner lösen dadurch nichts aus. Eingelöst wird erst nach der Anmeldung; der Kauf lässt sich genau einmal zuordnen.
+- Ist der Kauf schon zugeordnet, zeigt die App einen Hinweis statt einer wortlosen Startseite.
+- Mail 01: „Sie haben bereits ein Konto, auch mit einer anderen E-Mail-Adresse? Dann melden Sie sich hier an."
+- Migration `20261121100000_proj6_purchase_claim_mail_token.sql`, keine RLS-Änderung. Muss vor dem Code-Deploy laufen.
+
+**Geschenk ohne eigenen Zugang: kein Konto nötig (Jakob, 2026-11-21)**
+- Wer ohne Anmeldung ein Geschenk ohne eigenen Zugang kauft, legt kein Konto an. Der Webhook richtet Projekt, 12-Monats-Zugang und Einladung direkt nach der Zahlung ein und verschickt die Einladung sowie die Bestätigung (Mail 04). Mail 01 entfällt in diesem Fall.
+- Das Projekt hat bis zur Annahme keinen Eigentümer (`owner_id` NULL); die beschenkte Person wird beim Annehmen Projektleiter und Eigentümer. Die Zahlung bleibt in `payments` ohne `user_id` belegt.
+- Die Erfolgsseite zeigt „Vielen Dank – Ihre Zahlung ist eingegangen und Ihr Geschenk ist unterwegs" ohne Konto-Schritt. Angemeldete Käufer behalten den bisherigen Weg.
+- Einladungs-Seite: Foto im Hintergrund und Logo für alle Einladungen. Geschenk-Einladungen (`invitations.is_gift`) haben eigene Texte und zeigen weder Rolle noch Projekttitel; normale Einladungen an Co-Autoren behalten beides.
+- Migration `20261121110000_proj6_direct_gift.sql`, keine RLS-Änderung. Muss vor dem Code-Deploy laufen.
+
 **Restrisiken nach den Fixes**
 - **G6:** Die RLS-Policies prüfen den Ablauf nicht. Technisch versierte Mitglieder könnten mit ihrem Login weiter direkt über die Supabase-API schreiben oder ins Cover-Bucket laden. Das zu schließen ist eine RLS-Änderung und braucht Jakobs ausdrückliche Freigabe.
 - **G5:** Zahlen zwei **verschiedene** Mitglieder im selben Moment, kann eine der beiden Verlängerungen verloren gehen. Vollständig atomar ginge es nur mit einer Datenbank-Funktion (Migration).

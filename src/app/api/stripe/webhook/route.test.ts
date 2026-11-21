@@ -652,6 +652,109 @@ describe("Stripe webhook — Verlängerung zählt genau einmal (BUG-G5)", () => 
   });
 });
 
+describe("Stripe webhook — persönlicher Link in der Kauf-Mail (BUG-G12)", () => {
+  it("schickt das Geheimnis nur in der Mail, in der Datenbank liegt der Hash", async () => {
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: makeSession({
+          id: "cs_guest_link",
+          customer_details: { email: "gast@example.com" },
+          metadata: {
+            product_type: "initial",
+            guest: "1",
+            claim_hash: "a".repeat(64),
+            full_name: "Gast",
+            is_gift: "0",
+          },
+        }),
+      },
+    });
+    await callPost("body", "valid-sig");
+
+    const code = sendGuestPurchaseMailMock.mock.calls[0][0].claimCode as string;
+    expect(code).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    const row = fakeDb.purchase_claims[0];
+    expect(row.mail_token_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(row.mail_token_hash).not.toBe(code);
+    expect(JSON.stringify(row)).not.toContain(code);
+  });
+});
+
+describe("Stripe webhook — Geschenk ohne eigenen Zugang und ohne Konto", () => {
+  const directGift = (id = "cs_direct_gift") => ({
+    type: "checkout.session.completed",
+    data: {
+      object: makeSession({
+        id,
+        customer_details: { email: "kaeufer@example.com" },
+        metadata: {
+          product_type: "initial",
+          gift_direct: "1",
+          full_name: "Karla Käufer",
+          is_gift: "1",
+          gift_mode: "phone-plus-computer",
+          gift_recipient_name: "Oma Erna",
+          gift_recipient_email: "Oma@Example.com",
+          gift_recipient_role: "projektleiter",
+          buyer_retains_access: "0",
+        },
+      }),
+    },
+  });
+
+  it("richtet das Projekt sofort ein und verschickt das Geschenk", async () => {
+    constructEventMock.mockReturnValue(directGift());
+    const res = await callPost("body", "valid-sig");
+    expect(await res.json()).toMatchObject({ processed: "direct_gift" });
+
+    expect(fakeDb.projects).toHaveLength(1);
+    expect(fakeDb.projects[0].owner_id).toBeNull();
+    expect(fakeDb.project_members).toHaveLength(0);
+    expect(fakeDb.project_access).toHaveLength(1);
+    expect(fakeDb.purchase_claims).toHaveLength(0);
+    expect(fakeDb.payments[0].user_id).toBeNull();
+    expect(fakeDb.invitations[0]).toMatchObject({
+      email: "oma@example.com",
+      role: "projektleiter",
+      is_gift: true,
+      expires_at: fakeDb.project_access[0].expires_at,
+    });
+
+    expect(sendGuestPurchaseMailMock).not.toHaveBeenCalled();
+    expect(sendInvitationMailMock.mock.calls[0][0]).toMatchObject({
+      to: "Oma@Example.com",
+      inviterName: "Karla Käufer",
+      inviterEmail: "kaeufer@example.com",
+      isGift: true,
+    });
+    expect(sendPortalPurchaseMailMock.mock.calls[0][0]).toMatchObject({
+      to: "kaeufer@example.com",
+      fullName: "Karla Käufer",
+      buyerHasAccess: false,
+      giftRecipientEmail: "Oma@Example.com",
+    });
+  });
+
+  it("zweite Zustellung: kein zweites Projekt, keine zweite Mail", async () => {
+    constructEventMock.mockReturnValue(directGift());
+    await callPost("body", "valid-sig");
+    const second = await callPost("body", "valid-sig");
+    expect(await second.json()).toMatchObject({ duplicate: true });
+    expect(fakeDb.projects).toHaveLength(1);
+    expect(sendInvitationMailMock).toHaveBeenCalledTimes(1);
+    expect(sendPortalPurchaseMailMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("ein Mail-Fehler ändert nichts am erfüllten Kauf", async () => {
+    sendInvitationMailMock.mockRejectedValueOnce(new Error("resend down"));
+    constructEventMock.mockReturnValue(directGift());
+    const res = await callPost("body", "valid-sig");
+    expect(res.status).toBe(200);
+    expect(fakeDb.payments).toHaveLength(1);
+  });
+});
+
 describe("Stripe webhook — Zahlungsstatus (BUG-G2, BUG-G3)", () => {
   const initialMeta = { product_type: "initial", user_id: "user-1", full_name: "Test User", is_gift: "0" };
 

@@ -65,6 +65,8 @@ Stage = Projekt-Ref `kdjhxqitfxnsavhiafdn`. Production = Haupt-Projekt (`main`) 
 
 - [ ] Alle Migrationen aus `supabase/migrations/` in Production angewendet (Stand 2026-11-19: 17 Dateien, letzte `20261119210000_lookup_invitation_service_role_only.sql`). Mit `list_migrations` bzw. im Dashboard gegen das Repo abgleichen.
 - [x] Stage: `20261116100000_proj6_purchase_claims.sql` am 2026-11-19 über den SQL-Editor eingespielt und in `supabase_migrations.schema_migrations` vermerkt (Version `20261116100000`). In Production genauso: Datei im SQL-Editor ausführen, dann `insert into supabase_migrations.schema_migrations (version, name) values ('20261116100000', 'proj6_purchase_claims');` — ohne die Tabelle werden Gast-Käufe nicht erfasst (Webhook antwortet 500).
+- [ ] Migration `20261121100000_proj6_purchase_claim_mail_token.sql` (Spalte `purchase_claims.mail_token_hash` für den persönlichen Einlöse-Link in der Kauf-Mail). **Vor dem Code-Deploy einspielen**, sonst scheitert der Webhook bei Käufen ohne Konto. Keine RLS-Änderung. Stage: am 2026-11-21 eingespielt und geprüft.
+- [ ] Migration `20261121110000_proj6_direct_gift.sql` (`projects.owner_id` darf bis zur Annahme eines Geschenks leer sein, neue Spalte `invitations.is_gift`). **Vor dem Code-Deploy einspielen**, sonst scheitern Geschenk-Käufe. Keine RLS-Änderung.
 - [ ] Seed `supabase/seed.sql` (15 Erzähl-Impulse) in Production eingespielt; Leitfragen kommen aus der Migration `proj8_impulse_leading_questions`.
 - [ ] Storage-Buckets aus `20260515200002_storage_buckets.sql` vorhanden (4 private Buckets).
 - [ ] Testdaten **nicht** übernehmen: QA-Konto `qa-test@narravit.de`, Test-Projekte, Test-Zahlungen bleiben auf Stage.
@@ -114,7 +116,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] Promotion-Codes/Coupons im Live-Modus anlegen, falls gewünscht (Checkout erlaubt Codes: `allow_promotion_codes: true`).
 - [ ] Checkout-Einstellungen: Links zu AGB und Datenschutz hinterlegen.
 - [ ] MwSt.: Stripe Tax aktivieren oder Preise ausdrücklich als Brutto-Endpreise führen (offene Entscheidung).
-- [ ] Rechnungen: Checkout erzeugt derzeit keine Rechnungen; die Kauf-Mail zeigt den Rechnungs-Link nur, wenn eine Rechnung existiert (offene Entscheidung, PROJ-11 BUG-7).
+- [ ] Rechnungen: Checkout erzeugt derzeit keine Rechnungen; die Kauf-Mail zeigt den Rechnungs-Link nur, wenn eine Rechnung existiert (offene Entscheidung, PROJ-11 BUG-7). Der Bereich „Rechnungen" im persönlichen Bereich ist noch ein Platzhalter. Vorschlag (2026-11-21): Stripe erzeugt die Rechnung im Checkout (`invoice_creation`) und schickt sie an die Checkout-Adresse, das deckt auch Käufe ohne Konto ab. Vorher klären: Steuerstatus (Kleinunternehmer oder Umsatzsteuer), Absenderdaten in Stripe, Kosten.
 
 ---
 
@@ -194,6 +196,8 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
+| 2026-11-21 | Geschenk ohne eigenen Zugang läuft ohne Konto: Projekt und Einladung entstehen direkt nach der Zahlung. Neue Migration `20261121110000_proj6_direct_gift.sql`, auf Stage und Production jeweils **vor** dem Code-Deploy. Kein neuer Env-Wert. |
+| 2026-11-21 | Persönlicher Einlöse-Link in der Kauf-Mail (`/kauf-zuordnen`): neue Migration `20261121100000_proj6_purchase_claim_mail_token.sql`, auf Stage und Production jeweils **vor** dem Code-Deploy einspielen. Kein neuer Env-Wert. |
 | 2026-11-21 | Das HTML aller Mails (App-Mails und Supabase-Vorlagen) ist jetzt reines ASCII, Umlaute und Sonderzeichen stehen als HTML-Codes, weil sie auf Stage kaputt ankamen. Supabase-Vorlagen auf Stage eingesetzt; in Production erst direkt nach dem Merge (Abschnitt 1, Schritt 7). Stage-Webhook-URL braucht den Vercel-Bypass-Parameter (Abschnitt 4). |
 | 2026-11-21 | PROJ-6-Fixes: Stripe-Webhook braucht zusätzlich das Event `checkout.session.async_payment_succeeded` (Stage und Production, Abschnitt 4). Keine Migration, kein neuer Env-Wert. |
 | 2026-11-19 | Kein Handelsregistereintrag → keine Pflichtangaben in Mails, Impressum-Link genügt. Platzhalter aus den Supabase-Vorlagen entfernt, Vorlagen neu erzeugt (vor dem Einsetzen auf Stage die neue Fassung nehmen). Kein neuer Env-Wert. |

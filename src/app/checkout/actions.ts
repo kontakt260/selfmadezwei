@@ -159,11 +159,23 @@ export async function startCheckoutAction(
   const metadata: Record<string, string> = {
     product_type: input.productType,
   };
+  // Geschenk ohne eigenen Zugang, ohne Anmeldung: Der Käufer braucht kein
+  // Konto, es gibt also auch nichts einzulösen. Projekt und Einladung
+  // entstehen direkt nach der Zahlung im Webhook.
+  const isDirectGift =
+    !user &&
+    input.productType === "initial" &&
+    input.metadata.isGift &&
+    input.metadata.giftMode === "phone-plus-computer" &&
+    !input.metadata.buyerRetainsAccess;
+
   // Angemeldet: Kauf direkt dem Konto zuordnen. Gast: Einlöse-Geheimnis
   // erzeugen — Stripe und Datenbank sehen nur den Hash.
-  const claimToken = user ? null : generateClaimToken();
+  const claimToken = user || isDirectGift ? null : generateClaimToken();
   if (user) {
     metadata.user_id = user.id;
+  } else if (isDirectGift) {
+    metadata.gift_direct = "1";
   } else if (claimToken) {
     metadata.guest = "1";
     metadata.claim_hash = hashClaimToken(claimToken);

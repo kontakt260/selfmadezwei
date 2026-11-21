@@ -11,6 +11,9 @@ import { PRODUCTS } from "@/lib/stripe/server";
 //   - Stripe-Webhook, wenn der Käufer beim Kauf angemeldet war.
 //   - Einlösen eines Gast-Kaufs, sobald der Käufer ein Konto hat
 //     (src/lib/purchases/guest-purchase.ts).
+//   - Stripe-Webhook beim Geschenk ohne eigenen Zugang und ohne Konto
+//     (`userId = null`): Das Projekt hat bis zur Annahme der Einladung keinen
+//     Eigentümer, die beschenkte Person wird Projektleiter.
 //
 // Reine Datenbank-Arbeit über die Service-Role. Mails verschickt der
 // Aufrufer — er weiß, welche schon unterwegs sind.
@@ -30,8 +33,11 @@ type ServiceClient = SupabaseClient<Database>;
 type MemberRole = "projektleiter" | "co_author";
 
 export type InitialPurchaseInput = {
-  /** Konto des Käufers — wird Eigentümer des Projekts. */
-  userId: string;
+  /**
+   * Konto des Käufers — wird Eigentümer des Projekts. `null` nur beim
+   * Geschenk ohne eigenen Zugang.
+   */
+  userId: string | null;
   stripeSessionId: string;
   amountCents: number | null | undefined;
   currency: string | null | undefined;
@@ -59,6 +65,14 @@ export async function fulfillInitialPurchase(
   const recipientEmail = meta.gift_recipient_email?.trim() || null;
   const recipientRole = (meta.gift_recipient_role as MemberRole | undefined) ?? "co_author";
   const buyerRetainsAccess = meta.buyer_retains_access === "1";
+
+  // Ohne Konto gibt es niemanden, der das Projekt sonst verwalten könnte.
+  if (
+    userId === null &&
+    !(isGift && giftMode === "phone-plus-computer" && !buyerRetainsAccess && recipientEmail)
+  ) {
+    throw new Error("purchase without account is only possible for a gift without own access");
+  }
 
   // 1. Projekt anlegen.
   const { data: project, error: projErr } = await supabase
@@ -102,7 +116,7 @@ export async function fulfillInitialPurchase(
       }
     }
 
-    if (buyerIsMember) {
+    if (buyerIsMember && userId) {
       const { error: memErr } = await supabase
         .from("project_members")
         .insert({ project_id: projectId, user_id: userId, role: buyerRole });
@@ -119,6 +133,7 @@ export async function fulfillInitialPurchase(
         role: inviteRole,
         token,
         expires_at: expiresAt,
+        is_gift: true,
       });
       if (invErr) throw new Error(invErr.message);
       invitation = { token, email: recipientEmail, role: inviteRole };

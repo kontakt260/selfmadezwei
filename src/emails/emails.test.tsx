@@ -66,6 +66,34 @@ const templates: Array<{ name: string; element: ReactElement; mustContain: strin
     ],
   },
   {
+    name: "GuestPurchaseEmail (Geschenk)",
+    element: GuestPurchaseEmail({
+      fullName: "Maria Muster",
+      buyerEmail: "maria@example.test",
+      amountFormatted: "249,00 €",
+      paymentDateFormatted: "16. November 2026",
+      isGift: true,
+      siteUrl,
+    }),
+    mustContain: ["Damit wir Ihr Geschenk versenden und Sie das Projekt verwalten"],
+  },
+  {
+    name: "GuestPurchaseEmail (mit persönlichem Link)",
+    element: GuestPurchaseEmail({
+      fullName: "Maria Muster",
+      buyerEmail: "maria@example.test",
+      amountFormatted: "249,00 €",
+      paymentDateFormatted: "16. November 2026",
+      claimCode: "abc_DEF-123",
+      siteUrl,
+    }),
+    mustContain: [
+      "auch mit einer anderen E-Mail-Adresse",
+      `${siteUrl}/kauf-zuordnen?code=abc_DEF-123&ziel=registrieren`,
+      `${siteUrl}/kauf-zuordnen?code=abc_DEF-123&ziel=anmelden`,
+    ],
+  },
+  {
     name: "RenewalEmail",
     element: RenewalEmail({
       fullName: "Maria Muster",
@@ -136,6 +164,8 @@ const templates: Array<{ name: string; element: ReactElement; mustContain: strin
     }),
     mustContain: [
       "Lena Muster schenkt Ihnen ein Buch-Projekt",
+      "am Computer oder einem Tablet aufschreiben oder ganz einfach per Sprachnachricht erzählen",
+      "Wir unterstützen Sie dabei. Wir senden Ihnen von nun an regelmäßige Erzähl-Impulse",
       `${siteUrl}/einladung/tok_gift`,
       "Geschenk annehmen",
     ],

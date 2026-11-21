@@ -5,7 +5,7 @@ import { getStripe } from "@/lib/stripe/server";
 import { isCheckoutPaid } from "@/lib/stripe/payment-status";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
-import { isGuestSession } from "@/lib/purchases/guest-purchase";
+import { isDirectGiftSession, isGuestSession } from "@/lib/purchases/guest-purchase";
 
 // Erfolgsseite nach Stripe-Hosted-Checkout (PROJ-6).
 //
@@ -45,6 +45,8 @@ type VerifiedSession = {
   paymentPending: boolean;
   /** Kauf wurde ohne Anmeldung gestartet. */
   isGuest: boolean;
+  /** Geschenk ohne eigenen Zugang: Der Käufer braucht kein Konto. */
+  isDirectGift: boolean;
   /** E-Mail-Adresse aus dem Checkout (für die Konto-Anlage vorbelegt). */
   buyerEmail: string;
 };
@@ -61,6 +63,7 @@ async function verifyStripeSession(sessionId: string): Promise<VerifiedSession |
     const base = {
       paymentPending: !paid,
       isGuest: isGuestSession(session),
+      isDirectGift: isDirectGiftSession(session),
       buyerEmail:
         session.customer_details?.email?.trim() || session.customer_email?.trim() || "",
     };
@@ -119,7 +122,7 @@ export default async function KaufErfolgreichPage({
 
   const verified = await verifyStripeSession(session_id);
   if (!verified) redirect("/");
-  const { variant, isGuest, buyerEmail, paymentPending } = verified;
+  const { variant, isGuest, isDirectGift, buyerEmail, paymentPending } = verified;
 
   // Erst wenn das Geld da ist, wird der Kauf erfüllt (Webhook) — bis dahin
   // weder einlösen noch „Zugang aktiv" anzeigen.
@@ -136,6 +139,19 @@ export default async function KaufErfolgreichPage({
             einige Tage. Sobald die Zahlung bei uns angekommen ist, bekommen
             Sie eine E-Mail mit den nächsten Schritten.
           </p>
+        </div>
+      </main>
+    );
+  }
+
+  // Geschenk ohne eigenen Zugang: Alles ist erledigt, kein Konto nötig.
+  if (isDirectGift && variant.type === "initial-gift-phone-computer") {
+    return (
+      <main className="flex min-h-[100dvh] items-center justify-center bg-[#FAF8F6] px-6 py-16">
+        <div className="flex w-full max-w-xl flex-col items-center gap-6 border border-[#e0dcd5] bg-white p-8 text-center sm:p-12">
+          <Image src="/logo.svg" alt="NARRAVIT" width={64} height={56} className="h-14 w-auto" />
+          <SuccessIcon />
+          <DirectGiftContent recipientEmail={variant.recipientEmail} buyerEmail={buyerEmail} />
         </div>
       </main>
     );
@@ -216,7 +232,7 @@ function GuestAccountContent({
       </h1>
       <p className="text-lg leading-8 text-[#535252]">
         {isGift
-          ? "Nur noch ein Schritt: Legen Sie jetzt Ihr Konto an, damit wir Ihr Geschenk einrichten können."
+          ? "Nur noch ein Schritt: Legen Sie jetzt Ihr Konto an, damit wir Ihr Geschenk versenden und Sie das Projekt verwalten können."
           : "Nur noch ein Schritt: Legen Sie jetzt Ihr Konto an, dann können Sie sofort mit Ihrem Lebensbuch beginnen."}
       </p>
       {isGiftWithInvitation ? (
@@ -333,9 +349,9 @@ function InitialGiftPhoneComputerContent({
         Geschenk verschickt
       </h1>
       <p className="text-lg leading-8 text-[#535252]">
-        Vielen Dank für Ihren Kauf. Wir haben eine Einladung an Ihre
-        beschenkte Person geschickt — sobald sie sie annimmt, kann sie
-        selbst im Portal schreiben.
+        Vielen Dank für Ihren Kauf. Wir haben eine Einladung an die
+        beschenkte Person geschickt — sobald sie sie annimmt, erhält sie
+        Zugang zum Projekt.
       </p>
       <p className="border border-[#96B897]/40 bg-[#96B897]/10 p-4 text-base text-[#3E3831]">
         Einladungs-Mail unterwegs an{" "}
@@ -348,7 +364,8 @@ function InitialGiftPhoneComputerContent({
         {buyerRetainsAccess ? (
           <>
             Sie sind ebenfalls als Projektleiter:in eingetragen und können
-            jederzeit mitschreiben oder die Geschichten lesen.
+            jederzeit mitschreiben, die Geschichten lesen &amp; das Projekt
+            verwalten.
           </>
         ) : (
           <>
@@ -364,9 +381,45 @@ function InitialGiftPhoneComputerContent({
           href="/"
           className="inline-flex h-12 items-center justify-center bg-[#D0BCA6] px-6 text-lg font-bold text-[#0a0909] transition-colors hover:bg-[#c0ad98]"
         >
-          Zur Startseite
+          Zum Projekt
         </Link>
       ) : null}
+    </>
+  );
+}
+
+function DirectGiftContent({
+  recipientEmail,
+  buyerEmail,
+}: {
+  recipientEmail: string;
+  buyerEmail: string;
+}) {
+  return (
+    <>
+      <h1 className="[font-family:var(--font-merriweather)] text-3xl font-medium text-[#3E3831]">
+        Vielen Dank – Ihre Zahlung ist eingegangen und Ihr Geschenk ist unterwegs
+      </h1>
+      <p className="text-lg leading-8 text-[#535252]">
+        Wir haben die Einladung an die beschenkte Person geschickt. Sobald sie
+        sie annimmt, erhält sie Zugang zum Projekt und kann mit dem Erzählen
+        beginnen.
+      </p>
+      <p className="border border-[#96B897]/40 bg-[#96B897]/10 p-4 text-base text-[#3E3831]">
+        Einladungs-Mail unterwegs an{" "}
+        <span className="font-semibold">{recipientEmail}</span>. Die Einladung
+        bleibt gültig, solange der Portal-Zugang läuft.
+      </p>
+      <p className="text-base leading-7 text-[#535252]">
+        Für Sie ist nichts weiter zu tun, ein Konto brauchen Sie nicht.
+        {buyerEmail ? (
+          <>
+            {" "}
+            Die Kaufbestätigung haben wir an{" "}
+            <span className="font-semibold">{buyerEmail}</span> geschickt.
+          </>
+        ) : null}
+      </p>
     </>
   );
 }

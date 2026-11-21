@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { getStripe } from "@/lib/stripe/server";
-import { CLAIM_COOKIE, parseClaimCookie } from "@/lib/purchases/claim-token";
+import { CLAIM_COOKIE, CLAIM_LINK_COOKIE, parseClaimCookie } from "@/lib/purchases/claim-token";
 import { claimGuestPurchases, type ClaimOutcome } from "@/lib/purchases/guest-purchase";
 
 // Einlösen eines Kaufs ohne Konto (PROJ-6, 2026-11-16).
@@ -15,8 +15,9 @@ import { claimGuestPurchases, type ClaimOutcome } from "@/lib/purchases/guest-pu
 // weiter — sie zeigt selbst nichts an.
 //
 // GET mit Schreibwirkung ist hier vertretbar: Eingelöst wird nur, was dem
-// angemeldeten Konto ohnehin zusteht (bestätigte E-Mail-Adresse oder
-// Einlöse-Geheimnis aus dem eigenen Browser). Ein fremd ausgelöster Aufruf
+// angemeldeten Konto ohnehin zusteht (bestätigte E-Mail-Adresse, Einlöse-
+// Geheimnis aus dem eigenen Browser oder persönlicher Link aus der Kauf-Mail,
+// den /kauf-zuordnen als Cookie abgelegt hat). Ein fremd ausgelöster Aufruf
 // kann nichts anderes bewirken.
 
 export const runtime = "nodejs";
@@ -34,8 +35,14 @@ export async function GET(request: NextRequest) {
 
   const cookieStore = await cookies();
   const claimCookie = parseClaimCookie(cookieStore.get(CLAIM_COOKIE)?.value);
+  const mailToken = cookieStore.get(CLAIM_LINK_COOKIE)?.value ?? null;
 
-  let outcome: ClaimOutcome = { claimed: [], failed: 0, cookieSpent: false };
+  let outcome: ClaimOutcome = {
+    claimed: [],
+    failed: 0,
+    cookieSpent: false,
+    mailLinkUnavailable: false,
+  };
   try {
     outcome = await claimGuestPurchases(createServiceRoleClient(), {
       user: {
@@ -44,6 +51,7 @@ export async function GET(request: NextRequest) {
         emailConfirmed: !!user.email_confirmed_at,
       },
       cookie: claimCookie,
+      mailToken,
       retrieveSession: (sessionId) => getStripe().checkout.sessions.retrieve(sessionId),
     });
   } catch (err) {
@@ -52,7 +60,7 @@ export async function GET(request: NextRequest) {
     console.error(
       `[kauf-einloesen] claim failed: ${err instanceof Error ? err.message : String(err)}`,
     );
-    outcome = { claimed: [], failed: 1, cookieSpent: false };
+    outcome = { claimed: [], failed: 1, cookieSpent: false, mailLinkUnavailable: false };
   }
 
   // Nichts einzulösen: Konten mit Projekt gehen zur Startseite (z. B.
@@ -68,11 +76,20 @@ export async function GET(request: NextRequest) {
     target = `${origin}/kauf-erfolgreich?session_id=${encodeURIComponent(outcome.claimed[0].stripeSessionId)}`;
   } else if (outcome.failed > 0 && !hasProject) {
     target = `${origin}/onboarding?kauf=nicht-zugeordnet`;
+  } else if (outcome.mailLinkUnavailable) {
+    // Link aus der Mail, aber sein Kauf ist schon zugeordnet: nicht wortlos
+    // auf der Startseite landen.
+    target = `${target}?kauf=link-verbraucht`;
   }
 
   const response = NextResponse.redirect(target);
   if (claimCookie && outcome.cookieSpent) {
     response.cookies.delete(CLAIM_COOKIE);
+  }
+  // Mail-Link verbraucht. Bei einem technischen Fehler bleibt er für den
+  // nächsten Versuch liegen.
+  if (mailToken && outcome.failed === 0) {
+    response.cookies.delete({ name: CLAIM_LINK_COOKIE, path: "/kauf-einloesen" });
   }
   return response;
 }

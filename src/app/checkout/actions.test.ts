@@ -92,6 +92,60 @@ describe("startCheckoutAction — Kauf ohne Konto", () => {
     expect(JSON.stringify(params)).not.toContain(parsed!.token);
   });
 
+  const giftWithoutAccess: InitialMetadata = {
+    fullName: "Karla Käufer",
+    isGift: true,
+    giftRecipientName: "Oma Erna",
+    giftRecipientEmail: "oma@example.com",
+    giftMode: "phone-plus-computer",
+    giftRecipientRole: "projektleiter",
+    buyerRetainsAccess: false,
+  };
+
+  it("Geschenk ohne eigenen Zugang: kein Konto, kein Einlöse-Cookie", async () => {
+    await startCheckoutAction({ productType: "initial", metadata: giftWithoutAccess });
+    const { metadata } = createSessionMock.mock.calls[0][0];
+    expect(metadata.gift_direct).toBe("1");
+    expect(metadata.guest).toBeUndefined();
+    expect(metadata.claim_hash).toBeUndefined();
+    expect(cookieSetMock).not.toHaveBeenCalled();
+  });
+
+  it("Geschenk mit eigenem Zugang braucht weiter ein Konto", async () => {
+    await startCheckoutAction({
+      productType: "initial",
+      metadata: { ...giftWithoutAccess, buyerRetainsAccess: true },
+    });
+    const { metadata } = createSessionMock.mock.calls[0][0];
+    expect(metadata.gift_direct).toBeUndefined();
+    expect(metadata.guest).toBe("1");
+    expect(cookieSetMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("Geschenk „nur erzählen“ braucht weiter ein Konto", async () => {
+    await startCheckoutAction({
+      productType: "initial",
+      metadata: {
+        fullName: "Karla Käufer",
+        isGift: true,
+        giftRecipientName: "Oma Erna",
+        giftMode: "phone-only",
+        buyerRetainsAccess: false,
+      },
+    });
+    const { metadata } = createSessionMock.mock.calls[0][0];
+    expect(metadata.gift_direct).toBeUndefined();
+    expect(metadata.guest).toBe("1");
+  });
+
+  it("angemeldeter Käufer bleibt beim bisherigen Weg", async () => {
+    currentUser = { id: "user-1", email: "karla@example.com" };
+    await startCheckoutAction({ productType: "initial", metadata: giftWithoutAccess });
+    const { metadata } = createSessionMock.mock.calls[0][0];
+    expect(metadata.user_id).toBe("user-1");
+    expect(metadata.gift_direct).toBeUndefined();
+  });
+
   it("verweigert Gästen die Verlängerung", async () => {
     const res = await startCheckoutAction({ productType: "renewal", projectId: "proj-1" });
     expect(res).toEqual({ ok: false, error: "Nicht eingeloggt." });

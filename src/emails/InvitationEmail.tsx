@@ -61,10 +61,14 @@ export function InvitationEmail({
         <MailParagraph>
           Mit einem Klick auf den Button nehmen Sie das Geschenk an. Falls
           Sie noch kein NARRAVIT-Konto haben, legen Sie dabei eines an.
-          Danach können Sie Ihre Geschichten direkt am Computer oder Tablet
-          aufschreiben.
+          Danach können Sie Ihre Geschichten direkt am Computer oder einem
+          Tablet aufschreiben oder ganz einfach per Sprachnachricht erzählen.
         </MailParagraph>
-        <MailParagraph>Wir unterstützen Sie dabei.</MailParagraph>
+        <MailParagraph>
+          Wir unterstützen Sie dabei. Wir senden Ihnen von nun an regelmäßige
+          Erzähl-Impulse und tiefgehende Leitfragen zu, die Ihnen das Schreiben
+          und Erzählen erleichtern sollen.
+        </MailParagraph>
 
         <MailCtaButton href={acceptUrl}>Geschenk annehmen</MailCtaButton>
 

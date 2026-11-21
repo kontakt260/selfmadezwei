@@ -62,6 +62,11 @@ describe("Ablauf pro Projekt", () => {
     expect(target(await visit("/"))).toBe("https://app.test/zugang-abgelaufen");
   });
 
+  it("der Link aus der Kauf-Mail ist ohne Anmeldung erreichbar", async () => {
+    state.user = null;
+    expect(target(await visit("/kauf-zuordnen?code=x&ziel=anmelden"))).toBeNull();
+  });
+
   it("die Seite zur Verlängerung selbst bleibt erreichbar", async () => {
     state.rows = [{ project_id: EXPIRED, expires_at: past() }];
     expect(target(await visit(`/zugang-abgelaufen?project=${EXPIRED}`))).toBeNull();
