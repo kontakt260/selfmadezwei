@@ -14,6 +14,10 @@ import {
 } from "./members-actions";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
+const projectWriteBlockedErrorMock = vi.hoisted(() => vi.fn(async (): Promise<string | null> => null));
+vi.mock("@/lib/projects/project-access", () => ({
+  projectWriteBlockedError: projectWriteBlockedErrorMock,
+}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn(() => { throw new Error("REDIRECT"); }) }));
 

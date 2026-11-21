@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { projectWriteBlockedError } from "@/lib/projects/project-access";
 import { COVER_COLORS, DEFAULT_COLOR_ID } from "@/lib/cover-colors";
 import { COVER_THEMES, DEFAULT_THEME_ID } from "@/lib/cover-themes";
 import { COVER_SCHEMA_VERSION } from "@/lib/cover-types";
@@ -97,6 +98,9 @@ export async function saveCoverAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
+
+  const accessError = await projectWriteBlockedError(supabase, projectId);
+  if (accessError) return { error: accessError };
 
   // Mitgliedschaft prüfen (defense-in-depth zu RLS)
   const { data: membership } = await supabase

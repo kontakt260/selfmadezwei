@@ -8,6 +8,10 @@ import {
 import type { ImageSections } from "@/lib/kapiteleditor/types";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
+const projectWriteBlockedErrorMock = vi.hoisted(() => vi.fn(async (): Promise<string | null> => null));
+vi.mock("@/lib/projects/project-access", () => ({
+  projectWriteBlockedError: projectWriteBlockedErrorMock,
+}));
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -168,6 +172,35 @@ describe("chapterAutosaveAction — existing fields untouched", () => {
     expect(lastPayload.value).toHaveProperty("body");
     expect(lastPayload.value).toHaveProperty("image_sections");
     expect(lastPayload.value).toHaveProperty("updated_at");
+  });
+});
+
+// ─── Abgelaufener Zugang (BUG-G6) ────────────────────────────────────────────
+
+describe("abgelaufenes Projekt darf nicht bearbeitet werden", () => {
+  const blocked = "Ihr Portal-Zugang für dieses Projekt ist abgelaufen.";
+
+  it("Auto-Save wird abgelehnt, ohne zu schreiben", async () => {
+    const client = makeMockClient();
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    projectWriteBlockedErrorMock.mockResolvedValueOnce(blocked);
+    expect(await chapterAutosaveAction(baseInput())).toEqual({ error: blocked });
+    expect(client.from).not.toHaveBeenCalled();
+  });
+
+  it("Bild-Upload bekommt keinen Upload-Link", async () => {
+    const { client, storage } = makeUploadClient();
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    projectWriteBlockedErrorMock.mockResolvedValueOnce(blocked);
+    const res = await chapterImageUploadPrepareAction({
+      projectId: PROJECT_ID,
+      chapterId: CHAPTER_ID,
+      section: "start",
+      contentType: "image/jpeg",
+      size: 1000,
+    });
+    expect(res.error).toBe(blocked);
+    expect(storage.createSignedUploadUrl).not.toHaveBeenCalled();
   });
 });
 

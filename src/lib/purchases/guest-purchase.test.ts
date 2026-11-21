@@ -18,6 +18,11 @@ vi.mock("@/lib/email/send-invitation", () => ({
   sendInvitationMail: (input: Record<string, unknown>) => sendInvitationMailMock(input),
 }));
 
+const sendPortalPurchaseMailMock = vi.fn(async (_input: Record<string, unknown>) => undefined);
+vi.mock("@/lib/email/send-portal-purchase", () => ({
+  sendPortalPurchaseMail: (input: Record<string, unknown>) => sendPortalPurchaseMailMock(input),
+}));
+
 import { generateClaimToken, hashClaimToken } from "./claim-token";
 import {
   claimGuestPurchases,
@@ -71,6 +76,7 @@ beforeEach(() => {
   };
   options = { unique: UNIQUE };
   sendInvitationMailMock.mockClear();
+  sendPortalPurchaseMailMock.mockClear();
 });
 
 describe("isGuestSession", () => {
@@ -315,6 +321,78 @@ describe("claimGuestPurchases — Fehler und Geschenk", () => {
     await claimGuestPurchases(client(), { user: buyer, cookie: null, retrieveSession: noStripe });
     expect(db.project_members).toHaveLength(0);
     expect(db.invitations[0].role).toBe("projektleiter");
+  });
+});
+
+describe("claimGuestPurchases — Kaufbestätigung nach dem Einlösen (BUG-G4)", () => {
+  const claim = (user: ClaimUser = buyer) =>
+    claimGuestPurchases(client(), { user, cookie: null, retrieveSession: noStripe });
+
+  it("Kauf für sich selbst: Bestätigung mit Betrag, Ablauf und Projekt", async () => {
+    await recordGuestPurchase(client(), guestSession());
+    const outcome = await claim();
+    expect(sendPortalPurchaseMailMock).toHaveBeenCalledTimes(1);
+    expect(sendPortalPurchaseMailMock.mock.calls[0][0]).toMatchObject({
+      to: "kaeufer@example.com",
+      fullName: "Karla Käufer",
+      amountFormatted: expect.stringContaining("249,00"),
+      expiresAtFormatted: expect.any(String),
+      projectId: outcome.claimed[0].projectId,
+      buyerHasAccess: true,
+      giftRecipientEmail: undefined,
+      giftRecipientName: undefined,
+    });
+  });
+
+  it("Geschenk „nur erzählen“: nennt den Namen der beschenkten Person", async () => {
+    await recordGuestPurchase(
+      client(),
+      guestSession({}, { is_gift: "1", gift_mode: "phone-only", gift_recipient_name: " Oma Erna " }),
+    );
+    await claim();
+    expect(sendInvitationMailMock).not.toHaveBeenCalled();
+    expect(sendPortalPurchaseMailMock.mock.calls[0][0]).toMatchObject({
+      buyerHasAccess: true,
+      giftRecipientName: "Oma Erna",
+    });
+  });
+
+  it("Geschenk ohne eigenen Zugang: Einladung und Bestätigung in der Geschenk-Fassung", async () => {
+    await recordGuestPurchase(
+      client(),
+      guestSession({}, {
+        is_gift: "1",
+        gift_mode: "phone-plus-computer",
+        gift_recipient_email: "oma@example.com",
+        buyer_retains_access: "0",
+      }),
+    );
+    await claim();
+    expect(sendInvitationMailMock).toHaveBeenCalledTimes(1);
+    expect(sendPortalPurchaseMailMock.mock.calls[0][0]).toMatchObject({
+      buyerHasAccess: false,
+      giftRecipientEmail: "oma@example.com",
+    });
+  });
+
+  it("ein Mail-Fehler ändert nichts am eingelösten Kauf", async () => {
+    sendPortalPurchaseMailMock.mockRejectedValueOnce(new Error("resend down"));
+    await recordGuestPurchase(client(), guestSession());
+    const outcome = await claim();
+    expect(outcome.claimed).toHaveLength(1);
+    expect(outcome.failed).toBe(0);
+    expect(db.purchase_claims[0].claimed_at).toBeTruthy();
+  });
+
+  it("100-%-Code, Webhook noch nicht da: wird direkt bei Stripe erkannt und eingelöst", async () => {
+    const free = guestSession({ payment_status: "no_payment_required", amount_total: 0 });
+    const outcome = await claimGuestPurchases(client(), {
+      user: { ...buyer, email: "anders@example.com" },
+      cookie: { sessionId: free.id, token },
+      retrieveSession: async () => free,
+    });
+    expect(outcome.claimed).toHaveLength(1);
+    expect(db.payments[0].amount_cents).toBe(0);
   });
 });
 

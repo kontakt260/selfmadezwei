@@ -3,7 +3,10 @@ import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/database.types";
 import { PRODUCTS } from "@/lib/stripe/server";
+import { isCheckoutPaid } from "@/lib/stripe/payment-status";
+import { formatEur, formatGermanDate } from "@/lib/email/format";
 import { sendInvitationMail } from "@/lib/email/send-invitation";
+import { sendPortalPurchaseMail } from "@/lib/email/send-portal-purchase";
 import {
   claimHashesEqual,
   hashClaimToken,
@@ -147,7 +150,7 @@ export async function claimGuestPurchases(
       if (
         session &&
         session.status === "complete" &&
-        session.payment_status === "paid" &&
+        isCheckoutPaid(session) &&
         isGuestSession(session) &&
         claimHashesEqual(session.metadata?.claim_hash ?? "", tokenHash)
       ) {
@@ -229,30 +232,54 @@ export async function claimGuestPurchases(
       projectId: result.projectId,
     });
 
-    // Geschenk: Die Einladung an die beschenkte Person geht jetzt raus —
-    // vorher gab es kein Projekt, in das sie hätte eintreten können. Ein
-    // Mail-Fehler ändert nichts daran, dass der Kauf eingelöst ist.
-    if (result.invitation) {
-      try {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("id", user.id)
-          .maybeSingle();
-        await sendInvitationMail({
-          to: result.invitation.email,
-          inviterName: profile?.full_name ?? meta.full_name ?? "",
-          inviterEmail: user.email ?? "",
-          projectName: PROJECT_DEFAULT_TITLE,
-          role: result.invitation.role,
-          token: result.invitation.token,
-          isGift: true,
-        });
-      } catch (err) {
-        console.error(
-          `[purchases] gift invitation for session ${row.stripe_session_id} failed: ${err instanceof Error ? err.message : String(err)}`,
+    // Jetzt gehen die Mails raus: die Kaufbestätigung an den Käufer (vorher
+    // kannte er nur die Bitte, ein Konto anzulegen — BUG-G4) und beim Geschenk
+    // die Einladung; vorher gab es kein Projekt, in das sie führen könnte.
+    // Ein Mail-Fehler ändert nichts daran, dass der Kauf eingelöst ist.
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      const mails: Array<Promise<void>> = [];
+      if (result.invitation) {
+        mails.push(
+          sendInvitationMail({
+            to: result.invitation.email,
+            inviterName: profile?.full_name ?? meta.full_name ?? "",
+            inviterEmail: user.email ?? "",
+            projectName: PROJECT_DEFAULT_TITLE,
+            role: result.invitation.role,
+            token: result.invitation.token,
+            isGift: true,
+          }),
         );
       }
+      const confirmationTo = user.email?.trim() || row.buyer_email;
+      if (confirmationTo) {
+        mails.push(
+          sendPortalPurchaseMail({
+            to: confirmationTo,
+            fullName: profile?.full_name?.trim() || meta.full_name?.trim() || undefined,
+            amountFormatted: formatEur(row.amount_cents, row.currency),
+            paymentDateFormatted: formatGermanDate(row.paid_at || Date.now()),
+            expiresAtFormatted: formatGermanDate(result.expiresAt),
+            projectId: result.projectId,
+            giftRecipientEmail: result.invitation?.email,
+            giftRecipientName:
+              meta.is_gift === "1" && !result.invitation
+                ? meta.gift_recipient_name?.trim() || undefined
+                : undefined,
+            buyerHasAccess: result.buyerIsMember,
+          }),
+        );
+      }
+      await Promise.all(mails);
+    } catch (err) {
+      console.error(
+        `[purchases] mails for session ${row.stripe_session_id} failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 

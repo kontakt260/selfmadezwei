@@ -82,6 +82,7 @@ type FakeRows = {
 };
 
 let fakeDb: FakeRows;
+let failNextAccessWrite = false;
 
 // Builder, der sowohl direkt-awaitbar ist als auch .select().single()
 // unterstützt. Push passiert genau einmal — entweder im `then` der
@@ -89,17 +90,11 @@ let fakeDb: FakeRows;
 function makeInsertBuilder(table: keyof FakeRows, row: Record<string, unknown> | Record<string, unknown>[]) {
   const r = Array.isArray(row) ? row[0] : row;
   // Wie in Postgres: zweite Zeile mit derselben Session → unique_violation.
-  if (
-    table === "purchase_claims" &&
-    fakeDb.purchase_claims.some((c) => c.stripe_session_id === r.stripe_session_id)
-  ) {
-    const error = { code: "23505", message: "duplicate key value" };
-    return {
-      select: () => ({ single: async () => ({ data: null, error }) }),
-      then: (resolve: (v: { data: null; error: typeof error }) => unknown) =>
-        Promise.resolve({ data: null, error }).then(resolve),
-    };
-  }
+  // Geprüft wird erst beim Ausführen, damit parallele Aufrufe realistisch sind.
+  const uniqueError = { code: "23505", message: "duplicate key value" };
+  const conflicts = () =>
+    (table === "purchase_claims" || table === "payments") &&
+    fakeDb[table].some((c) => c.stripe_session_id === r.stripe_session_id);
   let pushed = false;
   const push = () => {
     if (pushed) return null;
@@ -112,12 +107,14 @@ function makeInsertBuilder(table: keyof FakeRows, row: Record<string, unknown> |
     select(_cols?: string) {
       return {
         single: async () => {
+          if (conflicts()) return { data: null, error: uniqueError };
           const withId = push();
           return { data: withId, error: null };
         },
       };
     },
-    then(resolve: (v: { data: null; error: null }) => unknown) {
+    then(resolve: (v: { data: null; error: typeof uniqueError | null }) => unknown) {
+      if (conflicts()) return Promise.resolve({ data: null, error: uniqueError }).then(resolve);
       push();
       return Promise.resolve({ data: null, error: null }).then(resolve);
     },
@@ -144,7 +141,17 @@ const supabaseMock = {
     }),
     insert: (row: Record<string, unknown> | Record<string, unknown>[]) =>
       makeInsertBuilder(table, row),
+    delete: () => ({
+      eq: async (col: string, val: unknown) => {
+        fakeDb[table] = fakeDb[table].filter((r) => r[col] !== val);
+        return { data: null, error: null };
+      },
+    }),
     upsert: (row: Record<string, unknown>, _opts?: { onConflict?: string }) => {
+      if (failNextAccessWrite && table === "project_access") {
+        failNextAccessWrite = false;
+        return Promise.resolve({ data: null, error: { message: "db down" } });
+      }
       const onConflict = _opts?.onConflict;
       if (onConflict) {
         const existingIdx = fakeDb[table].findIndex(
@@ -216,6 +223,7 @@ beforeEach(() => {
     ],
     purchase_claims: [],
   };
+  failNextAccessWrite = false;
   constructEventMock.mockReset();
   sendInvitationMailMock.mockClear();
   sendPortalPurchaseMailMock.mockClear();
@@ -594,6 +602,109 @@ describe("Stripe webhook — renewal GREATEST-trick (Pflicht-Test 6)", () => {
     const expected = new Date(futureExpiry.getTime() + 365 * 24 * 60 * 60 * 1000);
     const diffDays = Math.abs(newExpiry.getTime() - expected.getTime()) / (24 * 60 * 60 * 1000);
     expect(diffDays).toBeLessThan(1);
+  });
+});
+
+describe("Stripe webhook — Verlängerung zählt genau einmal (BUG-G5)", () => {
+  const renewalEvent = () => ({
+    type: "checkout.session.completed",
+    data: {
+      object: makeSession({
+        id: "cs_renew_once",
+        metadata: { product_type: "renewal", user_id: "user-1", project_id: "proj-1" },
+        amount_total: 9900,
+      }),
+    },
+  });
+
+  it("a failed access write rolls the payment back, so the retry still extends once", async () => {
+    const start = Date.now() + 10 * 24 * 60 * 60 * 1000;
+    fakeDb.project_access.push({ project_id: "proj-1", expires_at: new Date(start).toISOString() });
+    constructEventMock.mockReturnValue(renewalEvent());
+
+    failNextAccessWrite = true;
+    const first = await callPost("body", "valid-sig");
+    expect(first.status).toBe(500);
+    expect(fakeDb.payments).toHaveLength(0);
+    expect(fakeDb.project_access[0].expires_at).toBe(new Date(start).toISOString());
+
+    const retry = await callPost("body", "valid-sig");
+    expect(retry.status).toBe(200);
+    expect(fakeDb.payments).toHaveLength(1);
+    expect(new Date(fakeDb.project_access[0].expires_at as string).getTime()).toBe(
+      start + 365 * 24 * 60 * 60 * 1000,
+    );
+  });
+
+  it("two parallel deliveries extend only once and send one confirmation", async () => {
+    const start = Date.now() + 10 * 24 * 60 * 60 * 1000;
+    fakeDb.project_access.push({ project_id: "proj-1", expires_at: new Date(start).toISOString() });
+    constructEventMock.mockReturnValue(renewalEvent());
+
+    const [a, b] = await Promise.all([callPost("body", "valid-sig"), callPost("body", "valid-sig")]);
+    expect(a.status).toBe(200);
+    expect(b.status).toBe(200);
+    expect(fakeDb.payments).toHaveLength(1);
+    expect(new Date(fakeDb.project_access[0].expires_at as string).getTime()).toBe(
+      start + 365 * 24 * 60 * 60 * 1000,
+    );
+    expect(sendRenewalMailMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Stripe webhook — Zahlungsstatus (BUG-G2, BUG-G3)", () => {
+  const initialMeta = { product_type: "initial", user_id: "user-1", full_name: "Test User", is_gift: "0" };
+
+  it("fulfils a 100 % promotion code (no_payment_required, amount 0)", async () => {
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: { ...makeSession({ payment_status: "no_payment_required", metadata: initialMeta }), amount_total: 0 },
+      },
+    });
+    const res = await callPost("body", "valid-sig");
+    expect(res.status).toBe(200);
+    expect(fakeDb.projects).toHaveLength(1);
+    expect(fakeDb.payments[0].amount_cents).toBe(0);
+    expect(sendPortalPurchaseMailMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fulfil no_payment_required with an open amount", async () => {
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: { object: makeSession({ payment_status: "no_payment_required", metadata: initialMeta }) },
+    });
+    await callPost("body", "valid-sig");
+    expect(fakeDb.projects).toHaveLength(0);
+  });
+
+  it("delayed payment: nothing on completed (unpaid), fulfilled on async_payment_succeeded", async () => {
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: { object: makeSession({ id: "cs_sepa", payment_status: "unpaid", metadata: initialMeta }) },
+    });
+    await callPost("body", "valid-sig");
+    expect(fakeDb.projects).toHaveLength(0);
+    expect(fakeDb.payments).toHaveLength(0);
+
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.async_payment_succeeded",
+      data: { object: makeSession({ id: "cs_sepa", payment_status: "paid", metadata: initialMeta }) },
+    });
+    const res = await callPost("body", "valid-sig");
+    expect(res.status).toBe(200);
+    expect(fakeDb.projects).toHaveLength(1);
+    expect(fakeDb.payments).toHaveLength(1);
+  });
+
+  it("ignores a failed delayed payment", async () => {
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.async_payment_failed",
+      data: { object: makeSession({ id: "cs_sepa_fail", payment_status: "unpaid", metadata: initialMeta }) },
+    });
+    const res = await callPost("body", "valid-sig");
+    expect(res.status).toBe(200);
+    expect(fakeDb.projects).toHaveLength(0);
   });
 });
 

@@ -57,6 +57,62 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 - **Nicht eingelöste Käufe:** Wer bezahlt und nie ein Konto anlegt, bekommt derzeit genau eine Mail. Eine Erinnerung (Cron) und eine Übersicht für den Kundenservice fehlen noch.
 - **Datenschutz:** Für Käufer ohne Konto wird die Checkout-E-Mail-Adresse gespeichert; das Cookie `nv_kauf` ist technisch notwendig. In die Datenschutzerklärung aufnehmen.
 
+### QA Test Results (Kauf ohne Konto + Verlängerung, 2026-11-21)
+**Ergebnis der QA: NOT READY** (2 High, 4 Medium, 5 Low). **Stand nach den Fixes vom 2026-11-21:** alle High- und Medium-Befunde im Code behoben (siehe „Fixes" unten). Status bleibt **In Review**, bis der Live-Test auf Stage durch ist.
+
+**Geprüft**
+- Vitest 356/356, Typprüfung fehlerfrei, Lint 0 Fehler.
+- Playwright Chromium, PROJ-6 + PROJ-2 gegen die Stage-DB: 37 bestanden, 1 übersprungen.
+- `/onboarding` ohne Querscrollen bei 375, 768 und 1440 px (Chromium).
+- Code-Review von Checkout, Webhook, Einlösen, Erfüllung, Erfolgsseite und Middleware.
+
+**Nicht geprüft**
+- Echter Stripe-Durchlauf auf Stage (Live-Testliste unten).
+- Firefox ist nicht installiert. WebKit/„Mobile Safari" stürzt auf diesem Mac (macOS 14.0) schon beim Start ab (`Bus error`) — das ist ein Problem der Testumgebung, kein Befund zur App.
+
+**Befunde**
+
+| ID | Schwere | Befund | Folge |
+|---|---|---|---|
+| BUG-G1 ✅ | **High** | `/zugang-abgelaufen` hat nur einen deaktivierten Button mit falschem Preis („Zugang verlängern — 79 €", richtig: 99 €). Die Middleware leitet bei abgelaufenem Zugang auch die Projektübersicht dorthin um — dort läge der einzige funktionierende Verlängern-Button. | Nach dem Ablauf kann niemand mehr verlängern. Die Erinnerungs-Mails versprechen genau das. |
+| BUG-G2 ✅ | **High** (Verdacht, im Testmodus bestätigen) | Webhook, Erfolgsseite und Einlösen akzeptieren nur `payment_status = "paid"`. Ein 100-%-Rabattcode meldet vermutlich `no_payment_required`; die Stripe-Doku sagt dazu nichts Eindeutiges. | Wer mit einem Gratis-Code kauft, bekäme weder Projekt noch Mail. Betrifft auch den geplanten Smoke-Test per Promotion-Code. |
+| BUG-G3 ✅ | Medium | `checkout.session.async_payment_succeeded` wird nicht verarbeitet. Die Zahlarten kommen aus dem Stripe-Dashboard. | Ist dort eine verzögerte Zahlart aktiv (z. B. SEPA-Lastschrift), zahlt der Kunde und bekommt keinen Zugang. Umgehung: nur sofortige Zahlarten aktivieren. |
+| BUG-G4 ✅ | Medium | Beim Kauf ohne Konto geht nach dem Einlösen keine Kaufbestätigung raus (Mail 02/03/03b/04), nur Mail 01 davor und ggf. die Einladung. | Der Standardweg von der Landingpage bekommt die neuen Mails nie; der Gast-Käufer eines Geschenks erfährt per Mail nicht, dass es verschickt wurde. |
+| BUG-G5 ✅ | Medium | Verlängerung schreibt erst `project_access`, dann `payments`. Scheitert der zweite Schritt oder laufen zwei Webhook-Zustellungen gleichzeitig, verlängert der Retry noch einmal. | Ein Kauf kann 24 statt 12 Monate Zugang ergeben. |
+| BUG-G6 ✅ | Medium | Der Ablauf wird nur kontoweit geprüft („alle Projekte abgelaufen"). Einzelne Projektseiten, Server Actions und RLS prüfen ihn nicht. | Wer noch ein aktives Projekt hat, kann in einem abgelaufenen Projekt weiterarbeiten. |
+| BUG-G7 | Low | `startCheckoutAction` gibt rohe Fehlertexte zurück (z. B. fehlende Env-Variable), auch an nicht angemeldete Besucher. | Interne Details werden sichtbar. |
+| BUG-G8 | Low | Bricht der Server zwischen Sperre und Erfüllung ab, bleibt `purchase_claims` als eingelöst ohne Projekt stehen. | Bezahlter Kauf hängt, nur von Hand lösbar. |
+| BUG-G9 | Low | „12 Monate" sind fest 365 Tage. | Über einen 29. Februar endet der Zugang einen Tag früher. |
+| BUG-G10 | Low | Die Erfolgsseite legt die Checkout-Adresse als `?email=` in die Links zu Registrierung und Anmeldung. | Personenbezogene Daten in URLs (Verlauf, Logs). |
+| BUG-G11 | Low | Erstattungen (`charge.refunded`) werden nicht verarbeitet. | Nach Widerruf bleibt der Zugang aktiv, bis er von Hand entzogen wird. Produktentscheidung offen. |
+
+**Security-Audit:** Webhook-Signatur, Idempotenz des Erstkaufs, Einlösen nur mit bestätigter Adresse oder Browser-Geheimnis, atomare Sperre, Mitgliedschaftsprüfung bei der Verlängerung und Schutz vor Open Redirect sind in Ordnung. Das Rate-Limit für den anonymen Checkout-Start fehlt weiterhin (PROJ-17). Sicherheitsrelevant sind außerdem BUG-G6 und BUG-G7.
+
+**Fixes (2026-11-21)**
+- **G1:** `/zugang-abgelaufen` zeigt die abgelaufenen Projekte des Kontos mit funktionierendem Button „Um 12 Monate verlängern — 99 €"; nicht Angemeldete werden zur Anmeldung geführt. Der Button ist aus `PaywallStats` nach `CheckoutButton.tsx` gezogen.
+- **G2:** Neuer Helfer `src/lib/stripe/payment-status.ts`: `paid` oder `no_payment_required` mit Betrag 0 gilt als bezahlt (Webhook, Erfolgsseite, Einlösen).
+- **G3:** Webhook verarbeitet zusätzlich `checkout.session.async_payment_succeeded`; die Erfolgsseite zeigt bei ausstehender Zahlung „Ihre Zahlung wird bearbeitet". **Das Event muss in Stripe am Webhook-Endpunkt ergänzt werden** (prod-umzug.md, Abschnitt 4).
+- **G4:** Nach dem Einlösen geht die passende Kaufbestätigung (Mail 02/03/03b/04) an die Adresse des Kontos.
+- **G5:** Die Verlängerung trägt zuerst die Zahlung ein (eindeutige `stripe_session_id`), dann den Zugang; scheitert der Zugang, wird die Zahlung zurückgenommen und Stripe wiederholt.
+- **G6:** `src/lib/projects/project-access.ts`: Die Middleware sperrt die Seiten eines abgelaufenen Projekts, alle Inhalte ändernden Server Actions prüfen den Ablauf selbst. Lesen, Verlassen, Mitglieder entfernen und Projekt löschen bleiben möglich.
+
+**Restrisiken nach den Fixes**
+- **G6:** Die RLS-Policies prüfen den Ablauf nicht. Technisch versierte Mitglieder könnten mit ihrem Login weiter direkt über die Supabase-API schreiben oder ins Cover-Bucket laden. Das zu schließen ist eine RLS-Änderung und braucht Jakobs ausdrückliche Freigabe.
+- **G5:** Zahlen zwei **verschiedene** Mitglieder im selben Moment, kann eine der beiden Verlängerungen verloren gehen. Vollständig atomar ginge es nur mit einer Datenbank-Funktion (Migration).
+- Die Low-Befunde G7 bis G11 sind offen.
+
+**Tests nach den Fixes:** Vitest 391/391, Typprüfung fehlerfrei, Lint 0 Fehler. Playwright Chromium (alle Suites, gegen die Stage-DB): 127 bestanden, 1 übersprungen, 1 Test an die neue Abgelaufen-Seite angepasst. Die Ansicht mit einem wirklich abgelaufenen Projekt ist per Komponenten-Test geprüft, noch nicht im Browser gegen Stage.
+
+**Live-Testliste für Stage (Stripe-Testmodus, nach den Fixes)**
+1. Kauf als Gast → Mail 01 → Registrierung mit derselben Adresse → Projekt vorhanden.
+2. Kauf als Gast → Registrierung mit anderer Adresse im selben Browser.
+3. Mail-Link auf einem anderen Gerät → Anmeldung als Bestandskunde.
+4. Geschenk in allen drei Varianten: mit Zugang, ohne Zugang, nur erzählen; Einladung annehmen.
+5. Verlängerung durch die beschenkte Person; alle Mitglieder bekommen ihre Mail.
+6. Kauf mit 100-%-Rabattcode (klärt BUG-G2).
+7. Reminder-Cron einmal von Hand auslösen.
+8. Abgelaufenes Projekt: Ablaufdatum eines Testprojekts in die Vergangenheit setzen → Weiterleitung auf `/zugang-abgelaufen` → verlängern → Projekt wieder offen.
+
 ## Refinement 2026-10-13 — Rückbau Erzählzeit-Kontingent
 **Anlass:** Vapi wird durch Audio-Sprachnachrichten ersetzt ([PROJ-12](PROJ-12-audio-erzaehlpipeline.md)). Erzählen ist im Portal-Zugang enthalten; es gibt kein Zeit-Kontingent und kein Nachkauf-Produkt mehr. PROJ-6 umfasst damit nur noch **Portal-Zugang Initial (249 €)** und **Verlängerung (99 €)**.
 
@@ -134,9 +190,9 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 
 ---
 
-## Status: In Progress
+## Status: In Review
 **Created:** 2026-05-15
-**Last Updated:** 2026-10-13
+**Last Updated:** 2026-11-21 (QA Kauf ohne Konto + Verlängerung; High- und Medium-Befunde behoben, Live-Test offen)
 
 ## Dependencies
 - Requires: PROJ-2 (Auth + SSR) — Session, Onboarding-Wizard-Daten, Middleware

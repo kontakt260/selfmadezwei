@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { getStripe } from "@/lib/stripe/server";
+import { isCheckoutPaid } from "@/lib/stripe/payment-status";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { isGuestSession } from "@/lib/purchases/guest-purchase";
@@ -40,6 +41,8 @@ type Variant =
 
 type VerifiedSession = {
   variant: Variant;
+  /** Verzögerte Zahlart (z. B. SEPA): Das Geld ist noch nicht eingegangen. */
+  paymentPending: boolean;
   /** Kauf wurde ohne Anmeldung gestartet. */
   isGuest: boolean;
   /** E-Mail-Adresse aus dem Checkout (für die Konto-Anlage vorbelegt). */
@@ -50,12 +53,13 @@ async function verifyStripeSession(sessionId: string): Promise<VerifiedSession |
   try {
     const stripe = getStripe();
     const session = await stripe.checkout.sessions.retrieve(sessionId);
-    if (session.status !== "complete" || session.payment_status !== "paid") {
-      return null;
-    }
+    if (session.status !== "complete") return null;
+    const paid = isCheckoutPaid(session);
+    if (!paid && session.payment_status !== "unpaid") return null;
     const meta = session.metadata ?? {};
     const productType = meta.product_type;
     const base = {
+      paymentPending: !paid,
       isGuest: isGuestSession(session),
       buyerEmail:
         session.customer_details?.email?.trim() || session.customer_email?.trim() || "",
@@ -115,7 +119,27 @@ export default async function KaufErfolgreichPage({
 
   const verified = await verifyStripeSession(session_id);
   if (!verified) redirect("/");
-  const { variant, isGuest, buyerEmail } = verified;
+  const { variant, isGuest, buyerEmail, paymentPending } = verified;
+
+  // Erst wenn das Geld da ist, wird der Kauf erfüllt (Webhook) — bis dahin
+  // weder einlösen noch „Zugang aktiv" anzeigen.
+  if (paymentPending) {
+    return (
+      <main className="flex min-h-[100dvh] items-center justify-center bg-[#FAF8F6] px-6 py-16">
+        <div className="flex w-full max-w-xl flex-col items-center gap-6 border border-[#e0dcd5] bg-white p-8 text-center sm:p-12">
+          <Image src="/logo.svg" alt="NARRAVIT" width={64} height={56} className="h-14 w-auto" />
+          <h1 className="[font-family:var(--font-merriweather)] text-3xl font-medium text-[#3E3831]">
+            Ihre Zahlung wird bearbeitet
+          </h1>
+          <p className="text-lg leading-8 text-[#535252]">
+            Vielen Dank für Ihren Kauf. Bei dieser Zahlart dauert der Eingang
+            einige Tage. Sobald die Zahlung bei uns angekommen ist, bekommen
+            Sie eine E-Mail mit den nächsten Schritten.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   const supabase = await createClient();
   const {

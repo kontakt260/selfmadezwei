@@ -1,0 +1,63 @@
+import { describe, expect, it, vi } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.types";
+import {
+  PROJECT_EXPIRED_ERROR,
+  isAccessExpired,
+  projectIdFromPath,
+  projectWriteBlockedError,
+} from "./project-access";
+
+const ID = "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb";
+
+function client(result: { data: { expires_at: string | null } | null; error: unknown }) {
+  const builder = {
+    select: vi.fn(() => builder),
+    eq: vi.fn(() => builder),
+    maybeSingle: vi.fn(async () => result),
+  };
+  return { from: vi.fn(() => builder) } as unknown as SupabaseClient<Database>;
+}
+
+describe("isAccessExpired", () => {
+  const now = Date.parse("2026-11-21T12:00:00Z");
+  it("unterscheidet abgelaufen und aktiv", () => {
+    expect(isAccessExpired("2026-11-21T11:59:59Z", now)).toBe(true);
+    expect(isAccessExpired("2026-11-21T12:00:01Z", now)).toBe(false);
+  });
+  it("ohne Datum nicht abgelaufen", () => {
+    expect(isAccessExpired(null, now)).toBe(false);
+    expect(isAccessExpired(undefined, now)).toBe(false);
+  });
+});
+
+describe("projectIdFromPath", () => {
+  it("findet die Projekt-ID auch in Unterseiten", () => {
+    expect(projectIdFromPath(`/projektuebersicht/${ID}`)).toBe(ID);
+    expect(projectIdFromPath(`/projektuebersicht/${ID}/kapiteleditor/x`)).toBe(ID);
+    expect(projectIdFromPath(`/projektuebersicht/${ID}/cover-bearbeiten`)).toBe(ID);
+  });
+  it("ignoriert andere Pfade", () => {
+    expect(projectIdFromPath("/")).toBeNull();
+    expect(projectIdFromPath("/projektuebersicht/kein-projekt")).toBeNull();
+    expect(projectIdFromPath(`/andere/${ID}`)).toBeNull();
+  });
+});
+
+describe("projectWriteBlockedError", () => {
+  it("aktiv: darf schreiben", async () => {
+    const future = new Date(Date.now() + 86_400_000).toISOString();
+    expect(await projectWriteBlockedError(client({ data: { expires_at: future }, error: null }), ID)).toBeNull();
+  });
+  it("abgelaufen: gesperrt", async () => {
+    const past = new Date(Date.now() - 86_400_000).toISOString();
+    expect(await projectWriteBlockedError(client({ data: { expires_at: past }, error: null }), ID)).toBe(
+      PROJECT_EXPIRED_ERROR,
+    );
+  });
+  it("Datenbankfehler: lieber nicht schreiben", async () => {
+    const res = await projectWriteBlockedError(client({ data: null, error: { message: "down" } }), ID);
+    expect(res).toBeTruthy();
+    expect(res).not.toBe(PROJECT_EXPIRED_ERROR);
+  });
+});

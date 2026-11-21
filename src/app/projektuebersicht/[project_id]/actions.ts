@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { projectWriteBlockedError } from "@/lib/projects/project-access";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -78,6 +79,9 @@ export async function addChapterAction(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
 
+  const accessError = await projectWriteBlockedError(supabase, projectId);
+  if (accessError) return { error: accessError };
+
   // Get current max sort_order for this project (RLS enforces membership)
   const { data: lastChapter } = await supabase
     .from("chapters")
@@ -145,6 +149,9 @@ export async function addImpulseChapterAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
+
+  const accessError = await projectWriteBlockedError(supabase, projectId);
+  if (accessError) return { error: accessError };
 
   // Wenn impulseId geliefert wurde, vorab existieren prüfen — sonst
   // landet später ein FK-Fehler aus chapters_source_impulse_id_fkey.
@@ -219,6 +226,9 @@ export async function renameChapterAction(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
 
+  const accessError = await projectWriteBlockedError(supabase, projectId);
+  if (accessError) return { error: accessError };
+
   // RLS enforces that user is member of the project containing this chapter
   const { error } = await supabase
     .from("chapters")
@@ -255,6 +265,9 @@ export async function deleteChapterAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
+
+  const accessError = await projectWriteBlockedError(supabase, projectId);
+  if (accessError) return { error: accessError };
 
   // RLS enforces membership; .eq("project_id") prevents cross-project deletion
   const { error } = await supabase
@@ -302,6 +315,9 @@ export async function saveChapterOrderAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
+
+  const accessError = await projectWriteBlockedError(supabase, projectId);
+  if (accessError) return { error: accessError };
 
   // Security: load all chapter IDs for this project from DB (RLS enforces membership)
   const { data: dbChapters, error: fetchError } = await supabase

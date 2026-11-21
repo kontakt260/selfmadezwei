@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
+import { isAccessExpired, projectIdFromPath } from "@/lib/projects/project-access";
 
 const PUBLIC_ROUTES = [
   "/anmelden",
@@ -130,7 +131,7 @@ export async function updateSession(request: NextRequest) {
     // filtert automatisch auf Projekte des eingeloggten Users.
     const { data: accessRows } = await supabase
       .from("project_access")
-      .select("expires_at")
+      .select("project_id, expires_at")
       .limit(50);
 
     const now = Date.now();
@@ -141,8 +142,13 @@ export async function updateSession(request: NextRequest) {
     const allExpired =
       !!accessRows &&
       accessRows.length > 0 &&
-      accessRows.every(
-        (r) => r.expires_at && new Date(r.expires_at).getTime() < now,
+      accessRows.every((r) => isAccessExpired(r.expires_at, now));
+    // Auch mit einem anderen aktiven Projekt bleibt ein abgelaufenes gesperrt.
+    const routeProjectId = projectIdFromPath(pathname);
+    const routeProjectExpired =
+      !!routeProjectId &&
+      !!accessRows?.some(
+        (r) => r.project_id === routeProjectId && isAccessExpired(r.expires_at, now),
       );
 
     if (hasNeverPaid) {
@@ -155,9 +161,12 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    if (allExpired) {
+    if (allExpired || routeProjectExpired) {
       const url = request.nextUrl.clone();
       url.pathname = "/zugang-abgelaufen";
+      if (routeProjectExpired && routeProjectId) {
+        url.searchParams.set("project", routeProjectId);
+      }
       return NextResponse.redirect(url);
     }
   }

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { getStripe, PRODUCTS, type ProductType } from "@/lib/stripe/server";
+import { isCheckoutPaid } from "@/lib/stripe/payment-status";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { sendPortalPurchaseMail } from "@/lib/email/send-portal-purchase";
 import { sendRenewalInfoMail, sendRenewalMail } from "@/lib/email/send-renewal";
@@ -131,15 +132,19 @@ export async function POST(req: NextRequest) {
     return new NextResponse(`Invalid signature: ${msg}`, { status: 400 });
   }
 
-  // Nur checkout.session.completed verarbeiten — andere Events 200 quittieren,
-  // damit Stripe nicht retried.
-  if (event.type !== "checkout.session.completed") {
+  // Abgeschlossener Checkout, bei verzögerten Zahlarten (z. B. SEPA) zusätzlich
+  // der spätere Zahlungseingang. Andere Events 200 quittieren, damit Stripe
+  // nicht retried.
+  if (
+    event.type !== "checkout.session.completed" &&
+    event.type !== "checkout.session.async_payment_succeeded"
+  ) {
     return NextResponse.json({ received: true, ignored: event.type });
   }
 
   const session = event.data.object;
-  if (session.payment_status !== "paid") {
-    // Nur „paid"-Sessions führen zu State-Änderungen.
+  if (!isCheckoutPaid(session)) {
+    // Geld noch nicht da: Die Erfüllung folgt mit async_payment_succeeded.
     return NextResponse.json({ received: true, ignored: session.payment_status });
   }
 
@@ -339,12 +344,26 @@ async function handleRenewal(
   const projectId = meta.project_id?.trim();
   if (!projectId) throw new Error("renewal: missing project_id in metadata");
 
-  // Project exists check (sollte immer der Fall sein — sonst gab's einen
-  // race vor Webhook-Eintreffen). Kein Hard-Fail nötig, der INSERT
-  // unten würde fehlschlagen.
+  // Zuerst die Zahlung eintragen: `stripe_session_id` ist eindeutig, damit
+  // verlängert genau eine Zustellung dieses Events (BUG-G5). Vorher hätte ein
+  // Stripe-Retry nach einem Fehler weitere 12 Monate gutgeschrieben.
+  const { error: payErr } = await supabase.from("payments").insert({
+    project_id: projectId,
+    user_id: userId,
+    stripe_session_id: session.id,
+    type: PRODUCTS.renewal.paymentType,
+    amount_cents: session.amount_total ?? PRODUCTS.renewal.amountCents,
+    currency: (session.currency ?? PRODUCTS.renewal.currency).toLowerCase(),
+    status: "completed",
+  });
+  if (payErr) {
+    // 23505 = unique_violation → eine parallele Zustellung war schneller.
+    if (payErr.code === "23505") return;
+    throw new Error(payErr.message);
+  }
 
   // Aktuellen expires_at lesen (default = now() falls neu).
-  const { data: access } = await supabase
+  const { data: access, error: accessReadErr } = await supabase
     .from("project_access")
     .select("expires_at")
     .eq("project_id", projectId)
@@ -357,24 +376,28 @@ async function handleRenewal(
   const newExpiresAt = new Date(baseTime + TWELVE_MONTHS_MS).toISOString();
 
   // UPSERT in project_access (Webhook ist service_role → RLS bypass).
-  const { error: accessErr } = await supabase
-    .from("project_access")
-    .upsert(
-      { project_id: projectId, expires_at: newExpiresAt },
-      { onConflict: "project_id" },
-    );
-  if (accessErr) throw new Error(accessErr.message);
-
-  const { error: payErr } = await supabase.from("payments").insert({
-    project_id: projectId,
-    user_id: userId,
-    stripe_session_id: session.id,
-    type: PRODUCTS.renewal.paymentType,
-    amount_cents: session.amount_total ?? PRODUCTS.renewal.amountCents,
-    currency: (session.currency ?? PRODUCTS.renewal.currency).toLowerCase(),
-    status: "completed",
-  });
-  if (payErr) throw new Error(payErr.message);
+  const accessWrite = accessReadErr
+    ? { error: accessReadErr }
+    : await supabase
+        .from("project_access")
+        .upsert(
+          { project_id: projectId, expires_at: newExpiresAt },
+          { onConflict: "project_id" },
+        );
+  if (accessWrite.error) {
+    // Zahlung wieder austragen, sonst hielte der Retry den Kauf für erledigt
+    // und der Kunde bekäme seine Verlängerung nie.
+    const { error: rollbackErr } = await supabase
+      .from("payments")
+      .delete()
+      .eq("stripe_session_id", session.id);
+    if (rollbackErr) {
+      console.error(
+        `[stripe-webhook] renewal rollback failed for session ${session.id}: ${rollbackErr.message}`,
+      );
+    }
+    throw new Error(accessWrite.error.message);
+  }
 
   // PROJ-11: Bestätigung an die Person, die verlängert hat, und Info an
   // alle anderen Projektmitglieder (Jakob, 2026-11-19: verlängern kann

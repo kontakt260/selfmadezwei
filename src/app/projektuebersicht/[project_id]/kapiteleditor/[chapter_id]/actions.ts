@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { projectWriteBlockedError } from "@/lib/projects/project-access";
 import type { ImageSections, ChapterImage } from "@/lib/kapiteleditor/types";
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/i;
@@ -92,6 +93,9 @@ export async function chapterAutosaveAction(input: {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
 
+  const accessError = await projectWriteBlockedError(supabase, projectId);
+  if (accessError) return { error: accessError };
+
   // Strip signed_url before persisting (server-erzeugt zur Laufzeit).
   const stripped: ImageSections = {
     start: {
@@ -180,6 +184,9 @@ async function requireMemberAndChapter(projectId: string, chapterId: string) {
     .eq("user_id", user.id)
     .single();
   if (!membership) return { error: "Projekt nicht gefunden." } as const;
+
+  const accessError = await projectWriteBlockedError(supabase, projectId);
+  if (accessError) return { error: accessError } as const;
 
   const { data: chapter, error: loadErr } = await supabase
     .from("chapters")
@@ -301,6 +308,9 @@ export async function chapterImageDeleteAction(input: {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
+
+  const accessError = await projectWriteBlockedError(supabase, projectId);
+  if (accessError) return { error: accessError };
 
   const { data: chapter, error: loadErr } = await supabase
     .from("chapters")

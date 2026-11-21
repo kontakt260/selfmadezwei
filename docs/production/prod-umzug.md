@@ -106,7 +106,8 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] Stripe-Konto für Live-Zahlungen aktiviert (Unternehmensdaten, Bankkonto).
 - [ ] Produkte im Live-Modus: „Portal-Zugang" **249 €** und „Portal-Zugang Verlängerung" **99 €** (Einmalzahlung). Hinweis: Der Test-Preis für den Erstkauf stand zuletzt auf 199 €.
 - [ ] Kein Vapi-Produkt anlegen (archiviert).
-- [ ] Webhook-Endpunkt im Live-Modus: `https://app.narravit.de/api/stripe/webhook`, Event `checkout.session.completed` → Secret in `STRIPE_WEBHOOK_SECRET`.
+- [ ] Webhook-Endpunkt im Live-Modus: `https://app.narravit.de/api/stripe/webhook`, Events `checkout.session.completed` **und** `checkout.session.async_payment_succeeded` → Secret in `STRIPE_WEBHOOK_SECRET`. Ohne das zweite Event bekommen Kunden mit verzögerter Zahlart (z. B. SEPA-Lastschrift) nach dem Geldeingang keinen Zugang.
+- [ ] **Stage (Testmodus):** dasselbe zweite Event am Stage-Webhook-Endpunkt ergänzen (seit 2026-11-21 nötig).
 - [ ] Promotion-Codes/Coupons im Live-Modus anlegen, falls gewünscht (Checkout erlaubt Codes: `allow_promotion_codes: true`).
 - [ ] Checkout-Einstellungen: Links zu AGB und Datenschutz hinterlegen.
 - [ ] MwSt.: Stripe Tax aktivieren oder Preise ausdrücklich als Brutto-Endpreise führen (offene Entscheidung).
@@ -190,6 +191,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
+| 2026-11-21 | PROJ-6-Fixes: Stripe-Webhook braucht zusätzlich das Event `checkout.session.async_payment_succeeded` (Stage und Production, Abschnitt 4). Keine Migration, kein neuer Env-Wert. |
 | 2026-11-19 | Kein Handelsregistereintrag → keine Pflichtangaben in Mails, Impressum-Link genügt. Platzhalter aus den Supabase-Vorlagen entfernt, Vorlagen neu erzeugt (vor dem Einsetzen auf Stage die neue Fassung nehmen). Kein neuer Env-Wert. |
 | 2026-11-19 | Mail-Design und -Texte aus Figma im Code. Neu: Bilder in Mails, fest von `https://app.narravit.de/images/mail/` geladen (Stage ist geschützt) — vor dem Go-live ohne Bilder. Supabase-Vorlagen neu erzeugt, können auf Stage eingesetzt werden. Offene Rechtsfragen ergänzt: Pflichtangaben je nach Rechtsform, 90-Tage-Aussage in den Erinnerungen; Impressum liefert weiter 404. Kein neuer Env-Wert. |
 | 2026-11-19 | Go-live-Blocker ergänzt: PROJ-12 Erzähl-Einstellungen (Onboarding + Projektübersicht), Mail-Design aus Figma. Kaufbestätigung „nur erzählen" am selben Tag erledigt (Mail 03 mit Namen). Geschenk ohne eigenen Zugang bleibt wie gebaut (kein Blocker). Supabase-Vorlagen setzt Jakob selbst nach der Design-Übertragung. Migration `purchase_claims` auf Stage eingespielt; Anleitung für Production ergänzt. „Leaked password protection" für Production aufgenommen. Kein neuer Env-Wert. |

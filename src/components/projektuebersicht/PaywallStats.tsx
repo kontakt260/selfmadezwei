@@ -1,8 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Loader2 } from "lucide-react";
-import { startCheckoutAction } from "@/app/checkout/actions";
+import { CheckoutButton } from "./CheckoutButton";
 
 // Client-Komponente für die zahlungsbezogene Stat-Karte der
 // Projektübersicht (PROJ-6 Frontend):
@@ -102,60 +100,6 @@ function StatCard({
       </p>
       <p className="text-sm leading-6 text-[#848484] sm:text-base">{hint}</p>
       <div className="mt-2">{action}</div>
-    </div>
-  );
-}
-
-function CheckoutButton({
-  label,
-  loadingLabel,
-  input,
-  disabled,
-}: {
-  label: string;
-  loadingLabel: string;
-  input: Parameters<typeof startCheckoutAction>[0];
-  disabled?: boolean;
-}) {
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const handleClick = () => {
-    setError(null);
-    startTransition(async () => {
-      const res = await startCheckoutAction(input);
-      if (!res.ok) {
-        setError(res.error);
-        return;
-      }
-      // Stripe Hosted Checkout — Vollredirect.
-      window.location.href = res.checkoutUrl;
-    });
-  };
-  return (
-    <div className="flex flex-col gap-2">
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={isPending || disabled}
-        className="inline-flex h-12 w-full min-w-0 cursor-pointer items-center justify-center gap-2 bg-[#0A0909]/5 px-4 text-base font-bold leading-6 text-[#534B42] transition-colors hover:bg-[#0A0909]/10 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-56 sm:text-lg"
-      >
-        {isPending ? (
-          <>
-            <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden />
-            {loadingLabel}
-          </>
-        ) : (
-          label
-        )}
-      </button>
-      {error && (
-        <p
-          className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
-          role="alert"
-        >
-          {error}
-        </p>
-      )}
     </div>
   );
 }

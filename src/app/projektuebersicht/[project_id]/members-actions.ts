@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import crypto from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
+import { projectWriteBlockedError } from "@/lib/projects/project-access";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { sendInvitationMail } from "@/lib/email/send-invitation";
 import { sendInBackground } from "@/lib/email/background";
@@ -77,6 +78,9 @@ export async function createInvitationAction(formData: FormData): Promise<{
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
+
+  const accessError = await projectWriteBlockedError(supabase, projectId);
+  if (accessError) return { error: accessError };
 
   // Self-Invite ablehnen.
   const ownEmail = (user.email ?? "").trim().toLowerCase();

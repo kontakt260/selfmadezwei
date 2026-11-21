@@ -49,11 +49,16 @@ test.describe("PROJ-2 — Public auth pages render", () => {
     await expect(page.locator('input[name="confirmPassword"]')).toBeVisible();
   });
 
-  test("/zugang-abgelaufen shows renewal CTA + sign out", async ({ page }) => {
+  // Verlängern braucht eine Anmeldung; die Ansicht mit abgelaufenem Projekt
+  // prüft src/app/zugang-abgelaufen/page.test.tsx (PROJ-6, BUG-G1).
+  test("/zugang-abgelaufen asks anonymous visitors to sign in", async ({ page }) => {
     await page.goto("/zugang-abgelaufen");
     await expect(page.getByRole("heading", { name: /abgelaufen/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Zugang verlängern/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Abmelden" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Anmelden", exact: true }).last()).toHaveAttribute(
+      "href",
+      /next=%2Fzugang-abgelaufen/,
+    );
+    await expect(page.getByRole("button", { name: /verlängern/ })).toHaveCount(0);
   });
 });
 
