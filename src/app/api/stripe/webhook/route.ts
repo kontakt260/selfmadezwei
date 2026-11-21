@@ -15,6 +15,7 @@ import {
   recordGuestPurchase,
 } from "@/lib/purchases/guest-purchase";
 import { generateClaimToken, hashClaimToken } from "@/lib/purchases/claim-token";
+import { addTwelveMonths } from "@/lib/purchases/access-period";
 
 // PROJ-11: Die Mails werden hier abgewartet, nicht im Hintergrund
 // gestartet. Der Webhook ist ein Server-zu-Server-Aufruf (niemand wartet
@@ -112,8 +113,6 @@ export const runtime = "nodejs";
 // Force-dynamic: kein Caching, Webhook-Calls sollen jederzeit
 // ausgeführt werden.
 export const dynamic = "force-dynamic";
-
-const TWELVE_MONTHS_MS = 365 * 24 * 60 * 60 * 1000;
 
 // 3-Linien-Verteidigung (siehe Tech-Design Sektion C):
 //   1. Signatur-Verifikation (Stripe-Secret).
@@ -457,7 +456,7 @@ async function handleRenewal(
     access?.expires_at && new Date(access.expires_at).getTime() > Date.now()
       ? new Date(access.expires_at).getTime()
       : Date.now();
-  const newExpiresAt = new Date(baseTime + TWELVE_MONTHS_MS).toISOString();
+  const newExpiresAt = addTwelveMonths(baseTime).toISOString();
 
   // UPSERT in project_access (Webhook ist service_role → RLS bypass).
   const accessWrite = accessReadErr

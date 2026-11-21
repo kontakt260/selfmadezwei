@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { PRODUCTS } from "@/lib/stripe/server";
+import { addTwelveMonths } from "./access-period";
 
 // Erfüllung eines bezahlten Erstkaufs (PROJ-6): Projekt, Zugang,
 // Mitgliedschaft, ggf. Einladung, Zahlungs-Eintrag.
@@ -18,7 +19,6 @@ import { PRODUCTS } from "@/lib/stripe/server";
 // Reine Datenbank-Arbeit über die Service-Role. Mails verschickt der
 // Aufrufer — er weiß, welche schon unterwegs sind.
 
-const TWELVE_MONTHS_MS = 365 * 24 * 60 * 60 * 1000;
 
 // Geschenk-Einladungen gelten so lange wie der Portal-Zugang des Projekts
 // (Entscheidung 2026-11-18) — nicht 14 Tage wie normale Einladungen
@@ -85,7 +85,7 @@ export async function fulfillInitialPurchase(
 
   try {
     // 2. project_access setzen (12 Monate ab jetzt).
-    const expiresAt = new Date(Date.now() + TWELVE_MONTHS_MS).toISOString();
+    const expiresAt = addTwelveMonths(Date.now()).toISOString();
     const { error: accessErr } = await supabase
       .from("project_access")
       .insert({ project_id: projectId, expires_at: expiresAt });

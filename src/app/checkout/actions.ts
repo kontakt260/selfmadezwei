@@ -73,6 +73,11 @@ const initialMetadataSchema = z.object({
 
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
+// Technische Details bleiben im Server-Log (BUG-G7): Die Action ist auch ohne
+// Anmeldung aufrufbar.
+const CHECKOUT_FAILED_MESSAGE =
+  "Der Kauf konnte gerade nicht gestartet werden. Bitte versuchen Sie es in einem Moment erneut.";
+
 export async function startCheckoutAction(
   input: StartCheckoutInput,
 ): Promise<StartCheckoutResult> {
@@ -141,8 +146,10 @@ export async function startCheckoutAction(
     priceId = getPriceId(input.productType);
     siteUrl = getSiteUrl();
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Stripe nicht konfiguriert.";
-    return { ok: false, error: msg };
+    console.error(
+      `[checkout] configuration error: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return { ok: false, error: CHECKOUT_FAILED_MESSAGE };
   }
 
   // success_url + cancel_url:
@@ -212,7 +219,8 @@ export async function startCheckoutAction(
       payment_intent_data: { metadata },
     });
     if (!session.url) {
-      return { ok: false, error: "Stripe lieferte keine Checkout-URL." };
+      console.error("[checkout] Stripe returned no checkout URL");
+      return { ok: false, error: CHECKOUT_FAILED_MESSAGE };
     }
     if (claimToken) {
       // Einlöse-Geheimnis nur im Browser des Käufers ablegen: httpOnly
@@ -234,8 +242,10 @@ export async function startCheckoutAction(
     }
     return { ok: true, checkoutUrl: session.url };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Checkout konnte nicht gestartet werden.";
-    return { ok: false, error: msg };
+    console.error(
+      `[checkout] session failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return { ok: false, error: CHECKOUT_FAILED_MESSAGE };
   }
 }
 

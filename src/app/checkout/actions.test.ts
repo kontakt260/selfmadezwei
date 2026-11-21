@@ -146,6 +146,17 @@ describe("startCheckoutAction — Kauf ohne Konto", () => {
     expect(metadata.gift_direct).toBeUndefined();
   });
 
+  it("zeigt bei Stripe-Fehlern keine internen Details", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    createSessionMock.mockRejectedValueOnce(new Error("Invalid API key sk_test_geheim"));
+    const res = await startCheckoutAction({ productType: "initial", metadata: selfPurchase });
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error).toMatch(/nicht gestartet werden/);
+      expect(res.error).not.toContain("sk_test");
+    }
+  });
+
   it("verweigert Gästen die Verlängerung", async () => {
     const res = await startCheckoutAction({ productType: "renewal", projectId: "proj-1" });
     expect(res).toEqual({ ok: false, error: "Nicht eingeloggt." });

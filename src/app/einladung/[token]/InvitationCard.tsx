@@ -1,33 +1,10 @@
-import Image from "next/image";
 import type { ReactNode } from "react";
+import { BackdropScreen } from "@/components/BackdropScreen";
 
-// Rahmen der Einladungs-Seite: Strandfoto aus der Willkommens-Mail weich
-// gezeichnet im Hintergrund, darüber die Karte mit dem NARRAVIT-Logo.
+// Rahmen der Einladungs-Seite: weichgezeichnetes Foto, Karte mit Logo.
 
 export function InvitationCard({ children }: { children: ReactNode }) {
-  return (
-    <main className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-[#3E3831] px-4 py-12 sm:px-6 sm:py-16">
-      <Image
-        src="/images/mail/willkommen-strand.jpg"
-        alt=""
-        fill
-        priority
-        sizes="100vw"
-        className="scale-105 object-cover blur-[3px]"
-        aria-hidden
-      />
-      <div className="absolute inset-0 bg-[#3E3831]/20" aria-hidden />
-      <div className="relative flex w-full max-w-xl flex-col gap-6 border border-[#e0dcd5] bg-white p-6 sm:gap-8 sm:p-10">
-        <div className="flex flex-col items-center gap-2">
-          <Image src="/logo.svg" alt="" width={90} height={80} className="h-16 w-auto" aria-hidden />
-          <p className="[font-family:var(--font-merriweather)] text-2xl font-light text-[#2D372D]">
-            NARRAVIT
-          </p>
-        </div>
-        {children}
-      </div>
-    </main>
-  );
+  return <BackdropScreen backdrop="einladung">{children}</BackdropScreen>;
 }
 
 export function InvitationHeading({ children }: { children: ReactNode }) {

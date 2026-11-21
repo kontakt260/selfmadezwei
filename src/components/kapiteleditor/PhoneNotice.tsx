@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { Smartphone, ArrowLeft } from "lucide-react";
+import { BackdropScreen } from "@/components/BackdropScreen";
 
 export function PhoneNotice({ projectId }: { projectId: string }) {
   return (
-    <main className="[font-family:var(--font-lato)] flex min-h-[100dvh] items-center justify-center bg-[#FAF8F6] px-6 py-16 md:hidden">
-      <div className="flex w-full max-w-md flex-col items-center gap-6 border border-[#e0dcd5] bg-white p-8 text-center">
+    <BackdropScreen backdrop="smartphone">
+      <div className="flex flex-col items-center gap-6 text-center">
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#F3F7F3] text-[#96B897]">
           <Smartphone className="h-7 w-7" />
         </div>
@@ -25,6 +26,6 @@ export function PhoneNotice({ projectId }: { projectId: string }) {
           Zurück zur Projektübersicht
         </Link>
       </div>
-    </main>
+    </BackdropScreen>
   );
 }

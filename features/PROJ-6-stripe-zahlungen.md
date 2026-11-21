@@ -80,9 +80,9 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 | BUG-G4 ✅ | Medium | Beim Kauf ohne Konto geht nach dem Einlösen keine Kaufbestätigung raus (Mail 02/03/03b/04), nur Mail 01 davor und ggf. die Einladung. | Der Standardweg von der Landingpage bekommt die neuen Mails nie; der Gast-Käufer eines Geschenks erfährt per Mail nicht, dass es verschickt wurde. |
 | BUG-G5 ✅ | Medium | Verlängerung schreibt erst `project_access`, dann `payments`. Scheitert der zweite Schritt oder laufen zwei Webhook-Zustellungen gleichzeitig, verlängert der Retry noch einmal. | Ein Kauf kann 24 statt 12 Monate Zugang ergeben. |
 | BUG-G6 ✅ | Medium | Der Ablauf wird nur kontoweit geprüft („alle Projekte abgelaufen"). Einzelne Projektseiten, Server Actions und RLS prüfen ihn nicht. | Wer noch ein aktives Projekt hat, kann in einem abgelaufenen Projekt weiterarbeiten. |
-| BUG-G7 | Low | `startCheckoutAction` gibt rohe Fehlertexte zurück (z. B. fehlende Env-Variable), auch an nicht angemeldete Besucher. | Interne Details werden sichtbar. |
+| BUG-G7 ✅ | Low | `startCheckoutAction` gibt rohe Fehlertexte zurück (z. B. fehlende Env-Variable), auch an nicht angemeldete Besucher. | Interne Details werden sichtbar. |
 | BUG-G8 | Low | Bricht der Server zwischen Sperre und Erfüllung ab, bleibt `purchase_claims` als eingelöst ohne Projekt stehen. | Bezahlter Kauf hängt, nur von Hand lösbar. |
-| BUG-G9 | Low | „12 Monate" sind fest 365 Tage. | Über einen 29. Februar endet der Zugang einen Tag früher. |
+| BUG-G9 ✅ | Low | „12 Monate" sind fest 365 Tage. | Über einen 29. Februar endet der Zugang einen Tag früher. |
 | BUG-G10 | Low | Die Erfolgsseite legt die Checkout-Adresse als `?email=` in die Links zu Registrierung und Anmeldung. | Personenbezogene Daten in URLs (Verlauf, Logs). |
 | BUG-G11 | Low | Erstattungen (`charge.refunded`) werden nicht verarbeitet. | Nach Widerruf bleibt der Zugang aktiv, bis er von Hand entzogen wird. Produktentscheidung offen. |
 | BUG-G12 | Medium (aus dem Code, Live-Test 4b offen) | Der Link „melden Sie sich hier an" aus Mail 01 ordnet den Kauf nur zu, wenn das Konto die Checkout-Adresse hat oder der Kauf-Browser verwendet wird. Mit einem Konto unter anderer Adresse auf einem anderen Gerät passiert nichts, und es erscheint kein Hinweis. | Der Kunde hat bezahlt und sieht kein Projekt; ein Konto ohne Projekt landet im Kauf-Assistenten und könnte erneut kaufen. Der Kauf bleibt offen und lässt sich mit der Checkout-Adresse einlösen. |
@@ -117,10 +117,16 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 - Einladungs-Seite: Foto im Hintergrund und Logo für alle Einladungen. Geschenk-Einladungen (`invitations.is_gift`) haben eigene Texte und zeigen weder Rolle noch Projekttitel; normale Einladungen an Co-Autoren behalten beides.
 - Migration `20261121110000_proj6_direct_gift.sql`, keine RLS-Änderung. Muss vor dem Code-Deploy laufen.
 
+**Weitere Anpassungen (2026-11-21)**
+- **G7:** Der Checkout zeigt Besuchern nur noch eine allgemeine Fehlermeldung, Details stehen im Server-Log.
+- **G9:** Der Zugang läuft 12 echte Kalendermonate (`src/lib/purchases/access-period.ts`), auch über einen 29. Februar.
+- Erfolgsseite „nur erzählen": neuer Text, Button „Zum Projekt". Der Satz kommt ohne „er/sie" aus, weil das Geschlecht der beschenkten Person nicht bekannt ist.
+- Alle Abschluss-Screens, die Einladung und der Smartphone-Hinweis nutzen `BackdropScreen` mit weichgezeichnetem Foto. Vier Bereiche (`einladung`, `geschenk`, `kauf`, `smartphone`) zeigen vorerst das Strandfoto und lassen sich einzeln austauschen.
+
 **Restrisiken nach den Fixes**
 - **G6:** Die RLS-Policies prüfen den Ablauf nicht. Technisch versierte Mitglieder könnten mit ihrem Login weiter direkt über die Supabase-API schreiben oder ins Cover-Bucket laden. Das zu schließen ist eine RLS-Änderung und braucht Jakobs ausdrückliche Freigabe.
 - **G5:** Zahlen zwei **verschiedene** Mitglieder im selben Moment, kann eine der beiden Verlängerungen verloren gehen. Vollständig atomar ginge es nur mit einer Datenbank-Funktion (Migration).
-- Die Low-Befunde G7 bis G11 sind offen.
+- Offen sind die Low-Befunde G8 (hängender Einlöse-Versuch), G10 (E-Mail-Adresse in der URL) und G11 (Erstattungen, Produktentscheidung).
 
 **Tests nach den Fixes:** Vitest 391/391, Typprüfung fehlerfrei, Lint 0 Fehler. Playwright Chromium (alle Suites, gegen die Stage-DB): 127 bestanden, 1 übersprungen, 1 Test an die neue Abgelaufen-Seite angepasst. Die Ansicht mit einem wirklich abgelaufenen Projekt ist per Komponenten-Test geprüft, noch nicht im Browser gegen Stage.
 

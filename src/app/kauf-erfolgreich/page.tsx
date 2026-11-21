@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { getStripe } from "@/lib/stripe/server";
 import { isCheckoutPaid } from "@/lib/stripe/payment-status";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { isDirectGiftSession, isGuestSession } from "@/lib/purchases/guest-purchase";
+import { BackdropScreen, type BackdropKey } from "@/components/BackdropScreen";
 import { DirectGiftScreen } from "./DirectGiftScreen";
 import { SuccessIcon } from "./SuccessIcon";
 
@@ -130,19 +130,16 @@ export default async function KaufErfolgreichPage({
   // weder einlösen noch „Zugang aktiv" anzeigen.
   if (paymentPending) {
     return (
-      <main className="flex min-h-[100dvh] items-center justify-center bg-[#FAF8F6] px-6 py-16">
-        <div className="flex w-full max-w-xl flex-col items-center gap-6 border border-[#e0dcd5] bg-white p-8 text-center sm:p-12">
-          <Image src="/logo.svg" alt="NARRAVIT" width={64} height={56} className="h-14 w-auto" />
-          <h1 className="[font-family:var(--font-merriweather)] text-3xl font-medium text-[#3E3831]">
-            Ihre Zahlung wird bearbeitet
-          </h1>
-          <p className="text-lg leading-8 text-[#535252]">
-            Vielen Dank für Ihren Kauf. Bei dieser Zahlart dauert der Eingang
-            einige Tage. Sobald die Zahlung bei uns angekommen ist, bekommen
-            Sie eine E-Mail mit den nächsten Schritten.
-          </p>
-        </div>
-      </main>
+      <SuccessScreen backdrop="kauf" icon={false}>
+        <h1 className="[font-family:var(--font-merriweather)] text-2xl font-medium text-[#3E3831] sm:text-3xl">
+          Ihre Zahlung wird bearbeitet
+        </h1>
+        <p className="text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
+          Vielen Dank für Ihren Kauf. Bei dieser Zahlart dauert der Eingang
+          einige Tage. Sobald die Zahlung bei uns angekommen ist, bekommen
+          Sie eine E-Mail mit den nächsten Schritten.
+        </p>
+      </SuccessScreen>
     );
   }
 
@@ -169,36 +166,51 @@ export default async function KaufErfolgreichPage({
 
   if (isGuest && !user) {
     return (
-      <main className="flex min-h-[100dvh] items-center justify-center bg-[#FAF8F6] px-6 py-16">
-        <div className="flex w-full max-w-xl flex-col items-center gap-6 border border-[#e0dcd5] bg-white p-8 text-center sm:p-12">
-          <Image src="/logo.svg" alt="NARRAVIT" width={64} height={56} className="h-14 w-auto" />
-          <SuccessIcon />
-          <GuestAccountContent variant={variant} buyerEmail={buyerEmail} />
-        </div>
-      </main>
+      <SuccessScreen backdrop={isGiftVariant(variant) ? "geschenk" : "kauf"}>
+        <GuestAccountContent variant={variant} buyerEmail={buyerEmail} />
+      </SuccessScreen>
     );
   }
 
   return (
-    <main className="flex min-h-[100dvh] items-center justify-center bg-[#FAF8F6] px-6 py-16">
-      <div className="flex w-full max-w-xl flex-col items-center gap-6 border border-[#e0dcd5] bg-white p-8 text-center sm:p-12">
-        <Image src="/logo.svg" alt="NARRAVIT" width={64} height={56} className="h-14 w-auto" />
-        <SuccessIcon />
-        {variant.type === "initial-self" && <InitialSelfContent />}
-        {variant.type === "initial-gift-phone-only" && (
-          <InitialGiftPhoneOnlyContent recipientName={variant.recipientName} />
-        )}
-        {variant.type === "initial-gift-phone-computer" && (
-          <InitialGiftPhoneComputerContent
-            recipientEmail={variant.recipientEmail}
-            buyerRetainsAccess={variant.buyerRetainsAccess}
-          />
-        )}
-        {variant.type === "renewal" && (
-          <RenewalContent projectId={variant.projectId} />
-        )}
+    <SuccessScreen backdrop={isGiftVariant(variant) ? "geschenk" : "kauf"}>
+      {variant.type === "initial-self" && <InitialSelfContent />}
+      {variant.type === "initial-gift-phone-only" && (
+        <InitialGiftPhoneOnlyContent recipientName={variant.recipientName} />
+      )}
+      {variant.type === "initial-gift-phone-computer" && (
+        <InitialGiftPhoneComputerContent
+          recipientEmail={variant.recipientEmail}
+          buyerRetainsAccess={variant.buyerRetainsAccess}
+        />
+      )}
+      {variant.type === "renewal" && (
+        <RenewalContent projectId={variant.projectId} />
+      )}
+    </SuccessScreen>
+  );
+}
+
+function isGiftVariant(variant: Variant): boolean {
+  return variant.type === "initial-gift-phone-only" || variant.type === "initial-gift-phone-computer";
+}
+
+function SuccessScreen({
+  backdrop,
+  icon = true,
+  children,
+}: {
+  backdrop: BackdropKey;
+  icon?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <BackdropScreen backdrop={backdrop}>
+      <div className="flex flex-col items-center gap-6 text-center">
+        {icon ? <SuccessIcon /> : null}
+        {children}
       </div>
-    </main>
+    </BackdropScreen>
   );
 }
 
@@ -221,10 +233,10 @@ function GuestAccountContent({
 
   return (
     <>
-      <h1 className="[font-family:var(--font-merriweather)] text-3xl font-medium text-[#3E3831]">
+      <h1 className="[font-family:var(--font-merriweather)] text-2xl font-medium text-[#3E3831] sm:text-3xl">
         Vielen Dank — Ihre Zahlung ist eingegangen
       </h1>
-      <p className="text-lg leading-8 text-[#535252]">
+      <p className="text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
         {isGift
           ? "Nur noch ein Schritt: Legen Sie jetzt Ihr Konto an, damit wir Ihr Geschenk versenden und Sie das Projekt verwalten können."
           : "Nur noch ein Schritt: Legen Sie jetzt Ihr Konto an, dann können Sie sofort mit Ihrem Lebensbuch beginnen."}
@@ -273,10 +285,10 @@ function GuestAccountContent({
 function InitialSelfContent() {
   return (
     <>
-      <h1 className="[font-family:var(--font-merriweather)] text-3xl font-medium text-[#3E3831]">
+      <h1 className="[font-family:var(--font-merriweather)] text-2xl font-medium text-[#3E3831] sm:text-3xl">
         Willkommen bei NARRAVIT!
       </h1>
-      <p className="text-lg leading-8 text-[#535252]">
+      <p className="text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
         Ihr Zugang ist aktiv – Wir wünschen Ihnen viel Freude mit Ihrem
         Projekt
       </p>
@@ -297,34 +309,28 @@ function InitialGiftPhoneOnlyContent({
 }) {
   return (
     <>
-      <h1 className="[font-family:var(--font-merriweather)] text-3xl font-medium text-[#3E3831]">
+      <h1 className="[font-family:var(--font-merriweather)] text-2xl font-medium text-[#3E3831] sm:text-3xl">
         Geschenk aktiviert
       </h1>
-      <p className="text-lg leading-8 text-[#535252]">
+      <p className="text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
         Vielen Dank für Ihren Kauf. Das Geschenk-Projekt ist freigeschaltet
         — Sie sind als Projektleiter:in eingetragen und können die
-        Geschichten Ihrer beschenkten Person im Portal lesen.
+        Geschichten der beschenkten Person im Portal lesen und das Projekt
+        verwalten.
       </p>
       <p className="border border-[#96B897]/40 bg-[#96B897]/10 p-4 text-base text-[#3E3831]">
-        {recipientName ? (
-          <>
-            <span className="font-semibold">{recipientName}</span> erzählt
-            die Geschichten per Sprachnachricht — ein eigener Portal-Zugang
-            ist dafür nicht nötig.
-          </>
-        ) : (
-          <>
-            Ihre beschenkte Person erzählt ihre Geschichten per
-            Sprachnachricht — ein eigener Portal-Zugang ist für sie nicht
-            nötig.
-          </>
-        )}
+        {/* Ohne Pronomen: Das Geschlecht der beschenkten Person kennen wir nicht. */}
+        <span className="font-semibold">{recipientName || "Die beschenkte Person"}</span>{" "}
+        erzählt die Geschichten per Sprachnachricht — wir senden die
+        regelmäßigen Erinnerungshilfen auf dem von Ihnen bevorzugten
+        Kontaktweg zu, danach genügt es, uns die Geschichten einfach zu
+        erzählen.
       </p>
       <Link
         href="/"
         className="inline-flex h-12 items-center justify-center bg-[#D0BCA6] px-6 text-lg font-bold text-[#0a0909] transition-colors hover:bg-[#c0ad98]"
       >
-        Zur Startseite
+        Zum Projekt
       </Link>
     </>
   );
@@ -339,10 +345,10 @@ function InitialGiftPhoneComputerContent({
 }) {
   return (
     <>
-      <h1 className="[font-family:var(--font-merriweather)] text-3xl font-medium text-[#3E3831]">
+      <h1 className="[font-family:var(--font-merriweather)] text-2xl font-medium text-[#3E3831] sm:text-3xl">
         Geschenk verschickt
       </h1>
-      <p className="text-lg leading-8 text-[#535252]">
+      <p className="text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
         Vielen Dank für Ihren Kauf. Wir haben eine Einladung an die
         beschenkte Person geschickt — sobald sie sie annimmt, erhält sie
         Zugang zum Projekt.
@@ -385,10 +391,10 @@ function InitialGiftPhoneComputerContent({
 function RenewalContent({ projectId }: { projectId: string }) {
   return (
     <>
-      <h1 className="[font-family:var(--font-merriweather)] text-3xl font-medium text-[#3E3831]">
+      <h1 className="[font-family:var(--font-merriweather)] text-2xl font-medium text-[#3E3831] sm:text-3xl">
         Kauf erfolgreich
       </h1>
-      <p className="text-lg leading-8 text-[#535252]">
+      <p className="text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
         Ihr Projekt-Zugang wurde um 12 Monate verlängert.
       </p>
       <Link

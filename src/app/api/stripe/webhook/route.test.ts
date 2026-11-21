@@ -10,6 +10,7 @@
 // project_access — siehe tests/PROJ-6-stripe-zahlungen.spec.ts.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { addTwelveMonths } from "@/lib/purchases/access-period";
 
 // Wir setzen Env-Vars BEVOR irgendein Modul importiert wird, damit
 // `getStripe()` und `createServiceRoleClient()` nicht beim Bootstrap
@@ -598,8 +599,8 @@ describe("Stripe webhook — renewal GREATEST-trick (Pflicht-Test 6)", () => {
 
     expect(fakeDb.project_access.length).toBe(1);
     const newExpiry = new Date(fakeDb.project_access[0].expires_at as string);
-    // Soll ungefähr futureExpiry + 365 days sein, NICHT NOW + 365 days.
-    const expected = new Date(futureExpiry.getTime() + 365 * 24 * 60 * 60 * 1000);
+    // Soll futureExpiry + 12 Monate sein, NICHT NOW + 12 Monate.
+    const expected = addTwelveMonths(futureExpiry);
     const diffDays = Math.abs(newExpiry.getTime() - expected.getTime()) / (24 * 60 * 60 * 1000);
     expect(diffDays).toBeLessThan(1);
   });
@@ -632,7 +633,7 @@ describe("Stripe webhook — Verlängerung zählt genau einmal (BUG-G5)", () => 
     expect(retry.status).toBe(200);
     expect(fakeDb.payments).toHaveLength(1);
     expect(new Date(fakeDb.project_access[0].expires_at as string).getTime()).toBe(
-      start + 365 * 24 * 60 * 60 * 1000,
+      addTwelveMonths(start).getTime(),
     );
   });
 
@@ -646,7 +647,7 @@ describe("Stripe webhook — Verlängerung zählt genau einmal (BUG-G5)", () => 
     expect(b.status).toBe(200);
     expect(fakeDb.payments).toHaveLength(1);
     expect(new Date(fakeDb.project_access[0].expires_at as string).getTime()).toBe(
-      start + 365 * 24 * 60 * 60 * 1000,
+      addTwelveMonths(start).getTime(),
     );
     expect(sendRenewalMailMock).toHaveBeenCalledTimes(1);
   });
