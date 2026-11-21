@@ -267,8 +267,8 @@ function InitialSelfContent() {
         Willkommen bei NARRAVIT!
       </h1>
       <p className="text-lg leading-8 text-[#535252]">
-        Ihr Zugang ist aktiv — viel Freude beim Schreiben Ihres
-        Lebensbuchs. Ihr Portal-Zugang gilt 12 Monate.
+        Ihr Zugang ist aktiv – Wir wünschen Ihnen viel Freude mit Ihrem
+        Projekt
       </p>
       <Link
         href="/"

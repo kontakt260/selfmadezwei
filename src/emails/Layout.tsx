@@ -308,8 +308,10 @@ export const mailLinkStyle = {
 } as const;
 
 /**
- * Schlüssel-Wert-Liste für Zahlungs-/Detail-Blöcke. Wird tabellarisch
- * gerendert (Render-Time React-Email löst das in <table> auf).
+ * Schlüssel-Wert-Liste für Zahlungs-/Detail-Blöcke. Zwei feste Spalten: Lange
+ * Werte brechen innerhalb ihrer Spalte um und bleiben eingerückt, auch auf
+ * schmalen Bildschirmen. Eine Tabelle pro Zeile, damit die Klartext-Fassung
+ * jede Angabe in einer eigenen Zeile zeigt.
  */
 export function MailDetailsList({
   items,
@@ -325,32 +327,46 @@ export function MailDetailsList({
         border: `1px solid ${COLORS.border}`,
       }}
     >
-      {items.map((item, idx) => (
-        <Text
-          key={idx}
-          style={{
-            margin: 0,
-            marginBottom: idx === items.length - 1 ? 0 : 8,
-            fontFamily: SANS,
-            fontSize: 14,
-            lineHeight: 1.6,
-            color: COLORS.ink,
-          }}
-        >
-          <span
-            style={{
-              display: "inline-block",
-              minWidth: 130,
-              color: COLORS.inkMuted,
-            }}
+      {items.map((item, idx) => {
+        const cell = {
+          fontFamily: SANS,
+          fontSize: 14,
+          lineHeight: 1.6,
+          verticalAlign: "top",
+          paddingBottom: idx === items.length - 1 ? 0 : 8,
+        } as const;
+        return (
+          <table
+            key={idx}
+            role="presentation"
+            width="100%"
+            cellPadding={0}
+            cellSpacing={0}
+            border={0}
+            style={{ borderCollapse: "collapse", tableLayout: "fixed", width: "100%" }}
           >
-            {item.label}
-          </span>
-          {/* Leerzeichen trennt Bezeichnung und Wert in der Klartext-Fassung */}
-          {" "}
-          <span style={{ fontWeight: 600 }}>{item.value}</span>
-        </Text>
-      ))}
+            <tbody>
+              <tr>
+                <td
+                  width="40%"
+                  valign="top"
+                  style={{ ...cell, width: "40%", paddingRight: 12, color: COLORS.inkMuted }}
+                >
+                  {/* Leerzeichen trennt Bezeichnung und Wert im Klartext */}
+                  {item.label}{" "}
+                </td>
+                <td
+                  width="60%"
+                  valign="top"
+                  style={{ ...cell, width: "60%", fontWeight: 600, color: COLORS.ink }}
+                >
+                  {item.value}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        );
+      })}
     </Container>
   );
 }

@@ -85,6 +85,7 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 | BUG-G9 | Low | „12 Monate" sind fest 365 Tage. | Über einen 29. Februar endet der Zugang einen Tag früher. |
 | BUG-G10 | Low | Die Erfolgsseite legt die Checkout-Adresse als `?email=` in die Links zu Registrierung und Anmeldung. | Personenbezogene Daten in URLs (Verlauf, Logs). |
 | BUG-G11 | Low | Erstattungen (`charge.refunded`) werden nicht verarbeitet. | Nach Widerruf bleibt der Zugang aktiv, bis er von Hand entzogen wird. Produktentscheidung offen. |
+| BUG-G12 | Medium (aus dem Code, Live-Test 4b offen) | Der Link „melden Sie sich hier an" aus Mail 01 ordnet den Kauf nur zu, wenn das Konto die Checkout-Adresse hat oder der Kauf-Browser verwendet wird. Mit einem Konto unter anderer Adresse auf einem anderen Gerät passiert nichts, und es erscheint kein Hinweis. | Der Kunde hat bezahlt und sieht kein Projekt; ein Konto ohne Projekt landet im Kauf-Assistenten und könnte erneut kaufen. Der Kauf bleibt offen und lässt sich mit der Checkout-Adresse einlösen. |
 
 **Security-Audit:** Webhook-Signatur, Idempotenz des Erstkaufs, Einlösen nur mit bestätigter Adresse oder Browser-Geheimnis, atomare Sperre, Mitgliedschaftsprüfung bei der Verlängerung und Schutz vor Open Redirect sind in Ordnung. Das Rate-Limit für den anonymen Checkout-Start fehlt weiterhin (PROJ-17). Sicherheitsrelevant sind außerdem BUG-G6 und BUG-G7.
 
@@ -95,6 +96,11 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 - **G4:** Nach dem Einlösen geht die passende Kaufbestätigung (Mail 02/03/03b/04) an die Adresse des Kontos.
 - **G5:** Die Verlängerung trägt zuerst die Zahlung ein (eindeutige `stripe_session_id`), dann den Zugang; scheitert der Zugang, wird die Zahlung zurückgenommen und Stripe wiederholt.
 - **G6:** `src/lib/projects/project-access.ts`: Die Middleware sperrt die Seiten eines abgelaufenen Projekts, alle Inhalte ändernden Server Actions prüfen den Ablauf selbst. Lesen, Verlassen, Mitglieder entfernen und Projekt löschen bleiben möglich.
+
+**Live-Test auf Stage (Jakob, 2026-11-21)**
+- Bestanden: Gast-Kauf mit gleicher Adresse und Link in anderem Browser, Gast-Kauf mit anderer Adresse im selben Browser, Bestandskunde über den Mail-Link. Stripe-Webhook 200, erneutes Senden 200 mit `duplicate: true`.
+- Korrigiert: Lange Werte in der Detail-Box der Mails bleiben eingerückt (feste Spalten, alle 9 Mails mit Box bei 600 und 340 px geprüft). Erfolgsseite „für mich selbst": „Ihr Zugang ist aktiv – Wir wünschen Ihnen viel Freude mit Ihrem Projekt".
+- Offen: Konto mit anderer Adresse (BUG-G12), Geschenk mit und ohne eigenen Zugang, Geschenk „nur erzählen", Verlängerung, 100-%-Code, Reminder-Cron, abgelaufenes Projekt.
 
 **Restrisiken nach den Fixes**
 - **G6:** Die RLS-Policies prüfen den Ablauf nicht. Technisch versierte Mitglieder könnten mit ihrem Login weiter direkt über die Supabase-API schreiben oder ins Cover-Bucket laden. Das zu schließen ist eine RLS-Änderung und braucht Jakobs ausdrückliche Freigabe.
