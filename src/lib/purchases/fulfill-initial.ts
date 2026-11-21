@@ -20,7 +20,7 @@ import { addTwelveMonths } from "./access-period";
 // Aufrufer — er weiß, welche schon unterwegs sind.
 
 
-// Geschenk-Einladungen gelten so lange wie der Portal-Zugang des Projekts
+// Geschenk-Einladungen gelten so lange wie der Projektzugang des Projekts
 // (Entscheidung 2026-11-18) — nicht 14 Tage wie normale Einladungen
 // (PROJ-9). Geschenke werden oft lange vor der Übergabe gekauft, und
 // verzichtet der Käufer auf eigenen Zugang, gibt es niemanden, der eine
@@ -47,7 +47,7 @@ export type InitialPurchaseInput = {
 
 export type InitialPurchaseResult = {
   projectId: string;
-  /** Ende des Portal-Zugangs (ISO) — 12 Monate ab Erfüllung. */
+  /** Ende des Projektzugangs (ISO) — 12 Monate ab Erfüllung. */
   expiresAt: string;
   /** false = Geschenk, bei dem der Käufer auf eigenen Zugang verzichtet. */
   buyerIsMember: boolean;

@@ -50,10 +50,10 @@ function mailTypeFor(variant: ReminderVariant): MailType {
 
 function subjectFor(daysLeft: number, variant: ReminderVariant, projectName: string): string {
   if (variant === "30") {
-    return `Erinnerung: Ihr Portal-Zugang für „${projectName}" läuft in ${daysLeft} Tagen ab`;
+    return `Erinnerung: Ihr Projektzugang für „${projectName}" läuft in ${daysLeft} Tagen ab`;
   }
   const days = daysLeft === 1 ? "1 Tag" : `${daysLeft} Tage`;
-  return `Nur noch ${days} Portal-Zugang für „${projectName}"`;
+  return `Nur noch ${days} Projektzugang für „${projectName}"`;
 }
 
 export async function maybeSendReminderMail(

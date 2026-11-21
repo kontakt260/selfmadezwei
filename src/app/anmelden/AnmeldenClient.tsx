@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useActionState } from "react";
+import { Suspense, useActionState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -97,6 +97,11 @@ export function AnmeldenClient({ initialEmail, initialNext, showExpiredLink }: P
     {},
   );
 
+  // Einlösen eines Kaufs: volle Navigation, siehe loginAction.
+  useEffect(() => {
+    if (state.redirectTo) window.location.assign(state.redirectTo);
+  }, [state.redirectTo]);
+
   return (
     <AuthLayout>
       <div className="mb-8 text-center md:mb-10">
@@ -154,8 +159,8 @@ export function AnmeldenClient({ initialEmail, initialNext, showExpiredLink }: P
           </p>
         )}
 
-        <Button type="submit" className="h-12" disabled={pending}>
-          {pending ? "Anmeldung …" : "Anmelden"}
+        <Button type="submit" className="h-12" disabled={pending || !!state.redirectTo}>
+          {pending || state.redirectTo ? "Anmeldung …" : "Anmelden"}
         </Button>
 
         <div className="my-3 flex items-center gap-3">

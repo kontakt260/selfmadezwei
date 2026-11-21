@@ -157,7 +157,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 - [ ] Impressum — liegt auf der Webflow-Website unter `https://www.narravit.de/impressum`. Der Footer jeder Mail (App-Mails und Supabase-Vorlagen) verlinkt **fest** dorthin, auf Stage wie in Production; die Seite muss also erreichbar und vollständig sein (PROJ-11 BUG-1). **Stand 2026-11-19:** liefert noch 404.
 - [x] Pflichtangaben in Mails: NARRAVIT ist **nicht** im Handelsregister eingetragen (Jakob, 2026-11-19). Die Geschäftsbrief-Pflichtangaben (§ 37a HGB, § 35a GmbHG) gelten damit nicht, der Impressum-Link im Fuß jeder Mail genügt; der Platzhalter ist aus den Supabase-Vorlagen entfernt. **Neu prüfen, falls sich die Rechtsform ändert** (Eintragung, UG/GmbH) — dann gehören Firma, Rechtsform, Sitz, Registergericht, Registernummer und ggf. Geschäftsführung in **jede** geschäftliche Mail (`src/emails/Layout.tsx`).
-- [ ] Erinnerungs-Mails 08/09 versprechen „Ihre Inhalte bleiben noch 90 weitere Tage erhalten". Es gibt dafür noch keine Lösch- oder Sperrlogik und keine Regel in AGB/Datenschutz — vor Go-live festlegen und umsetzen oder den Satz anpassen.
+- [ ] **Aufbewahrung 90 Tage:** Die Erinnerungs-Mails 08/09 und die Seite „Zugang abgelaufen" versprechen, dass Inhalte nach Ablauf noch 90 Tage gespeichert und dann **endgültig gelöscht** werden (`CONTENT_RETENTION_DAYS`). Die Löschung ist noch nicht gebaut und steht nicht in AGB/Datenschutz — vor Go-live festlegen und umsetzen oder den Satz anpassen.
 - [ ] Datenschutzerklärung (auch für Facebook-App und Stripe-Checkout nötig).
 - [ ] Datenschutzerklärung nennt den Kauf ohne Konto: Speicherung der Checkout-E-Mail-Adresse bis zur Konto-Anlage (`purchase_claims`) und das technisch notwendige Cookie `nv_kauf` (Zuordnung des Kaufs, 60 Tage).
 - [ ] AGB und Widerrufsbelehrung für den Kauf.
@@ -186,7 +186,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] Geschenk-Kauf „Auch am Computer schreiben": Einladung an die beschenkte Person kommt an.
 - [ ] Geschenk-Kauf **ohne Konto**: Einladung an die beschenkte Person kommt an, sobald der Käufer sein Konto angelegt hat.
 - [ ] Einladung über „Nutzer hinzufügen" kommt an.
-- [ ] Cron `/api/cron/reminders` nach dem ersten Lauf in den Vercel-Logs mit 200.
+- [ ] Cron: In Vercel unter Settings → Cron Jobs ist `/api/cron/reminders` eingetragen (täglich 9:00 UTC, erscheint erst nach dem Merge auf `main`); `CRON_SECRET` ist in Production gesetzt. Einmal über **Run** auslösen, in den Logs muss 200 stehen.
 - [ ] Mail-Links zeigen auf `app.narravit.de`, nicht auf `stage-app`.
 - [ ] Logo und Willkommens-Foto werden in den Mails angezeigt (Abschnitt 5).
 
@@ -196,6 +196,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
+| 2026-11-21 | Cron: `/api/cron` ist von der Middleware ausgenommen (wurde auf `/anmelden` umgeleitet). Vercel führt Cron-Jobs nur für Production-Deployments aus und liest sie aus `vercel.json`; `main` hat die Datei noch nicht, deshalb erscheint unter Settings → Cron Jobs erst nach dem Merge ein Eintrag. Kein neuer Env-Wert. |
 | 2026-11-21 | Geschenk ohne eigenen Zugang läuft ohne Konto: Projekt und Einladung entstehen direkt nach der Zahlung. Neue Migration `20261121110000_proj6_direct_gift.sql`, auf Stage und Production jeweils **vor** dem Code-Deploy. Kein neuer Env-Wert. |
 | 2026-11-21 | Persönlicher Einlöse-Link in der Kauf-Mail (`/kauf-zuordnen`): neue Migration `20261121100000_proj6_purchase_claim_mail_token.sql`, auf Stage und Production jeweils **vor** dem Code-Deploy einspielen. Kein neuer Env-Wert. |
 | 2026-11-21 | Das HTML aller Mails (App-Mails und Supabase-Vorlagen) ist jetzt reines ASCII, Umlaute und Sonderzeichen stehen als HTML-Codes, weil sie auf Stage kaputt ankamen. Supabase-Vorlagen auf Stage eingesetzt; in Production erst direkt nach dem Merge (Abschnitt 1, Schritt 7). Stage-Webhook-URL braucht den Vercel-Bypass-Parameter (Abschnitt 4). |

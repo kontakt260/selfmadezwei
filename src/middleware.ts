@@ -12,6 +12,8 @@ export const config = {
     //     würde mit 302 statt 400 antworten.
     //   - Raw-Body darf NICHT vorgelesen werden, sonst schlägt die
     //     Stripe-Signatur-Verifikation fehl.
-    "/((?!_next/static|_next/image|favicon.ico|icon.svg|api/stripe/webhook|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // /api/cron ausnehmen: Vercel-Cron hat keine User-Session und würde sonst
+    // auf /anmelden umgeleitet. Die Route prüft selbst das CRON_SECRET.
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|api/stripe/webhook|api/cron/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

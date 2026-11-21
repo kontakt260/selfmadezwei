@@ -85,7 +85,7 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 | BUG-G9 ✅ | Low | „12 Monate" sind fest 365 Tage. | Über einen 29. Februar endet der Zugang einen Tag früher. |
 | BUG-G10 | Low | Die Erfolgsseite legt die Checkout-Adresse als `?email=` in die Links zu Registrierung und Anmeldung. | Personenbezogene Daten in URLs (Verlauf, Logs). |
 | BUG-G11 | Low | Erstattungen (`charge.refunded`) werden nicht verarbeitet. | Nach Widerruf bleibt der Zugang aktiv, bis er von Hand entzogen wird. Produktentscheidung offen. |
-| BUG-G12 | Medium (aus dem Code, Live-Test 4b offen) | Der Link „melden Sie sich hier an" aus Mail 01 ordnet den Kauf nur zu, wenn das Konto die Checkout-Adresse hat oder der Kauf-Browser verwendet wird. Mit einem Konto unter anderer Adresse auf einem anderen Gerät passiert nichts, und es erscheint kein Hinweis. | Der Kunde hat bezahlt und sieht kein Projekt; ein Konto ohne Projekt landet im Kauf-Assistenten und könnte erneut kaufen. Der Kauf bleibt offen und lässt sich mit der Checkout-Adresse einlösen. |
+| BUG-G12 ✅ | Medium | Der Link „melden Sie sich hier an" aus Mail 01 ordnet den Kauf nur zu, wenn das Konto die Checkout-Adresse hat oder der Kauf-Browser verwendet wird. Mit einem Konto unter anderer Adresse auf einem anderen Gerät passiert nichts, und es erscheint kein Hinweis. | Der Kunde hat bezahlt und sieht kein Projekt; ein Konto ohne Projekt landet im Kauf-Assistenten und könnte erneut kaufen. Der Kauf bleibt offen und lässt sich mit der Checkout-Adresse einlösen. |
 
 **Security-Audit:** Webhook-Signatur, Idempotenz des Erstkaufs, Einlösen nur mit bestätigter Adresse oder Browser-Geheimnis, atomare Sperre, Mitgliedschaftsprüfung bei der Verlängerung und Schutz vor Open Redirect sind in Ordnung. Das Rate-Limit für den anonymen Checkout-Start fehlt weiterhin (PROJ-17). Sicherheitsrelevant sind außerdem BUG-G6 und BUG-G7.
 
@@ -122,6 +122,12 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 - **G9:** Der Zugang läuft 12 echte Kalendermonate (`src/lib/purchases/access-period.ts`), auch über einen 29. Februar.
 - Erfolgsseite „nur erzählen": neuer Text, Button „Zum Projekt". Der Satz kommt ohne „er/sie" aus, weil das Geschlecht der beschenkten Person nicht bekannt ist.
 - Alle Abschluss-Screens, die Einladung und der Smartphone-Hinweis nutzen `BackdropScreen` mit weichgezeichnetem Foto. Vier Bereiche (`einladung`, `geschenk`, `kauf`, `smartphone`) zeigen vorerst das Strandfoto und lassen sich einzeln austauschen.
+
+**Weitere Live-Test-Ergebnisse (Jakob, 2026-11-21)**
+- Bestanden: Geschenk mit eigenem Zugang (Test 5), Verlängerung durch die beschenkte Person (Test 7), 100-%-Rabattcode (Test 8, bestätigt zugleich BUG-G2), abgelaufenes Projekt mit Verlängerung (Test 9), Geschenk „nur erzählen".
+- **Test 4b fehlgeschlagen, behoben:** Nach dem Login-Formular rief die Server Action `/kauf-einloesen` nur intern auf, ohne das Cookie des Mail-Links. Der Login leitet jetzt per voller Browser-Navigation dorthin (E2E AC-Link-3). Erneuter Live-Test steht aus.
+- **BUG-G13 (High), behoben:** Die Middleware leitete `/api/cron/reminders` auf `/anmelden` um; Erinnerungsmails wären nie verschickt worden. Die Route ist jetzt ausgenommen und prüft selbst das `CRON_SECRET` (E2E AC-Cron-1). Live-Lauf steht aus.
+- Wortlaut: durchgehend „Projektzugang" statt „Portal-Zugang"; bei Geschenken „Geschenk versenden/empfangen" statt „Einladung". Hintergrundbilder von Jakob je Bereich eingebaut.
 
 **Restrisiken nach den Fixes**
 - **G6:** Die RLS-Policies prüfen den Ablauf nicht. Technisch versierte Mitglieder könnten mit ihrem Login weiter direkt über die Supabase-API schreiben oder ins Cover-Bucket laden. Das zu schließen ist eine RLS-Änderung und braucht Jakobs ausdrückliche Freigabe.

@@ -62,6 +62,13 @@ describe("/zugang-abgelaufen", () => {
     expect(screen.queryByText(/79/)).toBeNull();
   });
 
+  it("nennt Projektzugang und die Aufbewahrung", async () => {
+    const { container } = await show();
+    const text = container.textContent ?? "";
+    expect(text).toContain("Ihr NARRAVIT-Projektzugang ist nicht mehr aktiv.");
+    expect(text).toContain("noch 90 Tage bei uns gespeichert, bevor wir sie endgültig löschen.");
+  });
+
   it("mit ?project nur dieses abgelaufene Projekt", async () => {
     state.access = [
       { project_id: A, expires_at: past() },

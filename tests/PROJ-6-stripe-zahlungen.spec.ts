@@ -1,5 +1,8 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
 
+const QA_EMAIL = "qa-test@narravit.de";
+const QA_PASSWORD = "QA-Test-2026!";
+
 // PROJ-6 — Stripe-Zahlungen (Portal). Vapi-Paket zurückgebaut 2026-10-13.
 //
 // Diese E2E-Suite deckt die acceptance criteria ab, die nicht schon
@@ -123,6 +126,22 @@ test.describe("PROJ-6 — Kauf ohne Konto", () => {
     expect(await page.evaluate(() => document.cookie)).not.toContain(code);
   });
 
+  // Regression Live-Test 4b (2026-11-21): Die Anmeldung läuft als Server
+  // Action auf /anmelden. Das Geheimnis muss diesen Weg überstehen.
+  test("AC-Link-3: Mail-Link, dann Anmeldung über das Formular: Einlösen sieht das Geheimnis", async ({
+    page,
+    context,
+  }) => {
+    await context.clearCookies();
+    await page.goto(`/kauf-zuordnen?code=${"C".repeat(43)}&ziel=anmelden`);
+    await page.locator('input[name="email"]').fill(QA_EMAIL);
+    await page.locator('input[name="password"]').fill(QA_PASSWORD);
+    await page.locator('button[type="submit"]').click();
+    await expect(page.getByText(/bereits einem Konto zugeordnet/)).toBeVisible({ timeout: 20_000 });
+    const cookies = await context.cookies("http://localhost:3000/kauf-einloesen");
+    expect(cookies.find((c) => c.name === "nv_kauf_link")).toBeUndefined();
+  });
+
   test("AC-Guest-4: /kauf-erfolgreich ist öffentlich, zeigt ohne gültige Stripe-Session aber nichts", async ({
     page,
     context,
@@ -130,6 +149,21 @@ test.describe("PROJ-6 — Kauf ohne Konto", () => {
     await context.clearCookies();
     await page.goto("/kauf-erfolgreich?session_id=cs_test_invalid_xyz_does_not_exist");
     await expect(page).not.toHaveURL(/kauf-erfolgreich/);
+  });
+});
+
+test.describe("PROJ-11 — Cron-Route", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  // Regression 2026-11-21: Die Middleware leitete den Cron auf /anmelden um,
+  // Erinnerungsmails wären nie verschickt worden.
+  test("AC-Cron-1: wird nicht zur Anmeldung umgeleitet und verlangt das Secret", async ({ request }) => {
+    const res = await request.get("/api/cron/reminders", {
+      maxRedirects: 0,
+      headers: { authorization: "Bearer falsches-secret" },
+    });
+    expect([401, 500]).toContain(res.status());
+    expect(res.headers()["location"]).toBeUndefined();
   });
 });
 

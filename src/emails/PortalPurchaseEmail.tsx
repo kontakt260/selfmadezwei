@@ -4,7 +4,7 @@
 // payment_type = initial_portal_access (PROJ-6).
 //
 // Vier Fassungen (Texte: Figma-Frames 02, 03, 03b, 04 — Jakob, 2026-11-19):
-//   - 02 Kauf für sich selbst: „Ihr Portal-Zugang ist freigeschaltet".
+//   - 02 Kauf für sich selbst: „Ihr Projektzugang ist freigeschaltet".
 //   - 03 Geschenk mit eigenem Zugang, Einladung an die beschenkte Person:
 //     „Ihr Geschenk ist unterwegs", nennt die Adresse.
 //   - 03b Geschenk „Nur per Sprachnachricht erzählen": keine Einladung,
@@ -43,7 +43,7 @@ export type PortalPurchaseEmailProps = {
    * erzählen" (keine Einladung, deshalb keine Adresse).
    */
   giftRecipientName?: string;
-  /** false = Geschenk ohne eigenen Portal-Zugang des Käufers */
+  /** false = Geschenk ohne eigenen Projektzugang des Käufers */
   buyerHasAccess?: boolean;
 };
 
@@ -123,10 +123,10 @@ export function PortalPurchaseEmail({
   if (!isGift) {
     return (
       <Layout
-        preview="Ihr NARRAVIT-Portal-Zugang ist freigeschaltet."
+        preview="Ihr NARRAVIT-Projektzugang ist freigeschaltet."
         headerEyebrow="Willkommen"
       >
-        <MailHeading>Ihr Portal-Zugang ist freigeschaltet</MailHeading>
+        <MailHeading>Ihr Projektzugang ist freigeschaltet</MailHeading>
         <MailParagraph>{greeting}</MailParagraph>
         <MailParagraph>
           herzlich willkommen bei NARRAVIT. Vielen Dank für Ihr Vertrauen.
@@ -139,7 +139,7 @@ export function PortalPurchaseEmail({
         <MailCtaButton href={projectUrl}>Zur Projektübersicht</MailCtaButton>
 
         <MailParagraph>
-          Ihr Portal-Zugang ist <strong>12 Monate</strong> gültig. Vor Ablauf
+          Ihr Projektzugang ist <strong>12 Monate</strong> gültig. Vor Ablauf
           erinnern wir Sie rechtzeitig an die Verlängerung.
           <InvoiceHint invoiceUrl={invoiceUrl} />
         </MailParagraph>
@@ -189,7 +189,7 @@ export function PortalPurchaseEmail({
       <MailCtaButton href={projectUrl}>Zur Projektübersicht</MailCtaButton>
 
       <MailParagraph>
-        Ihr Portal-Zugang ist <strong>12 Monate</strong> gültig. Rechtzeitig
+        Ihr Projektzugang ist <strong>12 Monate</strong> gültig. Rechtzeitig
         vor dem Ablauf erinnern wir Sie an die Verlängerung.
         <InvoiceHint invoiceUrl={invoiceUrl} />
       </MailParagraph>

@@ -11,6 +11,8 @@ const schema = z.object({
   next: z.string().optional(),
 });
 
+const CLAIM_ROUTE = "/kauf-einloesen";
+
 function safeNext(next: string | undefined): string {
   if (!next || !next.startsWith("/") || next.startsWith("//")) return "/";
   return next;
@@ -19,6 +21,8 @@ function safeNext(next: string | undefined): string {
 export type LoginState = {
   error?: string;
   fieldErrors?: Partial<Record<"email" | "password", string>>;
+  /** Ziel, das der Browser per voller Navigation aufrufen muss. */
+  redirectTo?: string;
 };
 
 export async function loginAction(
@@ -52,9 +56,17 @@ export async function loginAction(
 
   // Kauf ohne Konto: Wartet ein bezahlter Kauf auf dieses Konto, wird er
   // jetzt zugeordnet — auch bei Bestandskunden, die schon ein Projekt haben.
+  //
+  // /kauf-einloesen ist eine Route, die Cookies liest und setzt. Ein
+  // redirect() aus der Server Action würde sie nur intern aufrufen — ohne das
+  // Cookie des Mail-Links und ohne dass ihre Weiterleitung im Browser ankommt
+  // (Live-Test 4b). Deshalb navigiert hier der Browser selbst.
   const target = safeNext(parsed.data.next);
-  if (data.user && isDefaultLandingTarget(target) && (await hasPendingClaim(data.user))) {
-    redirect("/kauf-einloesen");
+  if (
+    target.split("?")[0] === CLAIM_ROUTE ||
+    (data.user && isDefaultLandingTarget(target) && (await hasPendingClaim(data.user)))
+  ) {
+    return { redirectTo: CLAIM_ROUTE };
   }
 
   redirect(target);

@@ -158,14 +158,14 @@ export default async function HomePage() {
                 className="inline-flex h-12 w-full shrink-0 items-center justify-center gap-3 bg-[rgba(10,9,9,0.05)] px-5 text-lg font-bold leading-6 text-black transition-colors hover:bg-[rgba(10,9,9,0.08)] sm:w-auto sm:min-w-[300px] sm:justify-start sm:pl-6"
               >
                 <IconPlus className="shrink-0 text-black" />
-                Weiteren Projekt-Zugang kaufen
+                Weiteren Projektzugang kaufen
               </Link>
             </div>
 
             {projects.length === 0 ? (
               <div className="flex flex-col items-center gap-5 bg-white px-6 py-12 text-center sm:px-8 sm:py-14">
                 <p className="max-w-2xl text-lg leading-8 text-[#848484] sm:text-xl sm:leading-9">
-                  Sie haben noch kein Projekt. Kaufen Sie Ihren ersten Portal-Zugang, um loszulegen.
+                  Sie haben noch kein Projekt. Kaufen Sie Ihren ersten Projektzugang, um loszulegen.
                 </p>
                 <Link
                   href="/onboarding"

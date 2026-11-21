@@ -149,7 +149,7 @@ const templates: Array<{ name: string; element: ReactElement; mustContain: strin
       renewUrl: `${siteUrl}/projektuebersicht/p1`,
       siteUrl,
     }),
-    mustContain: ["Nur noch 1 Tag Projekt-Zugang", "14. Oktober 2026"],
+    mustContain: ["Nur noch 1 Tag Projektzugang", "14. Oktober 2026"],
   },
   {
     name: "InvitationEmail (Geschenk)",
@@ -181,7 +181,7 @@ const templates: Array<{ name: string; element: ReactElement; mustContain: strin
       projectId: "p1",
     }),
     mustContain: [
-      "Ihr Portal-Zugang ist freigeschaltet",
+      "Ihr Projektzugang ist freigeschaltet",
       "Zur Projektübersicht",
       `${siteUrl}/projektuebersicht/p1`,
     ],
@@ -248,7 +248,7 @@ const templates: Array<{ name: string; element: ReactElement; mustContain: strin
       siteUrl,
     }),
     mustContain: [
-      "Maria Muster hat den Portal-Zugang für das Projekt „Omas Lebensbuch“ um weitere 12 Monate verlängert",
+      "Maria Muster hat den Projektzugang für „Omas Lebensbuch“ um weitere 12 Monate verlängert",
       "Projekt Omas Lebensbuch",
       "Neuer Zugang gültig bis 14. Oktober 2028",
     ],
@@ -322,7 +322,7 @@ describe("WelcomeEmail image", () => {
   });
 });
 
-// Geschenk-Einladungen gelten so lange wie der Portal-Zugang (2026-11-18).
+// Geschenk-Einladungen gelten so lange wie der Projektzugang (2026-11-18).
 // Die 14 Tage gelten nur für normale Einladungen an Co-Autoren.
 describe.each(templates.filter((t) => t.name.includes("Geschenk")))("$name", ({ element }) => {
   it("does not promise the 14-day limit of regular invitations", async () => {

@@ -52,7 +52,7 @@ describe("maybeSendReminderMail", () => {
     const res = await maybeSendReminderMail(input());
     expect(res).toEqual({ sent: true });
     expect(vi.mocked(sendEmail).mock.calls[0][0].subject).toBe(
-      "Erinnerung: Ihr Portal-Zugang für „Omas Lebensbuch\" läuft in 30 Tagen ab",
+      "Erinnerung: Ihr Projektzugang für „Omas Lebensbuch\" läuft in 30 Tagen ab",
     );
     expect(finalizeMailLog).toHaveBeenCalledWith("log-1", { ok: true, resendMessageId: "msg_1" });
   });
@@ -93,7 +93,7 @@ describe("maybeSendReminderMail", () => {
   it("uses the singular on the last day", async () => {
     await maybeSendReminderMail(input({ variant: "7", daysLeft: 1 }));
     expect(vi.mocked(sendEmail).mock.calls[0][0].subject).toBe(
-      "Nur noch 1 Tag Portal-Zugang für „Omas Lebensbuch\"",
+      "Nur noch 1 Tag Projektzugang für „Omas Lebensbuch\"",
     );
   });
 });

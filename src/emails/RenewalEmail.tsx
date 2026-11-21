@@ -1,4 +1,4 @@
-// PROJ-11 — Verlängerung des Portal-Zugangs (12-Monate-Renewal).
+// PROJ-11 — Verlängerung des Projektzugangs (12-Monate-Renewal).
 //
 // Trigger: Stripe-Webhook checkout.session.completed mit
 // payment_type = renewal_portal_access (PROJ-6).
@@ -57,13 +57,13 @@ export function RenewalEmail(props: RenewalEmailProps) {
     const renewedBy = props.renewedBy.trim() || "Ein Projektmitglied";
     return (
       <Layout
-        preview={`${renewedBy} hat den Portal-Zugang für „${projectName}“ verlängert. Neu gültig bis ${newExpiresAtFormatted}.`}
+        preview={`${renewedBy} hat den Projektzugang für „${projectName}“ verlängert. Neu gültig bis ${newExpiresAtFormatted}.`}
         headerEyebrow="Verlängerung"
       >
         <MailHeading>Ihr Projekt wurde verlängert</MailHeading>
         <MailParagraph>{greeting}</MailParagraph>
         <MailParagraph>
-          <strong>{renewedBy}</strong> hat den Portal-Zugang für das Projekt{" "}
+          <strong>{renewedBy}</strong> hat den Projektzugang für{" "}
           <strong>„{projectName}“</strong> um weitere{" "}
           <strong>12 Monate</strong> verlängert. Sie können wie gewohnt weiter
           schreiben und erzählen — für Sie ist nichts weiter zu tun.
@@ -91,13 +91,13 @@ export function RenewalEmail(props: RenewalEmailProps) {
 
   return (
     <Layout
-      preview={`Ihr NARRAVIT-Portal-Zugang wurde um 12 Monate verlängert. Neu gültig bis ${newExpiresAtFormatted}.`}
+      preview={`Ihr NARRAVIT-Projektzugang wurde um 12 Monate verlängert. Neu gültig bis ${newExpiresAtFormatted}.`}
       headerEyebrow="Verlängerung"
     >
       <MailHeading>Ihr Projekt wurde verlängert</MailHeading>
       <MailParagraph>{greeting}</MailParagraph>
       <MailParagraph>
-        vielen Dank — Ihr NARRAVIT-Projekt-Zugang ist um weitere{" "}
+        vielen Dank — Ihr NARRAVIT-Projektzugang ist um weitere{" "}
         <strong>12 Monate</strong> verlängert. Sie können wie gewohnt weiter
         schreiben, einladen und erzählen.
       </MailParagraph>

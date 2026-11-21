@@ -76,6 +76,25 @@ describe("/kauf-erfolgreich — Geschenk „nur erzählen“", () => {
   });
 });
 
+describe("/kauf-erfolgreich — Geschenk mit eigenem Zugang", () => {
+  it("spricht vom Geschenk statt von der Einladung", async () => {
+    state.session = paidSession({
+      user_id: "u1",
+      is_gift: "1",
+      gift_mode: "phone-plus-computer",
+      gift_recipient_email: "oma@example.com",
+      buyer_retains_access: "1",
+    });
+    const { container } = await show();
+    const text = container.textContent ?? "";
+    expect(text).toContain("Wir haben das Geschenk versendet — sobald die beschenkte Person es empfängt");
+    expect(text).toContain("Geschenk-Mail unterwegs an oma@example.com. Das Geschenk bleibt gültig, solange der Projektzugang läuft.");
+    expect(text).toContain("mitschreiben, die Geschichten lesen & das Projekt verwalten");
+    expect(text).not.toMatch(/Einladung/);
+    expect(screen.getByRole("link", { name: "Zum Projekt" })).toBeTruthy();
+  });
+});
+
 describe("/kauf-erfolgreich — Geschenk ohne eigenen Zugang", () => {
   it("ist ohne Anmeldung sichtbar, kurz und ohne Konto-Schritt", async () => {
     state.user = null;

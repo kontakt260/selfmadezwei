@@ -178,7 +178,7 @@ describe("chapterAutosaveAction — existing fields untouched", () => {
 // ─── Abgelaufener Zugang (BUG-G6) ────────────────────────────────────────────
 
 describe("abgelaufenes Projekt darf nicht bearbeitet werden", () => {
-  const blocked = "Ihr Portal-Zugang für dieses Projekt ist abgelaufen.";
+  const blocked = "Ihr Projektzugang für dieses Projekt ist abgelaufen.";
 
   it("Auto-Save wird abgelehnt, ohne zu schreiben", async () => {
     const client = makeMockClient();

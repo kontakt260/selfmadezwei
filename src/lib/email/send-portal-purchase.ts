@@ -22,7 +22,7 @@ export type SendPortalPurchaseInput = {
   giftRecipientEmail?: string;
   /** Name der beschenkten Person beim Geschenk „Nur per Sprachnachricht erzählen" */
   giftRecipientName?: string;
-  /** false = Geschenk ohne eigenen Portal-Zugang des Käufers */
+  /** false = Geschenk ohne eigenen Projektzugang des Käufers */
   buyerHasAccess?: boolean;
 };
 
@@ -35,7 +35,7 @@ export async function sendPortalPurchaseMail(
   const result = await sendEmail({
     to: input.to,
     subject: buyerHasAccess
-      ? "Ihr NARRAVIT-Portal-Zugang ist freigeschaltet"
+      ? "Ihr NARRAVIT-Projektzugang ist freigeschaltet"
       : "Ihr NARRAVIT-Geschenk ist unterwegs",
     react: PortalPurchaseEmail({
       fullName: input.fullName,

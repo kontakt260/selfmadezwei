@@ -81,7 +81,7 @@ export function GuestPurchaseEmail({
         items={[
           { label: "Betrag", value: amountFormatted },
           { label: "Zahlungs-Datum", value: paymentDateFormatted },
-          { label: "Portal-Zugang", value: "12 Monate ab Einrichtung Ihres Kontos" },
+          { label: "Projektzugang", value: "12 Monate ab Einrichtung Ihres Kontos" },
         ]}
       />
 

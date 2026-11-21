@@ -72,6 +72,13 @@ export default async function EinladungAcceptPage({
     );
   }
 
+  const { data: giftRow } = await serviceRole
+    .from("invitations")
+    .select("is_gift")
+    .eq("id", lookup.invitation_id)
+    .maybeSingle();
+  const isGift = giftRow?.is_gift === true;
+
   // Variante 1b: Projekt existiert nicht mehr.
   if (!lookup.project_title || !lookup.project_id) {
     return (
@@ -89,7 +96,9 @@ export default async function EinladungAcceptPage({
   if (lookup.accepted_at !== null) {
     return (
       <InvitationCard>
-        <InvitationHeading>Diese Einladung wurde bereits angenommen</InvitationHeading>
+        <InvitationHeading>
+          {isGift ? "Dieses Geschenk wurde bereits angenommen" : "Diese Einladung wurde bereits angenommen"}
+        </InvitationHeading>
         <p className="text-base leading-7 text-[#535252] sm:text-lg">
           Wenn Sie Mitglied dieses Projekts sind, finden Sie es in Ihrer
           Projektliste auf der Startseite.
@@ -103,9 +112,13 @@ export default async function EinladungAcceptPage({
   if (isPast(lookup.expires_at)) {
     return (
       <InvitationCard>
-        <InvitationHeading>Diese Einladung ist abgelaufen</InvitationHeading>
+        <InvitationHeading>
+          {isGift ? "Dieses Geschenk ist abgelaufen" : "Diese Einladung ist abgelaufen"}
+        </InvitationHeading>
         <p className="text-base leading-7 text-[#535252] sm:text-lg">
-          Bitte erfragen Sie einen neuen Link bei Ihrem Projektleiter.
+          {isGift
+            ? "Bitte schreiben Sie uns an kontakt@narravit.de, wir helfen Ihnen gern weiter."
+            : "Bitte erfragen Sie einen neuen Link bei Ihrem Projektleiter."}
         </p>
         <HomeLink />
       </InvitationCard>
@@ -120,18 +133,11 @@ export default async function EinladungAcceptPage({
   const inviteEmail = lookup.email.trim().toLowerCase();
   const sessionEmail = (user?.email ?? "").trim().toLowerCase();
 
-  const { data: giftRow } = await serviceRole
-    .from("invitations")
-    .select("is_gift")
-    .eq("id", lookup.invitation_id)
-    .maybeSingle();
-  const isGift = giftRow?.is_gift === true;
-
   const previewFor = (giftTitle: string) => (
     <InvitationPreview
       title={isGift ? giftTitle : lookup.project_title!}
       role={isGift ? undefined : (ROLE_LABEL[lookup.role] ?? lookup.role)}
-      inviter={lookup.inviter_full_name || undefined}
+      inviter={isGift ? undefined : lookup.inviter_full_name || undefined}
       email={lookup.email}
     />
   );
@@ -175,13 +181,13 @@ export default async function EinladungAcceptPage({
       <InvitationCard>
         <InvitationHeading>Falsche E-Mail-Adresse</InvitationHeading>
         <p className="text-base leading-7 text-[#535252] sm:text-lg">
-          Diese Einladung gilt für{" "}
+          {isGift ? "Dieses Geschenk" : "Diese Einladung"} gilt für{" "}
           <span className="font-semibold">{lookup.email}</span>, Sie sind aber als{" "}
           <span className="font-semibold">{user.email}</span> eingeloggt.
         </p>
         <p className="text-base leading-7 text-[#535252] sm:text-lg">
-          Bitte melden Sie sich mit der korrekten E-Mail-Adresse an, um die
-          Einladung anzunehmen.
+          Bitte melden Sie sich mit der korrekten E-Mail-Adresse an, um{" "}
+          {isGift ? "das Geschenk" : "die Einladung"} anzunehmen.
         </p>
         <div className="self-start">
           <SignOutButton />

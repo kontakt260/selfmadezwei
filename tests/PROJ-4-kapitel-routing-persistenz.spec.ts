@@ -57,9 +57,9 @@ test.describe("PROJ-4 — Home-Seite (/)", () => {
     ).toBeVisible();
   });
 
-  test("AC-Home-2: 'Weiteren Projekt-Zugang kaufen' verlinkt auf /onboarding", async ({ page }) => {
+  test("AC-Home-2: 'Weiteren Projektzugang kaufen' verlinkt auf /onboarding", async ({ page }) => {
     await page.goto("/");
-    const link = page.getByRole("link", { name: /Weiteren Projekt-Zugang kaufen/ });
+    const link = page.getByRole("link", { name: /Weiteren Projektzugang kaufen/ });
     await expect(link).toBeVisible();
     await expect(link).toHaveAttribute("href", "/onboarding");
   });

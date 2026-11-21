@@ -2,7 +2,7 @@ import "server-only";
 import { sendEmail, getSiteUrl, hashEmailForLog } from "./client";
 import { RenewalEmail } from "@/emails/RenewalEmail";
 
-// PROJ-11 — Verlängerung des Portal-Zugangs.
+// PROJ-11 — Verlängerung des Projektzugangs.
 //
 // Trigger: Stripe-Webhook nach erfolgreichem `portal_access_renewal`-Payment.
 // Die Person, die bezahlt hat, bekommt die Bestätigung; alle anderen
@@ -26,7 +26,7 @@ export async function sendRenewalMail(input: SendRenewalInput): Promise<void> {
 
   const result = await sendEmail({
     to: input.to,
-    subject: "Ihr NARRAVIT-Portal-Zugang wurde verlängert",
+    subject: "Ihr NARRAVIT-Projektzugang wurde verlängert",
     react: RenewalEmail({
       fullName: input.fullName,
       projectName: input.projectName,
@@ -64,7 +64,7 @@ export async function sendRenewalInfoMail(input: SendRenewalInfoInput): Promise<
 
   const result = await sendEmail({
     to: input.to,
-    subject: `Der Portal-Zugang für „${input.projectName}“ wurde verlängert`,
+    subject: `Der Projektzugang für „${input.projectName}“ wurde verlängert`,
     react: RenewalEmail({
       fullName: input.fullName,
       renewedBy: input.renewedBy,

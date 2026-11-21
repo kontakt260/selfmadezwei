@@ -243,11 +243,11 @@ function GuestAccountContent({
       </p>
       {isGiftWithInvitation ? (
         <p className="border border-[#96B897]/40 bg-[#96B897]/10 p-4 text-base text-[#3E3831]">
-          Die Einladung an{" "}
+          Das Geschenk an{" "}
           <span className="font-semibold">
             {variant.recipientEmail || "die beschenkte Person"}
           </span>{" "}
-          verschicken wir, sobald Ihr Konto angelegt ist.
+          versenden wir, sobald Ihr Konto angelegt ist.
         </p>
       ) : null}
       <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
@@ -349,16 +349,15 @@ function InitialGiftPhoneComputerContent({
         Geschenk verschickt
       </h1>
       <p className="text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
-        Vielen Dank für Ihren Kauf. Wir haben eine Einladung an die
-        beschenkte Person geschickt — sobald sie sie annimmt, erhält sie
-        Zugang zum Projekt.
+        Vielen Dank für Ihren Kauf. Wir haben das Geschenk versendet — sobald
+        die beschenkte Person es empfängt, erhält sie Zugang zum Projekt.
       </p>
       <p className="border border-[#96B897]/40 bg-[#96B897]/10 p-4 text-base text-[#3E3831]">
-        Einladungs-Mail unterwegs an{" "}
+        Geschenk-Mail unterwegs an{" "}
         <span className="font-semibold">
           {recipientEmail || "die angegebene Adresse"}
         </span>
-        . Die Einladung bleibt gültig, solange der Portal-Zugang läuft.
+        . Das Geschenk bleibt gültig, solange der Projektzugang läuft.
       </p>
       <p className="text-base leading-7 text-[#535252]">
         {buyerRetainsAccess ? (
@@ -369,10 +368,9 @@ function InitialGiftPhoneComputerContent({
           </>
         ) : (
           <>
-            Sie haben sich entschieden, keinen eigenen Portal-Zugang zu
-            behalten — die Schreibrechte liegen ausschließlich bei Ihrer
-            beschenkten Person. Sie können später als Co-Autor:in
-            eingeladen werden, falls Sie doch mitschreiben möchten.
+            Sie haben sich entschieden, keinen eigenen Projektzugang zu
+            behalten — die beschenkte Person kann Sie jederzeit als
+            Co-Autor:in dazuholen, falls Sie doch mitschreiben möchten.
           </>
         )}
       </p>
@@ -395,7 +393,7 @@ function RenewalContent({ projectId }: { projectId: string }) {
         Kauf erfolgreich
       </h1>
       <p className="text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
-        Ihr Projekt-Zugang wurde um 12 Monate verlängert.
+        Ihr Projektzugang wurde um 12 Monate verlängert.
       </p>
       <Link
         href={`/projektuebersicht/${projectId}`}

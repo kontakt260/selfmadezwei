@@ -10,6 +10,7 @@
 // Beide Mails verlinken auf den Verlängerungs-Stripe-Checkout (PROJ-6).
 
 import type { ReactNode } from "react";
+import { CONTENT_RETENTION_DAYS } from "@/lib/projects/project-access";
 import {
   Layout,
   MailHeading,
@@ -45,21 +46,21 @@ function daysDative(daysLeft: number): string {
 
 // Texte: Figma-Frames 08 und 09 (Jakob, 2026-11-19).
 const HEADINGS: Record<ReminderVariant, (daysLeft: number) => string> = {
-  "30": (d) => `Ihr Projekt-Zugang läuft in ${daysDative(d)} ab`,
-  "7": (d) => `Nur noch ${daysNominative(d)} Projekt-Zugang`,
+  "30": (d) => `Ihr Projektzugang läuft in ${daysDative(d)} ab`,
+  "7": (d) => `Nur noch ${daysNominative(d)} Projektzugang`,
 };
 
 const TONE: Record<ReminderVariant, (daysLeft: number, projectName: string) => ReactNode> = {
   "30": (d, projectName) => (
     <>
-      ein freundlicher Hinweis: Ihr Portal-Zugang für{" "}
+      ein freundlicher Hinweis: Ihr Projektzugang für{" "}
       <strong>„{projectName}“</strong> läuft in {daysDative(d)} ab. Falls Sie
       weiter schreiben möchten, können Sie den Zugang jetzt um 12 Monate
       verlängern.
     </>
   ),
   "7": (d) =>
-    `nur noch ${daysNominative(d)}: Ihr Portal-Zugang läuft am unten genannten Datum ab. Wenn Sie weiter am Projekt arbeiten möchten, verlängern Sie den Zugang bitte rechtzeitig, sonst verlieren Sie kurzzeitig den Zugriff.`,
+    `nur noch ${daysNominative(d)}: Ihr Projektzugang läuft am unten genannten Datum ab. Wenn Sie weiter am Projekt arbeiten möchten, verlängern Sie den Zugang bitte rechtzeitig, sonst verlieren Sie kurzzeitig den Zugriff.`,
 };
 
 const CTA_LABEL: Record<ReminderVariant, string> = {
@@ -77,9 +78,9 @@ const PREVIEW: Record<
   (project: string, date: string, daysLeft: number) => string
 > = {
   "30": (project, date) =>
-    `Ihr NARRAVIT-Portal-Zugang für „${project}" läuft am ${date} ab.`,
+    `Ihr NARRAVIT-Projektzugang für „${project}" läuft am ${date} ab.`,
   "7": (project, date, d) =>
-    `Nur noch ${daysNominative(d)}: Portal-Zugang für „${project}" läuft am ${date} ab.`,
+    `Nur noch ${daysNominative(d)}: Projektzugang für „${project}" läuft am ${date} ab.`,
 };
 
 export function ReminderEmail({
@@ -116,8 +117,8 @@ export function ReminderEmail({
       <MailParagraph>
         Falls Sie das Projekt nicht weiterführen möchten, müssen Sie nichts
         unternehmen — der Zugang läuft dann einfach aus, Ihre Inhalte
-        bleiben noch 90 weitere Tage erhalten und können bei einer späteren
-        Verlängerung wieder bearbeitet werden.
+        bleiben noch {CONTENT_RETENTION_DAYS} weitere Tage erhalten und können
+        bei einer späteren Verlängerung wieder bearbeitet werden.
       </MailParagraph>
     </Layout>
   );

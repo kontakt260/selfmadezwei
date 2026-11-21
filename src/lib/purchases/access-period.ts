@@ -1,4 +1,4 @@
-// Laufzeit des Portal-Zugangs: 12 echte Kalendermonate (PROJ-6, BUG-G9).
+// Laufzeit des Projektzugangs: 12 echte Kalendermonate (PROJ-6, BUG-G9).
 // Fest 365 Tage hätten den Zugang über einen 29. Februar einen Tag zu früh
 // beendet. Vom 29. Februar aus endet er am 28. Februar des Folgejahres.
 

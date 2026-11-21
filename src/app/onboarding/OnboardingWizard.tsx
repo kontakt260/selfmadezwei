@@ -440,7 +440,7 @@ function StepGiftComputer({
     <div>
       <h2 className="heading-style-h3 mb-3">Zugang einrichten</h2>
       <p className="mb-6 text-[#535252]">
-        Wir laden die beschenkte Person per E-Mail in das Projekt ein.
+        Wir senden das Geschenk per E-Mail an die beschenkte Person.
       </p>
 
       <div className="grid gap-2">
@@ -553,7 +553,7 @@ function StepPurchase({ state, isGuest }: { state: WizardState; isGuest: boolean
       </dl>
 
       <div className="border border-[#e0dcd5] bg-[#FAF8F6] p-5 sm:p-7">
-        <p className="text-base text-[#848484]">12 Monate Portal-Zugang</p>
+        <p className="text-base text-[#848484]">12 Monate Projektzugang</p>
         <p className="heading-style-h4 mt-1">249 €</p>
         <p className="mt-2 text-base text-[#535252]">
           Inklusive Erzählen per Sprachnachricht, Editor und Druck-Vorbereitung.

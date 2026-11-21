@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 
-// Ablauf des Portal-Zugangs pro Projekt (PROJ-6, QA 2026-11-21, BUG-G6).
+// Ablauf des Projektzugangs pro Projekt (PROJ-6, QA 2026-11-21, BUG-G6).
 //
 // Vorher prüfte nur die Middleware, ob ALLE Projekte eines Kontos abgelaufen
 // sind. Wer noch ein aktives Projekt hatte, konnte in einem abgelaufenen
@@ -12,11 +12,14 @@ import type { Database } from "@/lib/database.types";
 //
 // Lesen, Verlassen, Löschen und Mitglieder entfernen bleiben erlaubt.
 
+/** So lange bleiben Inhalte nach Ablauf gespeichert (Mails, Abgelaufen-Seite). */
+export const CONTENT_RETENTION_DAYS = 90;
+
 export const PROJECT_EXPIRED_ERROR =
-  "Ihr Portal-Zugang für dieses Projekt ist abgelaufen. Bitte verlängern Sie ihn, um weiterzuarbeiten.";
+  "Ihr Projektzugang ist abgelaufen. Bitte verlängern Sie ihn, um weiterzuarbeiten.";
 
 const ACCESS_CHECK_FAILED_ERROR =
-  "Ihr Portal-Zugang konnte gerade nicht geprüft werden. Bitte versuchen Sie es erneut.";
+  "Ihr Projektzugang konnte gerade nicht geprüft werden. Bitte versuchen Sie es erneut.";
 
 const PROJECT_PATH =
   /^\/projektuebersicht\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i;

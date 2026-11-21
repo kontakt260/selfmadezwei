@@ -6,7 +6,7 @@ import { SignOutButton } from "@/components/auth/SignOutButton";
 import { CheckoutCancelToast } from "@/components/CheckoutCancelToast";
 import { CheckoutButton } from "@/components/projektuebersicht/CheckoutButton";
 import { formatGermanDate } from "@/lib/email/format";
-import { isAccessExpired } from "@/lib/projects/project-access";
+import { CONTENT_RETENTION_DAYS, isAccessExpired } from "@/lib/projects/project-access";
 import { createClient } from "@/lib/supabase/server";
 
 // Hierher leitet die Middleware, wenn der Zugang eines Projekts abgelaufen
@@ -35,7 +35,7 @@ export default async function ZugangAbgelaufenPage({
         <div className="text-center">
           <h1 className="heading-style-h2 mb-4">Ihr Zugang ist abgelaufen</h1>
           <p className="mb-8 text-[#535252]">
-            Bitte melden Sie sich an, um Ihren NARRAVIT-Portalzugang zu verlängern.
+            Bitte melden Sie sich an, um Ihren NARRAVIT-Projektzugang zu verlängern.
           </p>
           <Link
             href="/anmelden?next=%2Fzugang-abgelaufen"
@@ -82,8 +82,10 @@ export default async function ZugangAbgelaufenPage({
       <div className="text-center">
         <h1 className="heading-style-h2 mb-4">Ihr Zugang ist abgelaufen</h1>
         <p className="mb-8 text-[#535252]">
-          Ihr NARRAVIT-Portalzugang ist nicht mehr aktiv. Verlängern Sie ihn, um wieder
-          in Ihrem Projekt zu schreiben.
+          Ihr NARRAVIT-Projektzugang ist nicht mehr aktiv. Verlängern Sie ihn, um weiter
+          in Ihrem Projekt schreiben zu können. Ihre Inhalte bleiben nach Ablauf des
+          Projekts noch {CONTENT_RETENTION_DAYS} Tage bei uns gespeichert, bevor wir sie
+          endgültig löschen.
         </p>
 
         <ul className="mb-6 flex flex-col gap-4 text-left">

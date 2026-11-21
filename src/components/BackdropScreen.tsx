@@ -4,17 +4,16 @@ import type { ReactNode } from "react";
 // Vollbild-Screen mit weichgezeichnetem Foto im Hintergrund und einer weißen
 // Karte mit dem NARRAVIT-Logo darüber.
 //
-// Jeder Bereich hat einen eigenen Eintrag. Bis eigene Motive da sind, zeigen
-// alle das Strandfoto; ein neues Bild wird nur hier eingetragen.
+// Jeder Bereich hat ein eigenes Motiv (von Jakob ausgewählt, 2026-11-21).
 const BACKDROPS = {
   /** Einladung annehmen */
-  einladung: "/images/mail/willkommen-strand.jpg",
+  einladung: "/images/hintergruende/einladung.jpg",
   /** Abschluss eines Geschenk-Kaufs */
-  geschenk: "/images/mail/willkommen-strand.jpg",
+  geschenk: "/images/hintergruende/geschenk.jpg",
   /** Abschluss von Kauf und Verlängerung, Konto anlegen */
-  kauf: "/images/mail/willkommen-strand.jpg",
+  kauf: "/images/hintergruende/kauf.jpg",
   /** Hinweis: Editor nicht auf dem Smartphone */
-  smartphone: "/images/mail/willkommen-strand.jpg",
+  smartphone: "/images/hintergruende/smartphone.jpg",
 } as const;
 
 export type BackdropKey = keyof typeof BACKDROPS;
