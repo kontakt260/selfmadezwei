@@ -167,6 +167,12 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 ## 9. Go-live-Blocker (Features)
 
+- [ ] **Keine Bypass-Tokens in Production (Jakob, 2026-11-22, Pflicht vor dem Go-live):** `x-vercel-protection-bypass` darf in keiner Production-URL und keiner Production-Einstellung stehen. Prüfen:
+  - Stripe Live-Webhook lautet exakt `https://app.narravit.de/api/stripe/webhook`, ohne Parameter.
+  - `app.narravit.de` liegt nicht hinter der Vercel-Deployment-Protection, ein Bypass ist dort also gar nicht nötig.
+  - Keine Bypass-Werte in den Production-Variablen, in Supabase, Resend oder anderen Diensten.
+  - `git grep -n "x-vercel-protection-bypass" -- src` liefert nichts.
+  - Der Stage-Webhook in Stripe (Testmodus) ist von den Live-Endpunkten getrennt. Ein auf Stage genutzter Bypass-Wert wird nach dem Umzug in Vercel widerrufen, falls Stage ihn nicht mehr braucht.
 - [ ] PROJ-17 Rate-Limiting für Auth-Endpunkte (bringt eigene Env-Variablen mit — dann hier ergänzen).
 - [ ] PROJ-19 Production-Hardening (Security-Header, Env-Prüfung beim Start).
 - [ ] PROJ-12 Audio-Erzählen live, sonst Mail-Texte zum „Erzählen per Sprachnachricht" anpassen (PROJ-11 BUG-9). Bringt SMS-Anbieter (seven.io) und Transkriptions-/LLM-Schlüssel mit — dann hier ergänzen.
@@ -188,6 +194,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] Einladung über „Nutzer hinzufügen" kommt an.
 - [ ] Cron: In Vercel unter Settings → Cron Jobs ist `/api/cron/reminders` eingetragen (täglich 9:00 UTC, erscheint erst nach dem Merge auf `main`); `CRON_SECRET` ist in Production gesetzt. Einmal über **Run** auslösen, in den Logs muss 200 stehen.
 - [ ] Mail-Links zeigen auf `app.narravit.de`, nicht auf `stage-app`.
+- [ ] In Stripe (Live) steht beim Webhook kein `x-vercel-protection-bypass` in der URL (Abschnitt 9).
 - [ ] Logo und Willkommens-Foto werden in den Mails angezeigt (Abschnitt 5).
 
 ---
@@ -196,6 +203,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
+| 2026-11-22 | Go-live-Blocker ergänzt: keine Bypass-Tokens in Production-URLs oder -Einstellungen. `CRON_SECRET` auf Stage von Jakob neu gesetzt. Kein neuer Env-Wert. |
 | 2026-11-21 | Cron: `/api/cron` ist von der Middleware ausgenommen (wurde auf `/anmelden` umgeleitet). Vercel führt Cron-Jobs nur für Production-Deployments aus und liest sie aus `vercel.json`; `main` hat die Datei noch nicht, deshalb erscheint unter Settings → Cron Jobs erst nach dem Merge ein Eintrag. Kein neuer Env-Wert. |
 | 2026-11-21 | Geschenk ohne eigenen Zugang läuft ohne Konto: Projekt und Einladung entstehen direkt nach der Zahlung. Neue Migration `20261121110000_proj6_direct_gift.sql`, auf Stage und Production jeweils **vor** dem Code-Deploy. Kein neuer Env-Wert. |
 | 2026-11-21 | Persönlicher Einlöse-Link in der Kauf-Mail (`/kauf-zuordnen`): neue Migration `20261121100000_proj6_purchase_claim_mail_token.sql`, auf Stage und Production jeweils **vor** dem Code-Deploy einspielen. Kein neuer Env-Wert. |

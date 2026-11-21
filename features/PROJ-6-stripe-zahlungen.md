@@ -101,7 +101,7 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 - Bestanden: Gast-Kauf mit gleicher Adresse und Link in anderem Browser, Gast-Kauf mit anderer Adresse im selben Browser, Bestandskunde über den Mail-Link. Stripe-Webhook 200, erneutes Senden 200 mit `duplicate: true`.
 - Korrigiert: Lange Werte in der Detail-Box der Mails bleiben eingerückt (feste Spalten, alle 9 Mails mit Box bei 600 und 340 px geprüft). Erfolgsseite „für mich selbst": „Ihr Zugang ist aktiv – Wir wünschen Ihnen viel Freude mit Ihrem Projekt".
 - Bestanden am selben Tag: anderes Konto im selben Browser (Test 4a) und Geschenk ohne eigenen Zugang ohne Konto (Test 6, Webhook `direct_gift`, erneutes Senden `duplicate`).
-- Offen: Einlöse-Link mit anderem Konto in anderem Browser (Test 4b), Geschenk mit eigenem Zugang nach den Änderungen (Test 5), Geschenk „nur erzählen", Verlängerung, 100-%-Code, Reminder-Cron, abgelaufenes Projekt.
+- Offen: nur noch der Live-Lauf des Reminder-Crons (Test 10); die übrigen Tests sind unten als bestanden vermerkt.
 
 **Fix BUG-G12 (2026-11-21, von Jakob freigegeben): persönlicher Einlöse-Link**
 - Die Kauf-Mail enthält einen Link mit eigenem Geheimnis (256 Bit, in `purchase_claims.mail_token_hash` nur als SHA-256-Hash). Wer ihn öffnet, kann den Kauf jedem eigenen Konto zuordnen, auch unter anderer Adresse und auf einem anderen Gerät.
@@ -125,7 +125,7 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 
 **Weitere Live-Test-Ergebnisse (Jakob, 2026-11-21)**
 - Bestanden: Geschenk mit eigenem Zugang (Test 5), Verlängerung durch die beschenkte Person (Test 7), 100-%-Rabattcode (Test 8, bestätigt zugleich BUG-G2), abgelaufenes Projekt mit Verlängerung (Test 9), Geschenk „nur erzählen".
-- **Test 4b fehlgeschlagen, behoben:** Nach dem Login-Formular rief die Server Action `/kauf-einloesen` nur intern auf, ohne das Cookie des Mail-Links. Der Login leitet jetzt per voller Browser-Navigation dorthin (E2E AC-Link-3). Erneuter Live-Test steht aus.
+- **Test 4b fehlgeschlagen, behoben:** Nach dem Login-Formular rief die Server Action `/kauf-einloesen` nur intern auf, ohne das Cookie des Mail-Links. Der Login leitet jetzt per voller Browser-Navigation dorthin (E2E AC-Link-3). Erneuter Live-Test mit neuem Kauf am 2026-11-22 bestanden.
 - **BUG-G13 (High), behoben:** Die Middleware leitete `/api/cron/reminders` auf `/anmelden` um; Erinnerungsmails wären nie verschickt worden. Die Route ist jetzt ausgenommen und prüft selbst das `CRON_SECRET` (E2E AC-Cron-1). Live-Lauf steht aus.
 - Wortlaut: durchgehend „Projektzugang" statt „Portal-Zugang"; bei Geschenken „Geschenk versenden/empfangen" statt „Einladung". Hintergrundbilder von Jakob je Bereich eingebaut.
 

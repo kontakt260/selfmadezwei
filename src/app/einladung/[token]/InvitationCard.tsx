@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { BackdropScreen } from "@/components/BackdropScreen";
 
 // Rahmen der Einladungs-Seite: weichgezeichnetes Foto, Karte mit Logo.
@@ -38,12 +38,14 @@ export function InvitationPreview({
       <p className="[font-family:var(--font-pt-serif)] text-xl text-[#3E3831] sm:text-2xl">
         {title}
       </p>
-      <dl className="grid grid-cols-1 gap-2 text-base leading-7 text-[#535252] sm:text-lg">
+      {/* Linke Spalte so breit wie die längste Bezeichnung: Sie bricht nie um,
+          lange Werte bleiben in der rechten Spalte. */}
+      <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-5 gap-y-2 text-base leading-7 text-[#535252] sm:gap-x-8 sm:text-lg">
         {rows.map((row) => (
-          <div key={row.label} className="flex flex-row gap-3">
-            <dt className="w-28 shrink-0 font-semibold text-[#3E3831]">{row.label}</dt>
+          <Fragment key={row.label}>
+            <dt className="whitespace-nowrap font-semibold text-[#3E3831]">{row.label}</dt>
             <dd className="min-w-0 break-words">{row.value}</dd>
-          </div>
+          </Fragment>
         ))}
       </dl>
     </div>
