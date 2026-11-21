@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { render } from "@react-email/render";
 import type { ReactElement } from "react";
 import crypto from "node:crypto";
+import { encodeNonAscii } from "@/emails/encoding";
 
 // PROJ-11 — Resend-Mailer Server-Singleton.
 //
@@ -135,7 +136,9 @@ export async function sendEmail(input: SendMailInput): Promise<SendMailResult> {
   let html: string;
   let text: string;
   try {
-    html = await render(input.react);
+    // HTML als reines ASCII (Umlaute als HTML-Codes), damit keine Station auf
+    // dem Weg Sonderzeichen zerstören kann. Der Klartext bleibt UTF-8.
+    html = encodeNonAscii(await render(input.react));
     text = await render(input.react, { plainText: true });
   } catch (err) {
     return {

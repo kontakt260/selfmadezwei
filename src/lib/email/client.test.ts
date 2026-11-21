@@ -19,6 +19,7 @@ process.env.RESEND_API_KEY = "re_test_key";
 process.env.EMAIL_FROM = "narravit <no-reply@test.local>";
 process.env.NEXT_PUBLIC_SITE_URL = "https://stage-app.narravit.de";
 
+import { render } from "@react-email/render";
 import { sendEmail, hashEmailForLog, getSiteUrl, sanitizeSubject } from "./client";
 
 beforeEach(() => {
@@ -69,6 +70,27 @@ describe("sendEmail", () => {
         text: "<html>mocked</html>",
       }),
     );
+  });
+
+  it("sends HTML as pure ASCII, plain text and subject stay readable UTF-8", async () => {
+    vi.mocked(render)
+      .mockResolvedValueOnce("<p>für „Oma“ — Impressum · 😀</p>")
+      .mockResolvedValueOnce("für „Oma“ — Impressum · 😀");
+    mockSend.mockResolvedValueOnce({ data: { id: "msg_ok" }, error: null });
+
+    await sendEmail({
+      to: "user@example.com",
+      subject: "Einladung für „Oma“",
+      react: { type: "div", props: {}, key: null } as never,
+    });
+
+    const sent = mockSend.mock.calls[0][0];
+    expect(sent.html).toBe(
+      "<p>f&#252;r &#8222;Oma&#8220; &#8212; Impressum &#183; &#128512;</p>",
+    );
+    expect(sent.html).not.toMatch(/[^\x00-\x7F]/);
+    expect(sent.text).toBe("für „Oma“ — Impressum · 😀");
+    expect(sent.subject).toBe("Einladung für „Oma“");
   });
 
   it("redirects to EMAIL_TEST_RECIPIENT when set (stage/local override)", async () => {

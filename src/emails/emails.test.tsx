@@ -10,6 +10,7 @@ import {
   ReminderEmail,
   WelcomeEmail,
 } from "./index";
+import { encodeNonAscii } from "./encoding";
 import { MAIL_ASSETS_URL } from "./Layout";
 
 // PROJ-11 QA — Inhalts-Regression für alle Transaktionsmails.
@@ -258,6 +259,15 @@ describe.each(templates)("$name", ({ element, mustContain }) => {
     expect(html).toContain("kontakt@narravit.de");
     expect(html).toContain("Kontaktieren Sie uns");
     expect(html).toContain("Antworten Sie nicht auf diese Mail.");
+  });
+
+  // Reines ASCII übersteht jede Zeichenkodierung; der Inhalt bleibt gleich.
+  it("encodes to pure ASCII without changing the content", async () => {
+    const html = await render(element);
+    const encoded = encodeNonAscii(html);
+    expect(encoded).not.toMatch(/[^\x00-\x7F]/);
+    const decoded = encoded.replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)));
+    expect(decoded).toBe(html);
   });
 
   it("loads the logo from the production app (Stage is access-protected)", async () => {

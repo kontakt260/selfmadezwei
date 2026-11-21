@@ -15,6 +15,8 @@
 > - **Pflichtangaben:** NARRAVIT ist nicht im Handelsregister eingetragen (Jakob, 2026-11-19) — der Impressum-Link genügt; der Platzhalter `LEGAL_PLACEHOLDER` und die Layout-Option `footerLegal` sind entfernt, auch in Figma 11/12.
 > - **Offen:** Impressum-Seite liefert weiter 404 (BUG-1); die 90-Tage-Aussage hat noch keine Lösch-/Sperrlogik; die Reset-Mail nennt Apple, obwohl die Apple-Anmeldung noch archiviert ist; 03b verspricht die Frequenz-Einstellung aus PROJ-12.
 
+> ℹ️ **Anpassung 2026-11-21 — Zeichenkodierung.** In den Supabase-Mails kamen Umlaute, Anführungszeichen, Striche und der Mittelpunkt kaputt an („f√ºr"). Das HTML **aller** Mails ist jetzt reines ASCII: `src/emails/encoding.ts` wandelt Sonderzeichen in numerische HTML-Codes, angewendet in `sendEmail` und beim Erzeugen von `supabase/templates/`. Klartext-Fassung und Betreff bleiben UTF-8. Geprüft: alle 14 Vorlagen zeigen auch bei absichtlich falscher Kodierung denselben Text.
+
 ## Status: In Progress
 **Created:** 2026-05-22
 **Last Updated:** 2026-11-19

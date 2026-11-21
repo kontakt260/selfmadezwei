@@ -13,12 +13,13 @@
 Reihenfolge so wählen, dass Production nie halb konfiguriert Kunden sieht:
 
 1. Vorbedingungen aus Abschnitt 9 erfüllt (Rechtstexte, Go-live-Blocker).
-2. **Supabase Production** einrichten (Abschnitt 3): Migrationen + Seed, Auth-URLs, SMTP, Mail-Vorlagen, OAuth.
+2. **Supabase Production** einrichten (Abschnitt 3): Migrationen + Seed, Auth-URLs, SMTP, OAuth — **noch ohne Mail-Vorlagen**.
 3. **Stripe Live-Modus** einrichten (Abschnitt 4): Produkte, Webhook, Schlüssel.
 4. **Resend** Production-Schlüssel anlegen (Abschnitt 5).
 5. **Vercel Production-Variablen** setzen (Abschnitt 2), Domain `app.narravit.de` prüfen.
 6. `stage` → `main` mergen (über `/deploy`, nur mit ausdrücklicher Freigabe).
-7. Smoke-Tests (Abschnitt 10).
+7. **Direkt danach die Supabase-Mail-Vorlagen in Production einsetzen** (Abschnitt 3). Nicht früher: Die neuen Links brauchen den `token_hash`-Teil von `/auth/callback`, den der alte Stand auf `main` nicht kennt (geprüft 2026-11-21). Vor dem Merge wären Registrierung und „Passwort vergessen" in Production kaputt.
+8. Smoke-Tests (Abschnitt 10).
 
 ---
 
@@ -87,8 +88,9 @@ Stage = Projekt-Ref `kdjhxqitfxnsavhiafdn`. Production = Haupt-Projekt (`main`) 
 
 ### Auth → Email Templates
 
-- [ ] „Confirm signup" und „Reset password" aus `supabase/templates/` einsetzen (erzeugt aus `src/emails/auth/`). **Stand 2026-11-19 (abends):** Das Mail-Design aus Figma ist im Code, die Vorlagen sind neu erzeugt und können jetzt auf Stage eingesetzt werden (Jakob setzt sie selbst). Nach jeder Änderung an `src/emails/` mit `UPDATE_AUTH_TEMPLATES=1 npx vitest run src/emails/auth` neu erzeugen und neu einsetzen.
+- [ ] „Confirm signup" und „Reset password" aus `supabase/templates/` einsetzen (erzeugt aus `src/emails/auth/`). **Stage:** am 2026-11-21 von Jakob eingesetzt. **Production:** erst beim Umzug, direkt nach dem Merge (Abschnitt 1, Schritt 7). Nach jeder Änderung an `src/emails/` mit `UPDATE_AUTH_TEMPLATES=1 npx vitest run src/emails/auth` neu erzeugen und neu einsetzen.
 - [ ] Die Vorlagen laden das Logo von `https://app.narravit.de/images/mail/` (siehe Abschnitt 5) — auf Stage erscheint es erst, wenn Production live ist.
+- [ ] **Nur die aktuelle Fassung einsetzen:** Seit 2026-11-21 sind die Vorlagen reines ASCII, Umlaute stehen als HTML-Codes (`&#252;`). Vorher kamen sie beim Einsetzen auf Stage kaputt an („f√ºr" statt „für"). Kopieren mit `pbcopy < supabase/templates/<datei>.html`, danach eine Testmail prüfen.
 - [ ] Ohne diese Vorlagen funktionieren Mail-Links nur im selben Browser (PKCE-Code statt Token-Hash) — für Production Pflicht.
 
 ### Auth → Providers
@@ -108,6 +110,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] Kein Vapi-Produkt anlegen (archiviert).
 - [ ] Webhook-Endpunkt im Live-Modus: `https://app.narravit.de/api/stripe/webhook`, Events `checkout.session.completed` **und** `checkout.session.async_payment_succeeded` → Secret in `STRIPE_WEBHOOK_SECRET`. Ohne das zweite Event bekommen Kunden mit verzögerter Zahlart (z. B. SEPA-Lastschrift) nach dem Geldeingang keinen Zugang.
 - [ ] **Stage (Testmodus):** dasselbe zweite Event am Stage-Webhook-Endpunkt ergänzen (seit 2026-11-21 nötig).
+- [ ] **Nur Stage:** Die Vercel-Deployment-Protection beantwortet Aufrufe ohne Freigabe mit 302 (geprüft 2026-11-21), Stripe wertet das als Fehler. Die Stage-Webhook-URL braucht deshalb `?x-vercel-protection-bypass=<Secret>` (Vercel → Settings → Deployment Protection → Protection Bypass for Automation). In Production gibt es keinen Schutz und keinen Parameter: Die Live-URL bleibt ohne Zusatz.
 - [ ] Promotion-Codes/Coupons im Live-Modus anlegen, falls gewünscht (Checkout erlaubt Codes: `allow_promotion_codes: true`).
 - [ ] Checkout-Einstellungen: Links zu AGB und Datenschutz hinterlegen.
 - [ ] MwSt.: Stripe Tax aktivieren oder Preise ausdrücklich als Brutto-Endpreise führen (offene Entscheidung).
@@ -191,6 +194,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
+| 2026-11-21 | Das HTML aller Mails (App-Mails und Supabase-Vorlagen) ist jetzt reines ASCII, Umlaute und Sonderzeichen stehen als HTML-Codes, weil sie auf Stage kaputt ankamen. Supabase-Vorlagen auf Stage eingesetzt; in Production erst direkt nach dem Merge (Abschnitt 1, Schritt 7). Stage-Webhook-URL braucht den Vercel-Bypass-Parameter (Abschnitt 4). |
 | 2026-11-21 | PROJ-6-Fixes: Stripe-Webhook braucht zusätzlich das Event `checkout.session.async_payment_succeeded` (Stage und Production, Abschnitt 4). Keine Migration, kein neuer Env-Wert. |
 | 2026-11-19 | Kein Handelsregistereintrag → keine Pflichtangaben in Mails, Impressum-Link genügt. Platzhalter aus den Supabase-Vorlagen entfernt, Vorlagen neu erzeugt (vor dem Einsetzen auf Stage die neue Fassung nehmen). Kein neuer Env-Wert. |
 | 2026-11-19 | Mail-Design und -Texte aus Figma im Code. Neu: Bilder in Mails, fest von `https://app.narravit.de/images/mail/` geladen (Stage ist geschützt) — vor dem Go-live ohne Bilder. Supabase-Vorlagen neu erzeugt, können auf Stage eingesetzt werden. Offene Rechtsfragen ergänzt: Pflichtangaben je nach Rechtsform, 90-Tage-Aussage in den Erinnerungen; Impressum liefert weiter 404. Kein neuer Env-Wert. |

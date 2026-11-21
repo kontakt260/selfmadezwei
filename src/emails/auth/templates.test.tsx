@@ -6,6 +6,7 @@ import { render } from "@react-email/render";
 import type { ReactElement } from "react";
 import { ConfirmSignupTemplate } from "./ConfirmSignupTemplate";
 import { ResetPasswordTemplate } from "./ResetPasswordTemplate";
+import { encodeNonAscii } from "../encoding";
 
 // Die Supabase-Auth-Vorlagen liegen als statisches HTML in
 // `supabase/templates/` (zum Einfügen im Supabase-Dashboard). Dieser Test
@@ -26,12 +27,20 @@ describe.each(templates)("Supabase-Vorlage $file", ({ file, element, linkType })
   const path = resolve(process.cwd(), "supabase/templates", file);
 
   it("matches the committed HTML file", async () => {
-    const html = await render(element);
+    const html = encodeNonAscii(await render(element));
     if (process.env.UPDATE_AUTH_TEMPLATES === "1") {
       writeFileSync(path, html + "\n", "utf-8");
     }
     expect(existsSync(path)).toBe(true);
     expect(readFileSync(path, "utf-8")).toBe(html + "\n");
+  });
+
+  // Die Datei wird von Hand ins Dashboard kopiert — Umlaute dürfen dabei
+  // nicht von der Zeichenkodierung abhängen (2026-11-21).
+  it("is pure ASCII, umlauts are HTML codes", () => {
+    const file = readFileSync(path, "utf-8");
+    expect(file).not.toMatch(/[^\x00-\x7F]/);
+    expect(file).toContain("&#252;"); // ü
   });
 
   it("links to our own app via token hash, never to supabase.co", async () => {
