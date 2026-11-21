@@ -42,7 +42,7 @@ Production-Werte in Vercel unter **Settings → Environment Variables** mit Scop
 | `RESEND_API_KEY` | Schlüssel `narravit-app-stage` | eigener Schlüssel `narravit-app-prod` | Sensitive. Sending access, Domain `mail.narravit.de`. |
 | `EMAIL_TEST_RECIPIENT` | `kontakt@narravit.de` | **nicht setzen** | Leitet alle Mails um. Wird in Production zwar ignoriert, soll dort trotzdem fehlen. |
 | `EMAIL_FROM` | nicht gesetzt (Fallback) | optional | Fallback im Code: `NARRAVIT <no-reply@mail.narravit.de>`. Absender-Name immer in Großbuchstaben, Adresse auf `mail.narravit.de`. |
-| `CRON_SECRET` | eigener Zufallswert | **neuer** Zufallswert | Sensitive. Erzeugen: `openssl rand -base64 32`. |
+| `CRON_SECRET` | eigener Zufallswert | **neuer** Zufallswert | Sensitive. Erzeugen: `openssl rand -base64 32`. **Fehlt in Production noch** (Stand 2026-11-22: nur für Preview und Development angelegt). Ohne Wert antwortet der Cron mit 500 und es gehen keine Erinnerungen raus. |
 
 Sicherung im Code: Auf `https://app.narravit.de` (= `NEXT_PUBLIC_SITE_URL` in Production) wird `EMAIL_TEST_RECIPIENT` ignoriert, selbst wenn die Variable versehentlich gesetzt ist.
 
@@ -53,7 +53,7 @@ Entfallen, in Production **nicht** anlegen: `STRIPE_PRICE_ID_VAPI_60`, `VAPI_API
 - [ ] Domain `app.narravit.de` ist der Production-Domain zugeordnet (DNS siehe Abschnitt 7).
 - [ ] Deployment Protection (Vercel-Login) gilt nur für Stage/Preview, **nicht** für Production.
 - [ ] Cron `/api/cron/reminders` (täglich 09:00 UTC, `vercel.json`): Vercel führt Crons nur für Deployments der Umgebung „Production" aus. Nach dem ersten Lauf in den Vercel-Logs prüfen, dass er mit 200 antwortet.
-- [ ] Klären, in welcher Vercel-Umgebung Stage läuft (Deployment-Liste: Label „Production" oder „Preview"). Läuft Stage als „Production", muss beim Umzug der Production-Branch auf `main` und die Domain `app.narravit.de` umgestellt werden — und alle Stage-Variablen dürfen dann nicht in die Production-Umgebung von `main` geraten.
+- [x] Geklärt (2026-11-22): Stage läuft als „Preview", der Production-Branch ist bereits `main` und `app.narravit.de` zeigt auf dessen Production-Deployment. Stage-Werte gehören in die Umgebung „Preview", die Production-Werte werden separat angelegt. Beim Redeploy von Stage in der Deployment-Liste auf den Branch `stage` achten, dort stehen auch Preview-Deployments von `main`.
 
 ---
 
@@ -203,6 +203,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
+| 2026-11-22 | Reminder-Cron auf Stage von Hand erfolgreich ausgelöst. `CRON_SECRET` existiert in Vercel nur für Preview und Development und muss vor dem Go-live für Production angelegt werden. Geklärt: Stage läuft als Preview, Production-Branch ist `main`. |
 | 2026-11-22 | Go-live-Blocker ergänzt: keine Bypass-Tokens in Production-URLs oder -Einstellungen. `CRON_SECRET` auf Stage von Jakob neu gesetzt. Kein neuer Env-Wert. |
 | 2026-11-21 | Cron: `/api/cron` ist von der Middleware ausgenommen (wurde auf `/anmelden` umgeleitet). Vercel führt Cron-Jobs nur für Production-Deployments aus und liest sie aus `vercel.json`; `main` hat die Datei noch nicht, deshalb erscheint unter Settings → Cron Jobs erst nach dem Merge ein Eintrag. Kein neuer Env-Wert. |
 | 2026-11-21 | Geschenk ohne eigenen Zugang läuft ohne Konto: Projekt und Einladung entstehen direkt nach der Zahlung. Neue Migration `20261121110000_proj6_direct_gift.sql`, auf Stage und Production jeweils **vor** dem Code-Deploy. Kein neuer Env-Wert. |

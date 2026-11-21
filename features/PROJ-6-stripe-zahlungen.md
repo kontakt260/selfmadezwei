@@ -58,7 +58,7 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 - **Datenschutz:** Für Käufer ohne Konto wird die Checkout-E-Mail-Adresse gespeichert; das Cookie `nv_kauf` ist technisch notwendig. In die Datenschutzerklärung aufnehmen.
 
 ### QA Test Results (Kauf ohne Konto + Verlängerung, 2026-11-21)
-**Ergebnis der QA: NOT READY** (2 High, 4 Medium, 5 Low). **Stand nach den Fixes vom 2026-11-21:** alle High- und Medium-Befunde im Code behoben (siehe „Fixes" unten). Status bleibt **In Review**, bis der Live-Test auf Stage durch ist.
+**Ergebnis der QA: NOT READY** (2 High, 4 Medium, 5 Low). **Stand nach den Fixes vom 2026-11-21:** alle High- und Medium-Befunde im Code behoben (siehe „Fixes" unten). **Stand 2026-11-22:** Live-Test auf Stage vollständig bestanden, Status **Approved**. Offen sind nur die Low-Befunde G8, G10 und G11 sowie die Restrisiken unten.
 
 **Geprüft**
 - Vitest 356/356, Typprüfung fehlerfrei, Lint 0 Fehler.
@@ -101,7 +101,7 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 - Bestanden: Gast-Kauf mit gleicher Adresse und Link in anderem Browser, Gast-Kauf mit anderer Adresse im selben Browser, Bestandskunde über den Mail-Link. Stripe-Webhook 200, erneutes Senden 200 mit `duplicate: true`.
 - Korrigiert: Lange Werte in der Detail-Box der Mails bleiben eingerückt (feste Spalten, alle 9 Mails mit Box bei 600 und 340 px geprüft). Erfolgsseite „für mich selbst": „Ihr Zugang ist aktiv – Wir wünschen Ihnen viel Freude mit Ihrem Projekt".
 - Bestanden am selben Tag: anderes Konto im selben Browser (Test 4a) und Geschenk ohne eigenen Zugang ohne Konto (Test 6, Webhook `direct_gift`, erneutes Senden `duplicate`).
-- Offen: nur noch der Live-Lauf des Reminder-Crons (Test 10); die übrigen Tests sind unten als bestanden vermerkt.
+- Bestanden am 2026-11-22: Live-Lauf des Reminder-Crons (Test 10, Details bei BUG-G13); die übrigen Tests sind unten als bestanden vermerkt.
 
 **Fix BUG-G12 (2026-11-21, von Jakob freigegeben): persönlicher Einlöse-Link**
 - Die Kauf-Mail enthält einen Link mit eigenem Geheimnis (256 Bit, in `purchase_claims.mail_token_hash` nur als SHA-256-Hash). Wer ihn öffnet, kann den Kauf jedem eigenen Konto zuordnen, auch unter anderer Adresse und auf einem anderen Gerät.
@@ -126,7 +126,7 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 **Weitere Live-Test-Ergebnisse (Jakob, 2026-11-21)**
 - Bestanden: Geschenk mit eigenem Zugang (Test 5), Verlängerung durch die beschenkte Person (Test 7), 100-%-Rabattcode (Test 8, bestätigt zugleich BUG-G2), abgelaufenes Projekt mit Verlängerung (Test 9), Geschenk „nur erzählen".
 - **Test 4b fehlgeschlagen, behoben:** Nach dem Login-Formular rief die Server Action `/kauf-einloesen` nur intern auf, ohne das Cookie des Mail-Links. Der Login leitet jetzt per voller Browser-Navigation dorthin (E2E AC-Link-3). Erneuter Live-Test mit neuem Kauf am 2026-11-22 bestanden.
-- **BUG-G13 (High), behoben:** Die Middleware leitete `/api/cron/reminders` auf `/anmelden` um; Erinnerungsmails wären nie verschickt worden. Die Route ist jetzt ausgenommen und prüft selbst das `CRON_SECRET` (E2E AC-Cron-1). Live-Lauf steht aus.
+- **BUG-G13 (High), behoben:** Die Middleware leitete `/api/cron/reminders` auf `/anmelden` um; Erinnerungsmails wären nie verschickt worden. Die Route ist jetzt ausgenommen und prüft selbst das `CRON_SECRET` (E2E AC-Cron-1). Live-Lauf auf Stage am 2026-11-22 von Hand ausgelöst und bestanden: Antwort 200 mit `processed: 1, sent: 2, skipped: 0`, beide Projektmitglieder stehen im `mail_log` als `reminder_30` mit Resend-ID und ohne Fehler. Der automatische Tageslauf von Vercel ist erst nach dem Merge auf `main` prüfbar (prod-umzug.md).
 - Wortlaut: durchgehend „Projektzugang" statt „Portal-Zugang"; bei Geschenken „Geschenk versenden/empfangen" statt „Einladung". Hintergrundbilder von Jakob je Bereich eingebaut.
 
 **Restrisiken nach den Fixes**
@@ -223,9 +223,9 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 
 ---
 
-## Status: In Review
+## Status: Approved
 **Created:** 2026-05-15
-**Last Updated:** 2026-11-21 (QA Kauf ohne Konto + Verlängerung; High- und Medium-Befunde behoben, Live-Test offen)
+**Last Updated:** 2026-11-22 (QA Kauf ohne Konto + Verlängerung abgeschlossen, Live-Test auf Stage bestanden; Low-Befunde G8, G10, G11 offen)
 
 ## Dependencies
 - Requires: PROJ-2 (Auth + SSR) — Session, Onboarding-Wizard-Daten, Middleware
