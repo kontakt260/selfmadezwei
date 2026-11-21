@@ -100,7 +100,8 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 **Live-Test auf Stage (Jakob, 2026-11-21)**
 - Bestanden: Gast-Kauf mit gleicher Adresse und Link in anderem Browser, Gast-Kauf mit anderer Adresse im selben Browser, Bestandskunde über den Mail-Link. Stripe-Webhook 200, erneutes Senden 200 mit `duplicate: true`.
 - Korrigiert: Lange Werte in der Detail-Box der Mails bleiben eingerückt (feste Spalten, alle 9 Mails mit Box bei 600 und 340 px geprüft). Erfolgsseite „für mich selbst": „Ihr Zugang ist aktiv – Wir wünschen Ihnen viel Freude mit Ihrem Projekt".
-- Offen: Konto mit anderer Adresse (BUG-G12), Geschenk mit und ohne eigenen Zugang, Geschenk „nur erzählen", Verlängerung, 100-%-Code, Reminder-Cron, abgelaufenes Projekt.
+- Bestanden am selben Tag: anderes Konto im selben Browser (Test 4a) und Geschenk ohne eigenen Zugang ohne Konto (Test 6, Webhook `direct_gift`, erneutes Senden `duplicate`).
+- Offen: Einlöse-Link mit anderem Konto in anderem Browser (Test 4b), Geschenk mit eigenem Zugang nach den Änderungen (Test 5), Geschenk „nur erzählen", Verlängerung, 100-%-Code, Reminder-Cron, abgelaufenes Projekt.
 
 **Fix BUG-G12 (2026-11-21, von Jakob freigegeben): persönlicher Einlöse-Link**
 - Die Kauf-Mail enthält einen Link mit eigenem Geheimnis (256 Bit, in `purchase_claims.mail_token_hash` nur als SHA-256-Hash). Wer ihn öffnet, kann den Kauf jedem eigenen Konto zuordnen, auch unter anderer Adresse und auf einem anderen Gerät.
@@ -112,7 +113,7 @@ Angemeldete Nutzer kaufen unverändert (Kauf wird sofort ihrem Konto zugeordnet)
 **Geschenk ohne eigenen Zugang: kein Konto nötig (Jakob, 2026-11-21)**
 - Wer ohne Anmeldung ein Geschenk ohne eigenen Zugang kauft, legt kein Konto an. Der Webhook richtet Projekt, 12-Monats-Zugang und Einladung direkt nach der Zahlung ein und verschickt die Einladung sowie die Bestätigung (Mail 04). Mail 01 entfällt in diesem Fall.
 - Das Projekt hat bis zur Annahme keinen Eigentümer (`owner_id` NULL); die beschenkte Person wird beim Annehmen Projektleiter und Eigentümer. Die Zahlung bleibt in `payments` ohne `user_id` belegt.
-- Die Erfolgsseite zeigt „Vielen Dank – Ihre Zahlung ist eingegangen und Ihr Geschenk ist unterwegs" ohne Konto-Schritt. Angemeldete Käufer behalten den bisherigen Weg.
+- Die Erfolgsseite zeigt im Rahmen der Einladungs-Seite (Foto im Hintergrund) „Vielen Dank – Ihre Zahlung ist eingegangen und Ihr Geschenk ist unterwegs" ohne Konto-Schritt. Angemeldete Käufer behalten den bisherigen Weg.
 - Einladungs-Seite: Foto im Hintergrund und Logo für alle Einladungen. Geschenk-Einladungen (`invitations.is_gift`) haben eigene Texte und zeigen weder Rolle noch Projekttitel; normale Einladungen an Co-Autoren behalten beides.
 - Migration `20261121110000_proj6_direct_gift.sql`, keine RLS-Änderung. Muss vor dem Code-Deploy laufen.
 

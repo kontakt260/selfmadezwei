@@ -116,7 +116,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] Promotion-Codes/Coupons im Live-Modus anlegen, falls gewünscht (Checkout erlaubt Codes: `allow_promotion_codes: true`).
 - [ ] Checkout-Einstellungen: Links zu AGB und Datenschutz hinterlegen.
 - [ ] MwSt.: Stripe Tax aktivieren oder Preise ausdrücklich als Brutto-Endpreise führen (offene Entscheidung).
-- [ ] Rechnungen: Checkout erzeugt derzeit keine Rechnungen; die Kauf-Mail zeigt den Rechnungs-Link nur, wenn eine Rechnung existiert (offene Entscheidung, PROJ-11 BUG-7). Der Bereich „Rechnungen" im persönlichen Bereich ist noch ein Platzhalter. Vorschlag (2026-11-21): Stripe erzeugt die Rechnung im Checkout (`invoice_creation`) und schickt sie an die Checkout-Adresse, das deckt auch Käufe ohne Konto ab. Vorher klären: Steuerstatus (Kleinunternehmer oder Umsatzsteuer), Absenderdaten in Stripe, Kosten.
+- [ ] Rechnungen: Checkout erzeugt derzeit keine Rechnungen; die Kauf-Mail zeigt den Rechnungs-Link nur, wenn eine Rechnung existiert (offene Entscheidung, PROJ-11 BUG-7). Der Bereich „Rechnungen" im persönlichen Bereich ist noch ein Platzhalter. **Entscheidung (Jakob, 2026-11-21): vor dem Go-live einbauen, Rechnungen laufen nur über Stripe.** Stripe erzeugt sie im Checkout (`invoice_creation`) und schickt sie an die Checkout-Adresse, das deckt auch Käufe ohne Konto ab. Vorher klären: Steuerstatus (Kleinunternehmer oder Umsatzsteuer), Absenderdaten in Stripe, Kosten und ob für Kunden aus Österreich und der Schweiz die Adresse im Checkout abgefragt werden muss.
 
 ---
 

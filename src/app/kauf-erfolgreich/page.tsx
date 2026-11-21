@@ -6,6 +6,8 @@ import { isCheckoutPaid } from "@/lib/stripe/payment-status";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { isDirectGiftSession, isGuestSession } from "@/lib/purchases/guest-purchase";
+import { DirectGiftScreen } from "./DirectGiftScreen";
+import { SuccessIcon } from "./SuccessIcon";
 
 // Erfolgsseite nach Stripe-Hosted-Checkout (PROJ-6).
 //
@@ -146,15 +148,7 @@ export default async function KaufErfolgreichPage({
 
   // Geschenk ohne eigenen Zugang: Alles ist erledigt, kein Konto nötig.
   if (isDirectGift && variant.type === "initial-gift-phone-computer") {
-    return (
-      <main className="flex min-h-[100dvh] items-center justify-center bg-[#FAF8F6] px-6 py-16">
-        <div className="flex w-full max-w-xl flex-col items-center gap-6 border border-[#e0dcd5] bg-white p-8 text-center sm:p-12">
-          <Image src="/logo.svg" alt="NARRAVIT" width={64} height={56} className="h-14 w-auto" />
-          <SuccessIcon />
-          <DirectGiftContent recipientEmail={variant.recipientEmail} buyerEmail={buyerEmail} />
-        </div>
-      </main>
-    );
+    return <DirectGiftScreen recipientEmail={variant.recipientEmail} buyerEmail={buyerEmail} />;
   }
 
   const supabase = await createClient();
@@ -388,42 +382,6 @@ function InitialGiftPhoneComputerContent({
   );
 }
 
-function DirectGiftContent({
-  recipientEmail,
-  buyerEmail,
-}: {
-  recipientEmail: string;
-  buyerEmail: string;
-}) {
-  return (
-    <>
-      <h1 className="[font-family:var(--font-merriweather)] text-3xl font-medium text-[#3E3831]">
-        Vielen Dank – Ihre Zahlung ist eingegangen und Ihr Geschenk ist unterwegs
-      </h1>
-      <p className="text-lg leading-8 text-[#535252]">
-        Wir haben die Einladung an die beschenkte Person geschickt. Sobald sie
-        sie annimmt, erhält sie Zugang zum Projekt und kann mit dem Erzählen
-        beginnen.
-      </p>
-      <p className="border border-[#96B897]/40 bg-[#96B897]/10 p-4 text-base text-[#3E3831]">
-        Einladungs-Mail unterwegs an{" "}
-        <span className="font-semibold">{recipientEmail}</span>. Die Einladung
-        bleibt gültig, solange der Portal-Zugang läuft.
-      </p>
-      <p className="text-base leading-7 text-[#535252]">
-        Für Sie ist nichts weiter zu tun, ein Konto brauchen Sie nicht.
-        {buyerEmail ? (
-          <>
-            {" "}
-            Die Kaufbestätigung haben wir an{" "}
-            <span className="font-semibold">{buyerEmail}</span> geschickt.
-          </>
-        ) : null}
-      </p>
-    </>
-  );
-}
-
 function RenewalContent({ projectId }: { projectId: string }) {
   return (
     <>
@@ -440,25 +398,5 @@ function RenewalContent({ projectId }: { projectId: string }) {
         Zurück zum Projekt
       </Link>
     </>
-  );
-}
-
-function SuccessIcon() {
-  return (
-    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#96B897]/20">
-      <svg
-        width={32}
-        height={32}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="#3E3831"
-        strokeWidth={2.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden
-      >
-        <path d="M20 6L9 17l-5-5" />
-      </svg>
-    </div>
   );
 }
