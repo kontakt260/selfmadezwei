@@ -46,10 +46,20 @@ const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 h
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-const uploadSchema = z.object({
+const prepareUploadSchema = z.object({
   projectId: uuidSchema,
   chapterId: uuidSchema,
   section: z.enum(["start", "end"]),
+  contentType: z.string().max(100),
+  size: z.number().int().min(1).max(MAX_FILE_BYTES, "Datei zu groß. Maximum 10 MB."),
+});
+
+const commitUploadSchema = z.object({
+  projectId: uuidSchema,
+  chapterId: uuidSchema,
+  section: z.enum(["start", "end"]),
+  imageId: uuidSchema,
+  storagePath: z.string().max(200),
 });
 
 const deleteSchema = z.object({
@@ -132,31 +142,35 @@ export async function chapterAutosaveAction(input: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Bild-Upload
+// Bild-Upload in zwei Schritten (Fix 2026-11-20)
+//
+// Früher ging die Bilddatei als FormData durch eine Server Action. Next.js
+// erlaubt dort nur 1 MB, Vercel höchstens 4,5 MB pro Anfrage — zugeschnittene
+// Fotos sind fast immer größer, der Upload brach mit „Body exceeded 1 MB
+// limit" ab. Jetzt:
+//   1. `chapterImageUploadPrepareAction` prüft Login, Mitgliedschaft und
+//      Kapitel, legt den Speicherpfad fest und stellt einen einmaligen
+//      Upload-Link aus (Supabase `createSignedUploadUrl`).
+//   2. Der Browser lädt die Datei mit diesem Link direkt in den Bucket
+//      `chapter-heroes` (Bucket-Grenzen: 10 MB, nur Bildformate).
+//   3. `chapterImageUploadCommitAction` prüft Pfad und Datei und trägt das
+//      Bild in `image_sections` ein.
+// Den Pfad bestimmt immer der Server; der Client kann nur genau diesen einen
+// Pfad beschreiben.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function chapterImageUploadAction(
-  formData: FormData,
-): Promise<{ image?: ChapterImage; error?: string }> {
-  const parsed = uploadSchema.safeParse({
-    projectId: formData.get("projectId"),
-    chapterId: formData.get("chapterId"),
-    section: formData.get("section"),
-  });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
-  const { projectId, chapterId, section } = parsed.data;
+const IMAGE_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
 
-  const file = formData.get("file");
-  if (!(file instanceof File)) return { error: "Datei fehlt." };
-  if (file.size === 0) return { error: "Datei ist leer." };
-  if (file.size > MAX_FILE_BYTES) return { error: "Datei zu groß. Maximum 10 MB." };
-  if (!ALLOWED_MIME.has(file.type)) return { error: "Nur JPEG, PNG oder WebP erlaubt." };
-
+async function requireMemberAndChapter(projectId: string, chapterId: string) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Nicht angemeldet." };
+  if (!user) return { error: "Nicht angemeldet." } as const;
 
   // Membership-Check (Defense-in-depth; storage-RLS prüft ebenfalls).
   const { data: membership } = await supabase
@@ -165,79 +179,107 @@ export async function chapterImageUploadAction(
     .eq("project_id", projectId)
     .eq("user_id", user.id)
     .single();
-  if (!membership) return { error: "Projekt nicht gefunden." };
+  if (!membership) return { error: "Projekt nicht gefunden." } as const;
 
-  // Aktuellen Zustand laden, image_sections atomar via RPC patchen.
   const { data: chapter, error: loadErr } = await supabase
     .from("chapters")
     .select("image_sections")
     .eq("id", chapterId)
     .eq("project_id", projectId)
     .single();
-  if (loadErr || !chapter) return { error: "Kapitel nicht gefunden." };
+  if (loadErr || !chapter) return { error: "Kapitel nicht gefunden." } as const;
 
-  const sections = chapter.image_sections as unknown as ImageSections;
+  return { supabase, sections: chapter.image_sections as unknown as ImageSections } as const;
+}
+
+export async function chapterImageUploadPrepareAction(input: {
+  projectId: string;
+  chapterId: string;
+  section: "start" | "end";
+  contentType: string;
+  size: number;
+}): Promise<{ upload?: { imageId: string; storagePath: string; token: string }; error?: string }> {
+  const parsed = prepareUploadSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+  const { projectId, chapterId, contentType } = parsed.data;
+  if (!ALLOWED_MIME.has(contentType)) return { error: "Nur JPEG, PNG oder WebP erlaubt." };
+
+  const ctx = await requireMemberAndChapter(projectId, chapterId);
+  if ("error" in ctx) return { error: ctx.error };
 
   // Datei-Endung aus dem MIME-Type ableiten (sicher: nicht aus Filename).
-  const ext =
-    file.type === "image/png"
-      ? "png"
-      : file.type === "image/webp"
-        ? "webp"
-        : "jpg";
-  const imageId =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `img-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const storagePath = `${projectId}/${chapterId}/${imageId}.${ext}`;
+  const imageId = crypto.randomUUID();
+  const storagePath = `${projectId}/${chapterId}/${imageId}.${IMAGE_EXT[contentType]}`;
 
-  const buf = Buffer.from(await file.arrayBuffer());
-  const { error: uploadErr } = await supabase.storage
+  const { data, error } = await ctx.supabase.storage
     .from("chapter-heroes")
-    .upload(storagePath, buf, { contentType: file.type, upsert: false });
-  if (uploadErr) return { error: "Upload fehlgeschlagen." };
+    .createSignedUploadUrl(storagePath);
+  if (error || !data?.token) return { error: "Upload fehlgeschlagen." };
 
-  // image_sections updaten.
-  const next: ImageSections = {
-    start: { ...sections.start },
-    end: { ...sections.end },
-  };
+  return { upload: { imageId, storagePath, token: data.token } };
+}
+
+export async function chapterImageUploadCommitAction(input: {
+  projectId: string;
+  chapterId: string;
+  section: "start" | "end";
+  imageId: string;
+  storagePath: string;
+}): Promise<{ image?: ChapterImage; error?: string }> {
+  const parsed = commitUploadSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+  const { projectId, chapterId, section, imageId, storagePath } = parsed.data;
+
+  // Nur genau den Pfad akzeptieren, den Schritt 1 vergeben haben kann.
+  const allowed = Object.values(IMAGE_EXT).map((ext) => `${projectId}/${chapterId}/${imageId}.${ext}`);
+  if (!allowed.includes(storagePath)) return { error: "Ungültiger Speicherpfad." };
+
+  const ctx = await requireMemberAndChapter(projectId, chapterId);
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, sections } = ctx;
+
+  // Bild schon eingetragen (doppelter Aufruf)? Dann nichts doppelt anlegen.
+  const already = [...sections.start.images, ...sections.end.images].some((i) => i.id === imageId);
+
+  // Datei muss im Bucket liegen — die Signed-URL schlägt sonst fehl.
+  const { data: signed, error: signErr } = await supabase.storage
+    .from("chapter-heroes")
+    .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS);
+  if (signErr || !signed?.signedUrl) return { error: "Upload fehlgeschlagen." };
+
   const newEntry: ChapterImage = {
     id: imageId,
     storage_path: storagePath,
     signed_url: "",
     alt: "",
   };
-  next[section] = {
-    ...next[section],
-    images: [...next[section].images, newEntry],
-  };
 
-  const { error: updateErr } = await supabase
-    .from("chapters")
-    .update({
-      image_sections: next as never,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", chapterId)
-    .eq("project_id", projectId);
-  if (updateErr) {
-    // Storage-Rollback bei DB-Fehler — Datei wieder entfernen.
-    await supabase.storage.from("chapter-heroes").remove([storagePath]);
-    return { error: "Bild konnte nicht gespeichert werden." };
+  if (!already) {
+    const next: ImageSections = {
+      start: { ...sections.start },
+      end: { ...sections.end },
+    };
+    next[section] = {
+      ...next[section],
+      images: [...next[section].images, newEntry],
+    };
+
+    const { error: updateErr } = await supabase
+      .from("chapters")
+      .update({
+        image_sections: next as never,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", chapterId)
+      .eq("project_id", projectId);
+    if (updateErr) {
+      // Storage-Rollback bei DB-Fehler — Datei wieder entfernen.
+      await supabase.storage.from("chapter-heroes").remove([storagePath]);
+      return { error: "Bild konnte nicht gespeichert werden." };
+    }
   }
 
-  const { data: signed, error: signErr } = await supabase.storage
-    .from("chapter-heroes")
-    .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS);
-  if (signErr) {
-    // Bild wurde gespeichert, aber Signed-URL fehlte — Client kriegt einen Hint.
-    return { error: "Bild hochgeladen, aber Anzeige-URL fehlgeschlagen." };
-  }
-
-  return {
-    image: { ...newEntry, signed_url: signed?.signedUrl ?? "" },
-  };
+  return { image: { ...newEntry, signed_url: signed.signedUrl } };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -25,9 +25,11 @@ import {
 import type { UploadedImage } from "./ImageUploadDialog";
 import {
   chapterAutosaveAction,
-  chapterImageUploadAction,
+  chapterImageUploadPrepareAction,
+  chapterImageUploadCommitAction,
   chapterImageDeleteAction,
 } from "@/app/projektuebersicht/[project_id]/kapiteleditor/[chapter_id]/actions";
+import { createClient as createBrowserSupabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
 type Props = {
@@ -219,12 +221,37 @@ export function EditorClient({
   const uploadImage = useCallback(
     (section: "start" | "end") =>
       async (img: UploadedImage): Promise<ChapterImage> => {
-        const fd = new FormData();
-        fd.set("projectId", projectId);
-        fd.set("chapterId", chapterId);
-        fd.set("section", section);
-        fd.set("file", img.blob, img.fileName);
-        const res = await chapterImageUploadAction(fd);
+        // Upload in drei Schritten, damit große Fotos nicht an der 1-MB-
+        // Grenze der Server Actions scheitern (Fix 2026-11-20): Link holen,
+        // Datei direkt in den Bucket, dann eintragen.
+        const contentType = img.blob.type || "image/jpeg";
+        const prep = await chapterImageUploadPrepareAction({
+          projectId,
+          chapterId,
+          section,
+          contentType,
+          size: img.blob.size,
+        });
+        if (prep.error || !prep.upload) {
+          toast.error(prep.error ?? "Bild-Upload fehlgeschlagen.");
+          throw new Error(prep.error ?? "upload-failed");
+        }
+        const { error: putErr } = await createBrowserSupabase()
+          .storage.from("chapter-heroes")
+          .uploadToSignedUrl(prep.upload.storagePath, prep.upload.token, img.blob, {
+            contentType,
+          });
+        if (putErr) {
+          toast.error("Bild-Upload fehlgeschlagen.");
+          throw new Error(putErr.message);
+        }
+        const res = await chapterImageUploadCommitAction({
+          projectId,
+          chapterId,
+          section,
+          imageId: prep.upload.imageId,
+          storagePath: prep.upload.storagePath,
+        });
         if (res.error || !res.image) {
           toast.error(res.error ?? "Bild-Upload fehlgeschlagen.");
           throw new Error(res.error ?? "upload-failed");

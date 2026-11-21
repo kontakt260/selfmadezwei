@@ -2,7 +2,9 @@
 
 ## Status: Deployed
 **Created:** 2026-05-15
-**Last Updated:** 2026-05-19 (Backend angeschlossen — Migration + Server Actions, End-to-End-Persistenz validiert)
+**Last Updated:** 2026-11-21 (Bild-Upload-Fix für große Fotos)
+
+> **Fix 2026-11-21 — Bild-Upload:** Bilder über 1 MB scheiterten mit „Body exceeded 1 MB limit", weil die Datei durch eine Server Action lief (Vercel erlaubt dort zusätzlich höchstens 4,5 MB). Jetzt stellt der Server nach Prüfung von Login, Mitgliedschaft und Kapitel einen einmaligen Upload-Link aus (`chapterImageUploadPrepareAction`), der Browser lädt direkt in den privaten Bucket `chapter-heroes`, danach trägt `chapterImageUploadCommitAction` das Bild ein. Grenze bleibt 10 MB, JPEG/PNG/WebP. Keine Migration, kein neuer Env-Wert. Geprüft lokal gegen die Stage-Datenbank mit einem 5-MB-Foto (`tests/PROJ-5-bild-upload.spec.ts`); auf der Stage-Website erst nach dem Push.
 
 > **Refinement 2026-05-18:** QA-Testbericht hat fundamentale Lücken in der Pagination-Logik aufgedeckt (9 Bugs, u. a. Inhalt im Zwischenraum zwischen Seiten, kumulative Drift, schwebende Seitenzahlen, verirrter Bottom-Image-Slot). Konsequenz: Spec-Sektion G „Pagination-Drift wird akzeptiert" ist obsolet — Editor erhält eine echte Pagination-Engine mit Zero-Overflow-Garantie. Siehe neue Sektion „Pagination-Engine" in den Acceptance Criteria sowie überarbeitete Sektionen G und H.
 

@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createClient } from "@/lib/supabase/server";
-import { chapterAutosaveAction } from "./actions";
+import {
+  chapterAutosaveAction,
+  chapterImageUploadPrepareAction,
+  chapterImageUploadCommitAction,
+} from "./actions";
 import type { ImageSections } from "@/lib/kapiteleditor/types";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
@@ -164,5 +168,108 @@ describe("chapterAutosaveAction — existing fields untouched", () => {
     expect(lastPayload.value).toHaveProperty("body");
     expect(lastPayload.value).toHaveProperty("image_sections");
     expect(lastPayload.value).toHaveProperty("updated_at");
+  });
+});
+
+// ─── Bild-Upload in zwei Schritten (Fix 2026-11-20) ─────────────────────────
+
+const IMAGE_ID = "dddddddd-dddd-4ddd-addd-dddddddddddd";
+
+function makeUploadClient(opts: { member?: boolean; sections?: ImageSections } = {}) {
+  const updates: Array<Record<string, unknown>> = [];
+  const storage = {
+    createSignedUploadUrl: vi.fn().mockResolvedValue({ data: { token: "tok", path: "p" }, error: null }),
+    createSignedUrl: vi.fn().mockResolvedValue({ data: { signedUrl: "https://signed/x" }, error: null }),
+    remove: vi.fn().mockResolvedValue({ error: null }),
+  };
+  const client = {
+    auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: USER_ID } } }) },
+    storage: { from: vi.fn(() => storage) },
+    from: vi.fn((table: string) => {
+      const b: Record<string, unknown> = {};
+      b.select = vi.fn(() => b);
+      b.eq = vi.fn(() => b);
+      b.update = vi.fn((payload: Record<string, unknown>) => {
+        updates.push(payload);
+        return b;
+      });
+      b.single = vi.fn().mockResolvedValue(
+        table === "project_members"
+          ? { data: opts.member === false ? null : { role: "projektleiter" }, error: null }
+          : { data: { image_sections: opts.sections ?? EMPTY_SECTIONS }, error: null },
+      );
+      const done = Promise.resolve({ data: null, error: null });
+      b.then = done.then.bind(done);
+      return b;
+    }),
+  };
+  return { client, storage, updates };
+}
+
+describe("chapterImageUploadPrepareAction", () => {
+  const input = { projectId: PROJECT_ID, chapterId: CHAPTER_ID, section: "start" as const, contentType: "image/jpeg", size: 5_000_000 };
+
+  it("issues a signed upload link for a 5 MB photo — no 1 MB limit any more", async () => {
+    const { client, storage } = makeUploadClient();
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    const res = await chapterImageUploadPrepareAction(input);
+    expect(res.error).toBeUndefined();
+    expect(res.upload?.token).toBe("tok");
+    expect(res.upload?.storagePath).toMatch(new RegExp(`^${PROJECT_ID}/${CHAPTER_ID}/[0-9a-f-]{36}\\.jpg$`));
+    expect(storage.createSignedUploadUrl).toHaveBeenCalledWith(res.upload?.storagePath);
+  });
+
+  it("rejects files over 10 MB and non-image types", async () => {
+    expect((await chapterImageUploadPrepareAction({ ...input, size: 11 * 1024 * 1024 })).error).toBe("Datei zu groß. Maximum 10 MB.");
+    expect((await chapterImageUploadPrepareAction({ ...input, contentType: "application/pdf" })).error).toBe("Nur JPEG, PNG oder WebP erlaubt.");
+  });
+
+  it("refuses non-members", async () => {
+    const { client, storage } = makeUploadClient({ member: false });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    expect((await chapterImageUploadPrepareAction(input)).error).toBe("Projekt nicht gefunden.");
+    expect(storage.createSignedUploadUrl).not.toHaveBeenCalled();
+  });
+});
+
+describe("chapterImageUploadCommitAction", () => {
+  const path = `${PROJECT_ID}/${CHAPTER_ID}/${IMAGE_ID}.jpg`;
+  const input = { projectId: PROJECT_ID, chapterId: CHAPTER_ID, section: "end" as const, imageId: IMAGE_ID, storagePath: path };
+
+  it("adds the uploaded image to the section and returns a signed URL", async () => {
+    const { client, updates } = makeUploadClient();
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    const res = await chapterImageUploadCommitAction(input);
+    expect(res.image).toMatchObject({ id: IMAGE_ID, storage_path: path, signed_url: "https://signed/x" });
+    const saved = updates[0].image_sections as ImageSections;
+    expect(saved.end.images.map((i) => i.id)).toEqual([IMAGE_ID]);
+    expect(saved.start.images).toEqual([]);
+  });
+
+  it("rejects a path outside the own chapter folder", async () => {
+    const res = await chapterImageUploadCommitAction({
+      ...input,
+      storagePath: `eeeeeeee-eeee-4eee-aeee-eeeeeeeeeeee/${CHAPTER_ID}/${IMAGE_ID}.jpg`,
+    });
+    expect(res.error).toBe("Ungültiger Speicherpfad.");
+  });
+
+  it("fails when the file never reached the bucket", async () => {
+    const { client, storage, updates } = makeUploadClient();
+    storage.createSignedUrl.mockResolvedValue({ data: null, error: { message: "Object not found" } });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    expect((await chapterImageUploadCommitAction(input)).error).toBe("Upload fehlgeschlagen.");
+    expect(updates).toHaveLength(0);
+  });
+
+  it("does not add the image twice when called again", async () => {
+    const sections: ImageSections = {
+      start: { layout: "1-spaltig", images: [] },
+      end: { layout: "1-spaltig", images: [{ id: IMAGE_ID, storage_path: path, signed_url: "", alt: "" }] },
+    };
+    const { client, updates } = makeUploadClient({ sections });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    expect((await chapterImageUploadCommitAction(input)).image?.id).toBe(IMAGE_ID);
+    expect(updates).toHaveLength(0);
   });
 });
