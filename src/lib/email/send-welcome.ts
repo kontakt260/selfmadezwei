@@ -7,6 +7,7 @@ import {
   releaseMailLog,
   deleteAbandonedMailLog,
 } from "./idempotency";
+import { resolveWelcomeDiscountCode, WELCOME_DISCOUNT_LABEL } from "./welcome-discount";
 
 // PROJ-11 — Welcome-Mail nach Account-Verifikation.
 //
@@ -41,6 +42,8 @@ export type SendWelcomeInput = {
   to: string;
   userId: string;
   fullName?: string;
+  /** Normale Registrierung, nicht über einen Kauf oder eine Einladung. */
+  offerDiscount?: boolean;
 };
 
 export async function maybeSendWelcomeMail(
@@ -76,6 +79,10 @@ export async function maybeSendWelcomeMail(
     return;
   }
 
+  const discountCode = input.offerDiscount
+    ? await resolveWelcomeDiscountCode({ userId: input.userId, email: input.to })
+    : undefined;
+
   const siteUrl = getSiteUrl();
   const result = await sendEmail({
     to: input.to,
@@ -83,6 +90,9 @@ export async function maybeSendWelcomeMail(
     react: WelcomeEmail({
       fullName: input.fullName,
       siteUrl,
+      discount: discountCode
+        ? { code: discountCode, amountLabel: WELCOME_DISCOUNT_LABEL }
+        : undefined,
     }),
     tags: [{ name: "type", value: "welcome" }],
   });

@@ -62,6 +62,11 @@ export async function GET(request: NextRequest) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
+    // Kauf ohne Konto: Wartet ein bezahlter Kauf auf dieses Konto (frisch
+    // bestätigte E-Mail-Adresse oder Einlöse-Geheimnis im Browser), wird
+    // er zugeordnet, bevor es in die App geht.
+    const landsInApp = isDefaultLandingTarget(next);
+    const pendingClaim = !!user && landsInApp && (await hasPendingClaim(user));
     if (
       user &&
       user.email &&
@@ -79,13 +84,12 @@ export async function GET(request: NextRequest) {
           to,
           userId: user.id,
           fullName: profile?.full_name ?? undefined,
+          // Kein Rabattcode auf dem Weg über eine Einladung oder einen Kauf.
+          offerDiscount: landsInApp && !pendingClaim,
         }),
       );
     }
-    // Kauf ohne Konto: Wartet ein bezahlter Kauf auf dieses Konto (frisch
-    // bestätigte E-Mail-Adresse oder Einlöse-Geheimnis im Browser), wird
-    // er zugeordnet, bevor es in die App geht.
-    if (user && isDefaultLandingTarget(next) && (await hasPendingClaim(user))) {
+    if (pendingClaim) {
       return NextResponse.redirect(`${origin}/kauf-einloesen`);
     }
     return NextResponse.redirect(`${origin}${next}`);

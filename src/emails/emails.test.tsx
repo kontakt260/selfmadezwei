@@ -307,6 +307,28 @@ describe.each(templates)("$name", ({ element, mustContain }) => {
   });
 });
 
+describe("WelcomeEmail discount", () => {
+  it("shows amount and code when a discount is passed", async () => {
+    const text = await render(
+      WelcomeEmail({
+        fullName: "Maria Muster",
+        siteUrl,
+        discount: { code: "WILLKOMMEN50", amountLabel: "50 €" },
+      }),
+      { plainText: true },
+    );
+    expect(text).toContain("50 €");
+    expect(text).toContain("WILLKOMMEN50");
+  });
+
+  it("mentions no discount by default", async () => {
+    const text = await render(WelcomeEmail({ fullName: "Maria Muster", siteUrl }), {
+      plainText: true,
+    });
+    expect(text).not.toContain("Rabatt");
+  });
+});
+
 describe("WelcomeEmail image", () => {
   it("shows the beach photo at the top of the card with alt text", async () => {
     const html = await render(WelcomeEmail({ fullName: "Maria Muster", siteUrl }));

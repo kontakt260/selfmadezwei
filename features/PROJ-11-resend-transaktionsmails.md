@@ -19,7 +19,7 @@
 
 ## Status: In Review
 **Created:** 2026-05-22
-**Last Updated:** 2026-11-22 (QA-Befunde BUG-13, 15–18 behoben; offen vor „Approved": BUG-14, BUG-1, erneute QA)
+**Last Updated:** 2026-11-22 (QA-Befunde BUG-13 bis 18 behoben, Rabattcode eingebaut; offen: Coupon in Stripe, erneute QA, Impressum vor dem Go-live)
 
 ## Dependencies
 - Requires **PROJ-2** (Auth + SSR) — User-Profile mit E-Mail-Adressen als Empfänger; Verifikations-Status als Voraussetzung für Welcome-Mail
@@ -741,7 +741,7 @@ Jeder Projektleiter kann beliebig viele Einladungen an beliebige Adressen auslö
 - **Zusatz:** Verlängerungs-Mails gehen parallel raus. Ab etwa 11 Mitgliedern kann das Resend-Limit von 10 Anfragen pro Sekunde greifen, die betroffenen Mails entfallen dann ebenso.
 - **Priorität:** vor dem Go-live beheben.
 
-#### BUG-14 (Medium) — `EMAIL_TEST_RECIPIENT` ist für Production gesetzt
+#### BUG-14 (Medium) ✅ behoben (Jakob, in Vercel geprüft) — `EMAIL_TEST_RECIPIENT` ist für Production gesetzt
 - **Befund:** Laut Vercel-Metadaten gilt die Variable auch für Production; die Checkliste sagt „nicht setzen".
 - **Folge:** Die Sperre im Code greift nur, wenn `NEXT_PUBLIC_SITE_URL` exakt `https://app.narravit.de` ist. Sonst gingen alle Kunden-Mails an die Testadresse. Der Wert ist verschlüsselt und wurde nicht geprüft.
 - **Priorität:** vor dem Go-live in Vercel entfernen.
@@ -796,7 +796,20 @@ Von Jakob freigegeben („Alle Code-Fixes").
 
 **Nicht geprüft:** Das Nachholen ist nur per Unit-Test mit nachgebildeter Datenbank belegt, ein echter Resend-Ausfall wurde nicht erzeugt.
 
-**Offen vor „Approved":** BUG-14 (Variable in Vercel), BUG-1 (Impressum), danach erneut `/qa PROJ-11`. BUG-9 hängt an PROJ-12, BUG-10 an PROJ-17.
+**Offen:** erneut `/qa PROJ-11`. BUG-1 (Impressum) kommt mit der Webflow-Überarbeitung vor dem Go-live und steht in der Prod-Checkliste. BUG-9 hängt an PROJ-12, BUG-10 an PROJ-17.
+
+## Implementation Notes (Backend) — 2026-11-22: Rabattcode in der Willkommens-Mail
+
+**Entscheidungen (Jakob, 2026-11-22):** ein fester Stripe-Promotion-Code für alle, **50 €** auf den Erstkauf, ohne Ablaufdatum. Den Code bekommen nur Konten, die sich selbst registriert haben. **Käufer, beschenkte und eingeladene Personen bekommen ihn nicht.**
+
+- **Prüfung** (`src/lib/email/welcome-discount.ts`): kein Code bei eigener Zahlung, Projektmitgliedschaft, Einladung an die Adresse oder Gast-Kauf zu Adresse oder Konto. Bei einem Datenbankfehler geht die Mail ohne Code raus.
+- **Auslöser** (`/auth/callback`): Der Rabatt kommt nur bei einer normalen Registrierung infrage (Ziel `/` oder `/onboarding`, kein wartender Kauf). Der Anmeldeablauf und die Weiterleitungen bleiben unverändert.
+- **Mail:** Absatz und Code-Box vor dem Button (`MailCodeBox`), Vorschau `src/emails/preview/willkommen-rabatt.tsx`. Ohne `WELCOME_DISCOUNT_CODE` sieht die Mail aus wie bisher. In Figma ist der Block noch nicht nachgezogen.
+- **Bekannte Grenzen:** Der Code lässt sich weitergeben, und wer sich vor dem Kauf kostenlos registriert, bekommt ihn. Wer ein Geschenk ohne Konto gekauft hat und sich später selbst registriert, ist nicht als Käufer erkennbar und bekommt den Code ebenfalls.
+
+**Tests:** Vitest 522/522, Typprüfung fehlerfrei, Lint 0 Fehler, Production-Build erfolgreich. Playwright Chromium: Im ersten Lauf fiel `AC-Break-1` (Kapitel-Editor, bekannt sporadisch, ohne Bezug zu den Mails) aus, der vollständige zweite Lauf hatte 132 bestanden und 1 übersprungen. Darstellung bei 320, 375 und 600 px ohne Überlauf.
+
+**Nicht geprüft:** Einlösen des Codes im echten Stripe-Checkout, der Coupon muss zuerst in Stripe angelegt werden.
 
 ## Deployment
 _To be added by /deploy_

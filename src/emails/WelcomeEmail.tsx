@@ -12,6 +12,7 @@
 import {
   Layout,
   MAIL_ASSETS_URL,
+  MailCodeBox,
   MailHeading,
   MailParagraph,
   MailCtaButton,
@@ -21,9 +22,11 @@ import {
 export type WelcomeEmailProps = {
   fullName?: string;
   siteUrl: string;
+  /** Nur für selbst registrierte Konten ohne Kauf und ohne Einladung. */
+  discount?: { code: string; amountLabel: string };
 };
 
-export function WelcomeEmail({ fullName, siteUrl }: WelcomeEmailProps) {
+export function WelcomeEmail({ fullName, siteUrl, discount }: WelcomeEmailProps) {
   const greeting = fullName?.trim()
     ? `Hallo ${fullName.trim()},`
     : "Hallo,";
@@ -58,6 +61,17 @@ export function WelcomeEmail({ fullName, siteUrl }: WelcomeEmailProps) {
         <strong>Erzähl-Impulsen</strong> und{" "}
         <strong>tiefgehenden Leitfragen</strong> inspirieren.
       </MailParagraph>
+
+      {discount ? (
+        <>
+          <MailParagraph>
+            Als Willkommensgeschenk erhalten Sie{" "}
+            <strong>{discount.amountLabel} Rabatt</strong> auf Ihr Lebensbuch.
+            Geben Sie dafür beim Bezahlen diesen Code ein:
+          </MailParagraph>
+          <MailCodeBox code={discount.code} />
+        </>
+      ) : null}
 
       <MailCtaButton href={startUrl}>Jetzt eigenes Buch beginnen</MailCtaButton>
 

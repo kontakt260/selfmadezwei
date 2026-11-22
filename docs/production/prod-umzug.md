@@ -40,9 +40,10 @@ Production-Werte in Vercel unter **Settings → Environment Variables** mit Scop
 | `STRIPE_PRICE_ID_INITIAL` | Test-Preis | Live-Preis 249 € | Preis-IDs unterscheiden sich zwischen Test und Live. |
 | `STRIPE_PRICE_ID_RENEWAL` | Test-Preis | Live-Preis 99 € | |
 | `RESEND_API_KEY` | Schlüssel `narravit-app-stage` | eigener Schlüssel `narravit-app-prod` | Sensitive. Sending access, Domain `mail.narravit.de`. |
-| `EMAIL_TEST_RECIPIENT` | `kontakt@narravit.de` | **nicht setzen** | Leitet alle Mails um. Wird in Production zwar ignoriert, soll dort trotzdem fehlen. **Ist Stand 2026-11-22 in Vercel auch für Production gesetzt: vor dem Go-live dort entfernen.** Die Sperre im Code greift nur, wenn `NEXT_PUBLIC_SITE_URL` exakt `https://app.narravit.de` ist. |
+| `EMAIL_TEST_RECIPIENT` | `kontakt@narravit.de` | **nicht setzen** | Leitet alle Mails um. Wird in Production zwar ignoriert, soll dort trotzdem fehlen. Stand 2026-11-22: von Jakob für Production entfernt, gilt nur noch für Preview und Development (geprüft). |
 | `EMAIL_FROM` | nicht gesetzt (Fallback) | optional | Fallback im Code: `NARRAVIT <no-reply@mail.narravit.de>`. Absender-Name immer in Großbuchstaben, Adresse auf `mail.narravit.de`. |
 | `CRON_SECRET` | eigener Zufallswert | **neuer** Zufallswert | Sensitive. Erzeugen: `openssl rand -base64 32`. **Fehlt in Production noch** (Stand 2026-11-22: nur für Preview und Development angelegt). Ohne Wert antwortet der Cron mit 500 und es gehen keine Erinnerungen raus. |
+| `WELCOME_DISCOUNT_CODE` | Promotion-Code aus dem Stripe-Testmodus | Promotion-Code aus dem Stripe-Live-Modus | Kein Secret, steht in der Willkommens-Mail. Vorschlag: `WILLKOMMEN50`. Ohne Wert erscheint kein Rabatt in der Mail. Muss exakt dem Code in Stripe entsprechen (Abschnitt 4). |
 
 Sicherung im Code: Auf `https://app.narravit.de` (= `NEXT_PUBLIC_SITE_URL` in Production) wird `EMAIL_TEST_RECIPIENT` ignoriert, selbst wenn die Variable versehentlich gesetzt ist.
 
@@ -114,7 +115,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] Webhook-Endpunkt im Live-Modus: `https://app.narravit.de/api/stripe/webhook`, Events `checkout.session.completed` **und** `checkout.session.async_payment_succeeded` → Secret in `STRIPE_WEBHOOK_SECRET`. Ohne das zweite Event bekommen Kunden mit verzögerter Zahlart (z. B. SEPA-Lastschrift) nach dem Geldeingang keinen Zugang.
 - [ ] **Stage (Testmodus):** dasselbe zweite Event am Stage-Webhook-Endpunkt ergänzen (seit 2026-11-21 nötig).
 - [ ] **Nur Stage:** Die Vercel-Deployment-Protection beantwortet Aufrufe ohne Freigabe mit 302 (geprüft 2026-11-21), Stripe wertet das als Fehler. Die Stage-Webhook-URL braucht deshalb `?x-vercel-protection-bypass=<Secret>` (Vercel → Settings → Deployment Protection → Protection Bypass for Automation). In Production gibt es keinen Schutz und keinen Parameter: Die Live-URL bleibt ohne Zusatz.
-- [ ] Promotion-Codes/Coupons im Live-Modus anlegen, falls gewünscht (Checkout erlaubt Codes: `allow_promotion_codes: true`).
+- [ ] **Willkommens-Rabatt in Test- und Live-Modus anlegen** (Checkout erlaubt Codes: `allow_promotion_codes: true`): Coupon über **50 €** in EUR, Dauer „einmalig", **nur für das Produkt „Portal-Zugang" (249 €)**, sonst gilt er auch für die Verlängerung über 99 €. Dazu ein Promotion-Code ohne Ablaufdatum, Wert in `WELCOME_DISCOUNT_CODE`. Ändert sich die Höhe, auch `WELCOME_DISCOUNT_LABEL` in `src/lib/email/welcome-discount.ts` anpassen.
 - [ ] Checkout-Einstellungen: Links zu AGB und Datenschutz hinterlegen.
 - [ ] MwSt.: Stripe Tax aktivieren oder Preise ausdrücklich als Brutto-Endpreise führen (offene Entscheidung).
 - [ ] Rechnungen: Checkout erzeugt derzeit keine Rechnungen; die Kauf-Mail zeigt den Rechnungs-Link nur, wenn eine Rechnung existiert (offene Entscheidung, PROJ-11 BUG-7). Der Bereich „Rechnungen" im persönlichen Bereich ist noch ein Platzhalter. **Entscheidung (Jakob, 2026-11-21): vor dem Go-live einbauen, Rechnungen laufen nur über Stripe.** Stripe erzeugt sie im Checkout (`invoice_creation`) und schickt sie an die Checkout-Adresse, das deckt auch Käufe ohne Konto ab. Vorher klären: Steuerstatus (Kleinunternehmer oder Umsatzsteuer), Absenderdaten in Stripe, Kosten und ob für Kunden aus Österreich und der Schweiz die Adresse im Checkout abgefragt werden muss.
@@ -205,6 +206,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
+| 2026-11-22 | Willkommens-Rabatt: neue Env-Variable `WELCOME_DISCOUNT_CODE` (Stage und Production), Coupon über 50 € in Stripe nur für den Erstkauf. `EMAIL_TEST_RECIPIENT` von Jakob für Production entfernt (geprüft). |
 | 2026-11-22 | PROJ-11 BUG-13: neue Migration `20261122100000_proj11_mail_retry_queue.sql`, auf Stage und Production jeweils **vor** dem Code-Deploy. Gescheiterte Mails werden täglich nachgeholt, Hinweis an `kontakt@narravit.de`. Kein neuer Env-Wert. |
 | 2026-11-22 | QA PROJ-11: `EMAIL_TEST_RECIPIENT` ist in Vercel auch für Production gesetzt und muss dort entfernt werden. `RESEND_API_KEY` und `CRON_SECRET` fehlen in Production noch. Hinweis zu den Redirect URLs ergänzt. |
 | 2026-11-22 | Reminder-Cron auf Stage von Hand erfolgreich ausgelöst. `CRON_SECRET` existiert in Vercel nur für Preview und Development und muss vor dem Go-live für Production angelegt werden. Geklärt: Stage läuft als Preview, Production-Branch ist `main`. |

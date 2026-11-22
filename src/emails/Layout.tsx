@@ -380,6 +380,36 @@ export function MailDetailsList({
   );
 }
 
+/** Hervorgehobener Code zum Abtippen, z. B. ein Rabattcode. */
+export function MailCodeBox({ code }: { code: string }) {
+  return (
+    <Container
+      style={{
+        margin: "16px 0",
+        padding: "14px 18px",
+        backgroundColor: COLORS.paper,
+        border: `1px solid ${COLORS.border}`,
+        textAlign: "center",
+      }}
+    >
+      <Text
+        style={{
+          margin: 0,
+          fontFamily: SANS,
+          fontSize: 18,
+          fontWeight: 700,
+          lineHeight: "26px",
+          letterSpacing: "0.08em",
+          color: COLORS.ink,
+          ...WRAP_LONG_WORDS,
+        }}
+      >
+        {code}
+      </Text>
+    </Container>
+  );
+}
+
 /**
  * Primärer CTA-Button (Sand-Hintergrund), gebaut als Link statt
  * @react-email/components <Button>, um konsistente Farben zu garantieren und

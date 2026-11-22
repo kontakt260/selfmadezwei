@@ -3,9 +3,14 @@ import { NextRequest } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { maybeSendWelcomeMail } from "@/lib/email/send-welcome";
+import { hasPendingClaim } from "@/lib/purchases/pending-claim";
 import { GET } from "./route";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
+vi.mock("@/lib/purchases/pending-claim", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/purchases/pending-claim")>()),
+  hasPendingClaim: vi.fn(async () => false),
+}));
 vi.mock("@/lib/email/send-welcome", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/email/send-welcome")>()),
   maybeSendWelcomeMail: vi.fn(async () => undefined),
@@ -48,6 +53,7 @@ beforeEach(() => {
     },
   });
   vi.mocked(maybeSendWelcomeMail).mockClear();
+  vi.mocked(hasPendingClaim).mockReset().mockResolvedValue(false);
   mockSupabase();
 });
 
@@ -61,7 +67,27 @@ describe("/auth/callback — Mail-Link mit Token-Hash", () => {
       to: "maria@example.test",
       userId: "user-1",
       fullName: "Maria Muster",
+      offerDiscount: true,
     });
+  });
+
+  it.each([
+    ["an invitation", "next=%2Feinladung%2Ftok_123&token_hash=pkce_abc&type=email"],
+    ["a guest purchase", "next=%2Fkauf-einloesen&token_hash=pkce_abc&type=email"],
+  ])("offers no discount on the way through %s", async (_flow, query) => {
+    await call(query);
+    expect(maybeSendWelcomeMail).toHaveBeenCalledWith(
+      expect.objectContaining({ offerDiscount: false }),
+    );
+  });
+
+  it("offers no discount when a paid purchase is waiting for this account", async () => {
+    vi.mocked(hasPendingClaim).mockResolvedValue(true);
+    const res = await call("next=%2Fonboarding&token_hash=pkce_abc&type=email");
+    expect(res.headers.get("location")).toBe(`${ORIGIN}/kauf-einloesen`);
+    expect(maybeSendWelcomeMail).toHaveBeenCalledWith(
+      expect.objectContaining({ offerDiscount: false }),
+    );
   });
 
   it("confirms a recovery link and redirects to the reset form", async () => {
