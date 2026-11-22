@@ -6,7 +6,8 @@ import { useEffect, useRef, useState } from "react";
 //
 // Verhalten (aus Spec Sektion „Editor — Rotierender Leitfragen-Banner"):
 //   - Sequenz: [title, ...leading_questions]  (mind. Länge 2 wenn ≥ 1 Frage)
-//   - Auto-Rotation alle ~7 s (cross-fade transition)
+//   - Auto-Rotation alle 15 s (cross-fade transition; Jakob, 2026-11-22:
+//     7 s waren zum Lesen und Nachdenken zu schnell)
 //   - Hover oder Tastatur-Fokus pausieren die Rotation
 //   - Schließen-Button (X) blendet den Banner für die Session aus
 //   - Beim Editor-Mount erscheint Banner mit Sequenz-Index 0 (Titel)
@@ -19,14 +20,14 @@ import { useEffect, useRef, useState } from "react";
 type Props = {
   title: string;
   leadingQuestions: readonly string[];
-  /** Pause-Intervall in ms. Default 7000; override für Tests. */
+  /** Pause-Intervall in ms. Default 15000; override für Tests. */
   rotationIntervalMs?: number;
 };
 
 export function ImpulseHintBanner({
   title,
   leadingQuestions,
-  rotationIntervalMs = 7000,
+  rotationIntervalMs = 15000,
 }: Props) {
   // Sequenz: erst Titel, dann alle Leitfragen in Pflege-Reihenfolge.
   const sequence: string[] = [title, ...leadingQuestions];

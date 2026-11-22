@@ -45,7 +45,7 @@
 ### Editor — Rotierender Leitfragen-Banner
 - [ ] Wenn ein Kapitel `source_impulse_id` gesetzt hat und der referenzierte Impuls existiert, rendert der Editor oberhalb des A5-Seitenstacks (vor der ersten A5-Seite, innerhalb des regulären Editor-Bereichs — **nicht** auf die A5-Seite gelegt) einen Hinweis-Banner.
 - [ ] Inhalt des Banners ist eine **Sequenz**: `[title, leading_questions[0], leading_questions[1], …]` — also Titel + alle vorhandenen Leitfragen. Sequenz-Länge mindestens 2 (Titel + 1 Frage); keine harte Obergrenze.
-- [ ] Auto-Rotation alle **~7 Sekunden** durch die Sequenz, zyklisch. Übergang als Cross-Fade (kurze sanfte Animation, nicht hart).
+- [ ] Auto-Rotation alle **15 Sekunden** (Jakob, 2026-11-22; vorher ~7 Sekunden, das war zum Lesen zu schnell) durch die Sequenz, zyklisch. Übergang als Cross-Fade (kurze sanfte Animation, nicht hart).
 - [ ] Bei Mouse-Hover oder Tastatur-Fokus auf dem Banner **pausiert die Auto-Rotation**, bis Hover/Fokus verloren geht.
 - [ ] Banner hat einen X-/„Schließen"-Button. Klick blendet den Banner für die aktuelle Editor-Session aus.
 - [ ] Beim erneuten Öffnen des Kapitels (Neu-Mount des Editors) erscheint der Banner wieder mit Sequenz-Anfang (= Titel). Status wird **nicht** persistiert.
