@@ -207,6 +207,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] Anmeldung, Registrierung und „Passwort vergessen" mit dem echten Turnstile-Schlüssel, auch einmal auf dem Smartphone.
 - [ ] Sechs falsche Passwörter hintereinander: Beim sechsten erscheint „Zu viele Versuche".
 - [ ] Direkter Aufruf der Supabase-Anmeldung mit gefälschtem CAPTCHA-Token wird abgelehnt (`captcha_failed`). Auf Stage ist das nicht prüfbar, weil der Test-Secret jedes Token akzeptiert.
+- [ ] Das Login-Limit lässt sich nicht mit einem selbst gesetzten `X-Forwarded-For`-Header umgehen: sechs falsche Anmeldungen mit wechselndem Header, die sechste zeigt „Zu viele Versuche". Das bestätigt, dass Vercel den Header überschreibt (PROJ-17).
 - [ ] Anmeldung mit Google und mit Facebook.
 - [ ] „Passwort vergessen" für ein E-Mail-Konto und für ein Google-Konto.
 - [ ] Echter Kauf (kleiner Betrag per Promotion-Code oder sofortige Erstattung): Projekt entsteht, Kauf-Mail kommt, Webhook in Stripe als zugestellt markiert.
@@ -225,6 +226,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
+| 2026-11-22 | PROJ-17 Approved. Neue Prüfung nach dem Go-live: Login-Limit gegen gefälschten `X-Forwarded-For`-Header. |
 | 2026-11-22 | PROJ-17 BUG-4: Neue Migration `20261122120000_proj17_account_exists.sql` für den Login-Hinweis „kein Konto" (Entscheidung Jakob). Keine neue Variable. |
 | 2026-11-22 | Tarife entschieden (Jakob): Supabase wird bereits bezahlt, Vercel Pro kurz vor dem Go-live, Cloudflare Turnstile und Resend starten im Free-Tarif. |
 | 2026-11-22 | Mail-Kontingent ergänzt: Resend-Tarif vor dem Go-live prüfen, Vorschlag für das Supabase-Mail-Limit. |

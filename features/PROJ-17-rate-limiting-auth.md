@@ -1,8 +1,8 @@
 # PROJ-17: Rate-Limiting für Auth-Endpunkte
 
-## Status: In Review
+## Status: Approved
 **Created:** 2026-05-16
-**Last Updated:** 2026-11-22 (BUG-1 bis 6 lokal behoben und nachgetestet, noch nicht auf Stage ausgeliefert)
+**Last Updated:** 2026-11-22 (QA bestanden, Handtest auf Stage von Jakob bestätigt; Production folgt beim Go-live)
 **Priority:** P0 (Security-Blocker für Public-Launch)
 **Trigger:** Vibe-Security-Audit 2026-05-16 — High-Finding #1
 
@@ -208,7 +208,7 @@ Die Reihenfolge ist wichtig: Ist CAPTCHA in Supabase aktiv, bevor der Code das T
 **Umgebung:** lokaler Server gegen die Stage-Datenbank mit echten Limits und den Testschlüsseln von Cloudflare, dazu Live-Test von Jakob auf `stage-app.narravit.de`
 **Tester:** QA Engineer (AI)
 
-**Nicht abgedeckt:** Getestet wurde nur in Chromium, weil WebKit auf diesem Mac abstürzt und Firefox nicht installiert ist. Die Anmeldung mit Google und Facebook wurde mit aktivem CAPTCHA nicht durchgeklickt. Gefälschte Token lassen sich erst mit dem echten Schlüssel prüfen. Dass Vercel den IP-Header überschreibt, stammt aus der Vercel-Doku und wurde nicht auf Vercel selbst getestet.
+**Nicht abgedeckt:** Automatisch getestet wurde nur in Chromium, weil WebKit auf diesem Mac abstürzt und Firefox nicht installiert ist. Gefälschte Token lassen sich erst mit dem echten Schlüssel prüfen. Dass Vercel den IP-Header überschreibt, stammt aus der Vercel-Doku und wurde nicht auf Vercel selbst getestet.
 
 ### Automatische Tests
 - [x] Unit-Tests: 590 bestanden
@@ -216,7 +216,7 @@ Die Reihenfolge ist wichtig: Ist CAPTCHA in Supabase aktiv, bevor der Code das T
 - [x] Limit-E2E mit echten Zählern: bestanden
 - [x] Typprüfung fehlerfrei, Lint ohne Fehler (2 Warnungen)
 
-### Acceptance Criteria (nach den Fixes: 21 von 24 bestanden, 3 offen)
+### Acceptance Criteria (22 von 24 bestanden, 2 offen bis zum Go-live)
 
 #### Infrastruktur (5/5)
 - [x] Tabelle mit RLS, ohne Policies, Zugriff nur über die Service-Role
@@ -229,13 +229,13 @@ Die Reihenfolge ist wichtig: Ist CAPTCHA in Supabase aktiv, bevor der Code das T
 - [x] Alle acht Limits sind umgesetzt und zählen getrennt
 - [x] Erfolgreiche Anmeldung setzt den Kontozähler zurück und lässt frühere Fehlversuche der IP stehen
 
-#### CAPTCHA (6/8, 2 offen)
+#### CAPTCHA (7/8, 1 offen)
 - [x] Sitzt auf allen fünf Formularen, auch mit zwei Widgets auf `/anmelden?error=expired_link`
 - [x] Läuft im Normalfall unsichtbar
 - [x] Token geht an Supabase, der geheime Schlüssel kommt im Code nicht vor
 - [x] Skript lädt nur auf den Seiten mit Formular
 - [x] Lädt Turnstile nicht, erscheinen nach spätestens 10 Sekunden Hinweis und „Erneut versuchen" (BUG-2 behoben)
-- [ ] **Offen:** Google und Facebook mit aktivem CAPTCHA von Hand prüfen
+- [x] Google und Facebook funktionieren mit aktivem CAPTCHA (Handtest Jakob auf Stage)
 - [ ] **Offen bis Go-live:** Stage nutzt Testschlüssel, Production braucht echte Schlüssel
 - [x] CAPTCHA wurde erst nach dem Code-Deploy eingeschaltet
 
@@ -345,14 +345,14 @@ Die Reihenfolge ist wichtig: Ist CAPTCHA in Supabase aktiv, bevor der Code das T
 - [x] Blockiertes Skript: Hinweis und Retry erscheinen, nach dem Retry ist das Formular frei, auch mit zwei Widgets auf einer Seite
 - [x] Sichtbare Rückfrage bleibt bei 320 und 375 px im Formular
 
-**Nicht abgedeckt:** Mobile Safari startet auf diesem Mac nicht (71 Fehlschläge beim Browserstart, kein Testergebnis). Die Fixes sind noch nicht auf `stage-app.narravit.de` ausgeliefert.
+**Nicht abgedeckt:** Mobile Safari startet auf diesem Mac nicht (71 Fehlschläge beim Browserstart, kein Testergebnis). Die Fixes laufen seit Commit `fdafb43` auf `stage-app.narravit.de` (Deployment READY). Jakob hat dort beide Login-Meldungen, die stehen bleibende E-Mail, Google und Facebook geprüft: alles klappt.
 
 ### Summary
-- **Acceptance Criteria:** 21 von 24 bestanden, 3 offen (Google/Facebook von Hand, echter Schlüssel, IP-Header auf Vercel)
+- **Acceptance Criteria:** 22 von 24 bestanden, 2 offen bis zum Go-live (echter Schlüssel, IP-Header auf Vercel)
 - **Bugs:** 10 gefunden, 6 behoben, BUG-8 akzeptiert. Offen: BUG-10 (Medium), BUG-7, BUG-9 (Low)
 - **Security:** Keine offenen Critical- oder High-Befunde
-- **Production Ready:** Noch nicht. Erst nach Auslieferung auf Stage und dem Test von Google/Facebook
-- **Empfehlung:** Migration `20261122120000` einspielen, committen, auf Stage ausliefern, dort kurz nachtesten
+- **Production Ready:** JA für den Code. Die zwei offenen Punkte lassen sich erst auf Production prüfen und stehen in `docs/production/prod-umzug.md`
+- **Empfehlung:** Beim Go-live `/deploy` entlang der Checkliste
 
 ## Deployment
 _To be added by /deploy_
