@@ -6,7 +6,12 @@ import { maybeSendReminderMail } from "@/lib/email/send-reminder";
 import { getSiteUrl } from "@/lib/email/client";
 import { calendarDaysUntil, formatGermanDate } from "@/lib/email/format";
 import { processMailRetryQueue, type MailRetryResult } from "@/lib/email/retry-mails";
-import { processStorageCleanup, type StorageCleanupResult } from "@/lib/projects/storage-cleanup";
+import {
+  processChapterStorageCleanup,
+  processStorageCleanup,
+  type StorageCleanupResult,
+} from "@/lib/projects/storage-cleanup";
+import { purgeDueTrash, type TrashPurgeResult } from "@/lib/projects/trash";
 
 // PROJ-11 — Reminder-Cron.
 //
@@ -26,9 +31,11 @@ import { processStorageCleanup, type StorageCleanupResult } from "@/lib/projects
 //      Person versuchen, bei Erfolg Reminder versenden.
 //   4. Vorher: gescheiterte Kauf- und Einladungs-Mails nachholen (BUG-13)
 //      und Dateien gelöschter Projekte aus dem Speicher entfernen (PROJ-3).
+//      Fällige Inhalte aus dem Papierkorb werden davor endgültig gelöscht,
+//      damit ihre Dateien im selben Lauf verschwinden (PROJ-26).
 //
-// Antwort: JSON mit `processed`, `sent`, `skipped`, `mailRetries` und
-// `storageCleanup` für Monitoring.
+// Antwort: JSON mit `processed`, `sent`, `skipped`, `mailRetries`,
+// `trashPurge`, `storageCleanup` und `chapterStorageCleanup` für Monitoring.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -111,12 +118,30 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  let trashPurge: TrashPurgeResult = { projects: 0, chapters: 0 };
+  try {
+    trashPurge = await purgeDueTrash();
+  } catch (err) {
+    console.error(
+      `[cron/reminders] trash purge failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
   let storageCleanup: StorageCleanupResult = { processed: 0, cleaned: 0, failed: 0 };
   try {
     storageCleanup = await processStorageCleanup();
   } catch (err) {
     console.error(
       `[cron/reminders] storage cleanup failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  let chapterStorageCleanup: StorageCleanupResult = { processed: 0, cleaned: 0, failed: 0 };
+  try {
+    chapterStorageCleanup = await processChapterStorageCleanup();
+  } catch (err) {
+    console.error(
+      `[cron/reminders] chapter storage cleanup failed: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 
@@ -206,5 +231,13 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ processed, sent, skipped, mailRetries, storageCleanup });
+  return NextResponse.json({
+    processed,
+    sent,
+    skipped,
+    mailRetries,
+    trashPurge,
+    storageCleanup,
+    chapterStorageCleanup,
+  });
 }

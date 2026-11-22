@@ -199,6 +199,7 @@ export function ChapterSectionClient({
 
   const commitChapterOrder = useCallback(() => {
     const orderedIds = chapters.map((c) => c.id);
+    const previousOrderIds = savedOrderIds;
     setSavedOrderIds(orderedIds);
     startOrderTransition(async () => {
       const fd = new FormData();
@@ -207,12 +208,11 @@ export function ChapterSectionClient({
       const result = await saveChapterOrderAction(fd);
       if (result.error) {
         toast.error(result.error);
-        setSavedOrderIds((prev) => prev);
-      } else {
-        router.refresh();
+        setSavedOrderIds(previousOrderIds);
       }
+      router.refresh();
     });
-  }, [chapters, projectId, saveChapterOrderAction, router]);
+  }, [chapters, savedOrderIds, projectId, saveChapterOrderAction, router]);
 
   // ─── Delete chapter modal ─────────────────────────────────────────────────
 

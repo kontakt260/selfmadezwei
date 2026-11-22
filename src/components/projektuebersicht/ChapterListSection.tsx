@@ -25,8 +25,17 @@ export function ChapterListSection({
   deleteChapterAction,
   saveChapterOrderAction,
 }: Props) {
+  // PROJ-26: Die Liste hält ihren Stand lokal. Hat jemand anderes ein Kapitel
+  // gelöscht oder angelegt, startet sie mit dem Stand vom Server neu. Eine
+  // reine Umsortierung ändert den Schlüssel nicht.
+  const chapterSetKey = initialChapters
+    .map((chapter) => chapter.id)
+    .sort()
+    .join(",");
+
   return (
     <ChapterSectionClient
+      key={chapterSetKey}
       projectId={projectId}
       initialChapters={initialChapters}
       impulses={impulses}

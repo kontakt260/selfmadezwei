@@ -31,7 +31,7 @@ const EMPTY_SECTIONS: ImageSections = {
  * which fields were sent — central in PROJ-7 (page_count must show up when
  * provided, must NOT show up when omitted).
  */
-function makeUpdateBuilder() {
+function makeUpdateBuilder(savedRows: Array<{ id: string }> = [{ id: CHAPTER_ID }]) {
   const lastPayload: { value: Record<string, unknown> | null } = { value: null };
   const builder: Record<string, unknown> = {
     update: vi.fn((payload: Record<string, unknown>) => {
@@ -42,7 +42,7 @@ function makeUpdateBuilder() {
     select: vi.fn().mockReturnThis(),
     single: vi.fn().mockResolvedValue({ data: null, error: null }),
   };
-  const resolved = Promise.resolve({ data: null, error: null });
+  const resolved = Promise.resolve({ data: savedRows, error: null });
   (builder.then as unknown) = resolved.then.bind(resolved);
   return { builder, lastPayload };
 }
@@ -105,6 +105,19 @@ describe("chapterAutosaveAction — auth + validation", () => {
 });
 
 // ─── page_count Payload-Verhalten (PROJ-7 Kern-AC) ───────────────────────────
+
+describe("chapterAutosaveAction — deleted chapter (PROJ-26)", () => {
+  it("reports an error instead of success when the chapter is gone", async () => {
+    const client = makeMockClient();
+    const { builder } = makeUpdateBuilder([]);
+    client.from.mockReturnValue(builder);
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    expect(await chapterAutosaveAction(baseInput())).toEqual({
+      error: "Speichern fehlgeschlagen.",
+    });
+  });
+});
 
 describe("chapterAutosaveAction — page_count payload", () => {
   it("includes page_count in DB update when client sends it", async () => {

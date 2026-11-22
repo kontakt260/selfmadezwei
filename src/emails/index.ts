@@ -25,6 +25,8 @@ export type { ProjectHandoverEmailProps } from "./ProjectHandoverEmail";
 
 export { MailFailureAlertEmail } from "./MailFailureAlertEmail";
 export type { MailFailureAlertEmailProps } from "./MailFailureAlertEmail";
+export { DeletedProjectPaymentAlertEmail } from "./DeletedProjectPaymentAlertEmail";
+export type { DeletedProjectPaymentAlertEmailProps } from "./DeletedProjectPaymentAlertEmail";
 
 export { ReminderEmail } from "./ReminderEmail";
 export type {

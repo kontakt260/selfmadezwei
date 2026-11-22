@@ -22,8 +22,25 @@ vi.mock("@/lib/email/retry-mails", () => ({
 }));
 
 const storageCleanupMock = vi.fn(async () => ({ processed: 0, cleaned: 0, failed: 0 }));
+const chapterCleanupMock = vi.fn(async () => ({ processed: 0, cleaned: 0, failed: 0 }));
+const callOrder: string[] = [];
 vi.mock("@/lib/projects/storage-cleanup", () => ({
-  processStorageCleanup: () => storageCleanupMock(),
+  processStorageCleanup: () => {
+    callOrder.push("storage");
+    return storageCleanupMock();
+  },
+  processChapterStorageCleanup: () => {
+    callOrder.push("chapters");
+    return chapterCleanupMock();
+  },
+}));
+
+const trashPurgeMock = vi.fn(async () => ({ projects: 0, chapters: 0 }));
+vi.mock("@/lib/projects/trash", () => ({
+  purgeDueTrash: () => {
+    callOrder.push("purge");
+    return trashPurgeMock();
+  },
 }));
 
 // Service-Role-Client-Mock — chained Supabase builders.
@@ -103,6 +120,9 @@ beforeEach(() => {
   nextSendResult = { sent: true };
   retryMock.mockReset().mockResolvedValue({ retried: 0, sent: 0, dropped: 0, gaveUp: 0 });
   storageCleanupMock.mockReset().mockResolvedValue({ processed: 0, cleaned: 0, failed: 0 });
+  chapterCleanupMock.mockReset().mockResolvedValue({ processed: 0, cleaned: 0, failed: 0 });
+  trashPurgeMock.mockReset().mockResolvedValue({ projects: 0, chapters: 0 });
+  callOrder.length = 0;
 });
 
 describe("/api/cron/reminders — auth", () => {
@@ -255,6 +275,54 @@ describe("/api/cron/reminders — happy path", () => {
     const res = await GET(makeRequest({ "x-cron-secret": "test_cron_secret_123" }));
 
     expect(res.status).toBe(200);
+  });
+
+  it("sends no reminder for a deleted project, it has no members anymore (PROJ-26)", async () => {
+    accessRows = [
+      {
+        project_id: "proj-deleted",
+        expires_at: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+    ];
+    memberRows = [];
+    projectRow = { title: "Gelöschtes Buch" };
+
+    const res = await GET(makeRequest({ "x-cron-secret": "test_cron_secret_123" }));
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.sent).toBe(0);
+    expect(sendCalls).toHaveLength(0);
+  });
+
+  it("purges the trash first, so files go in the same run (PROJ-26)", async () => {
+    trashPurgeMock.mockResolvedValueOnce({ projects: 1, chapters: 2 });
+    chapterCleanupMock.mockResolvedValueOnce({ processed: 2, cleaned: 2, failed: 0 });
+
+    const res = await GET(makeRequest({ "x-cron-secret": "test_cron_secret_123" }));
+    const json = await res.json();
+
+    expect(callOrder).toEqual(["purge", "storage", "chapters"]);
+    expect(json.trashPurge).toEqual({ projects: 1, chapters: 2 });
+    expect(json.chapterStorageCleanup).toEqual({ processed: 2, cleaned: 2, failed: 0 });
+  });
+
+  it("does not touch the trash without the secret (PROJ-26)", async () => {
+    const res = await GET(makeRequest({}));
+
+    expect(res.status).toBe(401);
+    expect(trashPurgeMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps running when the trash purge crashes (PROJ-26)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    trashPurgeMock.mockRejectedValueOnce(new Error("db down"));
+
+    const res = await GET(makeRequest({ "x-cron-secret": "test_cron_secret_123" }));
+
+    expect(res.status).toBe(200);
+    expect(storageCleanupMock).toHaveBeenCalledTimes(1);
+    expect(chapterCleanupMock).toHaveBeenCalledTimes(1);
   });
 
   it("skips when reserve returns duplicate (already-sent)", async () => {

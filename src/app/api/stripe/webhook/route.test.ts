@@ -63,6 +63,12 @@ vi.mock("@/lib/email/send-guest-purchase", () => ({
   sendGuestPurchaseMail: (input: Record<string, unknown>) => sendGuestPurchaseMailMock(input),
 }));
 
+const sendDeletedProjectAlertMock = vi.fn(async (_input: Record<string, unknown>) => undefined);
+vi.mock("@/lib/email/send-deleted-project-alert", () => ({
+  sendDeletedProjectPaymentAlert: (input: Record<string, unknown>) =>
+    sendDeletedProjectAlertMock(input),
+}));
+
 // ─── Mock Supabase Service-Role-Client ───────────────────────────────
 //
 // Der Webhook ruft Insert/Upsert/Select-Methoden. Wir tracken alle
@@ -80,10 +86,13 @@ type FakeRows = {
   profiles: Array<Record<string, unknown>>;
   // Kauf ohne Konto (2026-11-16): offene Ansprüche aus Gast-Checkouts.
   purchase_claims: Array<Record<string, unknown>>;
+  // PROJ-26: gelöschte Projekte.
+  trash_projects: Array<Record<string, unknown>>;
 };
 
 let fakeDb: FakeRows;
 let failNextAccessWrite = false;
+let failNextPaymentReference = false;
 
 // Builder, der sowohl direkt-awaitbar ist als auch .select().single()
 // unterstützt. Push passiert genau einmal — entweder im `then` der
@@ -140,8 +149,16 @@ const supabaseMock = {
         }),
       }),
     }),
-    insert: (row: Record<string, unknown> | Record<string, unknown>[]) =>
-      makeInsertBuilder(table, row),
+    insert: (row: Record<string, unknown> | Record<string, unknown>[]) => {
+      if (failNextPaymentReference && table === "payments") {
+        failNextPaymentReference = false;
+        return Promise.resolve({
+          data: null,
+          error: { code: "23503", message: "violates foreign key constraint" },
+        });
+      }
+      return makeInsertBuilder(table, row);
+    },
     delete: () => ({
       eq: async (col: string, val: unknown) => {
         fakeDb[table] = fakeDb[table].filter((r) => r[col] !== val);
@@ -223,8 +240,11 @@ beforeEach(() => {
       { id: "buyer-1", email: "buyer@example.com", full_name: "Bea Buyer" },
     ],
     purchase_claims: [],
+    trash_projects: [],
   };
   failNextAccessWrite = false;
+  failNextPaymentReference = false;
+  sendDeletedProjectAlertMock.mockClear();
   constructEventMock.mockReset();
   sendInvitationMailMock.mockClear();
   sendPortalPurchaseMailMock.mockClear();
@@ -530,6 +550,105 @@ describe("Stripe webhook — purchase mails (PROJ-11)", () => {
       projectName: expect.any(String),
     });
     expect(sendRenewalInfoMailMock).not.toHaveBeenCalled();
+  });
+
+  it("renewal for a deleted project: payment stays booked and support is told (PROJ-26)", async () => {
+    fakeDb.trash_projects.push({ project_id: "proj-1" });
+    fakeDb.project_access.push({
+      project_id: "proj-1",
+      expires_at: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: makeSession({
+          metadata: { product_type: "renewal", user_id: "user-1", project_id: "proj-1" },
+          amount_total: 9900,
+        }),
+      },
+    });
+
+    const res = await callPost("body", "valid-sig");
+
+    expect(res.status).toBe(200);
+    expect(fakeDb.payments).toHaveLength(1);
+    expect(sendDeletedProjectAlertMock).toHaveBeenCalledTimes(1);
+    expect(sendDeletedProjectAlertMock.mock.calls[0][0]).toMatchObject({ projectId: "proj-1" });
+    expect(sendRenewalMailMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("renewal for a finally deleted project: payment is booked, support must refund (PROJ-26 BUG-3)", async () => {
+    failNextPaymentReference = true;
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: makeSession({
+          metadata: { product_type: "renewal", user_id: "user-1", project_id: "proj-gone" },
+          amount_total: 9900,
+        }),
+      },
+    });
+
+    const res = await callPost("body", "valid-sig");
+
+    expect(res.status).toBe(200);
+    expect(fakeDb.payments).toHaveLength(1);
+    expect(fakeDb.payments[0]).toMatchObject({ project_id: null, user_id: "user-1" });
+    expect(fakeDb.project_access).toHaveLength(0);
+    expect(sendDeletedProjectAlertMock).toHaveBeenCalledTimes(1);
+    expect(sendDeletedProjectAlertMock.mock.calls[0][0]).toMatchObject({
+      projectId: "proj-gone",
+      finallyDeleted: true,
+    });
+    expect(sendRenewalMailMock).not.toHaveBeenCalled();
+  });
+
+  it("renewal after the buyer deleted the account: the project still gets its time (PROJ-26 BUG-3)", async () => {
+    failNextPaymentReference = true;
+    fakeDb.projects.push({ id: "proj-1", title: "Lebensbuch" });
+    fakeDb.project_access.push({
+      project_id: "proj-1",
+      expires_at: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    const before = fakeDb.project_access[0].expires_at as string;
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: makeSession({
+          metadata: { product_type: "renewal", user_id: "account-gone", project_id: "proj-1" },
+          amount_total: 9900,
+        }),
+      },
+    });
+
+    const res = await callPost("body", "valid-sig");
+
+    expect(res.status).toBe(200);
+    expect(fakeDb.payments[0]).toMatchObject({ project_id: "proj-1", user_id: null });
+    expect(new Date(fakeDb.project_access[0].expires_at as string).getTime()).toBeGreaterThan(
+      new Date(before).getTime(),
+    );
+    expect(sendDeletedProjectAlertMock).not.toHaveBeenCalled();
+  });
+
+  it("renewal for a normal project does not alert support (PROJ-26)", async () => {
+    fakeDb.project_access.push({
+      project_id: "proj-1",
+      expires_at: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: makeSession({
+          metadata: { product_type: "renewal", user_id: "user-1", project_id: "proj-1" },
+          amount_total: 9900,
+        }),
+      },
+    });
+
+    await callPost("body", "valid-sig");
+
+    expect(sendDeletedProjectAlertMock).not.toHaveBeenCalled();
   });
 
   it("renewal by the gifted person: buyer and every other member get the info (Jakob, 2026-11-19)", async () => {

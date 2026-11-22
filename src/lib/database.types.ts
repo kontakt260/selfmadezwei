@@ -237,6 +237,123 @@ export type Database = {
         }
         Relationships: []
       }
+      storage_chapter_cleanup_queue: {
+        Row: {
+          attempts: number
+          chapter_id: string
+          created_at: string
+          last_error: string | null
+          project_id: string
+        }
+        Insert: {
+          attempts?: number
+          chapter_id: string
+          created_at?: string
+          last_error?: string | null
+          project_id: string
+        }
+        Update: {
+          attempts?: number
+          chapter_id?: string
+          created_at?: string
+          last_error?: string | null
+          project_id?: string
+        }
+        Relationships: []
+      }
+      trash_chapter_people: {
+        Row: {
+          chapter_id: string
+          first_contributed_at: string | null
+          user_id: string
+          was_member: boolean
+        }
+        Insert: {
+          chapter_id: string
+          first_contributed_at?: string | null
+          user_id: string
+          was_member?: boolean
+        }
+        Update: {
+          chapter_id?: string
+          first_contributed_at?: string | null
+          user_id?: string
+          was_member?: boolean
+        }
+        Relationships: []
+      }
+      trash_chapters: {
+        Row: {
+          chapter_id: string
+          deleted_at: string
+          deleted_by: string | null
+          project_id: string
+          purge_at: string
+          snapshot: Json
+          title: string
+        }
+        Insert: {
+          chapter_id: string
+          deleted_at?: string
+          deleted_by?: string | null
+          project_id: string
+          purge_at?: string
+          snapshot: Json
+          title: string
+        }
+        Update: {
+          chapter_id?: string
+          deleted_at?: string
+          deleted_by?: string | null
+          project_id?: string
+          purge_at?: string
+          snapshot?: Json
+          title?: string
+        }
+        Relationships: []
+      }
+      trash_project_members: {
+        Row: {
+          member_since: string
+          project_id: string
+          role: Database["public"]["Enums"]["member_role"]
+          user_id: string
+        }
+        Insert: {
+          member_since: string
+          project_id: string
+          role: Database["public"]["Enums"]["member_role"]
+          user_id: string
+        }
+        Update: {
+          member_since?: string
+          project_id?: string
+          role?: Database["public"]["Enums"]["member_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      trash_projects: {
+        Row: {
+          deleted_at: string
+          deleted_by: string | null
+          project_id: string
+          purge_at: string
+        }
+        Insert: {
+          deleted_at?: string
+          deleted_by?: string | null
+          project_id: string
+          purge_at?: string
+        }
+        Update: {
+          deleted_at?: string
+          deleted_by?: string | null
+          project_id?: string
+          purge_at?: string
+        }
+        Relationships: []
+      }
       mail_retry_queue: {
         Row: {
           attempts: number
@@ -644,6 +761,29 @@ export type Database = {
           p_successors: Json
           p_user_id: string
         }
+        Returns: Json
+      }
+      trash_delete_chapter_now: { Args: { p_chapter_id: string }; Returns: Json }
+      trash_delete_project_now: { Args: { p_project_id: string }; Returns: Json }
+      trash_find: {
+        Args: { p_search?: string | null }
+        Returns: {
+          contributor_emails: string | null
+          deleted_at: string
+          deleted_by_email: string | null
+          item_id: string
+          item_type: string
+          member_emails: string | null
+          project_id: string
+          project_title: string
+          purge_at: string
+          title: string
+        }[]
+      }
+      trash_purge_due: { Args: { p_limit?: number }; Returns: Json }
+      trash_restore_chapter: { Args: { p_chapter_id: string }; Returns: Json }
+      trash_restore_project: {
+        Args: { p_new_lead?: string | null; p_project_id: string }
         Returns: Json
       }
       am_i_pl_of: { Args: { p_project_id: string }; Returns: boolean }

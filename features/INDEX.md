@@ -34,10 +34,13 @@
 | PROJ-17 | Rate-Limiting für Auth-Endpunkte | P0 | Approved | PROJ-2 | [Spec](PROJ-17-rate-limiting-auth.md) | 2026-05-16 |
 | PROJ-18 | Debug-Telemetrie-Cleanup | P0 | Approved | — | [Spec](PROJ-18-debug-telemetrie-cleanup.md) | 2026-05-16 |
 | PROJ-19 | Production-Hardening (Headers, Middleware-Caching, Env-Failsafe) | P1 | Approved | PROJ-2 | [Spec](PROJ-19-production-hardening.md) | 2026-05-16 |
+| PROJ-26 | Papierkorb (serverseitig, 14 Tage) | P0 | Approved | PROJ-1, PROJ-3, PROJ-4, PROJ-5, PROJ-6, PROJ-7, PROJ-9, PROJ-10, PROJ-11 | [Spec](PROJ-26-papierkorb.md) | 2026-11-22 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-20
+## Next Available ID: PROJ-29
+
+> PROJ-20 bis PROJ-25, PROJ-27 und PROJ-28 sind für geplante Themen reserviert und haben noch keine Spec.
 
 ## Empfohlene Build-Reihenfolge
 ```

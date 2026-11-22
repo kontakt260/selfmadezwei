@@ -230,15 +230,21 @@ export async function renameChapterAction(
   if (accessError) return { error: accessError };
 
   // RLS enforces that user is member of the project containing this chapter
-  const { error } = await supabase
+  const { data: renamedRows, error } = await supabase
     .from("chapters")
     .update({ title, updated_at: new Date().toISOString() })
     .eq("id", chapterId)
-    .eq("project_id", projectId);
+    .eq("project_id", projectId)
+    .select("id");
 
   if (error) return { error: "Kapitel konnte nicht umbenannt werden." };
 
   revalidatePath(`/projektuebersicht/${projectId}`);
+
+  // PROJ-26: Ohne Treffer hat jemand das Kapitel inzwischen gelöscht.
+  if (!renamedRows || renamedRows.length === 0) {
+    return { error: "Dieses Kapitel ist nicht mehr verfügbar." };
+  }
   return {};
 }
 
@@ -333,7 +339,14 @@ export async function saveChapterOrderAction(
   const allValid =
     orderedIds.length === dbIds.size && orderedIds.every((id) => dbIds.has(id));
 
-  if (!allValid) return { error: "Sicherheitsfehler: Ungültige Kapitel-IDs." };
+  // PROJ-26: Passiert vor allem, wenn jemand anderes inzwischen ein Kapitel
+  // gelöscht oder angelegt hat. Geschrieben wird dann nichts.
+  if (!allValid) {
+    revalidatePath(`/projektuebersicht/${projectId}`);
+    return {
+      error: "Die Kapitelliste hat sich inzwischen geändert. Bitte ordnen Sie die Kapitel noch einmal an.",
+    };
+  }
 
   // Bulk update sort_order
   await Promise.all(

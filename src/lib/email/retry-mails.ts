@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { MailFailureAlertEmail } from "@/emails/MailFailureAlertEmail";
 import type { Database } from "@/lib/database.types";
 import { isPast } from "@/lib/dates";
+import { isProjectInTrash } from "@/lib/projects/trash";
 import { generateClaimToken, hashClaimToken } from "@/lib/purchases/claim-token";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { sendEmail, type SendMailResult } from "./client";
@@ -69,11 +70,12 @@ async function deliver(supabase: ServiceClient, row: QueueRow): Promise<Delivery
       // Eine widerrufene, angenommene oder abgelaufene Einladung bleibt still.
       const { data, error } = await supabase
         .from("invitations")
-        .select("accepted_at, expires_at")
+        .select("accepted_at, expires_at, project_id")
         .eq("token", input.token)
         .maybeSingle();
       if (error) return { status: "failed", error: error.message };
       if (!data || data.accepted_at || isPast(data.expires_at)) return { status: "obsolete" };
+      if (await isProjectInTrash(supabase, data.project_id)) return { status: "obsolete" };
       return fromResult(await deliverInvitationMail(input));
     }
     case "portal_purchase":
@@ -97,14 +99,20 @@ async function deliver(supabase: ServiceClient, row: QueueRow): Promise<Delivery
     }
     case "renewal":
       return fromResult(await deliverRenewalMail(row.payload as unknown as SendRenewalInput));
-    case "renewal_info":
-      return fromResult(
-        await deliverRenewalInfoMail(row.payload as unknown as SendRenewalInfoInput),
-      );
-    case "project_handover":
-      return fromResult(
-        await deliverProjectHandoverMail(row.payload as unknown as SendProjectHandoverInput),
-      );
+    // PROJ-26: Die Zahlungsbestätigung geht immer raus, diese beiden Hinweise
+    // ergeben für ein gelöschtes Projekt keinen Sinn mehr.
+    case "renewal_info": {
+      const input = row.payload as unknown as SendRenewalInfoInput;
+      if (input.projectId && (await isProjectInTrash(supabase, input.projectId))) {
+        return { status: "obsolete" };
+      }
+      return fromResult(await deliverRenewalInfoMail(input));
+    }
+    case "project_handover": {
+      const input = row.payload as unknown as SendProjectHandoverInput;
+      if (await isProjectInTrash(supabase, input.projectId)) return { status: "obsolete" };
+      return fromResult(await deliverProjectHandoverMail(input));
+    }
     default:
       return { status: "failed", error: `unknown mail kind: ${row.kind}` };
   }

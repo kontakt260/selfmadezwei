@@ -302,9 +302,19 @@ describe("renameChapterAction", () => {
 
   it("returns {} and revalidates projektuebersicht path on success", async () => {
     const client = makeMockClient();
-    client.from.mockReturnValueOnce(makeBuilder());
+    client.from.mockReturnValueOnce(makeBuilder({ data: [{ id: CHAPTER_1 }] }));
     vi.mocked(createClient).mockResolvedValue(client as never);
     expect(await renameChapterAction(fd())).toEqual({});
+    expect(revalidatePath).toHaveBeenCalledWith(`/projektuebersicht/${PROJECT_ID}`);
+  });
+
+  it("reports a deleted chapter and refreshes the list (PROJ-26 BUG-4)", async () => {
+    const client = makeMockClient();
+    client.from.mockReturnValueOnce(makeBuilder({ data: [] }));
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    expect(await renameChapterAction(fd())).toEqual({
+      error: "Dieses Kapitel ist nicht mehr verfügbar.",
+    });
     expect(revalidatePath).toHaveBeenCalledWith(`/projektuebersicht/${PROJECT_ID}`);
   });
 });
@@ -372,17 +382,20 @@ describe("saveChapterOrderAction", () => {
     expect(await saveChapterOrderAction(fd())).toEqual({ error: "Nicht angemeldet." });
   });
 
-  it("returns security error when submitted count does not match DB", async () => {
+  const CHANGED_LIST_ERROR =
+    "Die Kapitelliste hat sich inzwischen geändert. Bitte ordnen Sie die Kapitel noch einmal an.";
+
+  it("writes nothing when submitted count does not match DB (PROJ-26 BUG-5)", async () => {
     const client = makeMockClient();
     // DB has only 1 chapter; client submits 2
     client.from.mockReturnValueOnce(makeBuilder({ data: [{ id: CHAPTER_1 }] }));
     vi.mocked(createClient).mockResolvedValue(client as never);
-    expect(await saveChapterOrderAction(fd())).toEqual({
-      error: "Sicherheitsfehler: Ungültige Kapitel-IDs.",
-    });
+    expect(await saveChapterOrderAction(fd())).toEqual({ error: CHANGED_LIST_ERROR });
+    expect(client.from).toHaveBeenCalledTimes(1);
+    expect(revalidatePath).toHaveBeenCalledWith(`/projektuebersicht/${PROJECT_ID}`);
   });
 
-  it("returns security error when submitted list contains a foreign chapter ID", async () => {
+  it("writes nothing when submitted list contains a foreign chapter ID", async () => {
     const FOREIGN = "ffffffff-ffff-4fff-afff-ffffffffffff";
     const client = makeMockClient();
     client.from.mockReturnValueOnce(
@@ -390,9 +403,8 @@ describe("saveChapterOrderAction", () => {
     );
     vi.mocked(createClient).mockResolvedValue(client as never);
     const form = fd({ orderedIds: JSON.stringify([CHAPTER_1, FOREIGN]) });
-    expect(await saveChapterOrderAction(form)).toEqual({
-      error: "Sicherheitsfehler: Ungültige Kapitel-IDs.",
-    });
+    expect(await saveChapterOrderAction(form)).toEqual({ error: CHANGED_LIST_ERROR });
+    expect(client.from).toHaveBeenCalledTimes(1);
   });
 
   it("returns {} and performs bulk sort_order update on success", async () => {

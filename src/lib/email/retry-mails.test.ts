@@ -8,6 +8,7 @@ const tables: Record<string, Row[]> = {
   mail_retry_queue: [],
   invitations: [],
   purchase_claims: [],
+  trash_projects: [],
 };
 let beforeNextUpdate: (() => void) | null = null;
 let readError: { message: string } | null = null;
@@ -123,6 +124,7 @@ beforeEach(() => {
   tables.mail_retry_queue = [];
   tables.invitations = [];
   tables.purchase_claims = [];
+  tables.trash_projects = [];
   beforeNextUpdate = null;
   readError = null;
   vi.mocked(sendEmail).mockReset().mockResolvedValue({ ok: true, messageId: "msg", redirected: false });
@@ -164,6 +166,35 @@ describe("processMailRetryQueue", () => {
     expect(result).toMatchObject({ sent: 0, dropped: 1 });
     expect(tables.mail_retry_queue).toHaveLength(0);
   });
+
+  it("does not send an invitation to a deleted project (PROJ-26)", async () => {
+    tables.invitations.push({
+      token: "tok_123",
+      accepted_at: null,
+      expires_at: inFuture,
+      project_id: "project-1",
+    });
+    tables.trash_projects.push({ project_id: "project-1" });
+    tables.mail_retry_queue.push(queued("invitation", invitationPayload));
+
+    const result = await processMailRetryQueue();
+
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ sent: 0, dropped: 1 });
+  });
+
+  it.each(["renewal_info", "project_handover"])(
+    "does not send %s for a deleted project (PROJ-26)",
+    async (kind) => {
+      tables.trash_projects.push({ project_id: "project-1" });
+      tables.mail_retry_queue.push(queued(kind, { to: "oma@example.test", projectId: "project-1" }));
+
+      const result = await processMailRetryQueue();
+
+      expect(sendEmail).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ sent: 0, dropped: 1 });
+    },
+  );
 
   it("creates a new claim link for a guest purchase and stores only its hash", async () => {
     tables.purchase_claims.push({

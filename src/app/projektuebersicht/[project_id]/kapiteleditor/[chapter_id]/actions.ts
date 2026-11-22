@@ -133,13 +133,16 @@ export async function chapterAutosaveAction(input: {
     updatePayload.page_count = pageCount;
   }
 
-  const { error } = await supabase
+  const { data: savedRows, error } = await supabase
     .from("chapters")
     .update(updatePayload as never)
     .eq("id", chapterId)
-    .eq("project_id", projectId);
+    .eq("project_id", projectId)
+    .select("id");
 
-  if (error) {
+  // PROJ-26: Ohne Treffer wurde das Kapitel inzwischen gelöscht. Das darf nicht
+  // als „Gespeichert" erscheinen, sonst schreibt jemand unbemerkt ins Leere.
+  if (error || !savedRows || savedRows.length === 0) {
     return { error: "Speichern fehlgeschlagen." };
   }
   return { ok: true };

@@ -7,6 +7,8 @@ import { sendPortalPurchaseMail } from "@/lib/email/send-portal-purchase";
 import { sendRenewalInfoMail, sendRenewalMail } from "@/lib/email/send-renewal";
 import { sendInvitationMail } from "@/lib/email/send-invitation";
 import { sendGuestPurchaseMail } from "@/lib/email/send-guest-purchase";
+import { sendDeletedProjectPaymentAlert } from "@/lib/email/send-deleted-project-alert";
+import { isProjectInTrash } from "@/lib/projects/trash";
 import { formatEur, formatGermanDate } from "@/lib/email/format";
 import { fulfillInitialPurchase, PROJECT_DEFAULT_TITLE } from "@/lib/purchases/fulfill-initial";
 import {
@@ -432,19 +434,48 @@ async function handleRenewal(
   // Zuerst die Zahlung eintragen: `stripe_session_id` ist eindeutig, damit
   // verlängert genau eine Zustellung dieses Events (BUG-G5). Vorher hätte ein
   // Stripe-Retry nach einem Fehler weitere 12 Monate gutgeschrieben.
-  const { error: payErr } = await supabase.from("payments").insert({
-    project_id: projectId,
-    user_id: userId,
+  const payment = {
+    project_id: projectId as string | null,
+    user_id: userId as string | null,
     stripe_session_id: session.id,
     type: PRODUCTS.renewal.paymentType,
     amount_cents: session.amount_total ?? PRODUCTS.renewal.amountCents,
     currency: (session.currency ?? PRODUCTS.renewal.currency).toLowerCase(),
-    status: "completed",
-  });
+    status: "completed" as const,
+  };
+  const { error: payErr } = await supabase.from("payments").insert(payment);
   if (payErr) {
     // 23505 = unique_violation → eine parallele Zustellung war schneller.
     if (payErr.code === "23505") return;
-    throw new Error(payErr.message);
+    if (payErr.code !== "23503") throw new Error(payErr.message);
+
+    // PROJ-26: 23503 = Projekt oder Konto gibt es nicht mehr. Das Geld ist
+    // trotzdem da, die Zahlung muss also gebucht werden.
+    const [projectLookup, buyerLookup] = await Promise.all([
+      supabase.from("projects").select("id").eq("id", projectId).maybeSingle(),
+      supabase.from("profiles").select("id").eq("id", userId).maybeSingle(),
+    ]);
+    if (projectLookup.error) throw new Error(projectLookup.error.message);
+    if (buyerLookup.error) throw new Error(buyerLookup.error.message);
+
+    const { error: retryErr } = await supabase.from("payments").insert({
+      ...payment,
+      project_id: projectLookup.data ? projectId : null,
+      user_id: buyerLookup.data ? userId : null,
+    });
+    if (retryErr) {
+      if (retryErr.code === "23505") return;
+      throw new Error(retryErr.message);
+    }
+
+    if (!projectLookup.data) {
+      await sendDeletedProjectPaymentAlert({
+        projectId,
+        stripeSessionId: session.id,
+        finallyDeleted: true,
+      });
+      return;
+    }
   }
 
   // Aktuellen expires_at lesen (default = now() falls neu).
@@ -482,6 +513,18 @@ async function handleRenewal(
       );
     }
     throw new Error(accessWrite.error.message);
+  }
+
+  // PROJ-26: Das Projekt wurde zwischen Checkout und Zahlung gelöscht. Die
+  // Zahlung bleibt gebucht, der Support klärt den Fall.
+  try {
+    if (await isProjectInTrash(supabase, projectId)) {
+      await sendDeletedProjectPaymentAlert({ projectId, stripeSessionId: session.id });
+    }
+  } catch (err) {
+    console.error(
+      `[stripe-webhook] trash check failed for session ${session.id}: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 
   // PROJ-11: Bestätigung an die Person, die verlängert hat, und Info an
