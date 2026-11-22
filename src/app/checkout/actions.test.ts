@@ -40,12 +40,20 @@ vi.mock("next/headers", () => ({
   cookies: async () => ({ set: cookieSetMock }),
 }));
 
+const hitRateLimitsMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/rate-limit", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/rate-limit")>()),
+  getRequestIp: async () => "203.0.113.7",
+  hitRateLimits: hitRateLimitsMock,
+}));
+
 import { startCheckoutAction, type InitialMetadata, type StartCheckoutInput } from "./actions";
 import { CLAIM_COOKIE, hashClaimToken, parseClaimCookie } from "@/lib/purchases/claim-token";
 
 const selfPurchase: InitialMetadata = { fullName: "Karla Käufer", isGift: false };
 
 beforeEach(() => {
+  hitRateLimitsMock.mockReset().mockResolvedValue({ allowed: true, unavailable: false });
   currentUser = null;
   membership = null;
   createSessionMock.mockReset();
@@ -54,6 +62,34 @@ beforeEach(() => {
     url: "https://checkout.stripe.test/c/pay/cs_test_a1B2c3D4e5F6",
   });
   cookieSetMock.mockReset();
+});
+
+describe("startCheckoutAction — Rate-Limit (PROJ-17)", () => {
+  it("zählt pro IP und legt über dem Limit keine Stripe-Session an", async () => {
+    hitRateLimitsMock.mockResolvedValue({ allowed: false, unavailable: false });
+    const res = await startCheckoutAction({ productType: "initial", metadata: selfPurchase });
+    expect(res).toEqual({
+      ok: false,
+      error: "Zu viele Versuche. Bitte versuchen Sie es in einer Stunde erneut.",
+    });
+    expect(hitRateLimitsMock.mock.calls[0][0][0]).toMatchObject({ identifier: "203.0.113.7" });
+    expect(createSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("lässt den Kauf bei einem Datenbank-Aussetzer durch", async () => {
+    hitRateLimitsMock.mockResolvedValue({ allowed: false, unavailable: true });
+    const res = await startCheckoutAction({ productType: "initial", metadata: selfPurchase });
+    expect(res.ok).toBe(true);
+    expect(createSessionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("zählt ungültige Angaben nicht", async () => {
+    await startCheckoutAction({
+      productType: "initial",
+      metadata: { ...selfPurchase, fullName: "   " },
+    });
+    expect(hitRateLimitsMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("startCheckoutAction — Kauf ohne Konto", () => {

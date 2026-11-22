@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
+import { TURNSTILE_ENABLED, TurnstileField } from "@/components/auth/TurnstileField";
 import { registerAction, type RegisterState } from "./actions";
 
 // PROJ-9 Hotfix B-3:
@@ -40,6 +41,7 @@ export function RegistrierenClient({
     registerAction,
     {},
   );
+  const [captchaReady, setCaptchaReady] = useState(!TURNSTILE_ENABLED);
 
   return (
     <AuthLayout>
@@ -131,7 +133,13 @@ export function RegistrierenClient({
           </p>
         )}
 
-        <Button type="submit" className="h-12 sm:whitespace-nowrap" disabled={pending}>
+        <TurnstileField onReadyChange={setCaptchaReady} resetSignal={state} />
+
+        <Button
+          type="submit"
+          className="h-12 sm:whitespace-nowrap"
+          disabled={pending || !captchaReady}
+        >
           {pending ? "Konto wird erstellt …" : "Konto erstellen"}
         </Button>
 

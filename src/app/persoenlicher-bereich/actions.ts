@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { removeQueuedMailsOfAccount } from "@/lib/email/retry-queue";
+import { CAPTCHA_FAILED_MESSAGE, captchaTokenFrom, isCaptchaError } from "@/lib/captcha";
+import { RATE_LIMITS, RATE_LIMIT_MESSAGES, hitRateLimits } from "@/lib/rate-limit";
 
 // ─── Update Name ────────────────────────────────────────────────────────────
 
@@ -47,7 +49,7 @@ export type ResetPasswordState = { success?: boolean; error?: string };
 
 export async function resetPasswordAction(
   _prev: ResetPasswordState,
-  _formData: FormData,
+  formData: FormData,
 ): Promise<ResetPasswordState> {
   const supabase = await createClient();
   const {
@@ -55,11 +57,19 @@ export async function resetPasswordAction(
   } = await supabase.auth.getUser();
   if (!user?.email) return { error: "Nicht angemeldet." };
 
+  const limit = await hitRateLimits([{ rule: RATE_LIMITS.accountReset, identifier: user.id }]);
+  if (limit.unavailable) return { error: RATE_LIMIT_MESSAGES.unavailable };
+  if (!limit.allowed) {
+    return { error: "Zu viele Anfragen. Bitte versuchen Sie es in einer Stunde erneut." };
+  }
+
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
     redirectTo: `${origin}/auth/callback?next=/passwort-zuruecksetzen`,
+    captchaToken: captchaTokenFrom(formData),
   });
 
+  if (isCaptchaError(error)) return { error: CAPTCHA_FAILED_MESSAGE };
   if (error) return { error: "Zurücksetzen fehlgeschlagen. Bitte versuchen Sie es erneut." };
   return { success: true };
 }

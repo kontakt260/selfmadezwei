@@ -9,6 +9,7 @@ import { projectWriteBlockedError } from "@/lib/projects/project-access";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { sendInvitationMail } from "@/lib/email/send-invitation";
 import { sendInBackground } from "@/lib/email/background";
+import { RATE_LIMITS, RATE_LIMIT_MESSAGES, hitRateLimits } from "@/lib/rate-limit";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -118,6 +119,12 @@ export async function createInvitationAction(formData: FormData): Promise<{
       return { error: "Diese Person ist bereits Mitglied dieses Projekts." };
     }
   }
+
+  // PROJ-17 / PROJ-11 BUG-10: Einladungen sind Mails mit frei wählbarem Text
+  // von unserer Domain und deshalb pro Projekt und Tag begrenzt.
+  const limit = await hitRateLimits([{ rule: RATE_LIMITS.invitation, identifier: projectId }]);
+  if (limit.unavailable) return { error: RATE_LIMIT_MESSAGES.unavailable };
+  if (!limit.allowed) return { error: RATE_LIMIT_MESSAGES.invitation };
 
   const token = generateInviteToken();
   const expiresAt = new Date(

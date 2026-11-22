@@ -4,6 +4,15 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { hasPendingClaim, isDefaultLandingTarget } from "@/lib/purchases/pending-claim";
+import { CAPTCHA_FAILED_MESSAGE, captchaTokenFrom, isCaptchaError } from "@/lib/captcha";
+import {
+  RATE_LIMITS,
+  RATE_LIMIT_MESSAGES,
+  clearRateLimit,
+  getRequestIp,
+  hitRateLimits,
+  undoRateLimits,
+} from "@/lib/rate-limit";
 
 const schema = z.object({
   email: z.string().email("Bitte eine gültige E-Mail-Adresse angeben."),
@@ -44,15 +53,34 @@ export async function loginAction(
     return { fieldErrors };
   }
 
+  // PROJ-17: Jeder Versuch wird vorab gezählt, damit parallele Anfragen das
+  // Limit nicht umgehen. Zählen soll am Ende nur ein falsches Passwort.
+  const ipCheck = { rule: RATE_LIMITS.loginIp, identifier: await getRequestIp() };
+  const accountCheck = { rule: RATE_LIMITS.loginAccount, identifier: parsed.data.email };
+  const limit = await hitRateLimits([ipCheck, accountCheck]);
+  if (limit.unavailable) return { error: RATE_LIMIT_MESSAGES.unavailable };
+  if (!limit.allowed) return { error: RATE_LIMIT_MESSAGES.login };
+
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
+    options: { captchaToken: captchaTokenFrom(formData) },
   });
 
   if (error) {
+    if (error.code !== "invalid_credentials") {
+      await undoRateLimits([ipCheck, accountCheck]);
+    }
+    if (isCaptchaError(error)) return { error: CAPTCHA_FAILED_MESSAGE };
     return { error: "E-Mail oder Passwort falsch." };
   }
+
+  // Der Zähler der IP wird nur um diesen Versuch verringert, nicht gelöscht:
+  // Sonst könnte jemand mit dem eigenen Konto seine Fehlversuche an fremden
+  // Konten immer wieder zurücksetzen.
+  await undoRateLimits([ipCheck]);
+  await clearRateLimit(accountCheck);
 
   // Kauf ohne Konto: Wartet ein bezahlter Kauf auf dieses Konto, wird er
   // jetzt zugeordnet — auch bei Bestandskunden, die schon ein Projekt haben.
@@ -90,17 +118,28 @@ export async function resendConfirmAction(
     return { error: parsed.error.issues[0]?.message ?? "Ungültige E-Mail." };
   }
 
+  // PROJ-17: Über dem Limit sieht die Antwort aus wie immer, es geht nur keine
+  // Mail raus (kein Rückschluss darauf, ob die Adresse existiert).
+  const limit = await hitRateLimits([
+    { rule: RATE_LIMITS.resendIp, identifier: await getRequestIp() },
+    { rule: RATE_LIMITS.resendEmail, identifier: parsed.data.email },
+  ]);
+  if (limit.unavailable) return { error: RATE_LIMIT_MESSAGES.unavailable };
+  if (!limit.allowed) return { success: true };
+
   const supabase = await createClient();
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
-  // Fire-and-forget — never surface whether the email exists.
-  await supabase.auth.resend({
+  // Never surface whether the email exists.
+  const { error } = await supabase.auth.resend({
     type: "signup",
     email: parsed.data.email,
     options: {
       emailRedirectTo: `${origin}/auth/callback?next=/onboarding`,
+      captchaToken: captchaTokenFrom(formData),
     },
   });
+  if (isCaptchaError(error)) return { error: CAPTCHA_FAILED_MESSAGE };
 
   return { success: true };
 }

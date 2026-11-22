@@ -44,6 +44,8 @@ Production-Werte in Vercel unter **Settings → Environment Variables** mit Scop
 | `EMAIL_FROM` | nicht gesetzt (Fallback) | optional | Fallback im Code: `NARRAVIT <no-reply@mail.narravit.de>`. Absender-Name immer in Großbuchstaben, Adresse auf `mail.narravit.de`. |
 | `CRON_SECRET` | eigener Zufallswert | **neuer** Zufallswert | Sensitive. Erzeugen: `openssl rand -base64 32`. **Fehlt in Production noch** (Stand 2026-11-22: nur für Preview und Development angelegt). Ohne Wert antwortet der Cron mit 500 und es gehen keine Erinnerungen raus. |
 | `WELCOME_DISCOUNT_CODE` | `BUCH50` (Stripe-Testmodus) | `BUCH50` (muss im Stripe-Live-Modus existieren) | Kein Secret, steht in der Willkommens-Mail. Ohne Wert erscheint kein Rabatt in der Mail. Muss exakt dem Code in Stripe entsprechen (Abschnitt 4). |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | öffentlicher Testschlüssel `1x00000000000000000000AA` | echter Site Key für `app.narravit.de` | PROJ-17. Kein Secret. Der geheime Gegenschlüssel liegt nur in Supabase (Abschnitt 3). **Der Testschlüssel besteht jede Prüfung und darf nie in Production stehen.** Stage: gesetzt (nur Preview). |
+| `RATE_LIMIT_DISABLED` | **nicht setzen** | **nicht setzen** | Nur für lokale Entwicklung, schaltet die Limits ab. Wird in Production ignoriert. |
 
 Sicherung im Code: Auf `https://app.narravit.de` (= `NEXT_PUBLIC_SITE_URL` in Production) wird `EMAIL_TEST_RECIPIENT` ignoriert, selbst wenn die Variable versehentlich gesetzt ist.
 
@@ -52,6 +54,8 @@ Entfallen, in Production **nicht** anlegen: `STRIPE_PRICE_ID_VAPI_60`, `VAPI_API
 ### Weitere Vercel-Einstellungen
 
 - [ ] Domain `app.narravit.de` ist der Production-Domain zugeordnet (DNS siehe Abschnitt 7).
+- [ ] **Vercel Pro statt Hobby (Pflicht vor dem ersten Verkauf):** Das Projekt läuft auf dem Hobby-Plan (geprüft 2026-11-22). Die Vercel-AGB erlauben Hobby nur „for your personal or non-commercial use", NARRAVIT verkauft aber über die App. Vor dem Go-live auf den bezahlten Pro-Plan wechseln.
+- [ ] **Function-Region in die EU:** Die Server-Funktionen laufen aktuell in `iad1` (Washington, geprüft 2026-11-22), Kundendaten gehen also über die USA. Auf `fra1` (Frankfurt) oder die Region der Supabase-Datenbank umstellen: Settings → Functions → Function Regions. Vorher die Supabase-Region prüfen und das Ergebnis in die Datenschutzerklärung übernehmen.
 - [ ] Deployment Protection (Vercel-Login) gilt nur für Stage/Preview, **nicht** für Production.
 - [ ] Cron `/api/cron/reminders` (täglich 09:00 UTC, `vercel.json`): Vercel führt Crons nur für Deployments der Umgebung „Production" aus. Nach dem ersten Lauf in den Vercel-Logs prüfen, dass er mit 200 antwortet.
 - [x] Geklärt (2026-11-22): Stage läuft als „Preview", der Production-Branch ist bereits `main` und `app.narravit.de` zeigt auf dessen Production-Deployment. Stage-Werte gehören in die Umgebung „Preview", die Production-Werte werden separat angelegt. Beim Redeploy von Stage in der Deployment-Liste auf den Branch `stage` achten, dort stehen auch Preview-Deployments von `main`.
@@ -69,11 +73,12 @@ Stage = Projekt-Ref `kdjhxqitfxnsavhiafdn`. Production = Haupt-Projekt (`main`) 
 - [ ] Migration `20261121100000_proj6_purchase_claim_mail_token.sql` (Spalte `purchase_claims.mail_token_hash` für den persönlichen Einlöse-Link in der Kauf-Mail). **Vor dem Code-Deploy einspielen**, sonst scheitert der Webhook bei Käufen ohne Konto. Keine RLS-Änderung. Stage: am 2026-11-21 eingespielt und geprüft.
 - [ ] Migration `20261121110000_proj6_direct_gift.sql` (`projects.owner_id` darf bis zur Annahme eines Geschenks leer sein, neue Spalte `invitations.is_gift`). **Vor dem Code-Deploy einspielen**, sonst scheitern Geschenk-Käufe. Keine RLS-Änderung.
 - [ ] Migration `20261122100000_proj11_mail_retry_queue.sql` (neue Tabelle `mail_retry_queue` für Mails, deren Versand gescheitert ist; RLS aktiv, keine Policies, nur Service-Role). **Vor dem Code-Deploy einspielen**, sonst werden gescheiterte Mails nicht nachgeholt. Datei im SQL-Editor ausführen, dann `insert into supabase_migrations.schema_migrations (version, name) values ('20261122100000', 'proj11_mail_retry_queue');`. Stage: am 2026-11-22 eingespielt und geprüft.
+- [ ] Migration `20261122110000_proj17_rate_limit.sql` (Zähler für die Rate-Limits, RLS aktiv, keine Policies, nur Service-Role). **Zwingend vor dem Code-Deploy einspielen, sonst kann sich niemand anmelden oder registrieren.** Datei im SQL-Editor ausführen, dann `insert into supabase_migrations.schema_migrations (version, name) values ('20261122110000', 'proj17_rate_limit');`. Stage: am 2026-11-22 eingespielt und geprüft.
 - [ ] Seed `supabase/seed.sql` (15 Erzähl-Impulse) in Production eingespielt; Leitfragen kommen aus der Migration `proj8_impulse_leading_questions`.
 - [ ] Storage-Buckets aus `20260515200002_storage_buckets.sql` vorhanden (4 private Buckets).
 - [ ] Testdaten **nicht** übernehmen: QA-Konto `qa-test@narravit.de`, Test-Projekte, Test-Zahlungen bleiben auf Stage.
 - [ ] Migration `20261119200000_security_advisor_function_hardening.sql` (fester `search_path` für die Zeitstempel-Trigger, Trigger-Funktionen ohne RPC-Recht; Stage: am 2026-11-19 eingespielt und vermerkt — dabei versehentlich in einer Zwischenfassung, die auch die Rechte aus der nächsten Migration schon enthielt). Ohne Abhängigkeit zum Code, kann jederzeit eingespielt werden: Datei im SQL-Editor ausführen, dann `insert into supabase_migrations.schema_migrations (version, name) values ('20261119200000', 'security_advisor_function_hardening');`.
-- [ ] Migration `20261119210000_lookup_invitation_service_role_only.sql` (`lookup_invitation_by_token` nur noch für `service_role`; Stage: Rechte wirken schon seit 2026-11-19, die Datei nach dem Deploy trotzdem einmal ausführen — harmlos — und die Version vermerken). **Erst einspielen, wenn der Code mit dem Service-Role-Lookup ausgeliefert ist** — auf Stage nach abgeschlossenem Deploy von stage-app, in Production nach dem Merge `stage` → `main` und abgeschlossenem Deploy. Andersherum zeigt `/einladung/<token>` „Einladung nicht gefunden“, und Einladungen lassen sich nicht annehmen. Datei im SQL-Editor ausführen, dann `insert into supabase_migrations.schema_migrations (version, name) values ('20261119210000', 'lookup_invitation_service_role_only');`. Smoke-Test: Einladungslink abgemeldet öffnen (Vorschau mit Projekttitel) und angemeldet annehmen. Nach beiden Migrationen Dashboard → Advisors → Security: gewollt sind nur `rls_enabled_no_policy` (`mail_log`, `mail_retry_queue`, `purchase_claims`), `anon_`/`authenticated_security_definer_function_executable` für die RLS-Hilfsfunktionen `get_my_project_ids`, `am_i_pl_of`, `is_member_of` und `auth_leaked_password_protection` (Dashboard-Schalter unter Auth). Jeder andere Hinweis ist neu und vor dem Go-live zu klären.
+- [ ] Migration `20261119210000_lookup_invitation_service_role_only.sql` (`lookup_invitation_by_token` nur noch für `service_role`; Stage: Rechte wirken schon seit 2026-11-19, die Datei nach dem Deploy trotzdem einmal ausführen — harmlos — und die Version vermerken). **Erst einspielen, wenn der Code mit dem Service-Role-Lookup ausgeliefert ist** — auf Stage nach abgeschlossenem Deploy von stage-app, in Production nach dem Merge `stage` → `main` und abgeschlossenem Deploy. Andersherum zeigt `/einladung/<token>` „Einladung nicht gefunden“, und Einladungen lassen sich nicht annehmen. Datei im SQL-Editor ausführen, dann `insert into supabase_migrations.schema_migrations (version, name) values ('20261119210000', 'lookup_invitation_service_role_only');`. Smoke-Test: Einladungslink abgemeldet öffnen (Vorschau mit Projekttitel) und angemeldet annehmen. Nach beiden Migrationen Dashboard → Advisors → Security: gewollt sind nur `rls_enabled_no_policy` (`mail_log`, `mail_retry_queue`, `purchase_claims`, `rate_limit_counters`), `anon_`/`authenticated_security_definer_function_executable` für die RLS-Hilfsfunktionen `get_my_project_ids`, `am_i_pl_of`, `is_member_of` und `auth_leaked_password_protection` (Dashboard-Schalter unter Auth). Jeder andere Hinweis ist neu und vor dem Go-live zu klären.
 
 ### Auth → URL Configuration
 
@@ -89,6 +94,13 @@ Stage = Projekt-Ref `kdjhxqitfxnsavhiafdn`. Production = Haupt-Projekt (`main`) 
 ### Auth → Passwort-Sicherheit
 
 - [ ] „Leaked password protection" einschalten (Abgleich mit HaveIBeenPwned). Auf Stage laut Supabase-Advisor am 2026-11-19 aus.
+
+### Auth → Rate Limits und CAPTCHA (PROJ-17)
+
+- [ ] **Cloudflare Turnstile für Production anlegen:** Widget für `app.narravit.de`, Modus „Managed". Site Key nach Vercel, Secret Key nach Supabase. Cloudflare in die Datenschutzerklärung aufnehmen.
+- [ ] **Authentication → Rate Limits anheben**, weil alle App-Anfragen von der Server-IP kommen: Registrierung und Anmeldung 300 pro 5 Minuten, Token (Passwort-Login und Refresh) 1000 pro 5 Minuten, Token-Prüfung 300 pro 5 Minuten. Die feinen Limits pro Kunde macht die App.
+- [ ] **Authentication → Bot and Abuse Protection → CAPTCHA einschalten** (Cloudflare Turnstile, Secret Key eintragen). **Erst wenn der Code live ist**, sonst kann sich niemand mehr anmelden. Stage nutzt den öffentlichen Test-Secret-Key `1x0000000000000000000000000000000AA`, Production den echten.
+- [ ] **Kein `sb_secret_…`-Key für Auth-Aufrufe der App:** Supabase überspringt das CAPTCHA bei Admin-Rechten.
 
 ### Auth → Email Templates
 
@@ -177,7 +189,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
   - Keine Bypass-Werte in den Production-Variablen, in Supabase, Resend oder anderen Diensten.
   - `git grep -n "x-vercel-protection-bypass" -- src` liefert nichts.
   - Der Stage-Webhook in Stripe (Testmodus) ist von den Live-Endpunkten getrennt. Ein auf Stage genutzter Bypass-Wert wird nach dem Umzug in Vercel widerrufen, falls Stage ihn nicht mehr braucht.
-- [ ] PROJ-17 Rate-Limiting für Auth-Endpunkte (bringt eigene Env-Variablen mit — dann hier ergänzen).
+- [ ] PROJ-17 Rate-Limiting für Auth-Endpunkte: Migration (Abschnitt 3), `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (Abschnitt 2), Auth-Limits und CAPTCHA (Abschnitt 3). **CAPTCHA in Production erst einschalten, wenn der Code live ist.** Eine spätere Content-Security-Policy (PROJ-19) muss `https://challenges.cloudflare.com` für Skripte und Frames erlauben.
 - [ ] PROJ-19 Production-Hardening (Security-Header, Env-Prüfung beim Start).
 - [ ] PROJ-12 Audio-Erzählen live, sonst Mail-Texte zum „Erzählen per Sprachnachricht" anpassen (PROJ-11 BUG-9). Bringt SMS-Anbieter (seven.io) und Transkriptions-/LLM-Schlüssel mit — dann hier ergänzen.
 - [ ] PROJ-13 Fehler-Monitoring (Sentry) — dann `SENTRY_DSN` o. ä. hier ergänzen.
@@ -189,6 +201,8 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 ## 10. Smoke-Tests nach dem Umzug
 
 - [ ] Registrierung mit E-Mail: Bestätigungs-Mail kommt an, Link funktioniert auch in einem anderen Browser, Willkommens-Mail kommt.
+- [ ] Anmeldung, Registrierung und „Passwort vergessen" mit dem echten Turnstile-Schlüssel, auch einmal auf dem Smartphone.
+- [ ] Sechs falsche Passwörter hintereinander: Beim sechsten erscheint „Zu viele Versuche".
 - [ ] Anmeldung mit Google und mit Facebook.
 - [ ] „Passwort vergessen" für ein E-Mail-Konto und für ein Google-Konto.
 - [ ] Echter Kauf (kleiner Betrag per Promotion-Code oder sofortige Erstattung): Projekt entsteht, Kauf-Mail kommt, Webhook in Stripe als zugestellt markiert.
@@ -207,6 +221,8 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
+| 2026-11-22 | PROJ-17 gebaut: Migration `20261122110000_proj17_rate_limit.sql` (vor dem Code-Deploy), `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, Auth-Limits anheben, CAPTCHA nach dem Deploy einschalten. Die geplante IP-Weitergabe per Secret Key entfällt. |
+| 2026-11-22 | Neue Go-live-Pflichten: Vercel Pro statt Hobby (kommerzielle Nutzung), Function-Region von `iad1` in die EU. PROJ-17 Tech Design: Zähler in Supabase, Cloudflare Turnstile. |
 | 2026-11-22 | PROJ-11 BUG-19/20: Der Support-Hinweis wird bis zur Zustellung wiederholt, die Kontolöschung räumt `mail_retry_queue` auf. Keine neue Migration, kein neuer Env-Wert. |
 | 2026-11-22 | Willkommens-Rabatt: neue Env-Variable `WELCOME_DISCOUNT_CODE` = `BUCH50` (Stage und Production). Der Coupon über 50 € nur für den Erstkauf muss im Stripe-Live-Modus noch angelegt werden. `EMAIL_TEST_RECIPIENT` von Jakob für Production entfernt (geprüft). |
 | 2026-11-22 | PROJ-11 BUG-13: neue Migration `20261122100000_proj11_mail_retry_queue.sql`, auf Stage und Production jeweils **vor** dem Code-Deploy. Gescheiterte Mails werden täglich nachgeholt, Hinweis an `kontakt@narravit.de`. Kein neuer Env-Wert. |

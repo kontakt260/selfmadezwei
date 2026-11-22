@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useActionState, useEffect } from "react";
+import { Suspense, useActionState, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
+import { TURNSTILE_ENABLED, TurnstileField } from "@/components/auth/TurnstileField";
 import {
   loginAction,
   resendConfirmAction,
@@ -34,6 +35,7 @@ function ExpiredLinkBanner() {
     resendConfirmAction,
     {},
   );
+  const [captchaReady, setCaptchaReady] = useState(!TURNSTILE_ENABLED);
 
   if (!showExpired) return null;
 
@@ -83,7 +85,13 @@ function ExpiredLinkBanner() {
       {resendState.error && (
         <p className="text-destructive">{resendState.error}</p>
       )}
-      <Button type="submit" variant="outline" disabled={resendPending} className="h-12">
+      <TurnstileField onReadyChange={setCaptchaReady} resetSignal={resendState} />
+      <Button
+        type="submit"
+        variant="outline"
+        disabled={resendPending || !captchaReady}
+        className="h-12"
+      >
         {resendPending ? "Wird gesendet …" : "Neue Bestätigungs-E-Mail anfordern"}
       </Button>
     </form>
@@ -96,6 +104,7 @@ export function AnmeldenClient({ initialEmail, initialNext, showExpiredLink }: P
     loginAction,
     {},
   );
+  const [captchaReady, setCaptchaReady] = useState(!TURNSTILE_ENABLED);
 
   // Einlösen eines Kaufs: volle Navigation, siehe loginAction.
   useEffect(() => {
@@ -159,7 +168,13 @@ export function AnmeldenClient({ initialEmail, initialNext, showExpiredLink }: P
           </p>
         )}
 
-        <Button type="submit" className="h-12" disabled={pending || !!state.redirectTo}>
+        <TurnstileField onReadyChange={setCaptchaReady} resetSignal={state} />
+
+        <Button
+          type="submit"
+          className="h-12"
+          disabled={pending || !!state.redirectTo || !captchaReady}
+        >
           {pending || state.redirectTo ? "Anmeldung …" : "Anmelden"}
         </Button>
 

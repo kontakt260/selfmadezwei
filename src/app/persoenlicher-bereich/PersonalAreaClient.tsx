@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { Navbar } from "@/components/Navbar";
+import { TURNSTILE_ENABLED, TurnstileField } from "@/components/auth/TurnstileField";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -271,6 +272,7 @@ function SecuritySection({
     resetPasswordAction,
     {},
   );
+  const [captchaReady, setCaptchaReady] = useState(!TURNSTILE_ENABLED);
 
   const isEmailProvider = authProvider === "email";
   const providerLabel =
@@ -341,8 +343,9 @@ function SecuritySection({
             <p className="text-base text-destructive">{state.error}</p>
           )}
         </div>
-        <form action={formAction}>
-          <SandButton type="submit" disabled={pending || !!state.success}>
+        <form action={formAction} className="relative flex flex-col gap-2">
+          <TurnstileField onReadyChange={setCaptchaReady} resetSignal={state} />
+          <SandButton type="submit" disabled={pending || !!state.success || !captchaReady}>
             {pending
               ? "Wird gesendet …"
               : isEmailProvider

@@ -2,6 +2,13 @@
 
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { CAPTCHA_FAILED_MESSAGE, captchaTokenFrom, isCaptchaError } from "@/lib/captcha";
+import {
+  RATE_LIMITS,
+  RATE_LIMIT_MESSAGES,
+  getRequestIp,
+  hitRateLimits,
+} from "@/lib/rate-limit";
 
 const schema = z.object({
   email: z.string().email("Bitte eine gültige E-Mail-Adresse angeben."),
@@ -9,6 +16,7 @@ const schema = z.object({
 
 export type ForgotPasswordState = {
   success?: boolean;
+  error?: string;
   fieldErrors?: { email?: string };
 };
 
@@ -24,15 +32,26 @@ export async function forgotPasswordAction(
     };
   }
 
+  // PROJ-17: Über dem Limit sieht die Antwort aus wie immer, es geht nur keine
+  // Mail raus (kein Rückschluss darauf, ob die Adresse existiert).
+  const limit = await hitRateLimits([
+    { rule: RATE_LIMITS.resetIp, identifier: await getRequestIp() },
+    { rule: RATE_LIMITS.resetEmail, identifier: parsed.data.email },
+  ]);
+  if (limit.unavailable) return { error: RATE_LIMIT_MESSAGES.unavailable };
+  if (!limit.allowed) return { success: true };
+
   const supabase = await createClient();
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
-  // Fire-and-forget: we intentionally don't surface whether the email exists
-  // to prevent user enumeration. Route through /auth/callback so the recovery
-  // code is exchanged for a session before the user lands on the reset form.
-  await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+  // We intentionally don't surface whether the email exists to prevent user
+  // enumeration. Route through /auth/callback so the recovery code is
+  // exchanged for a session before the user lands on the reset form.
+  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo: `${origin}/auth/callback?next=/passwort-zuruecksetzen`,
+    captchaToken: captchaTokenFrom(formData),
   });
+  if (isCaptchaError(error)) return { error: CAPTCHA_FAILED_MESSAGE };
 
   return { success: true };
 }

@@ -444,6 +444,27 @@ export type Database = {
           },
         ]
       }
+      rate_limit_counters: {
+        Row: {
+          hits: number
+          identifier_hash: string
+          scope: string
+          window_ends_at: string
+        }
+        Insert: {
+          hits?: number
+          identifier_hash: string
+          scope: string
+          window_ends_at: string
+        }
+        Update: {
+          hits?: number
+          identifier_hash?: string
+          scope?: string
+          window_ends_at?: string
+        }
+        Relationships: []
+      }
       purchase_claims: {
         Row: {
           amount_cents: number
@@ -566,6 +587,23 @@ export type Database = {
     Functions: {
       am_i_pl_of: { Args: { p_project_id: string }; Returns: boolean }
       get_my_project_ids: { Args: never; Returns: string[] }
+      rate_limit_hit: {
+        Args: {
+          p_identifier_hash: string
+          p_limit: number
+          p_scope: string
+          p_window_seconds: number
+        }
+        Returns: {
+          current_hits: number
+          is_allowed: boolean
+          retry_after_seconds: number
+        }[]
+      }
+      rate_limit_undo: {
+        Args: { p_identifier_hash: string; p_scope: string }
+        Returns: undefined
+      }
       lookup_invitation_by_token: {
         Args: { p_token: string }
         Returns: {

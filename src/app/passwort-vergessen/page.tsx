@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthLayout } from "@/components/auth/AuthLayout";
+import { TURNSTILE_ENABLED, TurnstileField } from "@/components/auth/TurnstileField";
 import { forgotPasswordAction, type ForgotPasswordState } from "./actions";
 
 export default function PasswortVergessenPage() {
@@ -13,6 +14,7 @@ export default function PasswortVergessenPage() {
     forgotPasswordAction,
     {},
   );
+  const [captchaReady, setCaptchaReady] = useState(!TURNSTILE_ENABLED);
 
   if (state.success) {
     return (
@@ -61,7 +63,15 @@ export default function PasswortVergessenPage() {
           )}
         </div>
 
-        <Button type="submit" className="h-12" disabled={pending}>
+        {state.error && (
+          <p className="text-sm text-destructive" role="alert">
+            {state.error}
+          </p>
+        )}
+
+        <TurnstileField onReadyChange={setCaptchaReady} resetSignal={state} />
+
+        <Button type="submit" className="h-12" disabled={pending || !captchaReady}>
           {pending ? "Wird gesendet …" : "Reset-Link senden"}
         </Button>
       </form>

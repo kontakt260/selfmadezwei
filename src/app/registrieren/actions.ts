@@ -3,6 +3,13 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { CAPTCHA_FAILED_MESSAGE, captchaTokenFrom, isCaptchaError } from "@/lib/captcha";
+import {
+  RATE_LIMITS,
+  RATE_LIMIT_MESSAGES,
+  getRequestIp,
+  hitRateLimits,
+} from "@/lib/rate-limit";
 
 const schema = z
   .object({
@@ -72,6 +79,12 @@ export async function registerAction(
     return { fieldErrors };
   }
 
+  const limit = await hitRateLimits([
+    { rule: RATE_LIMITS.register, identifier: await getRequestIp() },
+  ]);
+  if (limit.unavailable) return { error: RATE_LIMIT_MESSAGES.unavailable };
+  if (!limit.allowed) return { error: RATE_LIMIT_MESSAGES.register };
+
   const supabase = await createClient();
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   // PROJ-9: wenn `next` mitgeliefert wurde und sicher relativ ist, geht der
@@ -86,10 +99,12 @@ export async function registerAction(
     options: {
       data: { full_name: parsed.data.fullName },
       emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(postConfirmTarget)}`,
+      captchaToken: captchaTokenFrom(formData),
     },
   });
 
   if (error) {
+    if (isCaptchaError(error)) return { error: CAPTCHA_FAILED_MESSAGE };
     return { error: "Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut." };
   }
 

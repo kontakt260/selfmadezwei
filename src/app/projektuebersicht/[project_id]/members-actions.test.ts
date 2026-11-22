@@ -18,6 +18,16 @@ const projectWriteBlockedErrorMock = vi.hoisted(() => vi.fn(async (): Promise<st
 vi.mock("@/lib/projects/project-access", () => ({
   projectWriteBlockedError: projectWriteBlockedErrorMock,
 }));
+const hitRateLimitsMock = vi.hoisted(() =>
+  vi.fn(async (): Promise<{ allowed: boolean; unavailable: boolean }> => ({
+    allowed: true,
+    unavailable: false,
+  })),
+);
+vi.mock("@/lib/rate-limit", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/rate-limit")>()),
+  hitRateLimits: hitRateLimitsMock,
+}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn(() => { throw new Error("REDIRECT"); }) }));
 
@@ -121,6 +131,7 @@ function makeMockClient(opts: {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  hitRateLimitsMock.mockReset().mockResolvedValue({ allowed: true, unavailable: false });
   serviceRoleMockState.inserts = [];
   serviceRoleMockState.updates = [];
   serviceRoleMockState.nextInsertError = null;
@@ -149,6 +160,39 @@ describe("createInvitationAction", () => {
     expect(await createInvitationAction(fd({ email: PL_EMAIL }))).toEqual({
       error: "Sie können sich nicht selbst einladen.",
     });
+  });
+
+  const projectLeadClient = () => {
+    const client = makeMockClient();
+    client.from
+      .mockReturnValueOnce(makeBuilder({ data: [{ user_id: PL_USER_ID, role: "projektleiter" }] }))
+      .mockReturnValueOnce(makeBuilder({ data: [{ email: PL_EMAIL }] }));
+    return client;
+  };
+
+  it("stops at the daily invitation limit of the project (PROJ-17)", async () => {
+    const client = projectLeadClient();
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    hitRateLimitsMock.mockResolvedValueOnce({ allowed: false, unavailable: false });
+
+    const result = await createInvitationAction(fd());
+
+    expect(result.error).toContain("zu viele Einladungen");
+    expect(client.from).not.toHaveBeenCalledWith("invitations");
+    expect(hitRateLimitsMock.mock.calls[0]).toEqual([
+      [expect.objectContaining({ identifier: PROJECT_ID })],
+    ]);
+  });
+
+  it("creates no invitation when the counters are unavailable (PROJ-17)", async () => {
+    const client = projectLeadClient();
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    hitRateLimitsMock.mockResolvedValueOnce({ allowed: false, unavailable: true });
+
+    const result = await createInvitationAction(fd());
+
+    expect(result.error).toContain("nicht geklappt");
+    expect(client.from).not.toHaveBeenCalledWith("invitations");
   });
 
   it("rejects when invoker is not PL of project", async () => {

@@ -12,6 +12,12 @@ import {
   generateClaimToken,
   hashClaimToken,
 } from "@/lib/purchases/claim-token";
+import {
+  RATE_LIMITS,
+  RATE_LIMIT_MESSAGES,
+  getRequestIp,
+  hitRateLimits,
+} from "@/lib/rate-limit";
 
 // Stripe-Checkout-Initiator (PROJ-6 Backend).
 //
@@ -135,6 +141,15 @@ export async function startCheckoutAction(
     if (!membership) {
       return { ok: false, error: "Keine Berechtigung für dieses Projekt." };
     }
+  }
+
+  // PROJ-17: begrenzt das Anlegen von Stripe-Sessions. Bewusst fail-open: Ein
+  // kurzer Datenbank-Aussetzer soll keinen Kauf verhindern.
+  const limit = await hitRateLimits([
+    { rule: RATE_LIMITS.checkout, identifier: await getRequestIp() },
+  ]);
+  if (!limit.allowed && !limit.unavailable) {
+    return { ok: false, error: RATE_LIMIT_MESSAGES.checkout };
   }
 
   // Stripe-Checkout-Session erstellen.

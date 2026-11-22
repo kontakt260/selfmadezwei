@@ -32,6 +32,13 @@ export default defineConfig({
       STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET ?? 'whsec_e2e_dummy',
       STRIPE_PRICE_ID_INITIAL: process.env.STRIPE_PRICE_ID_INITIAL ?? 'price_e2e_initial',
       STRIPE_PRICE_ID_RENEWAL: process.env.STRIPE_PRICE_ID_RENEWAL ?? 'price_e2e_renewal',
+      // PROJ-17: Alle Suites laufen von derselben IP und würden sich gegenseitig
+      // ins Limit bringen. Die Limits selbst prüft die eigene Suite mit
+      // `E2E_RATE_LIMIT=1 npx playwright test tests/PROJ-17-rate-limiting.spec.ts`.
+      RATE_LIMIT_DISABLED: process.env.E2E_RATE_LIMIT === '1' ? 'false' : 'true',
+      // Öffentlicher Testschlüssel von Cloudflare, die Prüfung besteht immer.
+      // Stage-Supabase nutzt den passenden Test-Secret-Key.
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: '1x00000000000000000000AA',
     },
   },
 })
