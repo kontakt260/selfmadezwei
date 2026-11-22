@@ -33,7 +33,7 @@
 | PROJ-16 | Print-on-Demand Adapter | P2 | Roadmap | PROJ-5, PROJ-6, PROJ-10, PROJ-11 | — | 2026-05-15 |
 | PROJ-17 | Rate-Limiting für Auth-Endpunkte | P0 | Approved | PROJ-2 | [Spec](PROJ-17-rate-limiting-auth.md) | 2026-05-16 |
 | PROJ-18 | Debug-Telemetrie-Cleanup | P0 | Approved | — | [Spec](PROJ-18-debug-telemetrie-cleanup.md) | 2026-05-16 |
-| PROJ-19 | Production-Hardening (Headers, Middleware-Caching, Env-Failsafe) | P1 | Planned | PROJ-2 | [Spec](PROJ-19-production-hardening.md) | 2026-05-16 |
+| PROJ-19 | Production-Hardening (Headers, Middleware-Caching, Env-Failsafe) | P1 | Approved | PROJ-2 | [Spec](PROJ-19-production-hardening.md) | 2026-05-16 |
 
 <!-- Add features above this line -->
 

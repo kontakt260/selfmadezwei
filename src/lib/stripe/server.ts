@@ -59,10 +59,4 @@ export function getPriceId(product: ProductType): string {
   return priceId;
 }
 
-export function getSiteUrl(): string {
-  const url = process.env.NEXT_PUBLIC_SITE_URL;
-  if (!url) {
-    throw new Error("NEXT_PUBLIC_SITE_URL fehlt — Stripe success_url/cancel_url nicht baubar.");
-  }
-  return url.replace(/\/$/, "");
-}
+export { getSiteUrl } from "@/lib/site-url";

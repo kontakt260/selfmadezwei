@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { getSiteUrl } from "@/lib/site-url";
 import { accountExists } from "@/lib/auth/account-exists";
 import { hasPendingClaim, isDefaultLandingTarget } from "@/lib/purchases/pending-claim";
 import { CAPTCHA_FAILED_MESSAGE, captchaTokenFrom, isCaptchaError } from "@/lib/captcha";
@@ -156,7 +157,7 @@ async function submitResend(formData: FormData): Promise<ResendState> {
   if (!limit.allowed) return { success: true };
 
   const supabase = await createClient();
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const origin = getSiteUrl();
 
   // Never surface whether the email exists.
   const { error } = await supabase.auth.resend({

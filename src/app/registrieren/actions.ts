@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { getSiteUrl } from "@/lib/site-url";
 import { CAPTCHA_FAILED_MESSAGE, captchaTokenFrom, isCaptchaError } from "@/lib/captcha";
 import { submittedText } from "@/lib/form-values";
 import {
@@ -99,7 +100,7 @@ async function submitRegistration(formData: FormData): Promise<RegisterState> {
   if (!limit.allowed) return { error: RATE_LIMIT_MESSAGES.register };
 
   const supabase = await createClient();
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const origin = getSiteUrl();
   // PROJ-9: wenn `next` mitgeliefert wurde und sicher relativ ist, geht der
   // Post-Confirm-Redirect dorthin; sonst auf den Onboarding-Pfad.
   const safeNextPath = safeNext(parsed.data.next);

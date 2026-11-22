@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { getSiteUrl } from "@/lib/site-url";
 import { CAPTCHA_FAILED_MESSAGE, captchaTokenFrom, isCaptchaError } from "@/lib/captcha";
 import { submittedText } from "@/lib/form-values";
 import {
@@ -52,7 +53,7 @@ async function requestPasswordReset(formData: FormData): Promise<ForgotPasswordS
   if (!limit.allowed) return { success: true };
 
   const supabase = await createClient();
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const origin = getSiteUrl();
 
   // We intentionally don't surface whether the email exists to prevent user
   // enumeration. Route through /auth/callback so the recovery code is

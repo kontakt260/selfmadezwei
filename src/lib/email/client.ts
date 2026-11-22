@@ -5,6 +5,8 @@ import type { ReactElement } from "react";
 import crypto from "node:crypto";
 import { encodeNonAscii } from "@/emails/encoding";
 
+export { getSiteUrl } from "@/lib/site-url";
+
 // PROJ-11 — Resend-Mailer Server-Singleton.
 //
 // CRITICAL: dieser Client darf NIE in ein Client-Bundle. `import "server-only"`
@@ -53,6 +55,12 @@ function getFromAddress(): string {
 /** Die Kunden-Domain. Nur dort wird `EMAIL_TEST_RECIPIENT` ignoriert. */
 const PRODUCTION_SITE_URL = "https://app.narravit.de";
 
+/** Ohne gesetzte Adresse gilt im Zweifel die Kunden-Domain. */
+function isCustomerSite(): boolean {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, "");
+  return !configured || configured === PRODUCTION_SITE_URL;
+}
+
 /**
  * Resolves the actual recipient. In stage/local environments, the
  * `EMAIL_TEST_RECIPIENT` override redirects every mail to a single test
@@ -66,7 +74,7 @@ const PRODUCTION_SITE_URL = "https://app.narravit.de";
 function resolveRecipient(to: string): { to: string; redirected: boolean } {
   const override = process.env.EMAIL_TEST_RECIPIENT?.trim();
   if (override && override.length > 0) {
-    if (getSiteUrl() === PRODUCTION_SITE_URL) {
+    if (isCustomerSite()) {
       console.warn(
         "[email] EMAIL_TEST_RECIPIENT is set in production and is ignored",
       );
@@ -225,15 +233,4 @@ export async function sendEmail(input: SendMailInput): Promise<SendMailResult> {
       };
     }
   }
-}
-
-/**
- * Resolves the site URL (used for absolute links in mails).
- * Falls back to a sensible default for prod.
- */
-export function getSiteUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
-    "https://app.narravit.de"
-  );
 }

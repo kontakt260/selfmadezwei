@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { getSiteUrl } from "@/lib/site-url";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { redirect } from "next/navigation";
 import {
@@ -77,7 +78,7 @@ export async function resetPasswordAction(
     return { error: "Zu viele Anfragen. Bitte versuchen Sie es in einer Stunde erneut." };
   }
 
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const origin = getSiteUrl();
   const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
     redirectTo: `${origin}/auth/callback?next=/passwort-zuruecksetzen`,
     captchaToken: captchaTokenFrom(formData),

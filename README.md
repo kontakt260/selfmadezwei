@@ -26,6 +26,8 @@ If you need a backend:
 
 Skip this step if you're building frontend-only (landing pages, portfolios, etc.)
 
+**Neue Umgebungsvariable:** Erst in `src/lib/config/build-config.ts` und `.env.local.example` eintragen, dann verwenden. Der Build bricht auf Stage und Production ab, wenn ein Pflichtwert fehlt. Die Adresse der App kommt immer aus `getSiteUrl()` in `src/lib/site-url.ts`.
+
 ### 3. Start Development
 
 ```bash

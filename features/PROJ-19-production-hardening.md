@@ -1,8 +1,8 @@
 # PROJ-19: Production-Hardening (Headers, Middleware-Caching, Env-Failsafe)
 
-## Status: Planned
+## Status: Approved
 **Created:** 2026-05-16
-**Last Updated:** 2026-05-16
+**Last Updated:** 2026-11-22 — Tech Design von Jakob freigegeben
 **Priority:** P1 (vor Public-Launch erforderlich, nicht zwingend vor Stage)
 **Trigger:** Vibe-Security-Audit 2026-05-16 — Medium- und Low-Findings #3, #4, #6
 
@@ -82,10 +82,181 @@ Drei Befunde aus dem Vibe-Security-Audit, die isoliert betrachtet jeweils Medium
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_ — insbesondere Block B (Cookie-Signatur-Schema, Invalidierungs-Hooks) verdient eine Architektur-Skizze, bevor Code geschrieben wird
+
+> **Stand 2026-11-22, von Jakob freigegeben (Abschnitte A bis H).** Abschnitt I ist davon ausgenommen und wird vor dem Bau separat entworfen und freigegeben. Die Spec stammt vom Mai. Seitdem sind Turnstile, die Audio-Aufnahme im Browser und die Paywall pro Projekt dazugekommen. Das Design passt die Spec deshalb an, am stärksten bei Block B.
+
+### A) Aufbau
+
+```
+Build auf Vercel
++-- Konfigurations-Prüfung (neu)
+|   +-- Pflichtwerte für Stage und Production
+|   +-- Zusatzregeln für die Kunden-Umgebung
+|   +-- Bei einem Fehler bricht der Build ab, die laufende Version bleibt online
+
+Jede Antwort der App
++-- Sicherheits-Header (neu, zentral an einer Stelle)
+|   +-- Schutz vor Einbetten, MIME-Sniffing und unverschlüsseltem Zugriff
+|   +-- Browser-Rechte gesperrt (Kamera, Mikrofon, Standort)
+|   +-- Content-Security-Policy: kleiner Kern aktiv, der Rest im Beobachtungsmodus
+
+Mail-Links, Auth-Weiterleitungen, Stripe-Rückleitung
++-- Eine zentrale Quelle für die Adresse der App (statt bisher mehrerer Stellen)
+```
+
+### B) Was gespeichert wird
+
+Nichts Neues: keine Tabelle, keine Migration, kein Cookie, keine neue Variable.
+
+### C) Änderungen gegenüber der Spec vom Mai
+
+| Spec vom Mai | Design | Warum |
+|---|---|---|
+| Cookie-Cache für den Portal-Status | **Entfällt** | Kaum Nutzen, schwächt die Paywall (siehe D) |
+| `SESSION_SECRET` | Entfällt | Wurde nur für den Cookie gebraucht |
+| Mikrofon gesperrt, weil Vapi es nicht nutzt | Bleibt vorerst gesperrt, PROJ-12 gibt es nur auf den Aufnahme-Routen frei | Vapi ist ersetzt, die Aufnahme läuft künftig im Browser |
+| CSP ohne Turnstile | CSP kennt Turnstile und lokale Bildvorschauen | Sonst wäre die Anmeldung beim späteren Scharfschalten blockiert |
+| CSP komplett nur beobachten | Kleiner Kern sofort aktiv, der Rest wird beobachtet | Der Kern (kein Einbetten, keine fremde Basis-URL, keine Plugins) bricht nichts und schützt sofort |
+| Prüfung der Variablen beim Serverstart | Prüfung beim Build | Eine fehlerhafte Konfiguration geht gar nicht erst live |
+| Umgebung über `NODE_ENV` erkennen | Kunden-Umgebung = Branch `main` oder Adresse `app.narravit.de` | `NODE_ENV` steht auch auf Stage auf „production" |
+| Upstash-Schlüssel prüfen | Entfällt | PROJ-17 zählt in Supabase |
+| Ersatz-Adresse für Preview-Builds | Entfällt | Die Adresse ist für Preview in Vercel gesetzt |
+
+### D) Warum der Cookie-Cache entfällt
+
+1. **Kaum Nutzen:** Die Abfrage dauert auf Stage im Schnitt 0,4 ms, höchstens 3 ms (4.597 gemessene Aufrufe). Die Prüfung der Anmeldung läuft bei jedem Seitenaufruf ohnehin weiter.
+2. **Schwächt die Paywall:** Die Datenbank kennt die Paywall beim Lesen nicht, diese Prüfung ist dort die zentrale Sperre. Ein Status pro Konto kann nicht abbilden, dass eines von mehreren Projekten abgelaufen ist. Abgelaufene oder entzogene Zugänge blieben bis zu 5 Minuten offen.
+3. **Die geplante Invalidierung funktioniert nicht:** Der Stripe-Webhook läuft von Server zu Server und kann kein Cookie im Browser löschen. Wer gerade verlängert hat, sähe bis zu 5 Minuten „Zugang abgelaufen".
+4. **Neues Geheimnis:** Der Cache bräuchte einen weiteren Schlüssel in jeder Umgebung.
+
+Neu bewerten, falls die Abfrage in den Supabase-Statistiken oder bei echter Last auffällt.
+
+### E) Sicherheits-Header
+
+| Schutz | Wirkung |
+|---|---|
+| Einbetten verboten | Die App lässt sich nicht in fremde Seiten einbauen (Clickjacking). **Annahme:** Auch Webflow bettet sie nirgends per iframe ein |
+| Kein MIME-Sniffing | Hochgeladene Dateien werden nicht als Skript ausgeführt |
+| Referrer begrenzt | Fremde Seiten sehen nur die Domain, nie Pfade mit Einladungs- oder Aufnahme-Token |
+| HTTPS erzwingen | 2 Jahre, inklusive Subdomains von `app.narravit.de`. **Ohne `preload`**, weil sich das kaum rückgängig machen lässt |
+| Browser-Rechte | Kamera, Mikrofon und Standort sind gesperrt |
+| Technik-Hinweis entfernt | Die Antwort verrät nicht mehr, dass Next.js läuft |
+
+### F) Konfigurations-Prüfung
+
+| Regel | Stage | Kunden-Umgebung | Lokal |
+|---|---|---|---|
+| Pflichtwerte: Supabase, App-Adresse, Stripe, Resend, Cron, Turnstile | Build bricht ab | Build bricht ab | Warnung |
+| Adresse ist `https://app.narravit.de` | nicht geprüft | Pflicht | nicht geprüft |
+| Stripe-Schlüssel ist ein Live-Schlüssel | nicht geprüft | Pflicht | nicht geprüft |
+| Kein Turnstile-Testschlüssel | erlaubt | Build bricht ab | erlaubt |
+| Keine Test-Schalter (`EMAIL_TEST_RECIPIENT`, `RATE_LIMIT_DISABLED`) | erlaubt | Build bricht ab | erlaubt |
+| Rabattcode fehlt | Warnung | Warnung | still |
+
+**Folge für den Go-live:** In Production fehlen heute sieben Pflichtwerte (`CRON_SECRET`, `RESEND_API_KEY`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY` und vier Stripe-Werte). Bis sie gesetzt sind, scheitert jeder Build von `main`, die laufende Version bleibt online. Das ist gewollt: Die Variablen müssen vor dem Merge stehen. Die Reihenfolge kommt beim Bau in `docs/production/prod-umzug.md`.
+
+### G) Neue Abhängigkeiten
+
+Keine.
+
+### H) Reihenfolge der Umsetzung
+
+1. Sicherheits-Header
+2. Konfigurations-Prüfung und zentrale App-Adresse
+3. Automatische Tests, dabei CSP-Meldungen in den wichtigen Abläufen auswerten
+4. Auf Stage prüfen: Anmeldung mit Turnstile, Google/Facebook, Stripe-Checkout, Bilder
+5. Go-live-Liste ergänzen
+
+### I) Ergänzung aus PROJ-3 BUG-6 (noch zu entwerfen und freizugeben)
+
+Vor dem unwiderruflichen Löschen eines Kontos reicht heute eine offene Sitzung. Geplant ist eine erneute Identitätsprüfung, Vorschlag: ein Code per Mail, weil Google- und Facebook-Konten kein Passwort haben. Das ändert den Auth-Ablauf und braucht Jakobs ausdrückliche Freigabe.
+
+## Implementation Notes — Backend 2026-11-22
+
+**Gebaut (Abschnitte A bis H):**
+- Sicherheits-Header für alle Routen in `src/lib/config/security-headers.ts`, eingebunden in `next.config.ts`. Der Hinweis auf Next.js in den Antworten ist entfernt.
+- Content-Security-Policy: `frame-ancestors`, `base-uri` und `object-src` sind aktiv, der Rest läuft im Beobachtungsmodus und kennt Turnstile, Supabase und lokale Bildvorschauen.
+- Konfigurationsprüfung beim Build in `src/lib/config/build-config.ts`. Meldungen nennen nur Namen von Variablen, nie Werte.
+- Zentrale App-Adresse in `src/lib/site-url.ts`. Die stillen Ersatzwerte `localhost` in vier Server Actions und die Produktionsadresse in den Mails sind entfernt.
+
+**Kein Cookie-Cache, kein `SESSION_SECRET`, keine Migration, keine neue Variable, keine neuen Pakete.** Abschnitt I (Identitätsprüfung) ist nicht gebaut.
+
+**Ergänzungen gegenüber dem Design:**
+- Als Kunden-Umgebung zählt zusätzlich `VERCEL_ENV=production`, damit auch ein Deployment ohne Git-Branch die strengen Regeln bekommt.
+- Eingeschränkte Stripe-Live-Schlüssel (`rk_live_`) gelten ebenfalls als Live-Schlüssel.
+- HTTPS wird auf allen Vercel-Deployments erzwungen, also auch auf Stage, und nie auf localhost.
+
+**Geprüft:**
+- Unit-Tests 690 von 690, Typprüfung, ESLint und Production-Build
+- E2E gegen einen echten Production-Build: 8 von 8 (Header, Einbett-Schutz, Turnstile, keine CSP-Meldung auf Anmeldung, Projekt, Editor, Cover und persönlichem Bereich)
+- E2E-Regression Chromium: 142 bestanden, 25 übersprungen, 0 fehlgeschlagen
+- Echte Builds brechen ab: Stage ohne Pflichtwerte und `main` mit Testwerten
+- Regeln gegen die echten Variablennamen in Vercel: Stage besteht, Production meldet genau die sieben fehlenden Werte
+- Website: Im Custom Code von Webflow steht kein iframe
+
+**Noch offen für `/qa`:** Ablauf auf `stage-app.narravit.de` (noch nicht deployed), Anmeldung mit Google und Facebook, Weiterleitung zum Stripe-Checkout, Bild-Upload unter der Beobachtung der CSP, Firefox und Safari. Embed-Elemente in Webflow ließen sich nicht prüfen.
 
 ## QA Test Results
-_To be added by /qa_
+
+**Getestet:** 2026-11-22
+**App:** echter Production-Build (`next build` und `next start`) auf `localhost:3000` gegen die Stage-Datenbank
+**Tester:** QA Engineer (AI)
+**Umfang:** Abschnitte A bis H des Tech Designs. Abschnitt I (Identitätsprüfung) ist nicht gebaut.
+
+### Acceptance Criteria Status
+
+- [x] AC-1: Einbetten verboten (`X-Frame-Options: DENY`, `frame-ancestors 'none'`), im Browser mit fremder Seite geprüft
+- [x] AC-2: `X-Content-Type-Options: nosniff`
+- [x] AC-3: Referrer begrenzt, eine fremde Seite sieht von `/einladung/<token>` nur die Domain
+- [x] AC-4: Kamera, Mikrofon und Standort gesperrt
+- [x] AC-5: Header gelten für Seiten, 404, Middleware-Weiterleitung, Auth-Callback, API und statische Dateien
+- [x] AC-6: Technik-Hinweis `X-Powered-By` entfernt
+- [x] AC-7: CSP-Kern ist aktiv, eingeschleuste Basis-Adresse und Plugins werden blockiert
+- [x] AC-8: Beobachtungsmodus meldet in den wichtigen Abläufen nichts: Anmeldung mit Turnstile, Start von Google und Facebook, Weiterleitung zu Stripe, Projekt, Editor, Cover, persönlicher Bereich, Bild-Upload
+- [x] AC-9: HTTPS wird nur auf Vercel und ohne `preload` erzwungen (Regel per Unit-Test, auf localhost im Browser geprüft, auf Vercel noch offen)
+- [x] AC-10: Build bricht auf Stage ohne Pflichtwerte ab
+- [x] AC-11: Build von `main` bricht bei falscher Adresse, Stripe-Testschlüssel, Turnstile-Testschlüssel und Test-Schaltern ab
+- [x] AC-12: Lokal gibt es nur eine Warnung, Meldungen enthalten nie Werte
+- [x] AC-13: Regeln gegen die echten Variablennamen in Vercel: Stage besteht, Production meldet genau die sieben fehlenden Werte
+- [x] AC-14: Eine zentrale Quelle für die App-Adresse
+- [x] AC-15: Kein Cookie-Cache, kein `SESSION_SECRET`, keine Migration
+
+### Security Audit Results
+
+- [x] Clickjacking: Die App lädt nicht in einem fremden Frame
+- [x] Token-Schutz: Einladungs-Token gelangen nicht über den Referrer nach außen
+- [x] Injection: `<base>` und `<object>` werden vom aktiven CSP-Kern blockiert
+- [x] Client-Bundle: keine Secret-Werte, keine Namen geheimer Variablen, keine Stripe-, Webhook- oder Resend-Schlüssel (34 Dateien). Lokal ist nur der Service-Role-Key als Wert vorhanden, die übrigen wurden über ihre Namen und Muster geprüft
+- [x] Konfigurationsprüfung gibt keine Werte aus
+
+### Bugs Found
+
+#### BUG-1: Lokaler Production-Build stürzt ohne App-Adresse ab
+- **Severity:** Low
+- **Schritte:** `.env.local` ohne `NEXT_PUBLIC_SITE_URL`, `npm run build`, `npm run start`, „Passwort vergessen" absenden.
+- **Erwartet:** Lokal gilt `http://localhost:3000`. **Tatsächlich:** Die Action wirft `NEXT_PUBLIC_SITE_URL fehlt`. Der Build warnt lokal nur. Auf Stage und Production kann das nicht passieren, weil der Build dort abbricht.
+- **Status:** Behoben am 2026-11-22. Lokal gilt jetzt auch im Production-Build `http://localhost:3000`, auf Vercel bleibt der Ersatzwert gesperrt. Die Regression lief danach ohne gesetzte Adresse grün.
+
+#### BUG-2: Gelöschte Kapitel lassen ihre Bilder im Speicher zurück
+- **Severity:** Medium
+- **Beschreibung:** `deleteChapterAction` entfernt nur den Datensatz. Im QA-Projekt lagen 30 verwaiste Bilder (rund 107 MB). Das betrifft auch persönliche Fotos und bestand schon vor PROJ-19.
+- **Priorität:** Vor dem Go-live, gehört zu **PROJ-26** (endgültiges Löschen aus dem Papierkorb entfernt auch die Dateien).
+
+### Automatische Tests
+
+- Unit-Tests: 691 von 691
+- PROJ-19 E2E auf dem Production-Build: 15 von 15
+- Komplette E2E-Regression Chromium auf dem Production-Build: 148 bestanden, 25 übersprungen, 0 fehlgeschlagen. Der Test AC-14 aus PROJ-3 blieb bewusst außen vor, weil er eine echte Reset-Mail auslöst
+
+**Nicht geprüft:** Ablauf auf `stage-app.narravit.de` (noch nicht deployed), vollständige Anmeldung bei Google und Facebook, echte Stripe-Session, echter Turnstile-Schlüssel, Firefox und Safari, Embed-Elemente in Webflow.
+
+### Summary
+
+- **Acceptance Criteria:** 15 von 15 bestanden
+- **Bugs:** 1 offen (BUG-2, Medium, wird mit PROJ-26 gelöst), BUG-1 ist behoben
+- **Security:** bestanden
+- **Production Ready:** JA, nach Prüfung der Header auf Stage
+- **Empfehlung:** Auf `stage` pushen und die Header dort einmal prüfen
 
 ## Deployment
 _To be added by /deploy_
