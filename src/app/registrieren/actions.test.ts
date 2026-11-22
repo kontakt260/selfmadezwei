@@ -86,6 +86,14 @@ describe("registerAction — Rate-Limit", () => {
     ]);
   });
 
+  it("returns name and address after an error, never the passwords", async () => {
+    const res = await registerAction({}, form({ confirmPassword: "anders-456" }));
+    expect(res.fullName).toBe("Maria Muster");
+    expect(res.email).toBe("maria@example.test");
+    expect(JSON.stringify(res)).not.toContain("geheim-123");
+    expect(JSON.stringify(res)).not.toContain("anders-456");
+  });
+
   it("keeps the count for any other answer", async () => {
     signUp.mockResolvedValue({ data: { user: null }, error: { code: "weak_password" } });
     await registerAction({}, form());

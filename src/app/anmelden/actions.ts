@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { accountExists } from "@/lib/auth/account-exists";
 import { hasPendingClaim, isDefaultLandingTarget } from "@/lib/purchases/pending-claim";
 import { CAPTCHA_FAILED_MESSAGE, captchaTokenFrom, isCaptchaError } from "@/lib/captcha";
+import { submittedText } from "@/lib/form-values";
 import {
   RATE_LIMITS,
   RATE_LIMIT_MESSAGES,
@@ -33,12 +34,19 @@ export type LoginState = {
   fieldErrors?: Partial<Record<"email" | "password", string>>;
   /** Ziel, das der Browser per voller Navigation aufrufen muss. */
   redirectTo?: string;
+  /** Bleibt nach einem Fehler im Feld stehen. */
+  email?: string;
 };
 
 export async function loginAction(
   _prev: LoginState,
   formData: FormData,
 ): Promise<LoginState> {
+  const result = await submitLogin(formData);
+  return { ...result, email: submittedText(formData, "email") };
+}
+
+async function submitLogin(formData: FormData): Promise<LoginState> {
   const parsed = schema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
@@ -119,12 +127,19 @@ const resendSchema = z.object({
 export type ResendState = {
   success?: boolean;
   error?: string;
+  /** Bleibt nach einem Fehler im Feld stehen. */
+  email?: string;
 };
 
 export async function resendConfirmAction(
   _prev: ResendState,
   formData: FormData,
 ): Promise<ResendState> {
+  const result = await submitResend(formData);
+  return result.success ? result : { ...result, email: submittedText(formData, "email") };
+}
+
+async function submitResend(formData: FormData): Promise<ResendState> {
   const parsed = resendSchema.safeParse({ email: formData.get("email") });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Ungültige E-Mail." };

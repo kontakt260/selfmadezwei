@@ -55,6 +55,7 @@ export default function PasswortVergessenPage() {
             type="email"
             autoComplete="email"
             required
+            defaultValue={state.email}
             aria-invalid={Boolean(state.fieldErrors?.email)}
             className="h-12"
           />

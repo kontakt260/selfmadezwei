@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { CAPTCHA_FAILED_MESSAGE, captchaTokenFrom, isCaptchaError } from "@/lib/captcha";
+import { submittedText } from "@/lib/form-values";
 import {
   RATE_LIMITS,
   RATE_LIMIT_MESSAGES,
@@ -56,12 +57,24 @@ export type RegisterState = {
   fieldErrors?: Partial<
     Record<"fullName" | "email" | "password" | "confirmPassword", string>
   >;
+  /** Bleiben nach einem Fehler in den Feldern stehen, die Passwörter nicht. */
+  fullName?: string;
+  email?: string;
 };
 
 export async function registerAction(
   _prev: RegisterState,
   formData: FormData,
 ): Promise<RegisterState> {
+  const result = await submitRegistration(formData);
+  return {
+    ...result,
+    fullName: submittedText(formData, "fullName", 200),
+    email: submittedText(formData, "email"),
+  };
+}
+
+async function submitRegistration(formData: FormData): Promise<RegisterState> {
   const parsed = schema.safeParse({
     fullName: formData.get("fullName"),
     email: formData.get("email"),

@@ -79,6 +79,7 @@ function ExpiredLinkBanner() {
           name="email"
           type="email"
           required
+          defaultValue={resendState.email}
           className="h-12"
         />
       </div>
@@ -105,9 +106,6 @@ export function AnmeldenClient({ initialEmail, initialNext, showExpiredLink }: P
     {},
   );
   const [captchaReady, setCaptchaReady] = useState(!TURNSTILE_ENABLED);
-  // React leert das Formular nach jeder Action. Die Adresse soll nach einem
-  // Fehlversuch stehen bleiben, das Passwort nicht.
-  const [email, setEmail] = useState(initialEmail);
 
   // Einlösen eines Kaufs: volle Navigation, siehe loginAction.
   useEffect(() => {
@@ -140,8 +138,7 @@ export function AnmeldenClient({ initialEmail, initialNext, showExpiredLink }: P
             type="email"
             autoComplete="email"
             required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            defaultValue={state.email ?? initialEmail}
             aria-invalid={Boolean(state.fieldErrors?.email)}
             className="h-12"
           />

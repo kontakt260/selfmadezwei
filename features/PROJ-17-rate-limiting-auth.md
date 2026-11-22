@@ -2,7 +2,7 @@
 
 ## Status: Approved
 **Created:** 2026-05-16
-**Last Updated:** 2026-11-22 (QA bestanden, Handtest auf Stage von Jakob bestätigt; Production folgt beim Go-live)
+**Last Updated:** 2026-11-22 (QA bestanden, Handtest auf Stage bestätigt; BUG-10 und die Korrektur von BUG-5 lokal geprüft, noch nicht auf Stage)
 **Priority:** P0 (Security-Blocker für Public-Launch)
 **Trigger:** Vibe-Security-Audit 2026-05-16 — High-Finding #1
 
@@ -304,6 +304,7 @@ Die Reihenfolge ist wichtig: Ist CAPTCHA in Supabase aktiv, bevor der Code das T
 
 #### BUG-5: E-Mail-Feld wird nach jedem fehlgeschlagenen Login geleert
 - **Status:** Behoben 2026-11-22. Die Adresse bleibt stehen, das Passwort wird geleert.
+- **Korrektur:** Der erste Fix (`fdafb43`, gesteuertes Feld) löschte Text, der vor dem Laden des JavaScripts getippt oder vom Passwort-Manager eingetragen wurde. Jetzt bleibt das Feld ungesteuert, die Action gibt die Adresse zurück (`src/lib/form-values.ts`).
 - **Severity:** Medium (vorbestehend)
 - **Tatsächlich:** React setzt das Formular nach der Action zurück. Die Person muss die Adresse bei jedem Versuch neu eintippen.
 - **Priorität:** Vor dem Go-live empfohlen
@@ -331,14 +332,15 @@ Die Reihenfolge ist wichtig: Ist CAPTCHA in Supabase aktiv, bevor der Code das T
 - **Priorität:** Vor dem Go-live empfohlen
 
 #### BUG-10: Registrierung und „Passwort vergessen" leeren die Felder nach einem Fehler
+- **Status:** Behoben 2026-11-22, auch für „Bestätigung erneut senden". Name und Adresse bleiben stehen, Passwörter nie. Im Browser geprüft, auch mit Text, der vor dem Laden der Seite getippt wurde.
 - **Severity:** Medium (vorbestehend, beim Nachtest von BUG-5 gefunden)
 - **Reproduktion:** Registrierung mit zwei verschiedenen Passwörtern absenden, oder „Passwort vergessen" mit fehlgeschlagener Sicherheitsprüfung.
 - **Tatsächlich:** Name und E-Mail (Registrierung) sowie die E-Mail (Passwort vergessen) sind danach leer.
 - **Priorität:** Vor dem Go-live empfohlen
 
 ### Nachtest nach den Fixes (2026-11-22, lokal gegen Stage)
-- [x] Unit-Tests: 613 bestanden. Typprüfung, Lint und Production-Build fehlerfrei
-- [x] E2E in Chromium: 133 bestanden, 2 übersprungen. Limit-E2E bestanden
+- [x] Unit-Tests: 620 bestanden. Typprüfung, Lint und Production-Build fehlerfrei
+- [x] E2E in Chromium: 134 bestanden, 2 übersprungen. Limit-E2E bestanden
 - [x] Login nennt im Browser „noch kein Konto" und „Passwort stimmt nicht"
 - [x] `account_exists` auf Stage eingespielt: nur `service_role` darf sie aufrufen, der öffentliche Schlüssel bekommt 401, keine neuen Security-Advisor-Hinweise
 - [x] Drei Anfragen ohne Token sperren eine fremde Adresse nicht mehr (Reset und Resend)
@@ -349,7 +351,7 @@ Die Reihenfolge ist wichtig: Ist CAPTCHA in Supabase aktiv, bevor der Code das T
 
 ### Summary
 - **Acceptance Criteria:** 22 von 24 bestanden, 2 offen bis zum Go-live (echter Schlüssel, IP-Header auf Vercel)
-- **Bugs:** 10 gefunden, 6 behoben, BUG-8 akzeptiert. Offen: BUG-10 (Medium), BUG-7, BUG-9 (Low)
+- **Bugs:** 10 gefunden, 7 behoben, BUG-8 akzeptiert. Offen: BUG-7, BUG-9 (Low)
 - **Security:** Keine offenen Critical- oder High-Befunde
 - **Production Ready:** JA für den Code. Die zwei offenen Punkte lassen sich erst auf Production prüfen und stehen in `docs/production/prod-umzug.md`
 - **Empfehlung:** Beim Go-live `/deploy` entlang der Checkliste

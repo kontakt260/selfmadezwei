@@ -112,6 +112,16 @@ describe("loginAction — Rate-Limit", () => {
     expect(undoRateLimits).not.toHaveBeenCalled();
   });
 
+  it("returns the address after an error, never the password", async () => {
+    signInWithPassword.mockResolvedValue({
+      data: { user: null },
+      error: { code: "invalid_credentials" },
+    });
+    const res = await loginAction({}, loginForm());
+    expect(res.email).toBe("maria@example.test");
+    expect(JSON.stringify(res)).not.toContain("geheim-123");
+  });
+
   it("stays neutral when the account lookup fails", async () => {
     signInWithPassword.mockResolvedValue({
       data: { user: null },

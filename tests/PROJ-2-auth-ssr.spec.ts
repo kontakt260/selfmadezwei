@@ -117,6 +117,11 @@ test.describe("PROJ-2 — Form validation (Zod, server actions)", () => {
     await page.locator('input[name="confirmPassword"]').fill("password456");
     await page.getByRole("button", { name: "Konto erstellen" }).click();
     await expect(page.getByText(/stimmen nicht überein/)).toBeVisible();
+    // PROJ-17 BUG-10: Name und Adresse bleiben stehen, die Passwörter nicht.
+    await expect(page.locator('input[name="fullName"]')).toHaveValue("Test User");
+    await expect(page.locator('input[name="email"]')).toHaveValue("test@example.com");
+    await expect(page.locator('input[name="password"]')).toHaveValue("");
+    await expect(page.locator('input[name="confirmPassword"]')).toHaveValue("");
   });
 
   test("register with short password shows error", async ({ page }) => {
@@ -144,6 +149,14 @@ test.describe("PROJ-2 — Form validation (Zod, server actions)", () => {
     await page.locator('input[name="email"]').fill("does-not-exist@example.com");
     await page.getByRole("button", { name: /Reset-Link senden/ }).click();
     await expect(page.getByText(/Falls ein Konto mit dieser E-Mail existiert/)).toBeVisible();
+  });
+
+  test("forgot-password keeps the address after an error", async ({ page }) => {
+    await page.goto("/passwort-vergessen");
+    await page.locator('input[name="email"]').fill("keine-adresse");
+    await page.getByRole("button", { name: /Reset-Link senden/ }).click();
+    await expect(page.getByText(/gültige E-Mail/)).toBeVisible();
+    await expect(page.locator('input[name="email"]')).toHaveValue("keine-adresse");
   });
 });
 

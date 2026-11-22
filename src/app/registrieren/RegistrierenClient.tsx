@@ -66,6 +66,7 @@ export function RegistrierenClient({
             type="text"
             autoComplete="name"
             required
+            defaultValue={state.fullName}
             aria-invalid={Boolean(state.fieldErrors?.fullName)}
             className="h-12"
           />
@@ -82,7 +83,7 @@ export function RegistrierenClient({
             type="email"
             autoComplete="email"
             required
-            defaultValue={initialEmail}
+            defaultValue={state.email ?? initialEmail}
             aria-invalid={Boolean(state.fieldErrors?.email)}
             className="h-12"
           />

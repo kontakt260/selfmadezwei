@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { CAPTCHA_FAILED_MESSAGE, captchaTokenFrom, isCaptchaError } from "@/lib/captcha";
+import { submittedText } from "@/lib/form-values";
 import {
   RATE_LIMITS,
   RATE_LIMIT_MESSAGES,
@@ -19,12 +20,19 @@ export type ForgotPasswordState = {
   success?: boolean;
   error?: string;
   fieldErrors?: { email?: string };
+  /** Bleibt nach einem Fehler im Feld stehen. */
+  email?: string;
 };
 
 export async function forgotPasswordAction(
   _prev: ForgotPasswordState,
   formData: FormData,
 ): Promise<ForgotPasswordState> {
+  const result = await requestPasswordReset(formData);
+  return result.success ? result : { ...result, email: submittedText(formData, "email") };
+}
+
+async function requestPasswordReset(formData: FormData): Promise<ForgotPasswordState> {
   const parsed = schema.safeParse({ email: formData.get("email") });
 
   if (!parsed.success) {

@@ -73,6 +73,12 @@ describe("forgotPasswordAction — Rate-Limit", () => {
     ]);
   });
 
+  it("returns the address after an error", async () => {
+    resetPasswordForEmail.mockResolvedValue({ error: { code: "captcha_failed" } });
+    const res = await forgotPasswordAction({}, form());
+    expect(res.email).toBe("maria@example.test");
+  });
+
   it("keeps the count when a mail was requested", async () => {
     await forgotPasswordAction({}, form("token-3"));
     expect(undoRateLimits).not.toHaveBeenCalled();
