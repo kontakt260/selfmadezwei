@@ -17,9 +17,9 @@
 
 > ℹ️ **Anpassung 2026-11-21 — Zeichenkodierung.** In den Supabase-Mails kamen Umlaute, Anführungszeichen, Striche und der Mittelpunkt kaputt an („f√ºr"). Das HTML **aller** Mails ist jetzt reines ASCII: `src/emails/encoding.ts` wandelt Sonderzeichen in numerische HTML-Codes, angewendet in `sendEmail` und beim Erzeugen von `supabase/templates/`. Klartext-Fassung und Betreff bleiben UTF-8. Geprüft: alle 14 Vorlagen zeigen auch bei absichtlich falscher Kodierung denselben Text.
 
-## Status: In Review
+## Status: Approved
 **Created:** 2026-05-22
-**Last Updated:** 2026-11-22 (QA-Befunde BUG-13 bis 18 behoben, Rabattcode eingebaut; offen: Coupon in Stripe, erneute QA, Impressum vor dem Go-live)
+**Last Updated:** 2026-11-22 (QA Re-Test bestanden, BUG-19 und BUG-20 behoben; offen: Impressum vor dem Go-live)
 
 ## Dependencies
 - Requires **PROJ-2** (Auth + SSR) — User-Profile mit E-Mail-Adressen als Empfänger; Verifikations-Status als Voraussetzung für Welcome-Mail
@@ -809,7 +809,99 @@ Von Jakob freigegeben („Alle Code-Fixes").
 
 **Tests:** Vitest 522/522, Typprüfung fehlerfrei, Lint 0 Fehler, Production-Build erfolgreich. Playwright Chromium: Im ersten Lauf fiel `AC-Break-1` (Kapitel-Editor, bekannt sporadisch, ohne Bezug zu den Mails) aus, der vollständige zweite Lauf hatte 132 bestanden und 1 übersprungen. Darstellung bei 320, 375 und 600 px ohne Überlauf.
 
-**Nicht geprüft:** Einlösen des Codes im echten Stripe-Checkout, der Coupon muss zuerst in Stripe angelegt werden.
+**Live-Test auf Stage (Jakob, 2026-11-22): bestanden.** Stand `f51dea5`, Code `BUCH50`: Neues Konto bekommt die Willkommens-Mail mit Code, Stripe zieht im Checkout 50 € ab, Konten über Kauf oder Einladung bekommen keinen Code.
+
+**Nicht geprüft:** Ablehnung des Codes bei der Verlängerung und der Coupon im Live-Modus (beides in der Prod-Checkliste).
+
+---
+
+## QA Re-Test — 2026-11-22 (nach den Fixes und dem Rabattcode)
+
+**Getestet:** Stand `f51dea5` auf `stage`, Stage-Datenbank, Live-Tests von Jakob auf `stage-app.narravit.de`
+**Tester:** QA Engineer (AI)
+
+### Testläufe
+
+| Lauf | Ergebnis |
+|---|---|
+| Vitest | **522/522** grün |
+| Typprüfung / Lint | fehlerfrei / 0 Fehler, 2 bekannte Warnungen |
+| Playwright Chromium, alle Suites | **131 bestanden**, 1 übersprungen, 1 Timeout in `AC-Display-1` (PROJ-7). Die PROJ-7-Suite lief danach einzeln dreimal komplett grün. |
+| Echter Resend-Client gegen simulierte Ausfälle (429, 500, 502, Verbindungsabbruch, Kontingent, 401, 422) | alle 8 Fälle wie vorgesehen, Wiederholungen mit demselben Idempotenz-Schlüssel |
+| Warteschlange mit nachgebildeter Datenbank | zwei parallele Läufe verschicken nur einmal; Dauerausfall zeigt BUG-19 |
+| Alle 14 Mail-Fassungen | HTML reines ASCII, Sie-Form, keine Platzhalter, nur erlaubte Links |
+| Darstellung bei 320, 375 und 600 px | 84 Darstellungen ohne Überlauf, die Rabatt-Fassung ebenfalls |
+| Live auf Stage (Jakob) | Cron-Kontrolllauf ohne Doppelversand, Rabattcode in Mail und Stripe-Checkout |
+
+**Nicht geprüft:** Darstellung in Outlook und weiteren Mail-Programmen, Firefox und Safari, automatischer Vercel-Cron (erst nach dem Merge auf `main`), die 7-Tage-Erinnerung im Live-Versand, ein echter Resend-Ausfall auf Stage, die Ablehnung von `BUCH50` bei der Verlängerung.
+
+### Acceptance Criteria
+
+| Bereich | Ergebnis | Anmerkung |
+|---|---|---|
+| Resend, Absender aus Env | ✅ | |
+| Deutsch, Sie-Form | ✅ | |
+| Footer mit Kontakt und Impressum | ❌ | Impressum liefert weiter 404 (BUG-1), kommt mit der Webflow-Überarbeitung |
+| Versand blockiert den Nutzer nicht | ✅ | |
+| Idempotenz | ✅ | inklusive Wiederholungen und paralleler Cron-Läufe |
+| Mail 1 Einladung inkl. Geschenk | ✅ | |
+| Mail 2 Kauf (02, 03, 03b, 04, Gast) | ✅ | |
+| Mail 3 Vapi | entfällt | |
+| Mail 4 Willkommen inkl. Rabattcode | ✅ | live geprüft |
+| Mail 5 Verlängerung (10, 10b) | ✅ | |
+| Mail 6 Erinnerung 30 Tage | ✅ | Versand live, Tageszahl korrigiert |
+| Mail 7 Erinnerung 7 Tage | ⚠️ | nur Unit-Tests |
+| Fehlerverhalten bei Resend-Ausfall | ⚠️ | Nachholen funktioniert, Hinweis an den Support kann ausbleiben (BUG-19) |
+| Ungültige Adresse: kein API-Aufruf | ✅ | |
+
+### Security Audit
+
+- [x] `mail_retry_queue`: RLS aktiv, keine Policies, `anon` und `authenticated` ohne Rechte (auf Stage geprüft).
+- [x] Das Einlöse-Geheimnis der Gast-Kauf-Mail liegt nie in der Warteschlange.
+- [x] Der Hinweis an den Support enthält keine Empfänger oder Namen.
+- [x] Schadcode in Namen, Adressen und Projekttiteln kommt in allen 14 Mails nur als Text an.
+- [x] `EMAIL_TEST_RECIPIENT` gilt nur noch für Preview und Development.
+- [ ] Mengenbegrenzung für Einladungen fehlt weiter (BUG-10, PROJ-17).
+- [ ] Daten in der Warteschlange überdauern eine Kontolöschung (BUG-20).
+
+### Neue Befunde
+
+#### BUG-19 (Medium) ✅ behoben — Der Hinweis an den Support geht bei einem Dauerausfall selbst verloren
+- **Ort:** `sendGaveUpAlert` und `processMailRetryQueue` in `src/lib/email/retry-mails.ts`.
+- **Reproduktion:** Resend scheitert an drei Cron-Läufen, zum Beispiel wegen eines falschen API-Schlüssels nach dem Go-live. Beim dritten Lauf wird die Mail aufgegeben, der Hinweis läuft über denselben Dienst und scheitert ebenfalls. Danach funktioniert Resend wieder.
+- **Erwartet:** Der Hinweis oder die Mail wird nachgeholt.
+- **Tatsächlich:** Im Test gab es nach der Erholung **0 Versandversuche**. Die Mail bleibt nur als Eintrag in `mail_retry_queue` stehen und wird nach 30 Tagen gelöscht, ohne dass jemand davon erfährt.
+- **Priorität:** vor dem Go-live beheben.
+
+#### BUG-20 (Low) ✅ behoben — Einträge der Warteschlange überdauern eine Kontolöschung
+Die Einträge sind nicht mit dem Konto verknüpft. Nach `deleteAccountAction` bleiben Name und Adresse bis zu 30 Tage nach dem letzten Versuch gespeichert, bei Einladungen auch der Token, und eine offene Mail kann noch rausgehen. Tritt nur auf, wenn in diesem Zeitraum ein Versand gescheitert ist.
+
+**Sporadische E2E-Ausfälle außerhalb der Mails:** `AC-Display-1` (PROJ-7) lief einmal beim Warten auf `networkidle` in einen Timeout. `AC-Break-1` (PROJ-5) fiel am 2026-11-22 in 3 von 9 Läufen aus, auch einzeln: Seite 2 begann nach einem manuellen Umbruch nicht am oberen Rand (233 px statt höchstens 2 px). **Ungeklärt ist, ob der Test zu früh misst oder der Editor kurzzeitig wirklich falsch umbricht.**
+
+### Stand der früheren Befunde
+
+- **Behoben und bestätigt:** BUG-2 bis BUG-8, BUG-11 bis BUG-18.
+- **Weiter offen:** BUG-1 (Medium, Impressum, Go-live-Blocker in der Checkliste), BUG-9 (Low, hängt an PROJ-12), BUG-10 (Low, PROJ-17).
+
+### Summary
+
+- **Acceptance Criteria:** 10 bestanden, 2 mit Einschränkung, 1 nicht erfüllt (von 13, ohne Vapi)
+- **Offene Bugs:** 5 (0 Critical, 0 High, 2 Medium, 3 Low)
+- **Security:** keine kritische Lücke
+- **Production Ready:** **JA**, für den Merge auf Production gelten die Pflichtpunkte aus `docs/production/prod-umzug.md`
+- **Empfehlung:** BUG-19 vor dem Go-live beheben. Status **Approved**.
+
+## Implementation Notes (Backend) — 2026-11-22: Fixes aus dem QA Re-Test
+
+Von Jakob freigegeben („BUG-19 und 20").
+
+- **BUG-19:** Eine Mail gilt erst als aufgegeben, wenn der Hinweis beim Support angekommen ist. Scheitert auch der Hinweis, bleibt der Eintrag offen, und der nächste Cron-Lauf versucht Mail und Hinweis erneut. Klappt die Mail nach der Erholung, ist kein Hinweis mehr nötig. Der simulierte Dauerausfall liefert jetzt nach der Erholung die Mail aus.
+- **BUG-20:** `deleteAccountAction` räumt die Warteschlange auf (`removeQueuedMailsOfAccount`). Mails an die Person entfallen, ebenso normale Einladungen von ihr. Bezahlte Geschenk-Einladungen gehen weiter raus, statt ihres Namens steht dort „Jemand aus Ihrem Umfeld". In der Verlängerungs-Info an andere steht „Ein Projektmitglied". Ein Fehler dabei verhindert die Kontolöschung nicht.
+- **Bewusst nicht geändert:** Die Kaufbestätigung an eine andere Person kann die Adresse einer beschenkten Person nennen, die ihr Konto gelöscht hat. Die Angabe stammt vom Käufer selbst.
+
+**Tests:** Vitest 533/533, Typprüfung fehlerfrei, Lint 0 Fehler, Production-Build erfolgreich. Playwright Chromium, komplette Suite: 123 bestanden, 1 übersprungen, `AC-Break-1` rot, dadurch 8 Folgetests im selben Block nicht gelaufen. Die Editor-Suite lief danach einzeln dreimal: zweimal alle 20 grün, einmal wieder `AC-Break-1` rot.
+
+**Offen:** BUG-1 (Impressum, Go-live-Blocker), BUG-9 (PROJ-12), BUG-10 (PROJ-17) und die ungeklärte Ursache von `AC-Break-1`.
 
 ## Deployment
 _To be added by /deploy_

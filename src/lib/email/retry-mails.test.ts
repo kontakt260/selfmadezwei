@@ -47,6 +47,10 @@ function query(table: string) {
       filters.push((row) => (row[column] ?? null) === value);
       return chain;
     },
+    in: (column: string, values: unknown[]) => {
+      filters.push((row) => values.includes(row[column]));
+      return chain;
+    },
     lt: (column: string, value: string) => {
       filters.push((row) => row[column] != null && String(row[column]) < value);
       return chain;
@@ -224,6 +228,50 @@ describe("processMailRetryQueue", () => {
     expect(html).toContain("Kaufbest");
     expect(html).not.toContain("maria@example.test");
     expect(html).not.toContain("oma@example.test");
+  });
+
+  it("keeps the mail open when the alert fails too, and delivers it after recovery (BUG-19)", async () => {
+    const down = { ok: false as const, error: "resend down", redirected: false, retryable: true };
+    vi.mocked(sendEmail).mockResolvedValue(down);
+    tables.mail_retry_queue.push(
+      queued("portal_purchase", purchasePayload, { attempts: MAX_RETRY_ATTEMPTS - 1 }),
+    );
+
+    const outage = await processMailRetryQueue();
+
+    expect(outage.gaveUp).toBe(0);
+    expect(tables.mail_retry_queue[0].gave_up_at).toBeNull();
+
+    vi.mocked(sendEmail).mockReset().mockResolvedValue({ ok: true, messageId: "msg", redirected: false });
+    const recovered = await processMailRetryQueue();
+
+    expect(recovered).toMatchObject({ retried: 1, sent: 1, gaveUp: 0 });
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(sendEmail).mock.calls[0][0].to).toBe("maria@example.test");
+    expect(tables.mail_retry_queue).toHaveLength(0);
+  });
+
+  it("repeats the alert until it arrives when the mail itself keeps failing (BUG-19)", async () => {
+    const down = { ok: false as const, error: "invalid address", redirected: false, retryable: true };
+    vi.mocked(sendEmail).mockResolvedValue(down);
+    tables.mail_retry_queue.push(
+      queued("portal_purchase", purchasePayload, { attempts: MAX_RETRY_ATTEMPTS - 1 }),
+    );
+    await processMailRetryQueue();
+
+    vi.mocked(sendEmail)
+      .mockReset()
+      .mockResolvedValueOnce(down)
+      .mockResolvedValueOnce({ ok: true, messageId: "alert", redirected: false });
+    const result = await processMailRetryQueue();
+
+    expect(result.gaveUp).toBe(1);
+    expect(vi.mocked(sendEmail).mock.calls[1][0].to).toBe(MAIL_ALERT_RECIPIENT);
+    expect(tables.mail_retry_queue[0].gave_up_at).toEqual(expect.any(String));
+
+    vi.mocked(sendEmail).mockClear();
+    await processMailRetryQueue();
+    expect(sendEmail).not.toHaveBeenCalled();
   });
 
   it("does not retry or alert again for a mail it gave up on", async () => {

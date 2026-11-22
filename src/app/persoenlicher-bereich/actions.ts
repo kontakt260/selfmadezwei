@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
+import { removeQueuedMailsOfAccount } from "@/lib/email/retry-queue";
 
 // ─── Update Name ────────────────────────────────────────────────────────────
 
@@ -121,6 +122,13 @@ export async function deleteAccountAction(
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  // Der Name wird gleich mit dem Profil gelöscht, die Warteschlange braucht ihn.
+  const { data: profile } = await adminClient
+    .from("profiles")
+    .select("full_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
   // 1) public.profiles explizit löschen — CASCADE räumt automatisch auch
   //    project_members und projects (owner_id) mit auf. payments + voice_sessions
   //    behalten ihre Records (user_id wird NULL gesetzt) für Audit-Trail.
@@ -134,6 +142,10 @@ export async function deleteAccountAction(
       error: "Account konnte nicht gelöscht werden. Bitte wenden Sie sich an den Support.",
     };
   }
+
+  // Noch nicht verschickte Mails an diese Person entfallen, ihr Name
+  // verschwindet aus Mails an andere (BUG-20).
+  await removeQueuedMailsOfAccount({ email: user.email, fullName: profile?.full_name });
 
   // 2) auth.users löschen — CASCADE räumt zusätzlich die auth.*-Tabellen auf
   //    (sessions, identities, mfa_factors, oauth_*, one_time_tokens, webauthn_*).

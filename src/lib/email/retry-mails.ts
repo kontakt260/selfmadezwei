@@ -18,9 +18,11 @@ import {
 
 // PROJ-11 BUG-13 — holt gescheiterte Mails nach (täglicher Cron).
 //
-// Pro Lauf ein Versuch je Mail. Nach dem letzten Versuch bleibt der Eintrag
-// für den Support stehen, und die Support-Adresse bekommt einen Hinweis ohne
-// personenbezogene Daten. Solche Einträge werden nach 30 Tagen gelöscht.
+// Pro Lauf ein Versuch je Mail. Nach dem letzten Versuch bekommt die
+// Support-Adresse einen Hinweis ohne personenbezogene Daten. Erst wenn dieser
+// Hinweis angekommen ist, gilt die Mail als aufgegeben (BUG-19): Fällt Resend
+// länger aus, scheitert auch der Hinweis, und der nächste Lauf versucht beides
+// erneut. Aufgegebene Einträge werden nach 30 Tagen gelöscht.
 
 export const MAX_RETRY_ATTEMPTS = 3;
 export const GAVE_UP_RETENTION_DAYS = 30;
@@ -47,6 +49,7 @@ export type MailRetryResult = {
   sent: number;
   /** Nicht mehr nötig, z. B. Einladung inzwischen angenommen oder widerrufen. */
   dropped: number;
+  /** Aufgegeben und dem Support gemeldet. */
   gaveUp: number;
 };
 
@@ -98,7 +101,8 @@ async function deliver(supabase: ServiceClient, row: QueueRow): Promise<Delivery
   }
 }
 
-async function sendGaveUpAlert(kinds: string[]): Promise<void> {
+/** Gibt zurück, ob der Hinweis beim Support angekommen ist. */
+async function sendGaveUpAlert(kinds: string[]): Promise<boolean> {
   const counts = new Map<string, number>();
   for (const kind of kinds) {
     const label = KIND_LABELS[kind] ?? kind;
@@ -117,6 +121,7 @@ async function sendGaveUpAlert(kinds: string[]): Promise<void> {
   if (!result.ok) {
     console.error(`[email/retry] alert failed: ${result.error}`);
   }
+  return result.ok;
 }
 
 /** Ein Durchlauf der Warteschlange. Wirft nicht bei Fehlern einzelner Mails. */
@@ -135,7 +140,7 @@ export async function processMailRetryQueue(): Promise<MailRetryResult> {
     return result;
   }
 
-  const gaveUpKinds: string[] = [];
+  const exhausted: Array<{ id: string; kind: string }> = [];
 
   for (const row of rows ?? []) {
     const attempt = row.attempts + 1;
@@ -176,25 +181,33 @@ export async function processMailRetryQueue(): Promise<MailRetryResult> {
       continue;
     }
 
-    const gaveUp = attempt >= MAX_RETRY_ATTEMPTS;
     console.error(`[email/retry] ${row.kind} ${row.id} attempt ${attempt} failed: ${delivery.error}`);
     const { error: updateError } = await supabase
       .from("mail_retry_queue")
-      .update({
-        last_error: delivery.error.slice(0, 500),
-        gave_up_at: gaveUp ? new Date().toISOString() : null,
-      })
+      .update({ last_error: delivery.error.slice(0, 500) })
       .eq("id", row.id);
     if (updateError) {
       console.error(`[email/retry] update of ${row.id} failed: ${updateError.message}`);
     }
-    if (gaveUp) {
-      result.gaveUp += 1;
-      gaveUpKinds.push(row.kind);
-    }
+    if (attempt >= MAX_RETRY_ATTEMPTS) exhausted.push({ id: row.id, kind: row.kind });
   }
 
-  if (gaveUpKinds.length > 0) await sendGaveUpAlert(gaveUpKinds);
+  // Aufgegeben wird erst, wenn der Support Bescheid weiß. Sonst bleibt der
+  // Eintrag offen, und der nächste Lauf versucht Mail und Hinweis erneut.
+  if (exhausted.length > 0 && (await sendGaveUpAlert(exhausted.map((row) => row.kind)))) {
+    const { error: gaveUpError } = await supabase
+      .from("mail_retry_queue")
+      .update({ gave_up_at: new Date().toISOString() })
+      .in(
+        "id",
+        exhausted.map((row) => row.id),
+      );
+    if (gaveUpError) {
+      console.error(`[email/retry] marking as given up failed: ${gaveUpError.message}`);
+    } else {
+      result.gaveUp = exhausted.length;
+    }
+  }
 
   // Personenbezogene Daten nicht länger als nötig aufheben.
   const { error: purgeError } = await supabase
