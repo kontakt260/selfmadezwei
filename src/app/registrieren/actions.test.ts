@@ -15,10 +15,16 @@ vi.mock("@/lib/rate-limit", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/rate-limit")>()),
   getRequestIp: vi.fn(async () => "203.0.113.7"),
   hitRateLimits: vi.fn(),
+  undoRateLimits: vi.fn(async () => undefined),
 }));
 
 import { CAPTCHA_FAILED_MESSAGE } from "@/lib/captcha";
-import { RATE_LIMITS, RATE_LIMIT_MESSAGES, hitRateLimits } from "@/lib/rate-limit";
+import {
+  RATE_LIMITS,
+  RATE_LIMIT_MESSAGES,
+  hitRateLimits,
+  undoRateLimits,
+} from "@/lib/rate-limit";
 import { registerAction } from "./actions";
 
 function form(extra: Record<string, string> = {}) {
@@ -39,6 +45,7 @@ beforeEach(() => {
     error: null,
   });
   vi.mocked(hitRateLimits).mockReset().mockResolvedValue({ allowed: true, unavailable: false });
+  vi.mocked(undoRateLimits).mockClear();
 });
 
 describe("registerAction — Rate-Limit", () => {
@@ -74,5 +81,14 @@ describe("registerAction — Rate-Limit", () => {
     const res = await registerAction({}, form({ "cf-turnstile-response": "token-4" }));
     expect(res.error).toBe(CAPTCHA_FAILED_MESSAGE);
     expect(signUp.mock.calls[0][0].options.captchaToken).toBe("token-4");
+    expect(undoRateLimits).toHaveBeenCalledWith([
+      { rule: RATE_LIMITS.register, identifier: "203.0.113.7" },
+    ]);
+  });
+
+  it("keeps the count for any other answer", async () => {
+    signUp.mockResolvedValue({ data: { user: null }, error: { code: "weak_password" } });
+    await registerAction({}, form());
+    expect(undoRateLimits).not.toHaveBeenCalled();
   });
 });

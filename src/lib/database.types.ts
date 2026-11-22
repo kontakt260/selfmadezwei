@@ -585,6 +585,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      account_exists: { Args: { p_email: string }; Returns: boolean }
       am_i_pl_of: { Args: { p_project_id: string }; Returns: boolean }
       get_my_project_ids: { Args: never; Returns: string[] }
       rate_limit_hit: {

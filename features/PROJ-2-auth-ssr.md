@@ -36,7 +36,7 @@
 
 ### Anmeldung
 - [ ] Anmeldeseite unter `/anmelden` mit Feldern: E-Mail, Passwort
-- [ ] Falsche Zugangsdaten zeigen Fehler: "E-Mail oder Passwort falsch" (keine Unterscheidung, ob E-Mail existiert)
+- [ ] Falsche Zugangsdaten zeigen einen Fehler. **Geändert 2026-11-22 (Jakob, PROJ-17 BUG-4):** Der Login nennt jetzt, ob es zur Adresse noch kein Konto gibt oder das Passwort nicht stimmt. Die Abfrage läuft erst nach bestandenem CAPTCHA und innerhalb des Login-Limits.
 - [ ] Nach erfolgreichem Login: Weiterleitung gemäß Middleware-Logik (s. u.)
 
 ### Passwort-Reset
@@ -114,7 +114,7 @@ Der Wizard sammelt alle Daten bis zum Kauf-CTA. Kein DB-Write während des Wizar
 - Nutzer im "Als Geschenk"-Pfad gibt seine eigene E-Mail als Empfänger-E-Mail ein → Validierung zeigt Fehler: "Bitte eine andere E-Mail-Adresse angeben"
 
 ## Technical Requirements
-- Sicherheit: Keine User-Enumeration bei Login und Passwort-Reset (generische Fehlermeldungen)
+- Sicherheit: Keine User-Enumeration beim Passwort-Reset (generische Meldung). Beim Login seit 2026-11-22 bewusst aufgehoben, siehe PROJ-17 BUG-4
 - Sicherheit: Session-Token nur in HTTP-Only-Cookies (Supabase SSR-Client), nicht in `localStorage`
 - Sicherheit: Middleware läuft auf der Next.js Edge Runtime; kein Auth-Check nur client-seitig
 - Sicherheit: `service_role`-Key ausschließlich server-seitig; kein Zugang im Browser-Bundle

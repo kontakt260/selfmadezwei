@@ -16,6 +16,7 @@ vi.mock("@/lib/purchases/pending-claim", () => ({
   hasPendingClaim: vi.fn(async () => false),
   isDefaultLandingTarget: () => true,
 }));
+vi.mock("@/lib/auth/account-exists", () => ({ accountExists: vi.fn() }));
 vi.mock("@/lib/rate-limit", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/rate-limit")>()),
   getRequestIp: vi.fn(async () => "203.0.113.7"),
@@ -24,6 +25,7 @@ vi.mock("@/lib/rate-limit", async (importOriginal) => ({
   clearRateLimit: vi.fn(async () => undefined),
 }));
 
+import { accountExists } from "@/lib/auth/account-exists";
 import { CAPTCHA_FAILED_MESSAGE } from "@/lib/captcha";
 import {
   RATE_LIMITS,
@@ -59,6 +61,7 @@ beforeEach(() => {
   vi.mocked(hitRateLimits).mockReset().mockResolvedValue({ allowed: true, unavailable: false });
   vi.mocked(undoRateLimits).mockClear();
   vi.mocked(clearRateLimit).mockClear();
+  vi.mocked(accountExists).mockReset().mockResolvedValue(true);
 });
 
 describe("loginAction — Rate-Limit", () => {
@@ -93,8 +96,36 @@ describe("loginAction — Rate-Limit", () => {
       error: { code: "invalid_credentials" },
     });
     const res = await loginAction({}, loginForm());
-    expect(res.error).toBe("E-Mail oder Passwort falsch.");
+    expect(res.error).toBe("Das Passwort stimmt leider nicht.");
     expect(undoRateLimits).not.toHaveBeenCalled();
+  });
+
+  it("says when the address has no account and keeps the count", async () => {
+    signInWithPassword.mockResolvedValue({
+      data: { user: null },
+      error: { code: "invalid_credentials" },
+    });
+    vi.mocked(accountExists).mockResolvedValue(false);
+    const res = await loginAction({}, loginForm());
+    expect(res.error).toBe("Zu dieser E-Mail gibt es noch kein Konto.");
+    expect(accountExists).toHaveBeenCalledWith("maria@example.test");
+    expect(undoRateLimits).not.toHaveBeenCalled();
+  });
+
+  it("stays neutral when the account lookup fails", async () => {
+    signInWithPassword.mockResolvedValue({
+      data: { user: null },
+      error: { code: "invalid_credentials" },
+    });
+    vi.mocked(accountExists).mockResolvedValue(null);
+    const res = await loginAction({}, loginForm());
+    expect(res.error).toBe("E-Mail oder Passwort falsch.");
+  });
+
+  it("does not look up the address above the limit", async () => {
+    vi.mocked(hitRateLimits).mockResolvedValue({ allowed: false, unavailable: false });
+    await loginAction({}, loginForm());
+    expect(accountExists).not.toHaveBeenCalled();
   });
 
   it("does not count a failed security check as a wrong password", async () => {
@@ -102,15 +133,33 @@ describe("loginAction — Rate-Limit", () => {
     const res = await loginAction({}, loginForm());
     expect(res.error).toBe(CAPTCHA_FAILED_MESSAGE);
     expect(undoRateLimits).toHaveBeenCalledWith([ipCheck, accountCheck]);
+    expect(accountExists).not.toHaveBeenCalled();
   });
 
-  it("does not count other errors", async () => {
+  it("asks to confirm the address without counting the attempt", async () => {
     signInWithPassword.mockResolvedValue({
       data: { user: null },
       error: { code: "email_not_confirmed" },
     });
-    await loginAction({}, loginForm());
+    const res = await loginAction({}, loginForm());
+    expect(res.error).toBe("Bitte bestätigen Sie zuerst Ihre E-Mail.");
     expect(undoRateLimits).toHaveBeenCalledWith([ipCheck, accountCheck]);
+  });
+
+  it("does not blame the password for a technical error", async () => {
+    signInWithPassword.mockResolvedValue({
+      data: { user: null },
+      error: { code: "over_request_rate_limit" },
+    });
+    const res = await loginAction({}, loginForm());
+    expect(res.error).toBe(RATE_LIMIT_MESSAGES.unavailable);
+    expect(undoRateLimits).toHaveBeenCalledWith([ipCheck, accountCheck]);
+  });
+
+  it("treats a network error without code as technical", async () => {
+    signInWithPassword.mockResolvedValue({ data: { user: null }, error: { message: "fetch failed" } });
+    const res = await loginAction({}, loginForm());
+    expect(res.error).toBe(RATE_LIMIT_MESSAGES.unavailable);
   });
 
   it("after success takes back only this attempt for the IP and clears the account", async () => {
@@ -148,6 +197,20 @@ describe("resendConfirmAction — Rate-Limit", () => {
     const res = await resendConfirmAction({}, resendForm("token-2"));
     expect(res.error).toBe(CAPTCHA_FAILED_MESSAGE);
     expect(resend.mock.calls[0][0].options.captchaToken).toBe("token-2");
+  });
+
+  it("takes back only the address after a failed security check", async () => {
+    resend.mockResolvedValue({ error: { code: "captcha_failed" } });
+    await resendConfirmAction({}, resendForm());
+    expect(undoRateLimits).toHaveBeenCalledTimes(1);
+    expect(undoRateLimits).toHaveBeenCalledWith([
+      { rule: RATE_LIMITS.resendEmail, identifier: "maria@example.test" },
+    ]);
+  });
+
+  it("keeps the count when a mail was requested", async () => {
+    await resendConfirmAction({}, resendForm("token-2"));
+    expect(undoRateLimits).not.toHaveBeenCalled();
   });
 
   it("does not reveal other errors", async () => {

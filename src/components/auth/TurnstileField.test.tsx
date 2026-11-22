@@ -7,13 +7,17 @@ type WidgetProps = {
   onSuccess?: (token: string) => void;
   onExpire?: () => void;
   onError?: () => void;
+  onUnsupported?: () => void;
   onBeforeInteractive?: () => void;
   onAfterInteractive?: () => void;
+  options?: { size?: string };
 };
 const widgetRender = vi.fn<(props: WidgetProps) => void>();
 const widget = (): WidgetProps => widgetRender.mock.lastCall?.[0] ?? {};
+const windowWidth = window.innerWidth;
 
 vi.mock("@marsidev/react-turnstile", () => ({
+  DEFAULT_SCRIPT_ID: "cf-turnstile-script",
   Turnstile: forwardRef(function MockTurnstile(props: WidgetProps, ref: Ref<unknown>) {
     widgetRender(props);
     useImperativeHandle(ref, () => ({ reset }));
@@ -35,6 +39,9 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.useRealTimers();
+  delete window.turnstile;
+  document.getElementById("cf-turnstile-script")?.remove();
+  window.innerWidth = windowWidth;
 });
 
 describe("TurnstileField", () => {
@@ -73,6 +80,7 @@ describe("TurnstileField", () => {
   it("explains a failed check and offers a retry", async () => {
     const { TurnstileField } = await loadField("site-key");
     const onReady = vi.fn();
+    window.turnstile = {} as NonNullable<typeof window.turnstile>;
     render(<TurnstileField onReadyChange={onReady} />);
 
     act(() => widget().onError?.());
@@ -82,6 +90,95 @@ describe("TurnstileField", () => {
     fireEvent.click(screen.getByRole("button", { name: "Erneut versuchen" }));
     expect(reset).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("shows the retry when the script never answers", async () => {
+    const { TurnstileField } = await loadField("site-key");
+    vi.useFakeTimers();
+    const onReady = vi.fn();
+    render(<TurnstileField onReadyChange={onReady} />);
+
+    act(() => {
+      vi.advanceTimersByTime(9_999);
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("konnte nicht geladen werden");
+    expect(screen.getByRole("button", { name: "Erneut versuchen" })).toBeInTheDocument();
+    expect(onReady).toHaveBeenLastCalledWith(false);
+  });
+
+  it("clears the hint when a late token still arrives", async () => {
+    const { TurnstileField } = await loadField("site-key");
+    vi.useFakeTimers();
+    const onReady = vi.fn();
+    render(<TurnstileField onReadyChange={onReady} />);
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+
+    act(() => widget().onSuccess?.("token"));
+
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(onReady).toHaveBeenLastCalledWith(true);
+  });
+
+  it("does not time out while the person answers a challenge", async () => {
+    const { TurnstileField } = await loadField("site-key");
+    vi.useFakeTimers();
+    render(<TurnstileField onReadyChange={vi.fn()} />);
+
+    act(() => widget().onBeforeInteractive?.());
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("loads a blocked script again on retry", async () => {
+    const { TurnstileField } = await loadField("site-key");
+    vi.useFakeTimers();
+    const script = document.createElement("script");
+    script.id = "cf-turnstile-script";
+    document.head.appendChild(script);
+    render(<TurnstileField onReadyChange={vi.fn()} />);
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Erneut versuchen" }));
+
+    expect(document.getElementById("cf-turnstile-script")).toBeNull();
+    expect(reset).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("explains an unsupported browser without a pointless retry", async () => {
+    const { TurnstileField } = await loadField("site-key");
+    const onReady = vi.fn();
+    render(<TurnstileField onReadyChange={onReady} />);
+
+    act(() => widget().onUnsupported?.());
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Ihr Browser unterstützt");
+    expect(screen.queryByRole("button", { name: "Erneut versuchen" })).toBeNull();
+    expect(onReady).toHaveBeenLastCalledWith(false);
+  });
+
+  it("uses the compact widget on phones and the wide one above", async () => {
+    const { TurnstileField } = await loadField("site-key");
+    window.innerWidth = 375;
+    const phone = render(<TurnstileField onReadyChange={vi.fn()} />);
+    expect(widget().options?.size).toBe("compact");
+    phone.unmount();
+
+    window.innerWidth = 1024;
+    render(<TurnstileField onReadyChange={vi.fn()} />);
+    expect(widget().options?.size).toBe("flexible");
   });
 
   it("explains the wait when the check takes longer", async () => {

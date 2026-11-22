@@ -1,7 +1,11 @@
 "use client";
 
-import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
-import { useEffect, useRef, useState } from "react";
+import {
+  DEFAULT_SCRIPT_ID,
+  Turnstile,
+  type TurnstileInstance,
+} from "@marsidev/react-turnstile";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 
 // PROJ-17 — Sicherheitsprüfung (Cloudflare Turnstile) in den Auth-Formularen.
@@ -18,10 +22,17 @@ const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "";
 
 /** Ab dieser Wartezeit erklären wir, warum der Button noch gesperrt ist. */
 const SLOW_HINT_MS = 2000;
+/** Kommt bis dahin kein Ergebnis, ist das Skript vermutlich blockiert. */
+const LOAD_TIMEOUT_MS = 10_000;
+/**
+ * Das breite Widget braucht mindestens 300 px. Darunter passt es in den
+ * Formularen nicht mehr, auf Handys nehmen wir deshalb die kompakte Größe.
+ */
+const COMPACT_BELOW_PX = 450;
 
 export const TURNSTILE_ENABLED = SITE_KEY.length > 0;
 
-type Status = "pending" | "ready" | "failed";
+type Status = "pending" | "ready" | "failed" | "unsupported";
 
 type Props = {
   /** Meldet, ob ein gültiges Token vorliegt und das Formular absendbar ist. */
@@ -29,6 +40,11 @@ type Props = {
   /** Ändert sich nach jeder Server-Antwort, z. B. der Action-State. */
   resetSignal?: unknown;
 };
+
+const neverChanges = () => () => {};
+const widgetSizeOnClient = () =>
+  window.innerWidth < COMPACT_BELOW_PX ? ("compact" as const) : ("flexible" as const);
+const noWidgetOnServer = () => null;
 
 function SlowCheckHint() {
   const [visible, setVisible] = useState(false);
@@ -52,11 +68,13 @@ export function TurnstileField({ onReadyChange, resetSignal }: Props) {
   const [status, setStatus] = useState<Status>("pending");
   const [seenSignal, setSeenSignal] = useState(resetSignal);
   const [interactive, setInteractive] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const size = useSyncExternalStore(neverChanges, widgetSizeOnClient, noWidgetOnServer);
 
   // Neue Server-Antwort: Das Token ist verbraucht.
   if (seenSignal !== resetSignal) {
     setSeenSignal(resetSignal);
-    setStatus("pending");
+    if (status !== "unsupported") setStatus("pending");
   }
 
   useEffect(() => {
@@ -66,32 +84,62 @@ export function TurnstileField({ onReadyChange, resetSignal }: Props) {
     widget.current?.reset();
   }, [resetSignal, onReadyChange]);
 
+  // Ein blockiertes Skript meldet sich nie. Ohne diese Grenze bliebe das
+  // Formular ohne Erklärung gesperrt. Kommt das Token später doch, verschwindet
+  // der Hinweis wieder.
+  useEffect(() => {
+    if (!TURNSTILE_ENABLED || status !== "pending" || interactive) return;
+    const timer = setTimeout(() => {
+      setStatus("failed");
+      onReadyChange(false);
+    }, LOAD_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [status, interactive, loadAttempt, resetSignal, onReadyChange]);
+
   const update = (next: Status) => {
     setStatus(next);
     onReadyChange(next === "ready");
   };
 
+  const retry = () => {
+    update("pending");
+    setInteractive(false);
+    if (window.turnstile) {
+      widget.current?.reset();
+      return;
+    }
+    // Das Skript kam nie an: Das alte Tag entfernen, damit es neu geladen wird.
+    document.getElementById(DEFAULT_SCRIPT_ID)?.remove();
+    setLoadAttempt((attempt) => attempt + 1);
+  };
+
   if (!TURNSTILE_ENABLED) return null;
+
+  const visibleLayout = size === "compact" ? "flex w-full justify-center" : "w-full";
 
   return (
     <>
       {/* Ohne Rückfrage nimmt das Widget keinen Platz im Formular ein. */}
-      <div className={interactive ? "w-full" : "absolute h-0 w-0 overflow-hidden"}>
-        <Turnstile
-          ref={widget}
-          siteKey={SITE_KEY}
-          options={{
-            appearance: "interaction-only",
-            language: "de",
-            size: "flexible",
-            refreshExpired: "auto",
-          }}
-          onSuccess={() => update("ready")}
-          onExpire={() => update("pending")}
-          onError={() => update("failed")}
-          onBeforeInteractive={() => setInteractive(true)}
-          onAfterInteractive={() => setInteractive(false)}
-        />
+      <div className={interactive ? visibleLayout : "absolute h-0 w-0 overflow-hidden"}>
+        {size && (
+          <Turnstile
+            key={loadAttempt}
+            ref={widget}
+            siteKey={SITE_KEY}
+            options={{
+              appearance: "interaction-only",
+              language: "de",
+              size,
+              refreshExpired: "auto",
+            }}
+            onSuccess={() => update("ready")}
+            onExpire={() => update("pending")}
+            onError={() => update("failed")}
+            onUnsupported={() => update("unsupported")}
+            onBeforeInteractive={() => setInteractive(true)}
+            onAfterInteractive={() => setInteractive(false)}
+          />
+        )}
       </div>
 
       {/* Bei einer sichtbaren Rückfrage ist die Person selbst am Zug. */}
@@ -103,18 +151,17 @@ export function TurnstileField({ onReadyChange, resetSignal }: Props) {
             Die Sicherheitsprüfung konnte nicht geladen werden. Bitte prüfen Sie Ihre
             Internetverbindung und versuchen Sie es erneut.
           </p>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-12"
-            onClick={() => {
-              update("pending");
-              widget.current?.reset();
-            }}
-          >
+          <Button type="button" variant="outline" className="h-12" onClick={retry}>
             Erneut versuchen
           </Button>
         </div>
+      )}
+
+      {status === "unsupported" && (
+        <p role="alert" className="text-sm text-destructive">
+          Ihr Browser unterstützt die Sicherheitsprüfung nicht. Bitte aktualisieren Sie
+          ihn oder nutzen Sie einen anderen Browser.
+        </p>
       )}
     </>
   );

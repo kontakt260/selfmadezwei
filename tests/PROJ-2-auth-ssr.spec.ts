@@ -90,13 +90,23 @@ test.describe("PROJ-2 — Form validation (Zod, server actions)", () => {
     await expect(page.getByText(/gültige E-Mail/)).toBeVisible();
   });
 
-  test("login with bogus credentials shows generic error (no enumeration)", async ({ page }) => {
+  test("login with an unknown address says there is no account", async ({ page }) => {
     await page.goto("/anmelden");
     await page.locator('input[name="email"]').fill("not-a-real-user@example.com");
     await page.locator('input[name="password"]').fill("wrongpassword");
     await page.getByRole("button", { name: "Anmelden", exact: true }).click();
-    await expect(page.getByText(/E-Mail oder Passwort falsch/)).toBeVisible();
-    await expect(page.getByText(/existiert nicht/)).toHaveCount(0);
+    await expect(page.getByText("Zu dieser E-Mail gibt es noch kein Konto.")).toBeVisible();
+    // PROJ-17 BUG-5: Die Adresse bleibt stehen, das Passwort nicht.
+    await expect(page.locator('input[name="email"]')).toHaveValue("not-a-real-user@example.com");
+    await expect(page.locator('input[name="password"]')).toHaveValue("");
+  });
+
+  test("login with a wrong password names the password", async ({ page }) => {
+    await page.goto("/anmelden");
+    await page.locator('input[name="email"]').fill("qa-test@narravit.de");
+    await page.locator('input[name="password"]').fill("definitely-not-the-password");
+    await page.getByRole("button", { name: "Anmelden", exact: true }).click();
+    await expect(page.getByText("Das Passwort stimmt leider nicht.")).toBeVisible();
   });
 
   test("register with mismatched passwords shows error", async ({ page }) => {

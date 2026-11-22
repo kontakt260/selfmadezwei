@@ -54,7 +54,7 @@ Entfallen, in Production **nicht** anlegen: `STRIPE_PRICE_ID_VAPI_60`, `VAPI_API
 ### Weitere Vercel-Einstellungen
 
 - [ ] Domain `app.narravit.de` ist der Production-Domain zugeordnet (DNS siehe Abschnitt 7).
-- [ ] **Vercel Pro statt Hobby (Pflicht vor dem ersten Verkauf):** Das Projekt läuft auf dem Hobby-Plan (geprüft 2026-11-22). Die Vercel-AGB erlauben Hobby nur „for your personal or non-commercial use", NARRAVIT verkauft aber über die App. Vor dem Go-live auf den bezahlten Pro-Plan wechseln.
+- [ ] **Vercel Pro statt Hobby (Pflicht vor dem ersten Verkauf):** Das Projekt läuft auf dem Hobby-Plan (geprüft 2026-11-22). Die Vercel-AGB erlauben Hobby nur „for your personal or non-commercial use", NARRAVIT verkauft aber über die App. Hobby wird nicht nachträglich abgerechnet: Vercel darf solche Projekte laut AGB ohne Vorwarnung abschalten, und bei überschrittenen Kontingenten pausiert die Funktion bis zu 30 Tage. **Entscheidung Jakob (2026-11-22): Wechsel auf Pro kurz vor dem Go-live**, spätestens bevor die Kaufseite öffentlich wird (20 $ im Monat inkl. 20 $ Nutzung; Logs 1 Tag statt 1 Stunde, E-Mail-Support, genaue Cron-Zeiten).
 - [ ] **Function-Region in die EU:** Die Server-Funktionen laufen aktuell in `iad1` (Washington, geprüft 2026-11-22), Kundendaten gehen also über die USA. Auf `fra1` (Frankfurt) oder die Region der Supabase-Datenbank umstellen: Settings → Functions → Function Regions. Vorher die Supabase-Region prüfen und das Ergebnis in die Datenschutzerklärung übernehmen.
 - [ ] Deployment Protection (Vercel-Login) gilt nur für Stage/Preview, **nicht** für Production.
 - [ ] Cron `/api/cron/reminders` (täglich 09:00 UTC, `vercel.json`): Vercel führt Crons nur für Deployments der Umgebung „Production" aus. Nach dem ersten Lauf in den Vercel-Logs prüfen, dass er mit 200 antwortet.
@@ -68,6 +68,7 @@ Stage = Projekt-Ref `kdjhxqitfxnsavhiafdn`. Production = Haupt-Projekt (`main`) 
 
 ### Datenbank
 
+- [ ] **Supabase-Tarif:** Jakob zahlt bereits (Stand 2026-11-22). Vor dem Go-live prüfen, dass das Production-Projekt in der bezahlten Organisation liegt und tägliche Backups laufen. Der Free-Tarif hätte keine Backups, pausiert nach 7 Tagen ohne Aktivität und bietet nur 1 GB Dateispeicher.
 - [ ] Alle Migrationen aus `supabase/migrations/` in Production angewendet (Stand 2026-11-19: 17 Dateien, letzte `20261119210000_lookup_invitation_service_role_only.sql`). Mit `list_migrations` bzw. im Dashboard gegen das Repo abgleichen.
 - [x] Stage: `20261116100000_proj6_purchase_claims.sql` am 2026-11-19 über den SQL-Editor eingespielt und in `supabase_migrations.schema_migrations` vermerkt (Version `20261116100000`). In Production genauso: Datei im SQL-Editor ausführen, dann `insert into supabase_migrations.schema_migrations (version, name) values ('20261116100000', 'proj6_purchase_claims');` — ohne die Tabelle werden Gast-Käufe nicht erfasst (Webhook antwortet 500).
 - [ ] Migration `20261121100000_proj6_purchase_claim_mail_token.sql` (Spalte `purchase_claims.mail_token_hash` für den persönlichen Einlöse-Link in der Kauf-Mail). **Vor dem Code-Deploy einspielen**, sonst scheitert der Webhook bei Käufen ohne Konto. Keine RLS-Änderung. Stage: am 2026-11-21 eingespielt und geprüft.
@@ -79,6 +80,7 @@ Stage = Projekt-Ref `kdjhxqitfxnsavhiafdn`. Production = Haupt-Projekt (`main`) 
 - [ ] Testdaten **nicht** übernehmen: QA-Konto `qa-test@narravit.de`, Test-Projekte, Test-Zahlungen bleiben auf Stage.
 - [ ] Migration `20261119200000_security_advisor_function_hardening.sql` (fester `search_path` für die Zeitstempel-Trigger, Trigger-Funktionen ohne RPC-Recht; Stage: am 2026-11-19 eingespielt und vermerkt — dabei versehentlich in einer Zwischenfassung, die auch die Rechte aus der nächsten Migration schon enthielt). Ohne Abhängigkeit zum Code, kann jederzeit eingespielt werden: Datei im SQL-Editor ausführen, dann `insert into supabase_migrations.schema_migrations (version, name) values ('20261119200000', 'security_advisor_function_hardening');`.
 - [ ] Migration `20261119210000_lookup_invitation_service_role_only.sql` (`lookup_invitation_by_token` nur noch für `service_role`; Stage: Rechte wirken schon seit 2026-11-19, die Datei nach dem Deploy trotzdem einmal ausführen — harmlos — und die Version vermerken). **Erst einspielen, wenn der Code mit dem Service-Role-Lookup ausgeliefert ist** — auf Stage nach abgeschlossenem Deploy von stage-app, in Production nach dem Merge `stage` → `main` und abgeschlossenem Deploy. Andersherum zeigt `/einladung/<token>` „Einladung nicht gefunden“, und Einladungen lassen sich nicht annehmen. Datei im SQL-Editor ausführen, dann `insert into supabase_migrations.schema_migrations (version, name) values ('20261119210000', 'lookup_invitation_service_role_only');`. Smoke-Test: Einladungslink abgemeldet öffnen (Vorschau mit Projekttitel) und angemeldet annehmen. Nach beiden Migrationen Dashboard → Advisors → Security: gewollt sind nur `rls_enabled_no_policy` (`mail_log`, `mail_retry_queue`, `purchase_claims`, `rate_limit_counters`), `anon_`/`authenticated_security_definer_function_executable` für die RLS-Hilfsfunktionen `get_my_project_ids`, `am_i_pl_of`, `is_member_of` und `auth_leaked_password_protection` (Dashboard-Schalter unter Auth). Jeder andere Hinweis ist neu und vor dem Go-live zu klären.
+- [ ] Migration `20261122120000_proj17_account_exists.sql` (Login-Hinweis „Zu dieser E-Mail gibt es noch kein Konto", Funktion `account_exists` nur für `service_role`). Vor dem Code-Deploy einspielen. Fehlt sie, funktioniert der Login weiter, zeigt aber nur die neutrale Meldung „E-Mail oder Passwort falsch".
 
 ### Auth → URL Configuration
 
@@ -89,17 +91,17 @@ Stage = Projekt-Ref `kdjhxqitfxnsavhiafdn`. Production = Haupt-Projekt (`main`) 
 
 - [ ] Custom SMTP aktiv: Host `smtp.resend.com`, Port 465, User `resend`, Passwort = eigener Resend-Schlüssel für Supabase-Production (nicht den App-Schlüssel teilen).
 - [ ] Absender-Name **`NARRAVIT`** (Großbuchstaben, wie die App-Mails), Absender-Adresse wie auf Stage (auf `mail.narravit.de`).
-- [ ] Mail-Rate-Limit unter Auth → Rate Limits passend setzen (mit eigenem SMTP frei wählbar).
+- [ ] Mail-Rate-Limit unter Auth → Rate Limits passend setzen (mit eigenem SMTP frei wählbar): 300 pro Stunde wie auf Stage. Es gilt für das ganze Projekt: Ist es erreicht, schlagen weitere Registrierungen und Passwort-Resets fehl.
 
 ### Auth → Passwort-Sicherheit
 
-- [ ] „Leaked password protection" einschalten (Abgleich mit HaveIBeenPwned). Auf Stage laut Supabase-Advisor am 2026-11-19 aus.
+- [ ] „Leaked password protection" einschalten (Abgleich mit HaveIBeenPwned, erst ab Supabase Pro verfügbar). Auf Stage laut Supabase-Advisor am 2026-11-19 aus.
 
 ### Auth → Rate Limits und CAPTCHA (PROJ-17)
 
 - [ ] **Cloudflare Turnstile für Production anlegen:** Widget für `app.narravit.de`, Modus „Managed". Site Key nach Vercel, Secret Key nach Supabase. Cloudflare in die Datenschutzerklärung aufnehmen.
 - [ ] **Authentication → Rate Limits anheben**, weil alle App-Anfragen von der Server-IP kommen: Registrierung und Anmeldung 300 pro 5 Minuten, Token (Passwort-Login und Refresh) 1000 pro 5 Minuten, Token-Prüfung 300 pro 5 Minuten. Die feinen Limits pro Kunde macht die App.
-- [ ] **Authentication → Bot and Abuse Protection → CAPTCHA einschalten** (Cloudflare Turnstile, Secret Key eintragen). **Erst wenn der Code live ist**, sonst kann sich niemand mehr anmelden. Stage nutzt den öffentlichen Test-Secret-Key `1x0000000000000000000000000000000AA`, Production den echten.
+- [ ] **Authentication → Bot and Abuse Protection → CAPTCHA einschalten** (Cloudflare Turnstile, Secret Key eintragen). **Erst wenn der Code live ist**, sonst kann sich niemand mehr anmelden. Stage nutzt den öffentlichen Test-Secret-Key `1x0000000000000000000000000000000AA` (am 2026-11-22 eingeschaltet und geprüft, Auth-Limits ebenfalls gesetzt), Production den echten.
 - [ ] **Kein `sb_secret_…`-Key für Auth-Aufrufe der App:** Supabase überspringt das CAPTCHA bei Admin-Rechten.
 
 ### Auth → Email Templates
@@ -140,6 +142,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] Domain `mail.narravit.de` ist verifiziert (DKIM `resend._domainkey.mail.narravit.de`, SPF/MX auf `send.mail.narravit.de`) — gilt für Stage und Production. Die Hauptdomain `narravit.de` ist **nicht** in Resend eingerichtet; Absender dort würden abgelehnt.
 - [ ] Eigener API-Schlüssel `narravit-app-prod` (Sending access, nur `mail.narravit.de`) → Vercel `RESEND_API_KEY` (Production).
 - [ ] Eigener Schlüssel für Supabase-SMTP in Production (Abschnitt 3).
+- [ ] **Resend-Tarif prüfen:** Der Free-Tarif erlaubt 100 Mails pro Tag und 3.000 pro Monat (Stand 2026-11-22). Ein Neukunde löst 3 bis 5 Mails aus, das reicht also nur für etwa 20 bis 30 Neukunden am Tag. **Entscheidung Jakob (2026-11-22): Start im Free-Tarif.** Auf Pro wechseln (20 $ im Monat, 50.000 Mails, kein Tageslimit), sobald sich das Tageslimit nähert oder vor einer größeren Aktion.
 - [ ] Stage-Schlüssel bleiben auf Stage; beim Umzug nicht wiederverwenden.
 - [ ] Suppression-Liste prüfen: Adressen aus Tests (z. B. `qa-test@narravit.de`) stehen dort; echte Kundenadressen dürfen nicht darauf landen.
 - [ ] **Bilder in Mails** (Logo im Kopf jeder Mail, Strandfoto in der Willkommens-Mail) liegen in `public/images/mail/` und werden **immer** von `https://app.narravit.de/images/mail/…` geladen (`MAIL_ASSETS_URL` in `src/emails/Layout.tsx`), auch in Stage-Mails und Supabase-Vorlagen. Grund: Stage ist per Vercel-Deployment-Protection gesperrt, Mail-Programme kämen dort nicht an die Bilder. **Stand 2026-11-19:** `app.narravit.de` liefert diese App noch nicht aus (`/images/…` → 404), deshalb zeigen Mails bis zum Go-live keine Bilder (das Layout bleibt intakt, der Schriftzug „NARRAVIT" steht als Text da). Nach dem Umzug prüfen: `https://app.narravit.de/images/mail/narravit-logo.png` und `…/willkommen-strand.jpg` liefern 200.
@@ -203,6 +206,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] Registrierung mit E-Mail: Bestätigungs-Mail kommt an, Link funktioniert auch in einem anderen Browser, Willkommens-Mail kommt.
 - [ ] Anmeldung, Registrierung und „Passwort vergessen" mit dem echten Turnstile-Schlüssel, auch einmal auf dem Smartphone.
 - [ ] Sechs falsche Passwörter hintereinander: Beim sechsten erscheint „Zu viele Versuche".
+- [ ] Direkter Aufruf der Supabase-Anmeldung mit gefälschtem CAPTCHA-Token wird abgelehnt (`captcha_failed`). Auf Stage ist das nicht prüfbar, weil der Test-Secret jedes Token akzeptiert.
 - [ ] Anmeldung mit Google und mit Facebook.
 - [ ] „Passwort vergessen" für ein E-Mail-Konto und für ein Google-Konto.
 - [ ] Echter Kauf (kleiner Betrag per Promotion-Code oder sofortige Erstattung): Projekt entsteht, Kauf-Mail kommt, Webhook in Stripe als zugestellt markiert.
@@ -221,6 +225,9 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
+| 2026-11-22 | PROJ-17 BUG-4: Neue Migration `20261122120000_proj17_account_exists.sql` für den Login-Hinweis „kein Konto" (Entscheidung Jakob). Keine neue Variable. |
+| 2026-11-22 | Tarife entschieden (Jakob): Supabase wird bereits bezahlt, Vercel Pro kurz vor dem Go-live, Cloudflare Turnstile und Resend starten im Free-Tarif. |
+| 2026-11-22 | Mail-Kontingent ergänzt: Resend-Tarif vor dem Go-live prüfen, Vorschlag für das Supabase-Mail-Limit. |
 | 2026-11-22 | PROJ-17 gebaut: Migration `20261122110000_proj17_rate_limit.sql` (vor dem Code-Deploy), `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, Auth-Limits anheben, CAPTCHA nach dem Deploy einschalten. Die geplante IP-Weitergabe per Secret Key entfällt. |
 | 2026-11-22 | Neue Go-live-Pflichten: Vercel Pro statt Hobby (kommerzielle Nutzung), Function-Region von `iad1` in die EU. PROJ-17 Tech Design: Zähler in Supabase, Cloudflare Turnstile. |
 | 2026-11-22 | PROJ-11 BUG-19/20: Der Support-Hinweis wird bis zur Zustellung wiederholt, die Kontolöschung räumt `mail_retry_queue` auf. Keine neue Migration, kein neuer Env-Wert. |

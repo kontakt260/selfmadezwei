@@ -1,8 +1,8 @@
 # PROJ-17: Rate-Limiting für Auth-Endpunkte
 
-## Status: In Progress
+## Status: In Review
 **Created:** 2026-05-16
-**Last Updated:** 2026-11-22 (Code gebaut; offen: Migration, Einstellungen auf Stage, `/qa`)
+**Last Updated:** 2026-11-22 (BUG-1 bis 6 lokal behoben und nachgetestet, noch nicht auf Stage ausgeliefert)
 **Priority:** P0 (Security-Blocker für Public-Launch)
 **Trigger:** Vibe-Security-Audit 2026-05-16 — High-Finding #1
 
@@ -196,10 +196,163 @@ Die Reihenfolge ist wichtig: Ist CAPTCHA in Supabase aktiv, bevor der Code das T
 
 **Auf der Stage-Datenbank geprüft (2026-11-22):** Migration eingespielt. Von 20 parallelen Versuchen bei Limit 5 kamen genau 5 durch, Zurücknehmen und Ablauf des Zeitfensters funktionieren. Der öffentliche Schlüssel darf weder lesen noch löschen noch die Funktionen aufrufen. Der sechste falsche Login im Browser wird gesperrt (`tests/PROJ-17-rate-limiting.spec.ts`).
 
-**Noch nicht geprüft:** CAPTCHA-Durchsetzung durch Supabase (wird nach dem Deploy eingeschaltet), echte Turnstile-Schlüssel.
+**CAPTCHA auf Stage aktiv (2026-11-22):** Direkte Aufrufe von Login und Passwort-Reset ohne Token lehnt Supabase mit `captcha_failed` ab. Mit aktivem CAPTCHA laufen alle E2E-Suites (132 bestanden, 2 übersprungen) und der Limit-Test.
+
+**Live auf `stage-app.narravit.de` (Jakob, 2026-11-22):** Anmeldung, Registrierung mit Bestätigungsmail und beide Passwort-Resets klappen mit aktivem CAPTCHA.
+
+**Noch nicht geprüft:** Echte Turnstile-Schlüssel: Der Test-Secret auf Stage akzeptiert jedes Token, gefälschte Token werden erst mit dem echten Schlüssel in Production abgelehnt.
 
 ## QA Test Results
-_To be added by /qa_
+
+**Getestet:** 2026-11-22, Commit `75071d2`
+**Umgebung:** lokaler Server gegen die Stage-Datenbank mit echten Limits und den Testschlüsseln von Cloudflare, dazu Live-Test von Jakob auf `stage-app.narravit.de`
+**Tester:** QA Engineer (AI)
+
+**Nicht abgedeckt:** Getestet wurde nur in Chromium, weil WebKit auf diesem Mac abstürzt und Firefox nicht installiert ist. Die Anmeldung mit Google und Facebook wurde mit aktivem CAPTCHA nicht durchgeklickt. Gefälschte Token lassen sich erst mit dem echten Schlüssel prüfen. Dass Vercel den IP-Header überschreibt, stammt aus der Vercel-Doku und wurde nicht auf Vercel selbst getestet.
+
+### Automatische Tests
+- [x] Unit-Tests: 590 bestanden
+- [x] E2E: 132 bestanden, 2 übersprungen
+- [x] Limit-E2E mit echten Zählern: bestanden
+- [x] Typprüfung fehlerfrei, Lint ohne Fehler (2 Warnungen)
+
+### Acceptance Criteria (nach den Fixes: 21 von 24 bestanden, 3 offen)
+
+#### Infrastruktur (5/5)
+- [x] Tabelle mit RLS, ohne Policies, Zugriff nur über die Service-Role
+- [x] Atomare Zählung: Von 20 parallelen Versuchen bei Limit 5 kamen genau 5 durch
+- [x] Abgelaufene Zähler löscht der aktive Job `rate-limit-counters-cleanup`
+- [x] IP und E-Mail liegen nur als HMAC-Hash vor
+- [x] Zentrales Modul `src/lib/rate-limit.ts`
+
+#### Limits (2/2)
+- [x] Alle acht Limits sind umgesetzt und zählen getrennt
+- [x] Erfolgreiche Anmeldung setzt den Kontozähler zurück und lässt frühere Fehlversuche der IP stehen
+
+#### CAPTCHA (6/8, 2 offen)
+- [x] Sitzt auf allen fünf Formularen, auch mit zwei Widgets auf `/anmelden?error=expired_link`
+- [x] Läuft im Normalfall unsichtbar
+- [x] Token geht an Supabase, der geheime Schlüssel kommt im Code nicht vor
+- [x] Skript lädt nur auf den Seiten mit Formular
+- [x] Lädt Turnstile nicht, erscheinen nach spätestens 10 Sekunden Hinweis und „Erneut versuchen" (BUG-2 behoben)
+- [ ] **Offen:** Google und Facebook mit aktivem CAPTCHA von Hand prüfen
+- [ ] **Offen bis Go-live:** Stage nutzt Testschlüssel, Production braucht echte Schlüssel
+- [x] CAPTCHA wurde erst nach dem Code-Deploy eingeschaltet
+
+#### IP-Ermittlung und Supabase-Limits (2/3, 1 offen)
+- [ ] **Offen:** Reihenfolge der Header ist im Code korrekt, das Überschreiben durch Vercel ist nicht selbst getestet
+- [x] Auth-Aufrufe laufen mit dem öffentlichen Schlüssel
+- [x] Supabase-Limits sind auf Stage angehoben
+
+#### Fehlerverhalten (3/3)
+- [x] Meldungen in Sie-Form, Reset und Resend antworten über dem Limit wie im Erfolgsfall
+- [x] Limit-Prüfung läuft vor jedem Supabase-Aufruf
+- [x] Log-Event `rate_limit_hit` enthält nur Bereich und gekürzten Hash
+
+#### Dokumentation und Tests (3/3)
+- [x] `src/lib/rate-limit.test.ts`
+- [x] `tests/PROJ-17-rate-limiting.spec.ts`
+- [x] Variablen und Einstellungen in `docs/production/prod-umzug.md`
+
+### Security Audit
+- [x] Direkter Weg an der App vorbei: `signup`, `otp`, `magiclink`, `recover`, `resend` und Passwort-Login lehnen Aufrufe ohne Token mit `captcha_failed` ab
+- [x] Anonyme Konten sind ausgeschaltet
+- [x] Öffentlicher Schlüssel kann die Zähler weder lesen noch löschen noch die Funktionen aufrufen
+- [x] Parallele Anfragen umgehen das Limit nicht
+- [x] `get_my_project_ids` liefert ohne Anmeldung 0 Zeilen (Advisor-Warnung ohne Auswirkung)
+- [x] Fremde Adressen lassen sich ohne gültiges CAPTCHA nicht mehr sperren (BUG-1 behoben)
+
+### Bugs
+
+#### BUG-1: Reset- und Bestätigungsmails fremder Konten lassen sich ohne CAPTCHA sperren
+- **Status:** Behoben 2026-11-22. Ein CAPTCHA-Fehler nimmt den Zähler der Adresse zurück. Der Zähler der IP bleibt stehen und bremst massenhafte Versuche.
+- **Severity:** High
+- **Ursache:** Reset und Resend zählen den E-Mail-Zähler vor der CAPTCHA-Prüfung und nehmen ihn bei `captcha_failed` nicht zurück.
+- **Reproduktion:**
+  1. Drei Anfragen ohne Token für eine fremde Adresse senden, alle von derselben IP. Jede endet mit dem CAPTCHA-Fehler.
+  2. Die betroffene Person fordert von einer anderen IP einen Link an.
+  3. Erwartet: Die Mail wird verschickt.
+  4. Tatsächlich: Die Seite meldet „E-Mail unterwegs", es geht aber keine Mail raus. Eine Kontrolladresse war nicht betroffen.
+- **Folge:** Mit drei Anfragen pro Stunde kann jemand ohne jede Lösung des CAPTCHAs die Passwort-Wiederherstellung eines Kontos dauerhaft blockieren, und die Person erfährt es nicht.
+- **Restrisiko nach dem Fix:** Wer gültige Token löst, kann das Limit pro Adresse weiter ausschöpfen. Das ist dann nur noch mit CAPTCHA möglich und schickt dem Opfer drei echte Mails.
+- **Priorität:** Vor dem Go-live
+
+#### BUG-2: Ohne Turnstile bleibt die Anmeldung dauerhaft gesperrt, ohne Erklärung
+- **Status:** Behoben 2026-11-22. Nach 10 Sekunden ohne Ergebnis erscheinen Hinweis und „Erneut versuchen". Der Retry lädt das Skript neu, Eingaben bleiben stehen. Nicht unterstützte Browser bekommen einen eigenen Hinweis.
+- **Severity:** High
+- **Reproduktion:**
+  1. `challenges.cloudflare.com` blockieren (Content-Blocker, Firmennetz) oder einen von Turnstile nicht unterstützten Browser nutzen.
+  2. `/anmelden` öffnen und warten.
+  3. Erwartet: Verständlicher Hinweis mit „Erneut versuchen".
+  4. Tatsächlich: Der Button bleibt gesperrt, „Sicherheitsprüfung läuft …" steht unbegrenzt da, es gibt keinen Hinweis und keinen Retry.
+- **Folge:** Trifft alle fünf Formulare. Gerade ältere Geräte der Zielgruppe wären ohne Erklärung ausgesperrt.
+- **Priorität:** Vor dem Go-live
+
+#### BUG-3: Sichtbare Rückfrage sprengt das Formular auf schmalen Handys
+- **Status:** Behoben 2026-11-22. Unter 450 px nutzt das Widget die kompakte Größe (150 × 140 px). Geprüft bei 320 und 375 px.
+- **Severity:** Medium
+- **Reproduktion:** Rückfrage (Testschlüssel `3x…FF`) bei 320 px öffnen.
+- **Tatsächlich:** Das Widget braucht mindestens 300 px und zieht das ganze Formular mit. Felder und Buttons laufen rechts über die Karte, unter etwa 348 px auch über den Bildschirmrand. Bei 375 px schrumpft der rechte Innenabstand sichtbar. Die Checkbox bleibt klickbar.
+- **Priorität:** Vor dem Go-live
+
+#### BUG-4: Technische Fehler beim Login erscheinen als „E-Mail oder Passwort falsch"
+- **Status:** Behoben 2026-11-22. Unbestätigte Adresse: „Bitte bestätigen Sie zuerst Ihre E-Mail." Technischer Fehler: „Das hat gerade nicht geklappt. Bitte versuchen Sie es in einigen Minuten erneut." Beides ist nur per Unit-Test geprüft.
+- **Entscheidung (Jakob, 2026-11-22):** Der Login darf nennen, ob eine Adresse ein Konto hat, das ersetzt die Regel aus PROJ-2. Meldungen: „Zu dieser E-Mail gibt es noch kein Konto." und „Das Passwort stimmt leider nicht." Die Prüfung läuft über `account_exists` (Migration `20261122120000`, nur Service-Role, liest `auth.users`), erst nach bestandenem CAPTCHA und innerhalb des Login-Limits. Schlägt sie fehl, bleibt es bei „E-Mail oder Passwort falsch." Reset und Resend bleiben neutral.
+- **Severity:** Medium (vorbestehend, aus dem Code belegt)
+- **Tatsächlich:** Überlast, Ausfall und eine noch nicht bestätigte E-Mail zeigen dieselbe Meldung wie ein falsches Passwort. Wer das richtige Passwort eingibt, sucht den Fehler dann an der falschen Stelle.
+- **Priorität:** Vor dem Go-live empfohlen
+
+#### BUG-5: E-Mail-Feld wird nach jedem fehlgeschlagenen Login geleert
+- **Status:** Behoben 2026-11-22. Die Adresse bleibt stehen, das Passwort wird geleert.
+- **Severity:** Medium (vorbestehend)
+- **Tatsächlich:** React setzt das Formular nach der Action zurück. Die Person muss die Adresse bei jedem Versuch neu eintippen.
+- **Priorität:** Vor dem Go-live empfohlen
+
+#### BUG-6: CAPTCHA-Fehler verbrauchen Versuche bei Registrierung und Konto-Reset
+- **Status:** Behoben 2026-11-22. Im Test blieben elf CAPTCHA-Fehler in Folge ohne Sperre.
+- **Severity:** Low
+- **Tatsächlich:** Zehn CAPTCHA-Fehler sperren die Registrierung dieser IP für eine Stunde (im Test belegt). Beim Passwort-Reset im Konto zählen drei Fehler auf dieselbe Weise (aus dem Code belegt).
+- **Priorität:** Zusammen mit BUG-1 beheben
+
+#### BUG-7: Login-Zähler bleiben nach einem Passwort-Reset stehen
+- **Severity:** Low (aus dem Code belegt)
+- **Tatsächlich:** Der Reset meldet die Person direkt an. Meldet sie sich danach ab, kann die nächste Anmeldung mit dem neuen Passwort noch bis zu einer Stunde gesperrt sein.
+- **Priorität:** Nice to have
+
+#### BUG-8: Registrierung verrät, ob eine Adresse schon ein Konto hat
+- **Status:** Akzeptiert mit der Entscheidung zu BUG-4 (2026-11-22). Auch der Login nennt das jetzt bewusst.
+- **Severity:** Low (vorbestehend)
+- **Tatsächlich:** Die Meldung „bereits registriert" bestätigt bestehende Adressen. CAPTCHA und 10 Versuche pro Stunde bremsen das Abfragen, verhindern es aber nicht.
+- **Priorität:** Produktentscheidung
+
+#### BUG-9: Prüfung auf geleakte Passwörter ist ausgeschaltet
+- **Severity:** Low (Supabase-Advisor)
+- **Tatsächlich:** Supabase prüft neue Passwörter nicht gegen bekannte Datenlecks. Die Einstellung liegt im Supabase-Dashboard. Die Registrierung braucht dafür eine eigene Meldung, sonst steht dort nur „Registrierung fehlgeschlagen".
+- **Priorität:** Vor dem Go-live empfohlen
+
+#### BUG-10: Registrierung und „Passwort vergessen" leeren die Felder nach einem Fehler
+- **Severity:** Medium (vorbestehend, beim Nachtest von BUG-5 gefunden)
+- **Reproduktion:** Registrierung mit zwei verschiedenen Passwörtern absenden, oder „Passwort vergessen" mit fehlgeschlagener Sicherheitsprüfung.
+- **Tatsächlich:** Name und E-Mail (Registrierung) sowie die E-Mail (Passwort vergessen) sind danach leer.
+- **Priorität:** Vor dem Go-live empfohlen
+
+### Nachtest nach den Fixes (2026-11-22, lokal gegen Stage)
+- [x] Unit-Tests: 613 bestanden. Typprüfung, Lint und Production-Build fehlerfrei
+- [x] E2E in Chromium: 133 bestanden, 2 übersprungen. Limit-E2E bestanden
+- [x] Login nennt im Browser „noch kein Konto" und „Passwort stimmt nicht"
+- [x] `account_exists` auf Stage eingespielt: nur `service_role` darf sie aufrufen, der öffentliche Schlüssel bekommt 401, keine neuen Security-Advisor-Hinweise
+- [x] Drei Anfragen ohne Token sperren eine fremde Adresse nicht mehr (Reset und Resend)
+- [x] Blockiertes Skript: Hinweis und Retry erscheinen, nach dem Retry ist das Formular frei, auch mit zwei Widgets auf einer Seite
+- [x] Sichtbare Rückfrage bleibt bei 320 und 375 px im Formular
+
+**Nicht abgedeckt:** Mobile Safari startet auf diesem Mac nicht (71 Fehlschläge beim Browserstart, kein Testergebnis). Die Fixes sind noch nicht auf `stage-app.narravit.de` ausgeliefert.
+
+### Summary
+- **Acceptance Criteria:** 21 von 24 bestanden, 3 offen (Google/Facebook von Hand, echter Schlüssel, IP-Header auf Vercel)
+- **Bugs:** 10 gefunden, 6 behoben, BUG-8 akzeptiert. Offen: BUG-10 (Medium), BUG-7, BUG-9 (Low)
+- **Security:** Keine offenen Critical- oder High-Befunde
+- **Production Ready:** Noch nicht. Erst nach Auslieferung auf Stage und dem Test von Google/Facebook
+- **Empfehlung:** Migration `20261122120000` einspielen, committen, auf Stage ausliefern, dort kurz nachtesten
 
 ## Deployment
 _To be added by /deploy_

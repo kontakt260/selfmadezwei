@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { accountExists } from "@/lib/auth/account-exists";
 import { hasPendingClaim, isDefaultLandingTarget } from "@/lib/purchases/pending-claim";
 import { CAPTCHA_FAILED_MESSAGE, captchaTokenFrom, isCaptchaError } from "@/lib/captcha";
 import {
@@ -69,11 +70,22 @@ export async function loginAction(
   });
 
   if (error) {
-    if (error.code !== "invalid_credentials") {
-      await undoRateLimits([ipCheck, accountCheck]);
+    if (error.code === "invalid_credentials") {
+      // Das CAPTCHA ist hier bestanden, und der Versuch bleibt gezählt. So
+      // lässt sich nicht massenhaft abfragen, welche Adressen ein Konto haben.
+      const exists = await accountExists(parsed.data.email);
+      if (exists === false) return { error: "Zu dieser E-Mail gibt es noch kein Konto." };
+      if (exists === true) return { error: "Das Passwort stimmt leider nicht." };
+      return { error: "E-Mail oder Passwort falsch." };
     }
+    await undoRateLimits([ipCheck, accountCheck]);
     if (isCaptchaError(error)) return { error: CAPTCHA_FAILED_MESSAGE };
-    return { error: "E-Mail oder Passwort falsch." };
+    // Supabase meldet das nur nach einem richtigen Passwort, verrät also
+    // keinem Fremden, ob es die Adresse gibt.
+    if (error.code === "email_not_confirmed") {
+      return { error: "Bitte bestätigen Sie zuerst Ihre E-Mail." };
+    }
+    return { error: RATE_LIMIT_MESSAGES.unavailable };
   }
 
   // Der Zähler der IP wird nur um diesen Versuch verringert, nicht gelöscht:
@@ -120,9 +132,10 @@ export async function resendConfirmAction(
 
   // PROJ-17: Über dem Limit sieht die Antwort aus wie immer, es geht nur keine
   // Mail raus (kein Rückschluss darauf, ob die Adresse existiert).
+  const emailCheck = { rule: RATE_LIMITS.resendEmail, identifier: parsed.data.email };
   const limit = await hitRateLimits([
     { rule: RATE_LIMITS.resendIp, identifier: await getRequestIp() },
-    { rule: RATE_LIMITS.resendEmail, identifier: parsed.data.email },
+    emailCheck,
   ]);
   if (limit.unavailable) return { error: RATE_LIMIT_MESSAGES.unavailable };
   if (!limit.allowed) return { success: true };
@@ -139,7 +152,13 @@ export async function resendConfirmAction(
       captchaToken: captchaTokenFrom(formData),
     },
   });
-  if (isCaptchaError(error)) return { error: CAPTCHA_FAILED_MESSAGE };
+  if (isCaptchaError(error)) {
+    // Ohne bestandene Prüfung ging keine Mail raus. Der Zähler der Adresse darf
+    // nicht steigen, sonst ließen sich fremde Adressen sperren. Der Zähler der
+    // IP bleibt und bremst weiter massenhafte Versuche.
+    await undoRateLimits([emailCheck]);
+    return { error: CAPTCHA_FAILED_MESSAGE };
+  }
 
   return { success: true };
 }

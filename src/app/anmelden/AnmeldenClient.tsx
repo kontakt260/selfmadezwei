@@ -105,6 +105,9 @@ export function AnmeldenClient({ initialEmail, initialNext, showExpiredLink }: P
     {},
   );
   const [captchaReady, setCaptchaReady] = useState(!TURNSTILE_ENABLED);
+  // React leert das Formular nach jeder Action. Die Adresse soll nach einem
+  // Fehlversuch stehen bleiben, das Passwort nicht.
+  const [email, setEmail] = useState(initialEmail);
 
   // Einlösen eines Kaufs: volle Navigation, siehe loginAction.
   useEffect(() => {
@@ -137,7 +140,8 @@ export function AnmeldenClient({ initialEmail, initialNext, showExpiredLink }: P
             type="email"
             autoComplete="email"
             required
-            defaultValue={initialEmail}
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
             aria-invalid={Boolean(state.fieldErrors?.email)}
             className="h-12"
           />

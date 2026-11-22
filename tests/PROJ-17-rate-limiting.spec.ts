@@ -35,7 +35,7 @@ test("AC-Limit-1: Der sechste Fehlversuch von derselben IP wird gesperrt", async
 
   for (let attempt = 1; attempt <= 5; attempt += 1) {
     await failedLogin(page);
-    await expect(page.getByText("E-Mail oder Passwort falsch.")).toBeVisible();
+    await expect(page.getByText("Zu dieser E-Mail gibt es noch kein Konto.")).toBeVisible();
   }
 
   await failedLogin(page);

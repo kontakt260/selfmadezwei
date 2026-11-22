@@ -8,6 +8,7 @@ import {
   RATE_LIMIT_MESSAGES,
   getRequestIp,
   hitRateLimits,
+  undoRateLimits,
 } from "@/lib/rate-limit";
 
 const schema = z.object({
@@ -34,9 +35,10 @@ export async function forgotPasswordAction(
 
   // PROJ-17: Über dem Limit sieht die Antwort aus wie immer, es geht nur keine
   // Mail raus (kein Rückschluss darauf, ob die Adresse existiert).
+  const emailCheck = { rule: RATE_LIMITS.resetEmail, identifier: parsed.data.email };
   const limit = await hitRateLimits([
     { rule: RATE_LIMITS.resetIp, identifier: await getRequestIp() },
-    { rule: RATE_LIMITS.resetEmail, identifier: parsed.data.email },
+    emailCheck,
   ]);
   if (limit.unavailable) return { error: RATE_LIMIT_MESSAGES.unavailable };
   if (!limit.allowed) return { success: true };
@@ -51,7 +53,13 @@ export async function forgotPasswordAction(
     redirectTo: `${origin}/auth/callback?next=/passwort-zuruecksetzen`,
     captchaToken: captchaTokenFrom(formData),
   });
-  if (isCaptchaError(error)) return { error: CAPTCHA_FAILED_MESSAGE };
+  if (isCaptchaError(error)) {
+    // Ohne bestandene Prüfung ging keine Mail raus. Der Zähler der Adresse darf
+    // nicht steigen, sonst ließen sich fremde Adressen sperren. Der Zähler der
+    // IP bleibt und bremst weiter massenhafte Versuche.
+    await undoRateLimits([emailCheck]);
+    return { error: CAPTCHA_FAILED_MESSAGE };
+  }
 
   return { success: true };
 }

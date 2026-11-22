@@ -9,6 +9,7 @@ import {
   RATE_LIMIT_MESSAGES,
   getRequestIp,
   hitRateLimits,
+  undoRateLimits,
 } from "@/lib/rate-limit";
 
 const schema = z
@@ -79,9 +80,8 @@ export async function registerAction(
     return { fieldErrors };
   }
 
-  const limit = await hitRateLimits([
-    { rule: RATE_LIMITS.register, identifier: await getRequestIp() },
-  ]);
+  const ipCheck = { rule: RATE_LIMITS.register, identifier: await getRequestIp() };
+  const limit = await hitRateLimits([ipCheck]);
   if (limit.unavailable) return { error: RATE_LIMIT_MESSAGES.unavailable };
   if (!limit.allowed) return { error: RATE_LIMIT_MESSAGES.register };
 
@@ -104,7 +104,11 @@ export async function registerAction(
   });
 
   if (error) {
-    if (isCaptchaError(error)) return { error: CAPTCHA_FAILED_MESSAGE };
+    if (isCaptchaError(error)) {
+      // Eine fehlgeschlagene Prüfung kostet keinen Registrierungsversuch.
+      await undoRateLimits([ipCheck]);
+      return { error: CAPTCHA_FAILED_MESSAGE };
+    }
     return { error: "Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut." };
   }
 

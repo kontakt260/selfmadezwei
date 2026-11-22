@@ -6,7 +6,12 @@ import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { removeQueuedMailsOfAccount } from "@/lib/email/retry-queue";
 import { CAPTCHA_FAILED_MESSAGE, captchaTokenFrom, isCaptchaError } from "@/lib/captcha";
-import { RATE_LIMITS, RATE_LIMIT_MESSAGES, hitRateLimits } from "@/lib/rate-limit";
+import {
+  RATE_LIMITS,
+  RATE_LIMIT_MESSAGES,
+  hitRateLimits,
+  undoRateLimits,
+} from "@/lib/rate-limit";
 
 // ─── Update Name ────────────────────────────────────────────────────────────
 
@@ -57,7 +62,8 @@ export async function resetPasswordAction(
   } = await supabase.auth.getUser();
   if (!user?.email) return { error: "Nicht angemeldet." };
 
-  const limit = await hitRateLimits([{ rule: RATE_LIMITS.accountReset, identifier: user.id }]);
+  const accountCheck = { rule: RATE_LIMITS.accountReset, identifier: user.id };
+  const limit = await hitRateLimits([accountCheck]);
   if (limit.unavailable) return { error: RATE_LIMIT_MESSAGES.unavailable };
   if (!limit.allowed) {
     return { error: "Zu viele Anfragen. Bitte versuchen Sie es in einer Stunde erneut." };
@@ -69,7 +75,11 @@ export async function resetPasswordAction(
     captchaToken: captchaTokenFrom(formData),
   });
 
-  if (isCaptchaError(error)) return { error: CAPTCHA_FAILED_MESSAGE };
+  if (isCaptchaError(error)) {
+    // Eine fehlgeschlagene Prüfung kostet keinen der drei Versuche.
+    await undoRateLimits([accountCheck]);
+    return { error: CAPTCHA_FAILED_MESSAGE };
+  }
   if (error) return { error: "Zurücksetzen fehlgeschlagen. Bitte versuchen Sie es erneut." };
   return { success: true };
 }

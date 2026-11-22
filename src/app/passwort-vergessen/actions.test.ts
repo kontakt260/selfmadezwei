@@ -10,10 +10,16 @@ vi.mock("@/lib/rate-limit", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/rate-limit")>()),
   getRequestIp: vi.fn(async () => "203.0.113.7"),
   hitRateLimits: vi.fn(),
+  undoRateLimits: vi.fn(async () => undefined),
 }));
 
 import { CAPTCHA_FAILED_MESSAGE } from "@/lib/captcha";
-import { RATE_LIMITS, RATE_LIMIT_MESSAGES, hitRateLimits } from "@/lib/rate-limit";
+import {
+  RATE_LIMITS,
+  RATE_LIMIT_MESSAGES,
+  hitRateLimits,
+  undoRateLimits,
+} from "@/lib/rate-limit";
 import { forgotPasswordAction } from "./actions";
 
 function form(token?: string) {
@@ -26,6 +32,7 @@ function form(token?: string) {
 beforeEach(() => {
   resetPasswordForEmail.mockReset().mockResolvedValue({ error: null });
   vi.mocked(hitRateLimits).mockReset().mockResolvedValue({ allowed: true, unavailable: false });
+  vi.mocked(undoRateLimits).mockClear();
 });
 
 describe("forgotPasswordAction — Rate-Limit", () => {
@@ -55,6 +62,20 @@ describe("forgotPasswordAction — Rate-Limit", () => {
     const res = await forgotPasswordAction({}, form("token-3"));
     expect(res.error).toBe(CAPTCHA_FAILED_MESSAGE);
     expect(resetPasswordForEmail.mock.calls[0][1].captchaToken).toBe("token-3");
+  });
+
+  it("takes back only the address after a failed security check", async () => {
+    resetPasswordForEmail.mockResolvedValue({ error: { code: "captcha_failed" } });
+    await forgotPasswordAction({}, form());
+    expect(undoRateLimits).toHaveBeenCalledTimes(1);
+    expect(undoRateLimits).toHaveBeenCalledWith([
+      { rule: RATE_LIMITS.resetEmail, identifier: "maria@example.test" },
+    ]);
+  });
+
+  it("keeps the count when a mail was requested", async () => {
+    await forgotPasswordAction({}, form("token-3"));
+    expect(undoRateLimits).not.toHaveBeenCalled();
   });
 
   it("does not reveal whether the address exists", async () => {
