@@ -144,6 +144,43 @@ export async function deleteStaleMailLog(input: {
   return (data ?? []).length > 0;
 }
 
+/** Ab diesem Alter läuft kein Versand mehr, der zu einem offenen Marker gehört. */
+const ABANDONED_MARKER_MS = 60 * 60 * 1000;
+
+/**
+ * Entfernt einen Marker, dessen Versand nie zu Ende kam (BUG-18): Die Funktion
+ * wurde nach der Reservierung beendet, es gibt weder Resend-ID noch Fehler.
+ * Ohne das bliebe die Erinnerung oder Willkommens-Mail für immer aus. Gibt
+ * zurück, ob ein Marker entfernt wurde.
+ */
+export async function deleteAbandonedMailLog(input: {
+  userId: string;
+  projectId: string | null;
+  mailType: MailType;
+  now?: number;
+}): Promise<boolean> {
+  const supabase = createServiceRoleClient();
+  const cutoff = new Date((input.now ?? Date.now()) - ABANDONED_MARKER_MS).toISOString();
+  const base = supabase
+    .from("mail_log")
+    .delete()
+    .eq("user_id", input.userId)
+    .eq("mail_type", input.mailType)
+    .is("resend_message_id", null)
+    .is("error", null)
+    .lt("sent_at", cutoff);
+  const scoped =
+    input.projectId === null ? base.is("project_id", null) : base.eq("project_id", input.projectId);
+  const { data, error } = await scoped.select("id");
+  if (error) {
+    console.error(
+      `[email/mail_log] abandoned cleanup failed for ${input.mailType}: ${error.message}`,
+    );
+    return false;
+  }
+  return (data ?? []).length > 0;
+}
+
 /**
  * Schreibt einen mail_log-Eintrag OHNE Idempotenz-Schutz (z. B. für
  * Stripe-Mails). Schlägt der Insert wegen Constraint-Verletzung fehl,

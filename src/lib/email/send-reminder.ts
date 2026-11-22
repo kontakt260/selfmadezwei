@@ -6,6 +6,7 @@ import {
   finalizeMailLog,
   releaseMailLog,
   deleteStaleMailLog,
+  deleteAbandonedMailLog,
   type MailType,
 } from "./idempotency";
 
@@ -50,10 +51,10 @@ function mailTypeFor(variant: ReminderVariant): MailType {
 
 function subjectFor(daysLeft: number, variant: ReminderVariant, projectName: string): string {
   if (variant === "30") {
-    return `Erinnerung: Ihr Projektzugang für „${projectName}" läuft in ${daysLeft} Tagen ab`;
+    return `Erinnerung: Ihr Projektzugang für „${projectName}“ läuft in ${daysLeft} Tagen ab`;
   }
   const days = daysLeft === 1 ? "1 Tag" : `${daysLeft} Tage`;
-  return `Nur noch ${days} Projektzugang für „${projectName}"`;
+  return `Nur noch ${days} Projektzugang für „${projectName}“`;
 }
 
 export async function maybeSendReminderMail(
@@ -72,7 +73,9 @@ export async function maybeSendReminderMail(
     const sentBefore = new Date(
       new Date(input.expiresAt).getTime() - STALE_MARKER_DAYS * ONE_DAY_MS,
     );
-    const removed = await deleteStaleMailLog({ ...markerKey, sentBefore });
+    const removed =
+      (await deleteStaleMailLog({ ...markerKey, sentBefore })) ||
+      (await deleteAbandonedMailLog(markerKey));
     if (removed) reserve = await reserveMailLog(markerKey);
   }
 

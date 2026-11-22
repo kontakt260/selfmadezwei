@@ -4,7 +4,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { maybeSendReminderMail } from "@/lib/email/send-reminder";
 import { getSiteUrl } from "@/lib/email/client";
-import { formatGermanDate } from "@/lib/email/format";
+import { calendarDaysUntil, formatGermanDate } from "@/lib/email/format";
+import { processMailRetryQueue, type MailRetryResult } from "@/lib/email/retry-mails";
 
 // PROJ-11 — Reminder-Cron.
 //
@@ -22,8 +23,10 @@ import { formatGermanDate } from "@/lib/email/format";
 //      Co-Autoren — verlängern kann jedes Mitglied, z. B. auch die
 //      beschenkte Person; Jakob, 2026-11-19), mail_log-Reservierung pro
 //      Person versuchen, bei Erfolg Reminder versenden.
+//   4. Vorher: gescheiterte Kauf- und Einladungs-Mails nachholen (BUG-13).
 //
-// Antwort: JSON mit `processed`, `sent`, `skipped` für Monitoring.
+// Antwort: JSON mit `processed`, `sent`, `skipped` und `mailRetries` für
+// Monitoring.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,8 +57,9 @@ function buildWindows(now: number): ReminderTask[] {
   ];
 }
 
+/** Kalendertage bis zum Ablauf in deutscher Zeit, am letzten Tag 1 (BUG-15). */
 function daysUntil(expiresAt: string, now: number): number {
-  return Math.max(1, Math.ceil((new Date(expiresAt).getTime() - now) / ONE_DAY_MS));
+  return Math.max(1, calendarDaysUntil(expiresAt, now));
 }
 
 /** Zeitkonstanter Vergleich, damit die Antwortzeit das Secret nicht verrät. */
@@ -92,6 +96,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       { error: authResult.reason },
       { status: authResult.status },
+    );
+  }
+
+  // Eigener Schritt: Ein Fehler hier darf die Erinnerungen nicht aufhalten.
+  let mailRetries: MailRetryResult = { retried: 0, sent: 0, dropped: 0, gaveUp: 0 };
+  try {
+    mailRetries = await processMailRetryQueue();
+  } catch (err) {
+    console.error(
+      `[cron/reminders] mail retry failed: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 
@@ -181,5 +195,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ processed, sent, skipped });
+  return NextResponse.json({ processed, sent, skipped, mailRetries });
 }

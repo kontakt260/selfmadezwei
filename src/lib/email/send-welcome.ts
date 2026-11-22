@@ -5,6 +5,7 @@ import {
   reserveMailLog,
   finalizeMailLog,
   releaseMailLog,
+  deleteAbandonedMailLog,
 } from "./idempotency";
 
 // PROJ-11 — Welcome-Mail nach Account-Verifikation.
@@ -47,11 +48,21 @@ export async function maybeSendWelcomeMail(
 ): Promise<void> {
   // Idempotenz: reserveMailLog versucht den Marker-Insert. Bei Duplicate
   // (User wurde schon mal begrüßt) wird komplett übersprungen.
-  const reserve = await reserveMailLog({
+  const markerKey = {
     userId: input.userId,
     projectId: null,
-    mailType: "welcome",
-  });
+    mailType: "welcome" as const,
+  };
+  let reserve = await reserveMailLog(markerKey);
+
+  // Ein Versand, der nie zu Ende kam, darf die Mail nicht dauerhaft sperren.
+  if (
+    !reserve.reserved &&
+    reserve.reason === "duplicate" &&
+    (await deleteAbandonedMailLog(markerKey))
+  ) {
+    reserve = await reserveMailLog(markerKey);
+  }
 
   if (!reserve.reserved) {
     // Entweder duplicate (häufig & erwartet) oder db_error.

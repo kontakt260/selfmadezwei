@@ -6,6 +6,7 @@ import {
   finalizeMailLog,
   releaseMailLog,
   deleteStaleMailLog,
+  deleteAbandonedMailLog,
 } from "./idempotency";
 import { maybeSendReminderMail, type SendReminderInput } from "./send-reminder";
 
@@ -19,6 +20,7 @@ vi.mock("./idempotency", () => ({
   finalizeMailLog: vi.fn(async () => undefined),
   releaseMailLog: vi.fn(async () => undefined),
   deleteStaleMailLog: vi.fn(async () => false),
+  deleteAbandonedMailLog: vi.fn(async () => false),
 }));
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -43,6 +45,7 @@ beforeEach(() => {
   vi.mocked(sendEmail).mockReset().mockResolvedValue({ ok: true, messageId: "msg_1", redirected: false });
   vi.mocked(reserveMailLog).mockReset().mockResolvedValue({ reserved: true, logId: "log-1" });
   vi.mocked(deleteStaleMailLog).mockReset().mockResolvedValue(false);
+  vi.mocked(deleteAbandonedMailLog).mockReset().mockResolvedValue(false);
   vi.mocked(finalizeMailLog).mockClear();
   vi.mocked(releaseMailLog).mockClear();
 });
@@ -52,7 +55,7 @@ describe("maybeSendReminderMail", () => {
     const res = await maybeSendReminderMail(input());
     expect(res).toEqual({ sent: true });
     expect(vi.mocked(sendEmail).mock.calls[0][0].subject).toBe(
-      "Erinnerung: Ihr Projektzugang für „Omas Lebensbuch\" läuft in 30 Tagen ab",
+      "Erinnerung: Ihr Projektzugang für „Omas Lebensbuch“ läuft in 30 Tagen ab",
     );
     expect(finalizeMailLog).toHaveBeenCalledWith("log-1", { ok: true, resendMessageId: "msg_1" });
   });
@@ -93,7 +96,24 @@ describe("maybeSendReminderMail", () => {
   it("uses the singular on the last day", async () => {
     await maybeSendReminderMail(input({ variant: "7", daysLeft: 1 }));
     expect(vi.mocked(sendEmail).mock.calls[0][0].subject).toBe(
-      "Nur noch 1 Tag Projektzugang für „Omas Lebensbuch\"",
+      "Nur noch 1 Tag Projektzugang für „Omas Lebensbuch“",
     );
+  });
+
+  it("recovers a marker whose send never finished (BUG-18)", async () => {
+    vi.mocked(reserveMailLog)
+      .mockResolvedValueOnce({ reserved: false, reason: "duplicate" })
+      .mockResolvedValueOnce({ reserved: true, logId: "log-3" });
+    vi.mocked(deleteAbandonedMailLog).mockResolvedValue(true);
+
+    const res = await maybeSendReminderMail(input());
+
+    expect(deleteAbandonedMailLog).toHaveBeenCalledWith({
+      userId: "user-1",
+      projectId: "proj-1",
+      mailType: "reminder_30",
+    });
+    expect(res).toEqual({ sent: true });
+    expect(sendEmail).toHaveBeenCalledTimes(1);
   });
 });

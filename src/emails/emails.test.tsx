@@ -330,3 +330,88 @@ describe.each(templates.filter((t) => t.name.includes("Geschenk")))("$name", ({ 
     expect(text).not.toContain("14 Tage");
   });
 });
+
+// Namen und Projekttitel sind frei wählbarer Text. Sie dürfen in keiner Mail
+// als HTML ankommen (QA 2026-11-22).
+describe("Nutzereingaben in Mails", () => {
+  const payload = "<img src=x onerror=alert(1)>";
+  const payment = {
+    amountFormatted: "249,00 €",
+    paymentDateFormatted: "22. November 2026",
+  };
+  const cases: Array<[string, ReactElement]> = [
+    [
+      "Einladung",
+      InvitationEmail({
+        inviterName: payload,
+        inviterEmail: "maria@example.test",
+        projectName: payload,
+        role: "co_author",
+        token: "tok_123",
+        siteUrl,
+      }),
+    ],
+    [
+      "Geschenk-Einladung",
+      InvitationEmail({
+        inviterName: payload,
+        inviterEmail: "maria@example.test",
+        projectName: payload,
+        role: "projektleiter",
+        token: "tok_123",
+        siteUrl,
+        isGift: true,
+      }),
+    ],
+    [
+      "Kauf",
+      PortalPurchaseEmail({
+        fullName: payload,
+        ...payment,
+        expiresAtFormatted: "22. November 2027",
+        siteUrl,
+        giftRecipientName: payload,
+      }),
+    ],
+    ["Kauf ohne Konto", GuestPurchaseEmail({ fullName: payload, buyerEmail: payload, ...payment, siteUrl })],
+    ["Willkommen", WelcomeEmail({ fullName: payload, siteUrl })],
+    [
+      "Erinnerung",
+      ReminderEmail({
+        fullName: payload,
+        projectName: payload,
+        expiresAtFormatted: "22. Dezember 2026",
+        daysLeft: 30,
+        variant: "30",
+        renewUrl: `${siteUrl}/projektuebersicht/p1`,
+        siteUrl,
+      }),
+    ],
+    [
+      "Verlängerung",
+      RenewalEmail({
+        fullName: payload,
+        projectName: payload,
+        ...payment,
+        newExpiresAtFormatted: "22. November 2027",
+        siteUrl,
+      }),
+    ],
+    [
+      "Verlängerungs-Info",
+      RenewalEmail({
+        fullName: payload,
+        renewedBy: payload,
+        projectName: payload,
+        newExpiresAtFormatted: "22. November 2027",
+        siteUrl,
+      }),
+    ],
+  ];
+
+  it.each(cases)("%s zeigt Eingaben nur als Text", async (_name, element) => {
+    const html = await render(element);
+    expect(html).not.toContain("<img src=x");
+    expect(html).toContain("&lt;img src=x");
+  });
+});

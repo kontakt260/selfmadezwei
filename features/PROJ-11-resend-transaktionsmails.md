@@ -17,9 +17,9 @@
 
 > ℹ️ **Anpassung 2026-11-21 — Zeichenkodierung.** In den Supabase-Mails kamen Umlaute, Anführungszeichen, Striche und der Mittelpunkt kaputt an („f√ºr"). Das HTML **aller** Mails ist jetzt reines ASCII: `src/emails/encoding.ts` wandelt Sonderzeichen in numerische HTML-Codes, angewendet in `sendEmail` und beim Erzeugen von `supabase/templates/`. Klartext-Fassung und Betreff bleiben UTF-8. Geprüft: alle 14 Vorlagen zeigen auch bei absichtlich falscher Kodierung denselben Text.
 
-## Status: In Progress
+## Status: In Review
 **Created:** 2026-05-22
-**Last Updated:** 2026-11-19
+**Last Updated:** 2026-11-22 (QA-Befunde BUG-13, 15–18 behoben; offen vor „Approved": BUG-14, BUG-1, erneute QA)
 
 ## Dependencies
 - Requires **PROJ-2** (Auth + SSR) — User-Profile mit E-Mail-Adressen als Empfänger; Verifikations-Status als Voraussetzung für Welcome-Mail
@@ -682,6 +682,121 @@ Jeder Projektleiter kann beliebig viele Einladungen an beliebige Adressen auslö
 **Nachtrag 2026-10-14 — Live-Vorschau für Vorlagen:** `npm run email` startet die React-Email-Vorschau (Dev-Abhängigkeiten `react-email`, `@react-email/ui` 6.11.1) auf http://localhost:3001. Pro Mail liegt in `src/emails/preview/` eine Datei mit Beispieldaten (11 Varianten inkl. der beiden Supabase-Vorlagen); Änderungen an `src/emails/*.tsx` erscheinen ohne Neuladen. Supabase-Vorlagen nach dem Bearbeiten mit `UPDATE_AUTH_TEMPLATES=1 npx vitest run src/emails/auth` nach `supabase/templates/` erzeugen und im Supabase-Dashboard einfügen. Absender-Name der App-Mails jetzt `NARRAVIT` (Großbuchstaben).
 
 **Tests:** Vitest 246/246 grün (neu: `background.test.ts`, `send-welcome.test.ts`, `send-reminder.test.ts`; erweitert: Webhook-Mails für alle Kauf-Varianten, Cron-Nachholen und Secret-Präfix, Callback ohne Welcome für Bestandskonten, Client-Betreff und Production-Sperre, Marker-Freigabe, Geschenk-Vorlagen). `npx tsc --noEmit` und `npx next build` fehlerfrei. Playwright PROJ-9 (Einladungs-Flow, Chromium) 7/7 grün; der Versand läuft dabei über `after()` und meldet lokal erwartungsgemäß den fehlenden `RESEND_API_KEY`.
+
+---
+
+## QA Test Results — 2026-11-22
+
+**Getestet:** Stand `3eff350` auf `stage`, Stage-Datenbank `kdjhxqitfxnsavhiafdn`, Live-Tests von Jakob auf `stage-app.narravit.de`
+**Tester:** QA Engineer (AI)
+
+### Testläufe
+
+| Lauf | Ergebnis |
+|---|---|
+| Vitest | **469/469** grün, davon 8 neue Tests zur Maskierung von Nutzereingaben |
+| Typprüfung / Lint | fehlerfrei / 0 Fehler, 2 bekannte Warnungen |
+| Playwright Chromium, alle Suites | **132 bestanden**, 1 übersprungen |
+| Alle 14 Mail-Fassungen gerendert | HTML reines ASCII, Sie-Form, keine Platzhalter, nur erlaubte Links |
+| Darstellung bei 320, 375 und 600 px | 84 Darstellungen, 11 mit Überlauf, alle durch sehr lange Wörter (BUG-16) |
+| Cron live auf Stage | 200, `processed: 1, sent: 2, skipped: 0`, beide Marker mit Resend-ID und ohne Fehler |
+
+**Nicht geprüft:** Darstellung in Outlook und weiteren Mail-Programmen, Firefox und Safari, automatischer Vercel-Cron (erst nach dem Merge auf `main`), die 7-Tage-Erinnerung im Live-Versand (nur Unit-Tests), ein echter Ausfall von Resend (BUG-13 stammt aus Code-Review und dem Webhook-Test „ein Mail-Fehler ändert nichts am erfüllten Kauf").
+
+### Acceptance Criteria
+
+| Bereich | Ergebnis | Anmerkung |
+|---|---|---|
+| Resend, Absender aus Env | ✅ | Absender liegt bewusst auf `mail.narravit.de` |
+| Deutsch, Sie-Form | ✅ | per Test abgesichert |
+| Footer mit Kontakt und Impressum | ❌ | Impressum liefert live 404 (BUG-1) |
+| Versand blockiert den Nutzer nicht | ✅ | `after()` bzw. im Webhook abgewartet |
+| Idempotenz | ✅ | Webhook live `duplicate`, Marker in `mail_log` |
+| Mail 1 Einladung inkl. Geschenk | ✅ | live in Test 5 und 6 |
+| Mail 2 Kauf (02, 03, 03b, 04, Gast) | ✅ | live in Test 1–6 |
+| Mail 3 Vapi | entfällt | Rückbau 2026-10-13 |
+| Mail 4 Willkommen | ✅ | 10 Marker auf Stage, keiner hängt; Bild erst ab Go-live |
+| Mail 5 Verlängerung (10, 10b) | ✅ | live in Test 7 |
+| Mail 6 Erinnerung 30 Tage | ⚠️ | Versand live bestanden, Tageszahl eins zu hoch (BUG-15) |
+| Mail 7 Erinnerung 7 Tage | ⚠️ | nur Unit-Tests, gleiche Tageszahl-Logik (BUG-15) |
+| Fehlerverhalten bei Resend-Ausfall | ❌ | kein Nachholen, kein Alarm (BUG-13); Sentry folgt mit PROJ-13 |
+| Ungültige Adresse: kein API-Aufruf | ✅ | Unit-Test |
+
+### Security Audit
+
+- [x] Cron: ohne oder mit falschem Secret 401, zeitkonstanter Vergleich, live geprüft.
+- [x] `mail_log`: RLS aktiv, keine Policies, keine Rechte für `anon` und `authenticated` (auf Stage abgefragt).
+- [x] Schadcode in Namen, Adressen und Projekttiteln: In allen 14 Mails kommt er nur als Text an, im Browser wurde nichts ausgeführt.
+- [x] Betreffzeilen ohne Zeilenumbrüche, kein fremdes Reply-To, Empfänger in Logs gehasht, Resend-Schlüssel nur serverseitig.
+- [ ] Mengenbegrenzung für Einladungen fehlt weiter (BUG-10, PROJ-17).
+- [ ] `EMAIL_TEST_RECIPIENT` ist in Production gesetzt (BUG-14).
+
+### Neue Befunde
+
+#### BUG-13 (High) ✅ behoben — Fehlgeschlagene Kauf- und Geschenk-Mails gehen still verloren
+- **Ort:** `handleDirectGift`, `handleInitial`, `sendGuestConfirmation` in `src/app/api/stripe/webhook/route.ts`; Einlösen in `src/lib/purchases/guest-purchase.ts`.
+- **Ablauf:** Kauf „Geschenk ohne eigenen Zugang" → Resend antwortet in diesem Moment mit Fehler oder 429 → Webhook antwortet trotzdem 200 → ein erneuter Aufruf endet bei `duplicate`.
+- **Erwartet:** Die Mail wird nachgeholt, oder jemand erfährt vom Fehler.
+- **Tatsächlich:** Die Einladung liegt nur in der Datenbank, das Projekt hat kein Mitglied, und der Käufer liest „Ihr Geschenk ist unterwegs". Der Fehler steht nur im Server-Log. Der Kauf über 249 € bleibt unerreichbar, bis sich jemand beim Support meldet. Gleiches gilt für die Mail mit dem Einlöse-Link beim Kauf ohne Konto.
+- **Zusatz:** Verlängerungs-Mails gehen parallel raus. Ab etwa 11 Mitgliedern kann das Resend-Limit von 10 Anfragen pro Sekunde greifen, die betroffenen Mails entfallen dann ebenso.
+- **Priorität:** vor dem Go-live beheben.
+
+#### BUG-14 (Medium) — `EMAIL_TEST_RECIPIENT` ist für Production gesetzt
+- **Befund:** Laut Vercel-Metadaten gilt die Variable auch für Production; die Checkliste sagt „nicht setzen".
+- **Folge:** Die Sperre im Code greift nur, wenn `NEXT_PUBLIC_SITE_URL` exakt `https://app.narravit.de` ist. Sonst gingen alle Kunden-Mails an die Testadresse. Der Wert ist verschlüsselt und wurde nicht geprüft.
+- **Priorität:** vor dem Go-live in Vercel entfernen.
+
+#### BUG-15 (Low) ✅ behoben — Erinnerungen nennen einen Tag zu viel
+- **Reproduktion:** Mail vom 22.11.2026, 00:48 Uhr, Ablauf 11.12.2026, 23:01 Uhr. Die Mail sagt „in 20 Tagen", im Kalender sind es 19. Am Vortag des Ablaufs kann „Nur noch 2 Tage" stehen.
+- **Ursache:** `daysUntil` in `src/app/api/cron/reminders/route.ts` rundet angebrochene Tage auf statt Kalendertage in deutscher Zeit zu zählen.
+
+#### BUG-16 (Low) ✅ behoben — Sehr lange Wörter laufen auf dem Smartphone aus der Karte
+- **Reproduktion:** Projekttitel mit einem Wortteil ab etwa 30 Zeichen, Breite 375 px: Die Mail scrollt quer (398 statt 375 px). Betroffen sind die Erinnerungen und Verlängerungen, bei 320 px auch die Einladung.
+- **Ursache:** Werte in `MailDetailsList` und Fließtext haben keinen Umbruch innerhalb von Wörtern.
+
+#### BUG-17 (Low) ✅ behoben — Gerade schließende Anführungszeichen
+Sechs Stellen in Betreff und Vorschautext schreiben `„Titel"` statt `„Titel“`: `send-invitation.ts:28`, `send-reminder.ts:53` und `:56`, `InvitationEmail.tsx:82`, `ReminderEmail.tsx:81` und `:83`.
+
+#### BUG-18 (Low) ✅ behoben — Abbruch zwischen Marker und Versand verliert die Mail
+Wird die Funktion nach `reserveMailLog` und vor dem Versand beendet (z. B. Zeitlimit), bleibt der Marker ohne Resend-ID stehen, und Erinnerung oder Willkommens-Mail kommen nie. Auf Stage gibt es aktuell keinen solchen Marker.
+
+### Stand der früheren Befunde
+
+- **Weiter offen:** BUG-1 (Medium, Impressum 404, auf `www.narravit.de` und `narravit.de` geprüft), BUG-9 (Low, Mails versprechen Funktionen aus PROJ-12), BUG-10 (Low, PROJ-17).
+- **Behoben und bestätigt:** BUG-2 bis BUG-8, BUG-11, BUG-12.
+- **Offen, aber kein Fehler:** Stripe-Rabattcode in der Willkommens-Mail (Jakobs Reminder), Mail-Bilder erst ab Go-live, 90-Tage-Aussage ohne Löschlogik, Apple in der Reset-Mail.
+
+### Summary
+
+- **Acceptance Criteria:** 9 bestanden, 2 mit Einschränkung, 2 nicht erfüllt (von 13, ohne Vapi)
+- **Offene Bugs:** 9 (0 Critical, 1 High, 2 Medium, 6 Low)
+- **Security:** keine kritische Lücke; BUG-14 und BUG-10 vor dem Go-live schließen
+- **Production Ready:** **NEIN**
+- **Empfehlung:** Zuerst BUG-13, dann BUG-14 und BUG-1, danach die kleinen Fixes BUG-15 bis BUG-18. Status bleibt **In Review**.
+
+## Implementation Notes (Backend) — 2026-11-22: Fixes aus der QA
+
+Von Jakob freigegeben („Alle Code-Fixes").
+
+- **BUG-13 (High) — Warteschlange:** Neue Tabelle `mail_retry_queue` (Migration `20261122100000_proj11_mail_retry_queue.sql`, RLS aktiv, keine Policies, nur Service-Role).
+  - `sendEmail` wiederholt Überlastung, Serverfehler und Netzwerkfehler sofort bis zu zweimal, mit demselben Resend-Idempotenz-Schlüssel.
+  - Scheitert der Versand weiter, landet die Mail in der Warteschlange (`src/lib/email/retry-queue.ts`). Das gilt für Einladung, Kauf, Kauf ohne Konto, Verlängerung und Verlängerungs-Info.
+  - Der tägliche Cron holt sie nach (`src/lib/email/retry-mails.ts`), maximal drei Läufe. Danach geht ein Hinweis ohne Empfängerdaten an `kontakt@narravit.de`; der Eintrag wird nach 30 Tagen gelöscht.
+  - Vor dem Nachholen wird geprüft, ob die Mail noch nötig ist: Widerrufene, angenommene oder abgelaufene Einladungen und schon eingelöste Käufe entfallen.
+  - Das Einlöse-Geheimnis der Gast-Kauf-Mail liegt nie in der Warteschlange. Das Nachholen erzeugt ein neues und speichert nur dessen Hash.
+  - Fehlt der Resend-Schlüssel (lokal) oder ist die Adresse formal ungültig, wird nichts eingereiht. Verlängerungs-Mails gehen nacheinander raus.
+- **BUG-15:** Die Erinnerungen zählen Kalendertage in deutscher Zeit (`calendarDaysUntil`), passend zum Datum in der Mail.
+- **BUG-16:** Lange Wörter brechen in Fließtext und Detail-Box um. Bei 320, 375 und 600 px läuft keine der 84 Darstellungen mehr über. Die Supabase-Vorlagen sind neu erzeugt.
+- **BUG-17:** Alle sechs Stellen nutzen typografische Anführungszeichen.
+- **BUG-18:** Ein Marker ohne Resend-ID und ohne Fehler, der älter als eine Stunde ist, wird ersetzt. Erinnerung und Willkommens-Mail gehen dann beim nächsten Auslöser raus.
+
+**Tests:** Vitest 507/507, Typprüfung fehlerfrei, Lint 0 Fehler, Production-Build erfolgreich, Playwright Chromium 132 bestanden, 1 übersprungen.
+
+**Migration:** Am 2026-11-22 auf Stage eingespielt und in der Historie vermerkt. Geprüft: RLS aktiv, keine Policies, `anon` und `authenticated` ohne Rechte, `service_role` mit Lesen, Einfügen, Ändern und Löschen.
+
+**Nicht geprüft:** Das Nachholen ist nur per Unit-Test mit nachgebildeter Datenbank belegt, ein echter Resend-Ausfall wurde nicht erzeugt.
+
+**Offen vor „Approved":** BUG-14 (Variable in Vercel), BUG-1 (Impressum), danach erneut `/qa PROJ-11`. BUG-9 hängt an PROJ-12, BUG-10 an PROJ-17.
 
 ## Deployment
 _To be added by /deploy_

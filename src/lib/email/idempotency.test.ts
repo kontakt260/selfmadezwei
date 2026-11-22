@@ -40,6 +40,10 @@ vi.mock("@/lib/supabase/serviceRole", () => ({
             filters.push(["lt", col, val]);
             return chain;
           },
+          is: (col: string, val: unknown) => {
+            filters.push(["is", col, val]);
+            return chain;
+          },
           select: () => Promise.resolve(nextDeleteResult),
           then: (cb: (v: { error: null }) => unknown) =>
             Promise.resolve(cb({ error: null })),
@@ -61,6 +65,7 @@ import {
   finalizeMailLog,
   releaseMailLog,
   deleteStaleMailLog,
+  deleteAbandonedMailLog,
 } from "./idempotency";
 
 beforeEach(() => {
@@ -105,6 +110,38 @@ describe("deleteStaleMailLog", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     nextDeleteResult = { data: null, error: { message: "boom" } };
     await expect(deleteStaleMailLog(input)).resolves.toBe(false);
+  });
+});
+
+describe("deleteAbandonedMailLog (BUG-18)", () => {
+  const now = Date.parse("2026-11-22T12:00:00Z");
+
+  it("only targets unfinished markers older than one hour", async () => {
+    nextDeleteResult = { data: [{ id: "stuck" }], error: null };
+    await expect(
+      deleteAbandonedMailLog({ userId: "user-1", projectId: "proj-1", mailType: "reminder_7", now }),
+    ).resolves.toBe(true);
+    expect(deleteCalls[0]?.filters).toEqual([
+      ["eq", "user_id", "user-1"],
+      ["eq", "mail_type", "reminder_7"],
+      ["is", "resend_message_id", null],
+      ["is", "error", null],
+      ["lt", "sent_at", "2026-11-22T11:00:00.000Z"],
+      ["eq", "project_id", "proj-1"],
+    ]);
+  });
+
+  it("handles the welcome marker without a project", async () => {
+    await deleteAbandonedMailLog({ userId: "user-1", projectId: null, mailType: "welcome", now });
+    expect(deleteCalls[0]?.filters).toContainEqual(["is", "project_id", null]);
+  });
+
+  it("reports false on database errors", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    nextDeleteResult = { data: null, error: { message: "boom" } };
+    await expect(
+      deleteAbandonedMailLog({ userId: "user-1", projectId: null, mailType: "welcome", now }),
+    ).resolves.toBe(false);
   });
 });
 

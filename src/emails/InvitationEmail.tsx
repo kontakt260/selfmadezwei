@@ -79,7 +79,7 @@ export function InvitationEmail({
 
   return (
     <Layout
-      preview={`${inviterDisplay} hat Sie zum Projekt „${projectName}" eingeladen.`}
+      preview={`${inviterDisplay} hat Sie zum Projekt „${projectName}“ eingeladen.`}
       headerEyebrow="Einladung"
     >
       <MailHeading>Sie wurden eingeladen</MailHeading>

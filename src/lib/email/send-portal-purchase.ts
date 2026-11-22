@@ -1,5 +1,6 @@
 import "server-only";
-import { sendEmail, getSiteUrl, hashEmailForLog } from "./client";
+import { sendEmail, getSiteUrl, type SendMailResult } from "./client";
+import { recordMailResult } from "./retry-queue";
 import { PortalPurchaseEmail } from "@/emails/PortalPurchaseEmail";
 
 // PROJ-11 — Portal-Erstkauf-Bestätigung.
@@ -26,13 +27,13 @@ export type SendPortalPurchaseInput = {
   buyerHasAccess?: boolean;
 };
 
-export async function sendPortalPurchaseMail(
+/** Ein Versandversuch ohne Warteschlange — auch für das spätere Nachholen. */
+export async function deliverPortalPurchaseMail(
   input: SendPortalPurchaseInput,
-): Promise<void> {
-  const siteUrl = getSiteUrl();
+): Promise<SendMailResult> {
   const buyerHasAccess = input.buyerHasAccess ?? true;
 
-  const result = await sendEmail({
+  return sendEmail({
     to: input.to,
     subject: buyerHasAccess
       ? "Ihr NARRAVIT-Projektzugang ist freigeschaltet"
@@ -43,7 +44,7 @@ export async function sendPortalPurchaseMail(
       paymentDateFormatted: input.paymentDateFormatted,
       expiresAtFormatted: input.expiresAtFormatted,
       invoiceUrl: input.invoiceUrl,
-      siteUrl,
+      siteUrl: getSiteUrl(),
       projectId: input.projectId,
       giftRecipientEmail: input.giftRecipientEmail,
       giftRecipientName: input.giftRecipientName,
@@ -51,10 +52,11 @@ export async function sendPortalPurchaseMail(
     }),
     tags: [{ name: "type", value: "portal_purchase" }],
   });
+}
 
-  if (!result.ok) {
-    console.error(
-      `[email/portal-purchase] send failed for ${hashEmailForLog(input.to)}: ${result.error}`,
-    );
-  }
+export async function sendPortalPurchaseMail(
+  input: SendPortalPurchaseInput,
+): Promise<void> {
+  const result = await deliverPortalPurchaseMail(input);
+  await recordMailResult({ kind: "portal_purchase", input }, result);
 }

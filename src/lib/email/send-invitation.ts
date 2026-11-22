@@ -1,5 +1,6 @@
 import "server-only";
-import { sendEmail, getSiteUrl, hashEmailForLog } from "./client";
+import { sendEmail, getSiteUrl, type SendMailResult } from "./client";
+import { recordMailResult } from "./retry-queue";
 import { InvitationEmail } from "@/emails/InvitationEmail";
 
 // PROJ-11 — Einladungs-Mail-Versand.
@@ -25,24 +26,14 @@ function subjectFor(input: SendInvitationInput): string {
     const inviter = input.inviterName.trim() || input.inviterEmail;
     return `${inviter} schenkt Ihnen ein Lebensbuch`;
   }
-  return `Einladung zum Projekt „${input.projectName}"`;
+  return `Einladung zum Projekt „${input.projectName}“`;
 }
 
-/**
- * Versendet die Einladungs-Mail an die eingeladene Adresse.
- *
- * Idempotenz: braucht KEINEN mail_log-Marker, weil pro Invitation-Row
- * höchstens einmal aufgerufen wird (die invitations.token-UNIQUE-Spalte
- * verhindert Doppel-Invitations). Bei Resend-Fehler erfolgt KEIN
- * automatischer Retry; der Fehler landet im Server-Log. Einen manuell
- * teilbaren Link gibt es bewusst nicht (Entscheidung 2026-10-14).
- */
-export async function sendInvitationMail(
+/** Ein Versandversuch ohne Warteschlange — auch für das spätere Nachholen. */
+export async function deliverInvitationMail(
   input: SendInvitationInput,
-): Promise<void> {
-  const siteUrl = getSiteUrl();
-
-  const result = await sendEmail({
+): Promise<SendMailResult> {
+  return sendEmail({
     to: input.to,
     subject: subjectFor(input),
     react: InvitationEmail({
@@ -51,16 +42,25 @@ export async function sendInvitationMail(
       projectName: input.projectName,
       role: input.role,
       token: input.token,
-      siteUrl,
+      siteUrl: getSiteUrl(),
       isGift: input.isGift,
     }),
     tags: [{ name: "type", value: input.isGift ? "gift_invitation" : "invitation" }],
   });
+}
 
-  if (!result.ok) {
-    // Best-Effort: nur Server-Log, kein User-Feedback.
-    console.error(
-      `[email/invitation] send failed for ${hashEmailForLog(input.to)}: ${result.error}`,
-    );
-  }
+/**
+ * Versendet die Einladungs-Mail an die eingeladene Adresse.
+ *
+ * Idempotenz: braucht KEINEN mail_log-Marker, weil pro Invitation-Row
+ * höchstens einmal aufgerufen wird (die invitations.token-UNIQUE-Spalte
+ * verhindert Doppel-Invitations). Scheitert der Versand, holt der tägliche
+ * Cron die Mail nach (BUG-13). Einen manuell teilbaren Link gibt es bewusst
+ * nicht (Entscheidung 2026-10-14).
+ */
+export async function sendInvitationMail(
+  input: SendInvitationInput,
+): Promise<void> {
+  const result = await deliverInvitationMail(input);
+  await recordMailResult({ kind: "invitation", input }, result);
 }

@@ -20,9 +20,10 @@ import { addTwelveMonths } from "@/lib/purchases/access-period";
 // PROJ-11: Die Mails werden hier abgewartet, nicht im Hintergrund
 // gestartet. Der Webhook ist ein Server-zu-Server-Aufruf (niemand wartet
 // auf die Antwort), und nur so ist sicher, dass der Versand nicht nach der
-// Antwort abgebrochen wird. Die Send-Helper werfen nicht; Fehler landen im
-// Server-Log. Ein Mail-Fehler darf den Webhook nicht scheitern lassen —
-// Projekt und Zahlung sind zu diesem Zeitpunkt schon gespeichert.
+// Antwort abgebrochen wird. Die Send-Helper werfen nicht. Ein Mail-Fehler
+// darf den Webhook nicht scheitern lassen — Projekt und Zahlung sind zu
+// diesem Zeitpunkt schon gespeichert. Gescheiterte Mails landen in der
+// Warteschlange und werden vom täglichen Cron nachgeholt (BUG-13).
 
 /**
  * Link zur Stripe-Rechnung. `session.invoice` ist eine Rechnungs-ID (bzw.
@@ -399,6 +400,7 @@ async function sendGuestConfirmation(
     }
     await sendGuestPurchaseMail({
       to,
+      stripeSessionId: session.id,
       fullName: meta.full_name?.trim() || undefined,
       amountFormatted: formatEur(
         session.amount_total ?? PRODUCTS.initial.amountCents,
@@ -497,41 +499,35 @@ async function handleRenewal(
       .eq("id", projectId)
       .maybeSingle();
     const projectName = project?.title?.trim() || PROJECT_DEFAULT_TITLE;
-    const mails: Array<Promise<void>> = [];
 
+    // Nacheinander, damit große Projekte nicht ins Resend-Limit laufen.
     if (buyer.email) {
-      mails.push(
-        sendRenewalMail({
-          to: buyer.email,
-          fullName: buyer.fullName ?? undefined,
-          projectName,
-          projectId,
-          amountFormatted: formatEur(
-            session.amount_total ?? PRODUCTS.renewal.amountCents,
-            (session.currency ?? PRODUCTS.renewal.currency).toUpperCase(),
-          ),
-          paymentDateFormatted: formatGermanDate(Date.now()),
-          newExpiresAtFormatted,
-          invoiceUrl: await resolveInvoiceUrl(session),
-        }),
-      );
+      await sendRenewalMail({
+        to: buyer.email,
+        fullName: buyer.fullName ?? undefined,
+        projectName,
+        projectId,
+        amountFormatted: formatEur(
+          session.amount_total ?? PRODUCTS.renewal.amountCents,
+          (session.currency ?? PRODUCTS.renewal.currency).toUpperCase(),
+        ),
+        paymentDateFormatted: formatGermanDate(Date.now()),
+        newExpiresAtFormatted,
+        invoiceUrl: await resolveInvoiceUrl(session),
+      });
     }
 
     const renewedBy = buyer.fullName?.trim() || buyer.email || "Ein Projektmitglied";
     for (const member of others) {
-      mails.push(
-        sendRenewalInfoMail({
-          to: member.email,
-          fullName: member.fullName ?? undefined,
-          renewedBy,
-          projectName,
-          projectId,
-          newExpiresAtFormatted,
-        }),
-      );
+      await sendRenewalInfoMail({
+        to: member.email,
+        fullName: member.fullName ?? undefined,
+        renewedBy,
+        projectName,
+        projectId,
+        newExpiresAtFormatted,
+      });
     }
-
-    await Promise.all(mails);
   } catch (err) {
     console.error(
       `[stripe-webhook] renewal mail failed for session ${session.id}: ${err instanceof Error ? err.message : String(err)}`,

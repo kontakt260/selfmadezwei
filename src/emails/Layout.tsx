@@ -47,6 +47,13 @@ const SERIF_WORDMARK = "Merriweather, Georgia, 'Times New Roman', serif";
 const SANS =
   "Lato, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif";
 
+// Lange Wörter, Adressen und Projekttitel brechen um, statt die Mail auf dem
+// Smartphone breiter als den Bildschirm zu machen (BUG-16).
+const WRAP_LONG_WORDS = {
+  overflowWrap: "anywhere",
+  wordBreak: "break-word",
+} as const;
+
 // Empfohlene Mail-Container-Breite — typisch ~600 px in Gmail/Outlook-Lese-
 // Bereich, schmaler auf Mobile.
 const CONTAINER_WIDTH = 600;
@@ -294,6 +301,7 @@ export function MailParagraph({ children }: { children: ReactNode }) {
         fontSize: 15,
         lineHeight: "24px",
         color: COLORS.inkSecondary,
+        ...WRAP_LONG_WORDS,
       }}
     >
       {children}
@@ -334,6 +342,7 @@ export function MailDetailsList({
           lineHeight: 1.6,
           verticalAlign: "top",
           paddingBottom: idx === items.length - 1 ? 0 : 8,
+          ...WRAP_LONG_WORDS,
         } as const;
         return (
           <table

@@ -78,9 +78,9 @@ const PREVIEW: Record<
   (project: string, date: string, daysLeft: number) => string
 > = {
   "30": (project, date) =>
-    `Ihr NARRAVIT-Projektzugang für „${project}" läuft am ${date} ab.`,
+    `Ihr NARRAVIT-Projektzugang für „${project}“ läuft am ${date} ab.`,
   "7": (project, date, d) =>
-    `Nur noch ${daysNominative(d)}: Projektzugang für „${project}" läuft am ${date} ab.`,
+    `Nur noch ${daysNominative(d)}: Projektzugang für „${project}“ läuft am ${date} ab.`,
 };
 
 export function ReminderEmail({

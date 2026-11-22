@@ -1,5 +1,6 @@
 import "server-only";
-import { sendEmail, getSiteUrl, hashEmailForLog } from "./client";
+import { sendEmail, getSiteUrl, type SendMailResult } from "./client";
+import { recordMailResult } from "./retry-queue";
 import { GuestPurchaseEmail } from "@/emails/GuestPurchaseEmail";
 
 // PROJ-6/PROJ-11 — Kauf-Bestätigung für Käufe ohne Konto.
@@ -11,6 +12,8 @@ import { GuestPurchaseEmail } from "@/emails/GuestPurchaseEmail";
 export type SendGuestPurchaseInput = {
   /** Adresse aus dem Stripe-Checkout */
   to: string;
+  /** Zuordnung zum Kauf, damit ein Nachholen einen neuen Link erzeugen kann */
+  stripeSessionId: string;
   fullName?: string;
   amountFormatted: string;
   paymentDateFormatted: string;
@@ -20,8 +23,11 @@ export type SendGuestPurchaseInput = {
   claimCode?: string;
 };
 
-export async function sendGuestPurchaseMail(input: SendGuestPurchaseInput): Promise<void> {
-  const result = await sendEmail({
+/** Ein Versandversuch ohne Warteschlange — auch für das spätere Nachholen. */
+export async function deliverGuestPurchaseMail(
+  input: SendGuestPurchaseInput,
+): Promise<SendMailResult> {
+  return sendEmail({
     to: input.to,
     subject: "Ihre Zahlung ist eingegangen — bitte legen Sie Ihr NARRAVIT-Konto an",
     react: GuestPurchaseEmail({
@@ -36,10 +42,13 @@ export async function sendGuestPurchaseMail(input: SendGuestPurchaseInput): Prom
     }),
     tags: [{ name: "type", value: "guest_purchase" }],
   });
+}
 
-  if (!result.ok) {
-    console.error(
-      `[email/guest-purchase] send failed for ${hashEmailForLog(input.to)}: ${result.error}`,
-    );
-  }
+export async function sendGuestPurchaseMail(input: SendGuestPurchaseInput): Promise<void> {
+  const result = await deliverGuestPurchaseMail(input);
+  // Das Geheimnis liegt nirgends im Klartext: Das Nachholen erzeugt ein neues.
+  await recordMailResult(
+    { kind: "guest_purchase", input: { ...input, claimCode: undefined } },
+    result,
+  );
 }

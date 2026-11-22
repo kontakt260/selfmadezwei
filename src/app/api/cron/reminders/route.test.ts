@@ -16,6 +16,11 @@ vi.mock("@/lib/email/send-reminder", () => ({
   }),
 }));
 
+const retryMock = vi.fn(async () => ({ retried: 0, sent: 0, dropped: 0, gaveUp: 0 }));
+vi.mock("@/lib/email/retry-mails", () => ({
+  processMailRetryQueue: () => retryMock(),
+}));
+
 // Service-Role-Client-Mock — chained Supabase builders.
 type FakeRow = Record<string, unknown>;
 let accessRows: FakeRow[] = [];
@@ -71,6 +76,7 @@ vi.mock("@/lib/supabase/serviceRole", () => ({
 }));
 
 import { GET } from "./route";
+import { calendarDaysUntil } from "@/lib/email/format";
 import type { NextRequest } from "next/server";
 
 function makeRequest(headers: Record<string, string> = {}): NextRequest {
@@ -90,6 +96,7 @@ beforeEach(() => {
   profileRow = null;
   memberFilters = [];
   nextSendResult = { sent: true };
+  retryMock.mockReset().mockResolvedValue({ retried: 0, sent: 0, dropped: 0, gaveUp: 0 });
 });
 
 describe("/api/cron/reminders — auth", () => {
@@ -152,7 +159,11 @@ describe("/api/cron/reminders — happy path", () => {
     expect(firstCall.to).toBe("pl@example.com");
     expect(firstCall.variant).toBe("30");
     expect(firstCall.projectName).toBe("Mein Lebensbuch");
-    expect(sendCalls[0]).toMatchObject({ expiresAt: inThirtyDays, daysLeft: 30 });
+    // Kalendertage in deutscher Zeit, passend zum Datum in der Mail (BUG-15).
+    expect(sendCalls[0]).toMatchObject({
+      expiresAt: inThirtyDays,
+      daysLeft: calendarDaysUntil(inThirtyDays),
+    });
   });
 
   it("catches up a missed 7-day reminder and passes the real days left", async () => {
@@ -173,7 +184,52 @@ describe("/api/cron/reminders — happy path", () => {
     const sevenDayCall = sendCalls.find(
       (c) => (c as { variant: string }).variant === "7",
     );
-    expect(sevenDayCall).toMatchObject({ daysLeft: 3, expiresAt: inThreeDays });
+    expect(sevenDayCall).toMatchObject({
+      daysLeft: calendarDaysUntil(inThreeDays),
+      expiresAt: inThreeDays,
+    });
+  });
+
+  it("never reports less than one day on the day of expiry", async () => {
+    const inOneHour = new Date(Date.now() + 60 * 1000).toISOString();
+    accessRows = [{ project_id: "proj-1", expires_at: inOneHour }];
+    memberRows = [{ user_id: "user-pl" }];
+    projectRow = { title: "Mein Lebensbuch" };
+    profileRow = { email: "pl@example.com", full_name: "Maria" };
+
+    await GET(makeRequest({ "x-cron-secret": "test_cron_secret_123" }));
+
+    expect((sendCalls[0] as { daysLeft: number }).daysLeft).toBeGreaterThanOrEqual(1);
+  });
+
+  it("retries failed mails and reports them (BUG-13)", async () => {
+    retryMock.mockResolvedValue({ retried: 2, sent: 1, dropped: 1, gaveUp: 0 });
+
+    const res = await GET(makeRequest({ "x-cron-secret": "test_cron_secret_123" }));
+    const json = await res.json();
+
+    expect(retryMock).toHaveBeenCalledTimes(1);
+    expect(json.mailRetries).toEqual({ retried: 2, sent: 1, dropped: 1, gaveUp: 0 });
+  });
+
+  it("still sends reminders when the retry step crashes", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    retryMock.mockRejectedValue(new Error("queue down"));
+    const inThirtyDays = new Date(Date.now() + 29.5 * 24 * 60 * 60 * 1000).toISOString();
+    accessRows = [{ project_id: "proj-1", expires_at: inThirtyDays }];
+    memberRows = [{ user_id: "user-pl" }];
+    projectRow = { title: "Mein Lebensbuch" };
+    profileRow = { email: "pl@example.com", full_name: "Maria" };
+
+    const res = await GET(makeRequest({ "x-cron-secret": "test_cron_secret_123" }));
+
+    expect(res.status).toBe(200);
+    expect(sendCalls.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("does not touch the retry queue without a valid secret", async () => {
+    await GET(makeRequest({ "x-cron-secret": "wrong" }));
+    expect(retryMock).not.toHaveBeenCalled();
   });
 
   it("skips when reserve returns duplicate (already-sent)", async () => {

@@ -109,7 +109,30 @@ export type SendMailInput = {
 
 export type SendMailResult =
   | { ok: true; messageId: string | null; redirected: boolean }
-  | { ok: false; error: string; redirected: boolean };
+  | {
+      ok: false;
+      error: string;
+      redirected: boolean;
+      /** true = ein späterer Versuch kann klappen (Warteschlange, BUG-13). */
+      retryable?: boolean;
+    };
+
+/** Wartezeiten vor dem zweiten und dritten Versuch innerhalb eines Aufrufs. */
+const RETRY_DELAYS_MS = [400, 1200];
+
+/**
+ * Lohnt sich ein sofortiger zweiter Versuch? Ja bei Überlastung, Serverfehlern
+ * und Netzwerkproblemen. Ein aufgebrauchtes Tages- oder Monatskontingent
+ * erholt sich nicht in Sekunden, das holt die Warteschlange später nach.
+ */
+function isTransientSendError(error: { name?: string; statusCode?: number | null }): boolean {
+  if (error.name === "rate_limit_exceeded" || error.name === "application_error") return true;
+  return typeof error.statusCode === "number" && error.statusCode >= 500;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /**
  * Sendet eine E-Mail über Resend. NIEMALS aus dem Client aufrufen.
@@ -148,34 +171,59 @@ export async function sendEmail(input: SendMailInput): Promise<SendMailResult> {
     };
   }
 
+  let resend: Resend;
   try {
-    const resend = getResend();
-    const { data, error } = await resend.emails.send({
-      from: getFromAddress(),
-      to: recipient,
-      subject: sanitizeSubject(input.subject),
-      html,
-      text,
-      tags: input.tags,
-    });
-    if (error) {
-      return {
-        ok: false,
-        error: error.message ?? String(error),
-        redirected: recipientCheck.redirected,
-      };
-    }
-    return {
-      ok: true,
-      messageId: data?.id ?? null,
-      redirected: recipientCheck.redirected,
-    };
+    resend = getResend();
   } catch (err) {
+    // Fehlender Schlüssel ist eine Konfigurationsfrage (z. B. lokal), kein
+    // Fall für die Warteschlange.
     return {
       ok: false,
       error: err instanceof Error ? err.message : String(err),
       redirected: recipientCheck.redirected,
     };
+  }
+
+  const payload = {
+    from: getFromAddress(),
+    to: recipient,
+    subject: sanitizeSubject(input.subject),
+    html,
+    text,
+    tags: input.tags,
+  };
+  // Derselbe Schlüssel für alle Versuche: Kam ein Versuch trotz Fehlermeldung
+  // bei Resend an, verschickt Resend die Mail kein zweites Mal.
+  const idempotencyKey = crypto.randomUUID();
+
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const { data, error } = await resend.emails.send(payload, { idempotencyKey });
+      if (!error) {
+        return {
+          ok: true,
+          messageId: data?.id ?? null,
+          redirected: recipientCheck.redirected,
+        };
+      }
+      if (attempt < RETRY_DELAYS_MS.length && isTransientSendError(error)) {
+        await wait(RETRY_DELAYS_MS[attempt]);
+        continue;
+      }
+      return {
+        ok: false,
+        error: error.message ?? String(error),
+        redirected: recipientCheck.redirected,
+        retryable: true,
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+        redirected: recipientCheck.redirected,
+        retryable: true,
+      };
+    }
   }
 }
 

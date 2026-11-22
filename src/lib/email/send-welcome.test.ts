@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { sendEmail } from "./client";
-import { reserveMailLog, finalizeMailLog, releaseMailLog } from "./idempotency";
+import {
+  reserveMailLog,
+  finalizeMailLog,
+  releaseMailLog,
+  deleteAbandonedMailLog,
+} from "./idempotency";
 import { isRecentSignup, maybeSendWelcomeMail } from "./send-welcome";
 
 vi.mock("./client", () => ({
@@ -13,6 +18,7 @@ vi.mock("./idempotency", () => ({
   reserveMailLog: vi.fn(),
   finalizeMailLog: vi.fn(async () => undefined),
   releaseMailLog: vi.fn(async () => undefined),
+  deleteAbandonedMailLog: vi.fn(async () => false),
 }));
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -20,6 +26,7 @@ const DAY = 24 * 60 * 60 * 1000;
 beforeEach(() => {
   vi.mocked(sendEmail).mockReset();
   vi.mocked(reserveMailLog).mockReset().mockResolvedValue({ reserved: true, logId: "log-1" });
+  vi.mocked(deleteAbandonedMailLog).mockReset().mockResolvedValue(false);
   vi.mocked(finalizeMailLog).mockClear();
   vi.mocked(releaseMailLog).mockClear();
 });
@@ -62,5 +69,22 @@ describe("maybeSendWelcomeMail", () => {
     vi.mocked(reserveMailLog).mockResolvedValue({ reserved: false, reason: "duplicate" });
     await maybeSendWelcomeMail(input);
     expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("recovers a marker whose send never finished (BUG-18)", async () => {
+    vi.mocked(sendEmail).mockResolvedValue({ ok: true, messageId: "msg_2", redirected: false });
+    vi.mocked(reserveMailLog)
+      .mockResolvedValueOnce({ reserved: false, reason: "duplicate" })
+      .mockResolvedValueOnce({ reserved: true, logId: "log-2" });
+    vi.mocked(deleteAbandonedMailLog).mockResolvedValue(true);
+
+    await maybeSendWelcomeMail(input);
+
+    expect(deleteAbandonedMailLog).toHaveBeenCalledWith({
+      userId: "user-1",
+      projectId: null,
+      mailType: "welcome",
+    });
+    expect(sendEmail).toHaveBeenCalledTimes(1);
   });
 });

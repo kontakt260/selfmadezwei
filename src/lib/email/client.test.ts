@@ -61,7 +61,7 @@ describe("sendEmail", () => {
       expect(result.messageId).toBe("msg_abc123");
       expect(result.redirected).toBe(false);
     }
-    expect(mockSend).toHaveBeenCalledWith(
+    expect(mockSend.mock.calls[0][0]).toEqual(
       expect.objectContaining({
         from: "narravit <no-reply@test.local>",
         to: "user@example.com",
@@ -104,7 +104,7 @@ describe("sendEmail", () => {
     });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.redirected).toBe(true);
-    expect(mockSend).toHaveBeenCalledWith(
+    expect(mockSend.mock.calls[0][0]).toEqual(
       expect.objectContaining({ to: "qa@narravit.de" }),
     );
   });
@@ -123,7 +123,7 @@ describe("sendEmail", () => {
     });
     process.env.NEXT_PUBLIC_SITE_URL = siteUrl;
     if (result.ok) expect(result.redirected).toBe(false);
-    expect(mockSend).toHaveBeenCalledWith(
+    expect(mockSend.mock.calls[0][0]).toEqual(
       expect.objectContaining({ to: "real-user@example.com" }),
     );
   });
@@ -141,7 +141,7 @@ describe("sendEmail", () => {
       react: { type: "div", props: {}, key: null } as never,
     });
     delete process.env.VERCEL_ENV;
-    expect(mockSend).toHaveBeenCalledWith(
+    expect(mockSend.mock.calls[0][0]).toEqual(
       expect.objectContaining({ to: "qa@narravit.de" }),
     );
   });
@@ -153,7 +153,7 @@ describe("sendEmail", () => {
       subject: "Einladung zum Projekt „Oma\r\nBcc: x@evil.example\"",
       react: { type: "div", props: {}, key: null } as never,
     });
-    expect(mockSend).toHaveBeenCalledWith(
+    expect(mockSend.mock.calls[0][0]).toEqual(
       expect.objectContaining({
         subject: "Einladung zum Projekt „Oma Bcc: x@evil.example\"",
       }),
@@ -183,6 +183,83 @@ describe("sendEmail", () => {
     });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe("network down");
+  });
+
+  describe("Wiederholung und Warteschlange (BUG-13)", () => {
+    const mail = {
+      to: "user@example.com",
+      subject: "Test",
+      react: { type: "div", props: {}, key: null } as never,
+    };
+
+    async function sendWithTimers() {
+      vi.useFakeTimers();
+      try {
+        const pending = sendEmail(mail);
+        await vi.runAllTimersAsync();
+        return await pending;
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+
+    it("retries a rate limit with the same idempotency key", async () => {
+      mockSend
+        .mockResolvedValueOnce({
+          data: null,
+          error: { name: "rate_limit_exceeded", statusCode: 429, message: "slow down" },
+        })
+        .mockResolvedValueOnce({ data: { id: "msg_retry" }, error: null });
+
+      const result = await sendWithTimers();
+
+      expect(result).toMatchObject({ ok: true, messageId: "msg_retry" });
+      expect(mockSend).toHaveBeenCalledTimes(2);
+      expect(mockSend.mock.calls[1][1].idempotencyKey).toBe(mockSend.mock.calls[0][1].idempotencyKey);
+    });
+
+    it("gives up after three attempts and marks the mail for the queue", async () => {
+      mockSend.mockResolvedValue({
+        data: null,
+        error: { name: "internal_server_error", statusCode: 500, message: "down" },
+      });
+
+      const result = await sendWithTimers();
+      mockSend.mockReset();
+
+      expect(result).toMatchObject({ ok: false, error: "down", retryable: true });
+    });
+
+    it("does not retry at once when the quota is used up, but queues the mail", async () => {
+      mockSend.mockResolvedValueOnce({
+        data: null,
+        error: { name: "daily_quota_exceeded", statusCode: 429, message: "quota" },
+      });
+
+      const result = await sendEmail(mail);
+
+      expect(mockSend).toHaveBeenCalledTimes(1);
+      expect(result).toMatchObject({ ok: false, retryable: true });
+    });
+
+    it("does not queue an invalid recipient", async () => {
+      const result = await sendEmail({ ...mail, to: "no-at-sign" });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.retryable).toBeUndefined();
+    });
+
+    it("does not queue when the API key is missing (local development)", async () => {
+      const key = process.env.RESEND_API_KEY;
+      delete process.env.RESEND_API_KEY;
+      vi.resetModules();
+      const fresh = await import("./client");
+
+      const result = await fresh.sendEmail(mail);
+
+      process.env.RESEND_API_KEY = key;
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.retryable).toBeUndefined();
+    });
   });
 });
 

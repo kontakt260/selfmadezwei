@@ -198,6 +198,36 @@ export type Database = {
           },
         ]
       }
+      mail_retry_queue: {
+        Row: {
+          attempts: number
+          created_at: string
+          gave_up_at: string | null
+          id: string
+          kind: string
+          last_error: string | null
+          payload: Json
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          gave_up_at?: string | null
+          id?: string
+          kind: string
+          last_error?: string | null
+          payload: Json
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          gave_up_at?: string | null
+          id?: string
+          kind?: string
+          last_error?: string | null
+          payload?: Json
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount_cents: number
