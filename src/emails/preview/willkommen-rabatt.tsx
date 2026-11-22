@@ -7,7 +7,7 @@ export default function Preview() {
     <WelcomeEmail
       fullName="Maria Muster"
       siteUrl={siteUrl}
-      discount={{ code: "WILLKOMMEN50", amountLabel: "50 €" }}
+      discount={{ code: "BUCH50", amountLabel: "50 €" }}
     />
   );
 }
