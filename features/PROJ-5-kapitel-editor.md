@@ -1352,3 +1352,18 @@ Fixes liegen auf `stage` und sind noch nicht in Production.
 - Die Pagination besteht weiterhin aus zwei kooperierenden Engines
   (Decorations für Text, `usePagination` für Bilder und Umbruch-Höhen). Die
   im Tech Design Refresh skizzierte Zusammenlegung bleibt offen.
+
+## Untersuchung `AC-Break-1` (2026-11-22)
+
+**Anlass:** Der E2E-Test fiel sporadisch aus (3 von 9 Läufen): Seite 2 begann nach einem manuellen Umbruch 233 px unter dem oberen Rand.
+
+**Ergebnis:** Der Endzustand ist immer richtig. Es gibt aber bei **jedem** Einfügen ein kurzes sichtbares Springen.
+
+- **Messung:** 40 von 40 Einfügungen zeigten den falschen Stand für genau 3 Frames (46 bis 51 ms, Chromium, 60 Hz). Danach stand der Text in allen 40 Fällen korrekt, ohne Verstoß gegen die Seitengrenzen.
+- **Ursache im Editor:** `PaginationDecorations` rechnet im ersten Frame, bevor `usePagination` die Höhe des Umbruchs gesetzt hat. Der Text scheint deshalb noch über die Seite zu laufen und bekommt einen Soft-Break-Spacer (im Testfall 209 px). Sobald der Umbruch seine Höhe hat, steht dieser Spacer falsch. Der Settling-Pass drei Frames später entfernt ihn.
+- **Ursache des Testausfalls:** `settledAudit` vergleicht zwei Messungen, zwischen denen keine Zeit vergeht (`expect.poll` misst sofort). Der Test hält das Layout deshalb für stabil und trifft gelegentlich genau diese 3 Frames.
+- **Folgen:** Dokument, Speicherstand und Druck sind nicht betroffen, weil die Spacer nur Decorations sind.
+
+**Test repariert (Jakob, 2026-11-22: „Nur den Test"):** `settledAudit` wartet jetzt 300 ms zwischen den Messungen. `AC-Break-1` lief danach 30-mal ohne Messfehler, die komplette Chromium-Suite hatte 132 bestanden und 1 übersprungen. In einer der 30 Wiederholungen lief nur das Aufräumen danach in einen Timeout (`waitForLoadState("networkidle")` in `deleteQaChapters`). Dasselbe Warten ließ auch `AC-Display-1` (PROJ-7) einmal ausfallen.
+
+**Offen:** Das Springen von etwa 50 ms nach jedem manuellen Umbruch bleibt bestehen. Es soll mit PROJ-21 (druckfähige Seitenlayouts) behoben werden, indem beide Engines in fester Reihenfolge rechnen.

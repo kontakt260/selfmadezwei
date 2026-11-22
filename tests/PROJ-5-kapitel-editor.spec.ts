@@ -52,17 +52,22 @@ async function settledAudit() {
   await expect
     .poll(async () => (await auditEditor(page)).violations, { timeout: 8_000 })
     .toEqual([]);
-  // Zwei gleiche Messungen in Folge = Layout steht.
+  // Zwei gleiche Messungen im Abstand von 300 ms = Layout steht. Die Wartezeit
+  // steht bewusst IN der Messung: `expect.poll` ruft sofort auf, ohne sie
+  // lägen beide Messungen im selben Frame. Nach einem Umbruch braucht die
+  // Pagination drei Frames, der Test traf sonst gelegentlich diesen
+  // Zwischenstand (AC-Break-1, 2026-11-22).
   let previous = JSON.stringify(await auditEditor(page));
   await expect
     .poll(
       async () => {
+        await page.waitForTimeout(300);
         const current = JSON.stringify(await auditEditor(page));
         const stable = current === previous;
         previous = current;
         return stable;
       },
-      { timeout: 8_000, intervals: [300] },
+      { timeout: 8_000, intervals: [50] },
     )
     .toBe(true);
   return auditEditor(page);

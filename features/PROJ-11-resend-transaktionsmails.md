@@ -876,7 +876,7 @@ Von Jakob freigegeben („Alle Code-Fixes").
 #### BUG-20 (Low) ✅ behoben — Einträge der Warteschlange überdauern eine Kontolöschung
 Die Einträge sind nicht mit dem Konto verknüpft. Nach `deleteAccountAction` bleiben Name und Adresse bis zu 30 Tage nach dem letzten Versuch gespeichert, bei Einladungen auch der Token, und eine offene Mail kann noch rausgehen. Tritt nur auf, wenn in diesem Zeitraum ein Versand gescheitert ist.
 
-**Sporadische E2E-Ausfälle außerhalb der Mails:** `AC-Display-1` (PROJ-7) lief einmal beim Warten auf `networkidle` in einen Timeout. `AC-Break-1` (PROJ-5) fiel am 2026-11-22 in 3 von 9 Läufen aus, auch einzeln: Seite 2 begann nach einem manuellen Umbruch nicht am oberen Rand (233 px statt höchstens 2 px). **Ungeklärt ist, ob der Test zu früh misst oder der Editor kurzzeitig wirklich falsch umbricht.**
+**Sporadische E2E-Ausfälle außerhalb der Mails:** `AC-Display-1` (PROJ-7) lief einmal beim Warten auf `networkidle` in einen Timeout. `AC-Break-1` (PROJ-5) fiel am 2026-11-22 in 3 von 9 Läufen aus, auch einzeln: Seite 2 begann nach einem manuellen Umbruch nicht am oberen Rand (233 px statt höchstens 2 px). **Geklärt am 2026-11-22:** Der Test misst zu früh und trifft ein 50 ms kurzes Springen des Editors, der Endzustand ist richtig (Details in [PROJ-5](PROJ-5-kapitel-editor.md)).
 
 ### Stand der früheren Befunde
 
@@ -901,7 +901,7 @@ Von Jakob freigegeben („BUG-19 und 20").
 
 **Tests:** Vitest 533/533, Typprüfung fehlerfrei, Lint 0 Fehler, Production-Build erfolgreich. Playwright Chromium, komplette Suite: 123 bestanden, 1 übersprungen, `AC-Break-1` rot, dadurch 8 Folgetests im selben Block nicht gelaufen. Die Editor-Suite lief danach einzeln dreimal: zweimal alle 20 grün, einmal wieder `AC-Break-1` rot.
 
-**Offen:** BUG-1 (Impressum, Go-live-Blocker), BUG-9 (PROJ-12), BUG-10 (PROJ-17) und die ungeklärte Ursache von `AC-Break-1`.
+**Offen:** BUG-1 (Impressum, Go-live-Blocker), BUG-9 (PROJ-12), BUG-10 (PROJ-17). `AC-Break-1` ist untersucht und betrifft PROJ-5.
 
 ## Deployment
 _To be added by /deploy_
