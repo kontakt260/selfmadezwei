@@ -248,15 +248,23 @@ Vor dem unwiderruflichen Löschen eines Kontos reicht heute eine offene Sitzung.
 - PROJ-19 E2E auf dem Production-Build: 15 von 15
 - Komplette E2E-Regression Chromium auf dem Production-Build: 148 bestanden, 25 übersprungen, 0 fehlgeschlagen. Der Test AC-14 aus PROJ-3 blieb bewusst außen vor, weil er eine echte Reset-Mail auslöst
 
-**Nicht geprüft:** Ablauf auf `stage-app.narravit.de` (noch nicht deployed), vollständige Anmeldung bei Google und Facebook, echte Stripe-Session, echter Turnstile-Schlüssel, Firefox und Safari, Embed-Elemente in Webflow.
+### Prüfung auf Stage (2026-11-22, Version `391f93d`)
+
+- Deployment fehlerfrei, die Konfigurationsprüfung hat auf Stage bestanden
+- Alle Header stimmen mit der Soll-Liste überein: Seite `/anmelden`, JavaScript-Datei, Datei aus `public/` und echte 404-Antwort. HSTS enthält `includeSubDomains`, aber kein `preload`, `X-Powered-By` fehlt
+- Unbekannte Pfade leiten nicht angemeldet zu `/anmelden` weiter und tragen dort ebenfalls alle Header
+- Turnstile lädt unter der CSP. Die einzigen Meldungen im Beobachtungsmodus betreffen `vercel.live`, die Vercel-Werkzeugleiste auf Preview-Deployments. Sie gehört nicht in die Regel
+- Gemessen im Browser nach Vercel-Anmeldung, weil `curl` an der Deployment-Protection endet. Die Seite wurde nur ohne App-Anmeldung aufgerufen
+
+**Nicht geprüft:** Seiten hinter der App-Anmeldung auf Stage, vollständige Anmeldung bei Google und Facebook, echte Stripe-Session, Firefox und Safari, Embed-Elemente in Webflow.
 
 ### Summary
 
 - **Acceptance Criteria:** 15 von 15 bestanden
 - **Bugs:** 1 offen (BUG-2, Medium, wird mit PROJ-26 gelöst), BUG-1 ist behoben
 - **Security:** bestanden
-- **Production Ready:** JA, nach Prüfung der Header auf Stage
-- **Empfehlung:** Auf `stage` pushen und die Header dort einmal prüfen
+- **Production Ready:** JA, die Header sind auf Stage bestätigt
+- **Empfehlung:** Vor dem Merge auf `main` die sieben fehlenden Production-Werte setzen (`docs/production/prod-umzug.md`, Abschnitt 1, Schritt 5)
 
 ## Deployment
 _To be added by /deploy_

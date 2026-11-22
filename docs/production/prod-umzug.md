@@ -212,7 +212,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] **PROJ-28 Aufbewahrung und automatische Löschung:** Nach Ablauf des Projektzugangs plus 90 Tagen werden Projekt, Kapitel und Dateien gelöscht. Spec fehlt noch.
 - [ ] PROJ-19 Production-Hardening (Security-Header, Konfigurationsprüfung beim Build, zentrale App-Adresse). Dazu aus PROJ-3 BUG-6: erneute Identitätsprüfung vor dem Konto-Löschen.
 - [ ] **Webflow bettet die App nicht per iframe ein (PROJ-19):** Die App verbietet das Einbetten. Im Custom Code der Website steht kein iframe (geprüft 2026-11-22). Embed-Elemente auf den Seiten ließen sich so nicht prüfen, deshalb nach der Veröffentlichung der Website einmal durchklicken.
-- [ ] **Content-Security-Policy scharf schalten (PROJ-19):** Aktiv ist nur der kleine Kern, der Rest läuft im Beobachtungsmodus. Nach echtem Betrieb die Meldungen auswerten (Anbindung mit PROJ-13) und dann entscheiden.
+- [ ] **Content-Security-Policy scharf schalten (PROJ-19):** Aktiv ist nur der kleine Kern, der Rest läuft im Beobachtungsmodus. Nach echtem Betrieb die Meldungen auswerten (Anbindung mit PROJ-13) und dann entscheiden. Meldungen zu `vercel.live` auf Stage kommen von der Vercel-Werkzeugleiste auf Preview-Deployments und gehören nicht in die Regel.
 - [ ] PROJ-12 Audio-Erzählen live, sonst Mail-Texte zum „Erzählen per Sprachnachricht" anpassen (PROJ-11 BUG-9). Bringt SMS-Anbieter (seven.io) und Transkriptions-/LLM-Schlüssel mit — dann hier ergänzen.
 - [ ] PROJ-13 Fehler-Monitoring (Sentry) — dann `SENTRY_DSN` o. ä. hier ergänzen.
 - [ ] PROJ-12 Paket „Erzähl-Einstellungen": Onboarding-Schritt „Wie soll [Name] die wöchentlichen Erzähl-Impulse erhalten? — Telefon, E-Mail oder beides" samt Kontaktdaten und Einverständnis, plus Sektion in der Projektübersicht. Ohne ihn fehlen bei Geschenk-Käufen die Kontaktdaten der erzählenden Person (Jakob, 2026-11-19).
@@ -247,6 +247,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
+| 2026-11-22 | PROJ-19 auf Stage geprüft (`391f93d`): Alle Sicherheits-Header stimmen, Turnstile lädt unter der CSP. Die einzigen CSP-Meldungen betreffen `vercel.live` (nur Preview). Kein neuer Env-Wert. |
 | 2026-11-22 | PROJ-19 gebaut: Sicherheits-Header, Konfigurationsprüfung beim Build, zentrale App-Adresse. **Die sieben fehlenden Production-Werte müssen vor dem Merge auf `main` stehen** (Abschnitt 1, Schritt 5). Keine Migration, keine neue Variable. |
 | 2026-11-22 | PROJ-3 BUG-7: neue Migration `20261122150000_proj3_protect_project_owner.sql`. Neuer Go-live-Blocker PROJ-28 (Aufbewahrung), Identitätsprüfung vor dem Konto-Löschen wandert zu PROJ-19. Kein neuer Env-Wert. |
 | 2026-11-22 | PROJ-3: neue Migration `20261122140000_proj3_account_deletion.sql` (vor dem Code-Deploy), neue Mail „Sie leiten jetzt dieses Projekt", der tägliche Cron räumt zusätzlich Dateien gelöschter Projekte auf. Kein neuer Env-Wert. |
