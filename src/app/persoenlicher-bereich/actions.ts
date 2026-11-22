@@ -2,9 +2,17 @@
 
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { redirect } from "next/navigation";
+import {
+  loadAccountDeletionOverview,
+  prepareAccountDeletion,
+  type AccountDeletionOverview,
+} from "@/lib/account/account-deletion";
+import { sendInBackground } from "@/lib/email/background";
 import { removeQueuedMailsOfAccount } from "@/lib/email/retry-queue";
+import { notifyProjectHandover } from "@/lib/email/send-project-handover";
+import { processStorageCleanup } from "@/lib/projects/storage-cleanup";
 import { CAPTCHA_FAILED_MESSAGE, captchaTokenFrom, isCaptchaError } from "@/lib/captcha";
 import {
   RATE_LIMITS,
@@ -87,95 +95,141 @@ export async function resetPasswordAction(
 // ─── Delete Account ──────────────────────────────────────────────────────────
 
 export type DeleteAccountState = {
-  success?: boolean;
   error?: string;
-  soleOwnerCount?: number;
+  /** Die Übersicht im Dialog ist veraltet und muss neu geladen werden. */
+  overviewChanged?: boolean;
 };
 
-export async function deleteAccountAction(
-  _prev: DeleteAccountState,
-  _formData: FormData,
-): Promise<DeleteAccountState> {
+export type AccountDeletionOverviewState = {
+  overview?: AccountDeletionOverview;
+  /** Steht im Dialog als erster Punkt unter „Wird gelöscht". */
+  account?: { fullName: string; email: string };
+  error?: string;
+};
+
+const DELETE_NOT_CONFIGURED =
+  "Account-Löschung ist serverseitig nicht konfiguriert. Bitte wenden Sie sich an den Support.";
+const DELETE_FAILED =
+  "Account konnte nicht gelöscht werden. Bitte versuchen Sie es erneut oder wenden Sie sich an den Support.";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const uuidSchema = z.string().regex(UUID_RE);
+
+const deleteAccountSchema = z.object({
+  confirmation: z.literal("LÖSCHEN"),
+  confirmedDelete: z.array(uuidSchema).max(500),
+  successors: z.record(uuidSchema, uuidSchema),
+});
+
+function parseJsonField(value: FormDataEntryValue | null): unknown {
+  if (typeof value !== "string") return undefined;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Zeigt vor dem Löschen, was mit den Projekten des Kontos passiert. */
+export async function getAccountDeletionOverviewAction(): Promise<AccountDeletionOverviewState> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
 
-  // Check if user is the sole owner on any project
-  const { data: ownedMemberships } = await supabase
-    .from("project_members")
-    .select("project_id")
-    .eq("user_id", user.id)
-    .eq("role", "projektleiter");
-
-  let soleOwnerCount = 0;
-  if (ownedMemberships && ownedMemberships.length > 0) {
-    for (const { project_id } of ownedMemberships) {
-      const { count } = await supabase
-        .from("project_members")
-        .select("*", { count: "exact", head: true })
-        .eq("project_id", project_id)
-        .eq("role", "projektleiter");
-      if (count === 1) soleOwnerCount++;
+  try {
+    const adminClient = createServiceRoleClient();
+    const overview = await loadAccountDeletionOverview(adminClient, user);
+    if (overview) {
+      const { data: profile } = await adminClient
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      return {
+        overview,
+        account: { fullName: profile?.full_name ?? "", email: user.email ?? "" },
+      };
     }
+  } catch (err) {
+    console.error("[getAccountDeletionOverviewAction] failed:", err);
   }
+  return { error: "Die Übersicht konnte nicht geladen werden. Bitte versuchen Sie es erneut." };
+}
 
-  if (soleOwnerCount > 0) {
-    return { error: "sole_owner", soleOwnerCount };
-  }
-
-  // Delete via admin client (service role key — never leaves server)
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!serviceRoleKey || !supabaseUrl) {
-    console.error(
-      "[deleteAccountAction] SUPABASE_SERVICE_ROLE_KEY oder NEXT_PUBLIC_SUPABASE_URL fehlt in den Environment-Variablen",
-    );
-    return {
-      error:
-        "Account-Löschung ist serverseitig nicht konfiguriert. Bitte wenden Sie sich an den Support.",
-    };
-  }
-
-  const adminClient = createAdminClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
+export async function deleteAccountAction(
+  _prev: DeleteAccountState,
+  formData: FormData,
+): Promise<DeleteAccountState> {
+  const parsed = deleteAccountSchema.safeParse({
+    confirmation: formData.get("confirmation"),
+    confirmedDelete: parseJsonField(formData.get("confirmedDelete")),
+    successors: parseJsonField(formData.get("successors")),
   });
+  if (!parsed.success) {
+    return { error: "Bitte bestätigen Sie die Löschung erneut.", overviewChanged: true };
+  }
 
-  // Der Name wird gleich mit dem Profil gelöscht, die Warteschlange braucht ihn.
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Nicht angemeldet." };
+
+  let adminClient: ReturnType<typeof createServiceRoleClient>;
+  try {
+    adminClient = createServiceRoleClient();
+  } catch (err) {
+    console.error("[deleteAccountAction] service role client unavailable:", err);
+    return { error: DELETE_NOT_CONFIGURED };
+  }
+
+  // Der Name verschwindet gleich mit dem Profil, die Warteschlange braucht ihn.
   const { data: profile } = await adminClient
     .from("profiles")
     .select("full_name")
     .eq("id", user.id)
     .maybeSingle();
 
-  // 1) public.profiles explizit löschen — CASCADE räumt automatisch auch
-  //    project_members und projects (owner_id) mit auf. payments + voice_sessions
-  //    behalten ihre Records (user_id wird NULL gesetzt) für Audit-Trail.
-  const { error: profileError } = await adminClient
-    .from("profiles")
-    .delete()
-    .eq("id", user.id);
-  if (profileError) {
-    console.error("[deleteAccountAction] profile delete failed:", profileError);
+  // 1) In einer Transaktion: Nachfolge, Eigentum, Einzelprojekte, Kaufdaten.
+  const prepared = await prepareAccountDeletion(adminClient, {
+    userId: user.id,
+    email: user.email,
+    confirmedDelete: parsed.data.confirmedDelete,
+    successors: parsed.data.successors,
+  });
+  if (prepared.status === "changed") {
     return {
-      error: "Account konnte nicht gelöscht werden. Bitte wenden Sie sich an den Support.",
+      error: "In Ihren Projekten hat sich etwas geändert. Bitte prüfen Sie die Übersicht erneut.",
+      overviewChanged: true,
     };
+  }
+  if (prepared.status === "failed") return { error: DELETE_FAILED };
+
+  // Beides gilt ab jetzt, auch falls der nächste Schritt scheitert.
+  prepared.handovers.forEach(notifyProjectHandover);
+  if (prepared.deletedProjectIds.length > 0) {
+    sendInBackground("storage_cleanup", () => processStorageCleanup(prepared.deletedProjectIds));
+  }
+
+  // 2) Konto löschen. Profil und Mitgliedschaften verschwinden per CASCADE in
+  //    einem Schritt, payments und purchase_claims verlieren den Personenbezug.
+  const { error: authError } = await adminClient.auth.admin.deleteUser(user.id);
+  if (authError) {
+    console.error("[deleteAccountAction] auth delete failed:", authError);
+    return { error: DELETE_FAILED, overviewChanged: true };
   }
 
   // Noch nicht verschickte Mails an diese Person entfallen, ihr Name
   // verschwindet aus Mails an andere (BUG-20).
   await removeQueuedMailsOfAccount({ email: user.email, fullName: profile?.full_name });
 
-  // 2) auth.users löschen — CASCADE räumt zusätzlich die auth.*-Tabellen auf
-  //    (sessions, identities, mfa_factors, oauth_*, one_time_tokens, webauthn_*).
-  const { error: authError } = await adminClient.auth.admin.deleteUser(user.id);
-  if (authError) {
-    console.error("[deleteAccountAction] auth delete failed:", authError);
-    return {
-      error:
-        "Profil-Daten wurden gelöscht, aber der Auth-Account konnte nicht entfernt werden. Bitte wenden Sie sich an den Support.",
-    };
+  // Die Session-Cookies gehören zu einem Konto, das es nicht mehr gibt.
+  try {
+    await supabase.auth.signOut({ scope: "local" });
+  } catch (err) {
+    console.error("[deleteAccountAction] local sign-out failed:", err);
   }
 
   redirect("/anmelden");

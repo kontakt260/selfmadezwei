@@ -6,6 +6,7 @@ import { maybeSendReminderMail } from "@/lib/email/send-reminder";
 import { getSiteUrl } from "@/lib/email/client";
 import { calendarDaysUntil, formatGermanDate } from "@/lib/email/format";
 import { processMailRetryQueue, type MailRetryResult } from "@/lib/email/retry-mails";
+import { processStorageCleanup, type StorageCleanupResult } from "@/lib/projects/storage-cleanup";
 
 // PROJ-11 — Reminder-Cron.
 //
@@ -23,10 +24,11 @@ import { processMailRetryQueue, type MailRetryResult } from "@/lib/email/retry-m
 //      Co-Autoren — verlängern kann jedes Mitglied, z. B. auch die
 //      beschenkte Person; Jakob, 2026-11-19), mail_log-Reservierung pro
 //      Person versuchen, bei Erfolg Reminder versenden.
-//   4. Vorher: gescheiterte Kauf- und Einladungs-Mails nachholen (BUG-13).
+//   4. Vorher: gescheiterte Kauf- und Einladungs-Mails nachholen (BUG-13)
+//      und Dateien gelöschter Projekte aus dem Speicher entfernen (PROJ-3).
 //
-// Antwort: JSON mit `processed`, `sent`, `skipped` und `mailRetries` für
-// Monitoring.
+// Antwort: JSON mit `processed`, `sent`, `skipped`, `mailRetries` und
+// `storageCleanup` für Monitoring.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -106,6 +108,15 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error(
       `[cron/reminders] mail retry failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  let storageCleanup: StorageCleanupResult = { processed: 0, cleaned: 0, failed: 0 };
+  try {
+    storageCleanup = await processStorageCleanup();
+  } catch (err) {
+    console.error(
+      `[cron/reminders] storage cleanup failed: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 
@@ -195,5 +206,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ processed, sent, skipped, mailRetries });
+  return NextResponse.json({ processed, sent, skipped, mailRetries, storageCleanup });
 }

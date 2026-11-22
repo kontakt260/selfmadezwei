@@ -21,6 +21,11 @@ vi.mock("@/lib/email/retry-mails", () => ({
   processMailRetryQueue: () => retryMock(),
 }));
 
+const storageCleanupMock = vi.fn(async () => ({ processed: 0, cleaned: 0, failed: 0 }));
+vi.mock("@/lib/projects/storage-cleanup", () => ({
+  processStorageCleanup: () => storageCleanupMock(),
+}));
+
 // Service-Role-Client-Mock — chained Supabase builders.
 type FakeRow = Record<string, unknown>;
 let accessRows: FakeRow[] = [];
@@ -97,6 +102,7 @@ beforeEach(() => {
   memberFilters = [];
   nextSendResult = { sent: true };
   retryMock.mockReset().mockResolvedValue({ retried: 0, sent: 0, dropped: 0, gaveUp: 0 });
+  storageCleanupMock.mockReset().mockResolvedValue({ processed: 0, cleaned: 0, failed: 0 });
 });
 
 describe("/api/cron/reminders — auth", () => {
@@ -230,6 +236,25 @@ describe("/api/cron/reminders — happy path", () => {
   it("does not touch the retry queue without a valid secret", async () => {
     await GET(makeRequest({ "x-cron-secret": "wrong" }));
     expect(retryMock).not.toHaveBeenCalled();
+    expect(storageCleanupMock).not.toHaveBeenCalled();
+  });
+
+  it("cleans up files of deleted projects and reports it (PROJ-3)", async () => {
+    storageCleanupMock.mockResolvedValueOnce({ processed: 2, cleaned: 1, failed: 1 });
+
+    const res = await GET(makeRequest({ "x-cron-secret": "test_cron_secret_123" }));
+    const json = await res.json();
+
+    expect(json.storageCleanup).toEqual({ processed: 2, cleaned: 1, failed: 1 });
+  });
+
+  it("still answers when the storage cleanup crashes (PROJ-3)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    storageCleanupMock.mockRejectedValueOnce(new Error("storage down"));
+
+    const res = await GET(makeRequest({ "x-cron-secret": "test_cron_secret_123" }));
+
+    expect(res.status).toBe(200);
   });
 
   it("skips when reserve returns duplicate (already-sent)", async () => {

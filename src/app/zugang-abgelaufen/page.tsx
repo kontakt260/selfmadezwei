@@ -116,6 +116,12 @@ export default async function ZugangAbgelaufenPage({
               Zu meinen anderen Projekten
             </Link>
           ) : null}
+          <Link
+            href="/persoenlicher-bereich"
+            className="text-sm font-bold text-[#534B42] underline underline-offset-4 transition-colors hover:text-[#96B897]"
+          >
+            Zum persönlichen Bereich
+          </Link>
           <SignOutButton />
         </div>
       </div>

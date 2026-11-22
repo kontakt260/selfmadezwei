@@ -6,6 +6,7 @@ import {
   GuestPurchaseEmail,
   InvitationEmail,
   PortalPurchaseEmail,
+  ProjectHandoverEmail,
   RenewalEmail,
   ReminderEmail,
   WelcomeEmail,
@@ -91,6 +92,22 @@ const templates: Array<{ name: string; element: ReactElement; mustContain: strin
       "auch mit einer anderen E-Mail-Adresse",
       `${siteUrl}/kauf-zuordnen?code=abc_DEF-123&ziel=registrieren`,
       `${siteUrl}/kauf-zuordnen?code=abc_DEF-123&ziel=anmelden`,
+    ],
+  },
+  {
+    name: "ProjectHandoverEmail",
+    element: ProjectHandoverEmail({
+      fullName: "Lena Muster",
+      projectName: "Omas Lebensbuch",
+      projectId: "p1",
+      siteUrl,
+    }),
+    // Nennt bewusst weder den Namen der bisherigen Leitung noch den Grund.
+    mustContain: [
+      "Sie leiten jetzt dieses Projekt",
+      "Omas Lebensbuch",
+      "Alle Kapitel bleiben erhalten",
+      `${siteUrl}/projektuebersicht/p1`,
     ],
   },
   {

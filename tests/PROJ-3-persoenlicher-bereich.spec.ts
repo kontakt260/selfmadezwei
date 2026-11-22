@@ -148,16 +148,15 @@ test.describe("PROJ-3 — Account löschen", () => {
     await expect(page.locator('input#delete-confirm')).toHaveValue("");
   });
 
-  test("AC-18: Sole-Owner-Check — Nutzer mit eigenem Projekt sieht Fehlermeldung beim Löschen", async ({ page }) => {
+  // ACHTUNG: Dieser Test darf den Button „Account endgültig löschen" NIE
+  // klicken. Seit dem Refine 2026-11-22 blockiert nichts mehr die Löschung,
+  // ein Klick würde das QA-Konto samt QA-Projekt auf Stage wirklich löschen.
+  test("AC-18: Dialog zeigt vor der Löschung, was gelöscht wird", async ({ page }) => {
     await page.goto("/persoenlicher-bereich");
     await triggerSelector(page).click();
-    await page.locator('input#delete-confirm').fill("LÖSCHEN");
-    await page.getByRole("button", { name: "Account endgültig löschen" }).click();
 
-    // QA user is sole projektleiter on QA-Testprojekt → should see sole-owner error
-    await expect(page.getByText(/einzige Projektleiter/)).toBeVisible();
-    // NOTE: Button remains enabled after sole-owner error (UX bug BUG-1, Medium)
-    // Deletion is still blocked server-side on every retry.
+    await expect(page.getByText("Wird gelöscht")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Account endgültig löschen" })).toBeDisabled();
   });
 });
 

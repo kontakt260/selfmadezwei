@@ -89,6 +89,12 @@ describe("/zugang-abgelaufen", () => {
     expect(screen.getByRole("link", { name: "Zu meinen anderen Projekten" })).toBeTruthy();
   });
 
+  it("führt zum persönlichen Bereich, damit das Konto löschbar bleibt (PROJ-3)", async () => {
+    await show();
+    const link = screen.getByRole("link", { name: "Zum persönlichen Bereich" });
+    expect(link.getAttribute("href")).toBe("/persoenlicher-bereich");
+  });
+
   it("nichts abgelaufen: zurück in die App", async () => {
     state.access = [{ project_id: A, expires_at: future() }];
     await expect(show()).rejects.toThrow("REDIRECT:/");

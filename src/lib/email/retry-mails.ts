@@ -10,6 +10,10 @@ import { deliverGuestPurchaseMail, type SendGuestPurchaseInput } from "./send-gu
 import { deliverInvitationMail, type SendInvitationInput } from "./send-invitation";
 import { deliverPortalPurchaseMail, type SendPortalPurchaseInput } from "./send-portal-purchase";
 import {
+  deliverProjectHandoverMail,
+  type SendProjectHandoverInput,
+} from "./send-project-handover";
+import {
   deliverRenewalInfoMail,
   deliverRenewalMail,
   type SendRenewalInfoInput,
@@ -37,6 +41,7 @@ const KIND_LABELS: Record<string, string> = {
   guest_purchase: "Kauf ohne Konto",
   renewal: "Verlängerung",
   renewal_info: "Verlängerungs-Info",
+  project_handover: "Neue Projektleitung",
 };
 
 type ServiceClient = SupabaseClient<Database>;
@@ -95,6 +100,10 @@ async function deliver(supabase: ServiceClient, row: QueueRow): Promise<Delivery
     case "renewal_info":
       return fromResult(
         await deliverRenewalInfoMail(row.payload as unknown as SendRenewalInfoInput),
+      );
+    case "project_handover":
+      return fromResult(
+        await deliverProjectHandoverMail(row.payload as unknown as SendProjectHandoverInput),
       );
     default:
       return { status: "failed", error: `unknown mail kind: ${row.kind}` };

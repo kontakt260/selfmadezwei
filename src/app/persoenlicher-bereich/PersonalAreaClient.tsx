@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { Navbar } from "@/components/Navbar";
@@ -18,9 +18,18 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { AccountDeletionOverview } from "@/lib/account/account-deletion";
+import {
   updateNameAction,
   resetPasswordAction,
   deleteAccountAction,
+  getAccountDeletionOverviewAction,
   type UpdateNameState,
   type ResetPasswordState,
   type DeleteAccountState,
@@ -362,28 +371,82 @@ function SecuritySection({
 
 // ─── Account löschen ─────────────────────────────────────────────────────────
 
+function candidateName(candidate: { fullName: string; email: string }): string {
+  return candidate.fullName.trim() || candidate.email || "Projektmitglied";
+}
+
 function DeleteAccountSection() {
   const [open, setOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
-  const [state, formAction, pending] = useActionState<DeleteAccountState, FormData>(
-    deleteAccountAction,
+  const [overview, setOverview] = useState<AccountDeletionOverview | null>(null);
+  const [account, setAccount] = useState<{ fullName: string; email: string } | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
+  const [dialogError, setDialogError] = useState<string | null>(null);
+  const [successors, setSuccessors] = useState<Record<string, string>>({});
+
+  const loadOverview = useCallback(async () => {
+    setOverview(null);
+    setOverviewError(null);
+    setOverviewLoading(true);
+    try {
+      const result = await getAccountDeletionOverviewAction();
+      if (!result.overview) {
+        setOverviewError(result.error ?? "Die Übersicht konnte nicht geladen werden.");
+        return;
+      }
+      setOverview(result.overview);
+      setAccount(result.account ?? null);
+      // Vorausgewählt ist die am längsten beteiligte Person.
+      setSuccessors(
+        Object.fromEntries(
+          result.overview.keep
+            .filter((project) => project.candidates.length > 0)
+            .map((project) => [project.projectId, project.candidates[0].userId]),
+        ),
+      );
+    } catch {
+      setOverviewError("Die Übersicht konnte nicht geladen werden. Bitte versuchen Sie es erneut.");
+    } finally {
+      setOverviewLoading(false);
+    }
+  }, []);
+
+  const [, formAction, pending] = useActionState<DeleteAccountState, FormData>(
+    async (previous, formData) => {
+      const result = await deleteAccountAction(previous, formData);
+      setDialogError(result.error ?? null);
+      if (result.overviewChanged) {
+        setConfirmation("");
+        await loadOverview();
+      }
+      return result;
+    },
     {},
   );
 
   const isConfirmed = confirmation === "LÖSCHEN";
-  const isSoleOwner = state.error === "sole_owner";
+  const projectsNeedingSuccessor =
+    overview?.keep.filter((project) => project.candidates.length > 0) ?? [];
+  const successorsComplete = projectsNeedingSuccessor.every((project) =>
+    Boolean(successors[project.projectId]),
+  );
+  const canDelete =
+    isConfirmed && overview !== null && !overviewLoading && successorsComplete && !pending;
+  const accountName = account?.fullName.trim();
+  const accountLabel = accountName ? `${accountName} (${account?.email})` : (account?.email ?? "");
 
   return (
     <SectionShell>
       <div className="flex flex-col gap-2">
         <SectionHeading>Account löschen</SectionHeading>
         <p className="[font-family:var(--font-lato)] max-w-3xl text-lg font-semibold leading-8 text-[#D00018] sm:text-xl sm:leading-9">
-          Achtung: Das Löschen ist unwiderruflich — Sie verlieren den Zugang zu
-          Ihrem Account und zu allen zugehörigen Inhalten.
+          Achtung: Das Löschen ist unwiderruflich. Sie verlieren den Zugang zu
+          Ihrem Account und zu allen Ihren Projekten.
         </p>
         <p className="max-w-3xl text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
-          Exportieren Sie vorher ggf. wichtige Texte oder Bilder. Nach Abschluss
-          können weder Projekte noch Rechnungen wiederhergestellt werden.
+          Projekte, in denen nur Sie mitwirken, werden mitgelöscht. Gemeinsame
+          Projekte bleiben für die anderen Mitglieder bestehen.
         </p>
       </div>
 
@@ -393,7 +456,18 @@ function DeleteAccountSection() {
           wenden Sie sich vorher an den Support.
         </p>
 
-        <AlertDialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setConfirmation(""); }}>
+        <AlertDialog
+          open={open}
+          onOpenChange={(o) => {
+            setOpen(o);
+            if (o) {
+              setDialogError(null);
+              void loadOverview();
+            } else {
+              setConfirmation("");
+            }
+          }}
+        >
           <AlertDialogTrigger asChild>
             <button
               type="button"
@@ -404,35 +478,128 @@ function DeleteAccountSection() {
           </AlertDialogTrigger>
 
           <AlertDialogContent
-            className="max-w-[calc(100vw-2rem)] p-5 sm:max-w-2xl sm:p-8"
+            className="max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto p-5 sm:max-w-2xl sm:p-8"
             onOverlayClick={() => {
               setOpen(false);
               setConfirmation("");
             }}
           >
-            <AlertDialogHeader>
+            <AlertDialogHeader className="text-left">
               <AlertDialogTitle className="text-2xl font-normal leading-8 text-[#3E3831] sm:text-3xl sm:leading-10">
                 Account wirklich löschen?
               </AlertDialogTitle>
-              <AlertDialogDescription asChild>
-                <div className="flex flex-col gap-4 text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
+              <AlertDialogDescription
+                asChild
+                className="text-base leading-7 text-[#535252] sm:text-lg sm:leading-8"
+              >
+                <div className="flex flex-col gap-4">
                   <p>
-                    Diese Aktion ist <strong>unwiderruflich</strong>. Alle Ihre
-                    Projekte, Kapitel und Daten werden dauerhaft entfernt.
+                    Das Löschen kann <strong>nicht rückgängig</strong> gemacht
+                    werden. Rechnungen müssen wir aus steuerlichen Gründen acht
+                    Jahre aufbewahren.
                   </p>
 
-                  {isSoleOwner && (
-                    <div className="border border-destructive/30 bg-destructive/5 p-4 text-base leading-7 text-destructive">
-                      Sie sind auf {state.soleOwnerCount}{" "}
-                      {state.soleOwnerCount === 1 ? "Projekt" : "Projekten"} der
-                      einzige Projektleiter. Übertragen Sie die Projektleiterschaft oder
-                      löschen Sie die Projekte zuerst.
+                  {overviewLoading && <p role="status">Ihre Projekte werden geladen …</p>}
+
+                  {overviewError && (
+                    <div className="flex flex-col items-start gap-2 border border-destructive/30 bg-destructive/5 p-4 text-base leading-7 text-destructive">
+                      <p>{overviewError}</p>
+                      <button
+                        type="button"
+                        onClick={() => void loadOverview()}
+                        className="font-bold underline underline-offset-4"
+                      >
+                        Erneut laden
+                      </button>
                     </div>
                   )}
 
-                  {state.error && !isSoleOwner && (
-                    <p className="text-base text-destructive">{state.error}</p>
+                  {overview && (
+                    <>
+                      <div className="flex flex-col gap-1">
+                        <p className="font-bold text-[#3E3831]">Wird gelöscht</p>
+                        <ul className="list-disc pl-5">
+                          <li className="break-words">Ihr Account: {accountLabel}</li>
+                          {overview.delete.map((project) => (
+                            <li key={project.projectId} className="break-words">
+                              Projekt „{project.title}“
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {(overview.keep.length > 0 || overview.otherCount > 0) && (
+                        <div className="flex flex-col gap-1">
+                          <p className="font-bold text-[#3E3831]">Bleibt bestehen</p>
+                          {overview.keep.length > 0 && (
+                            <ul className="list-disc pl-5">
+                              {overview.keep.map((project) => (
+                                <li key={project.projectId} className="break-words">
+                                  Projekt „{project.title}“
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {overview.otherCount > 0 && (
+                            <p>
+                              Verschenkte Bücher und Projekte, an denen Sie nicht mehr
+                              beteiligt sind, bleiben für die anderen bestehen.
+                            </p>
+                          )}
+                          {overview.keep.length > 0 && (
+                            <p>
+                              Möchten Sie eigene Texte entfernen lassen, schreiben Sie
+                              uns bitte vor der Löschung an{" "}
+                              <a
+                                href="mailto:kontakt@narravit.de"
+                                className="underline underline-offset-4"
+                              >
+                                kontakt@narravit.de
+                              </a>
+                              .
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {projectsNeedingSuccessor.map((project) => {
+                        const labelId = `successor-${project.projectId}`;
+                        return (
+                          <div key={project.projectId} className="flex flex-col gap-2">
+                            <p id={labelId} className="break-words font-bold text-[#3E3831]">
+                              Sie sind die einzige Projektleitung. Wer soll „{project.title}“
+                              weiterführen?
+                            </p>
+                            <Select
+                              value={successors[project.projectId]}
+                              onValueChange={(userId) =>
+                                setSuccessors((current) => ({
+                                  ...current,
+                                  [project.projectId]: userId,
+                                }))
+                              }
+                            >
+                              <SelectTrigger
+                                aria-labelledby={labelId}
+                                className="h-12 text-base sm:text-lg"
+                              >
+                                <SelectValue placeholder="Person auswählen" />
+                              </SelectTrigger>
+                              <SelectContent className="z-[310]">
+                                {project.candidates.map((candidate) => (
+                                  <SelectItem key={candidate.userId} value={candidate.userId}>
+                                    {candidateName(candidate)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        );
+                      })}
+                    </>
                   )}
+
+                  {dialogError && <p className="text-base text-destructive">{dialogError}</p>}
 
                   <div className="flex flex-col gap-2">
                     <Label htmlFor="delete-confirm" className="text-sm font-bold text-[#3E3831] sm:text-base">
@@ -454,9 +621,16 @@ function DeleteAccountSection() {
             <AlertDialogFooter className="flex-col gap-3 sm:flex-row">
               <AlertDialogCancel className="h-12 text-base sm:text-lg">Abbrechen</AlertDialogCancel>
               <form action={formAction}>
+                <input type="hidden" name="confirmation" value={confirmation} />
+                <input
+                  type="hidden"
+                  name="confirmedDelete"
+                  value={JSON.stringify(overview?.delete.map((project) => project.projectId) ?? [])}
+                />
+                <input type="hidden" name="successors" value={JSON.stringify(successors)} />
                 <button
                   type="submit"
-                  disabled={!isConfirmed || pending}
+                  disabled={!canDelete}
                   className="[font-family:var(--font-lato)] h-12 w-full bg-[#53444B] px-5 text-base font-bold text-white transition-colors hover:bg-[#45383e] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:text-lg"
                 >
                   {pending ? "Wird gelöscht …" : "Account endgültig löschen"}

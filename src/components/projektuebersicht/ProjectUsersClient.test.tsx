@@ -98,6 +98,17 @@ describe("ProjectUsersClient — Last-PL-Schutz", () => {
     expect(leave).toBeDisabled();
   });
 
+  it("Einziger PL mit Co-Autor: Verlassen geht, die Nachfolge ist vorausgewählt", () => {
+    render(<ProjectUsersClient projectId={PROJECT_ID} members={TEAM} myRole="projektleiter" />);
+
+    const leave = screen.getByRole("button", { name: /Projekt verlassen/ });
+    expect(leave).toBeEnabled();
+    fireEvent.click(leave);
+
+    expect(screen.getByText(/Wer soll das Projekt weiterführen/)).toBeInTheDocument();
+    expect(screen.getByRole("combobox")).toHaveTextContent("Bob Mitglied");
+  });
+
   it("Mit 2 PLs: Trash auf dem ANDEREN PL ist enabled; Trash auf sich selbst bleibt disabled (Self-Remove geht via 'Projekt verlassen')", () => {
     const twoPls: MemberDisplay[] = [
       SOLO_PL,

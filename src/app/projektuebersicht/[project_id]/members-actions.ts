@@ -7,7 +7,9 @@ import crypto from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { projectWriteBlockedError } from "@/lib/projects/project-access";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
+import { leaveProject } from "@/lib/account/account-deletion";
 import { sendInvitationMail } from "@/lib/email/send-invitation";
+import { notifyProjectHandover } from "@/lib/email/send-project-handover";
 import { sendInBackground } from "@/lib/email/background";
 import { RATE_LIMITS, RATE_LIMIT_MESSAGES, hitRateLimits } from "@/lib/rate-limit";
 
@@ -42,6 +44,7 @@ const removeMemberSchema = z.object({
 
 const leaveProjectSchema = z.object({
   projectId: uuidSchema,
+  successorUserId: uuidSchema.optional(),
 });
 
 // ─── Helper: opaque Token (≥ 128 Bit Entropie) ───────────────────────────────
@@ -233,11 +236,12 @@ export async function leaveProjectAction(formData: FormData): Promise<{
 }> {
   const parsed = leaveProjectSchema.safeParse({
     projectId: formData.get("projectId"),
+    successorUserId: formData.get("successorUserId") ?? undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
   }
-  const { projectId } = parsed.data;
+  const { projectId, successorUserId } = parsed.data;
 
   const supabase = await createClient();
   const {
@@ -245,20 +249,28 @@ export async function leaveProjectAction(formData: FormData): Promise<{
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
 
-  const { error: delErr } = await supabase
-    .from("project_members")
-    .delete()
-    .eq("project_id", projectId)
-    .eq("user_id", user.id);
+  // Läuft über die Datenbank-Funktion, weil Nachfolge, Eigentum und Austritt
+  // nur gemeinsam gelten dürfen. Die Person kommt aus der geprüften Session.
+  const result = await leaveProject(createServiceRoleClient(), {
+    projectId,
+    userId: user.id,
+    successorUserId,
+  });
 
-  if (delErr) {
-    if (delErr.code === "23514") {
+  switch (result.status) {
+    case "ok":
+      if (result.handover) notifyProjectHandover(result.handover);
+      break;
+    case "successor_required":
+      return { error: "Bitte wählen Sie aus, wer das Projekt weiterführen soll." };
+    case "last_member":
       return {
-        error:
-          "Befördern Sie zuerst eine andere Person zum Projektleiter, bevor Sie das Projekt verlassen.",
+        error: "Sie sind die einzige Person in diesem Projekt. Löschen Sie stattdessen das Projekt.",
       };
-    }
-    return { error: "Projekt konnte nicht verlassen werden." };
+    case "not_member":
+      return { error: "Projekt nicht gefunden." };
+    default:
+      return { error: "Projekt konnte nicht verlassen werden." };
   }
 
   revalidatePath("/");

@@ -20,6 +20,9 @@ export type { WelcomeEmailProps } from "./WelcomeEmail";
 export { RenewalEmail } from "./RenewalEmail";
 export type { RenewalEmailProps } from "./RenewalEmail";
 
+export { ProjectHandoverEmail } from "./ProjectHandoverEmail";
+export type { ProjectHandoverEmailProps } from "./ProjectHandoverEmail";
+
 export { MailFailureAlertEmail } from "./MailFailureAlertEmail";
 export type { MailFailureAlertEmailProps } from "./MailFailureAlertEmail";
 

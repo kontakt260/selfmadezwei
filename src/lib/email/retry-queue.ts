@@ -5,6 +5,7 @@ import { hashEmailForLog, type SendMailResult } from "./client";
 import type { SendGuestPurchaseInput } from "./send-guest-purchase";
 import type { SendInvitationInput } from "./send-invitation";
 import type { SendPortalPurchaseInput } from "./send-portal-purchase";
+import type { SendProjectHandoverInput } from "./send-project-handover";
 import type { SendRenewalInfoInput, SendRenewalInput } from "./send-renewal";
 
 // PROJ-11 BUG-13 — Warteschlange für Mails, deren Versand gescheitert ist.
@@ -19,7 +20,8 @@ export type RetryableMail =
   | { kind: "portal_purchase"; input: SendPortalPurchaseInput }
   | { kind: "guest_purchase"; input: SendGuestPurchaseInput }
   | { kind: "renewal"; input: SendRenewalInput }
-  | { kind: "renewal_info"; input: SendRenewalInfoInput };
+  | { kind: "renewal_info"; input: SendRenewalInfoInput }
+  | { kind: "project_handover"; input: SendProjectHandoverInput };
 
 /** Ersatz für den Namen einer Person, die ihr Konto gelöscht hat. */
 const ANONYMOUS_GIFT_SENDER = "Jemand aus Ihrem Umfeld";

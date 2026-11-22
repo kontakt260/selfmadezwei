@@ -4,6 +4,13 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   accentColorForStableId,
   accentForegroundForBackground,
 } from "@/lib/projektuebersicht-palette";
@@ -77,7 +84,20 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
   // Confirm-Modale
   const [confirmRemove, setConfirmRemove] = useState<MemberDisplay | null>(null);
   const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
+  const [leaveSuccessorId, setLeaveSuccessorId] = useState("");
   const [actionPending, startActionTransition] = useTransition();
+
+  const meMember = members.find((m) => m.isMe);
+  // Die Liste ist nach Beitritt sortiert, die erste Person ist am längsten dabei.
+  const otherMembers = members.filter((m) => !m.isMe);
+  const isOnlyLead = meMember?.role === "projektleiter" && plCount === 1;
+  const needsSuccessor = isOnlyLead && otherMembers.length > 0;
+  const canLeave = meMember !== undefined && !(isOnlyLead && otherMembers.length === 0);
+
+  const openLeave = () => {
+    setLeaveSuccessorId(otherMembers[0]?.userId ?? "");
+    setConfirmLeaveOpen(true);
+  };
 
   const openAdd = () => {
     setAddStep("input");
@@ -127,6 +147,7 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
   const handleLeaveConfirmed = () => {
     const fd = new FormData();
     fd.set("projectId", projectId);
+    if (needsSuccessor) fd.set("successorUserId", leaveSuccessorId);
     startActionTransition(async () => {
       const res = await leaveProjectAction(fd);
       // leaveProjectAction redirected; nur reachable falls Server-Action
@@ -137,11 +158,6 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
       }
     });
   };
-
-  const meMember = members.find((m) => m.isMe);
-  const canLeave =
-    meMember !== undefined &&
-    !(meMember.role === "projektleiter" && plCount === 1);
 
   return (
     <div className="flex flex-col gap-5 sm:gap-6">
@@ -233,9 +249,13 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
       <div className="flex">
         <button
           type="button"
-          onClick={() => setConfirmLeaveOpen(true)}
+          onClick={openLeave}
           disabled={!canLeave || actionPending}
-          title={!canLeave ? "Befördern Sie zuerst eine andere Person zum Projektleiter." : undefined}
+          title={
+            !canLeave
+              ? "Sie sind die einzige Person in diesem Projekt. Löschen Sie stattdessen das Projekt."
+              : undefined
+          }
           className="inline-flex h-12 items-center justify-center border border-[#e0dcd5] bg-white px-5 text-base font-semibold text-[#3E3831] transition-colors hover:bg-[#f5f3f0] disabled:cursor-not-allowed disabled:opacity-40 sm:text-lg"
         >
           Projekt verlassen
@@ -375,6 +395,31 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
             Möchten Sie dieses Projekt wirklich verlassen? Sie verlieren den
             Zugriff auf die Kapitel und alle Projekt-Daten.
           </p>
+          {needsSuccessor && (
+            <div className="flex flex-col gap-2">
+              <p id="leave-successor-label" className="text-base font-bold text-[#3E3831] sm:text-lg">
+                Sie sind die einzige Projektleitung. Wer soll das Projekt weiterführen?
+              </p>
+              <Select value={leaveSuccessorId} onValueChange={setLeaveSuccessorId}>
+                <SelectTrigger
+                  aria-labelledby="leave-successor-label"
+                  className="h-12 text-base sm:text-lg"
+                >
+                  <SelectValue placeholder="Person auswählen" />
+                </SelectTrigger>
+                <SelectContent className="z-[310]">
+                  {otherMembers.map((m) => (
+                    <SelectItem key={m.userId} value={m.userId}>
+                      {displayName(m)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-sm leading-6 text-[#848484] sm:text-base">
+                Die Person wird sofort Projektleitung und per E-Mail informiert.
+              </p>
+            </div>
+          )}
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-4">
             <button
               type="button"
@@ -387,7 +432,7 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
             <button
               type="button"
               onClick={handleLeaveConfirmed}
-              disabled={actionPending}
+              disabled={actionPending || (needsSuccessor && !leaveSuccessorId)}
               className="h-12 bg-[#53444B] px-5 text-base font-bold text-white transition-colors hover:bg-[#45383e] disabled:cursor-not-allowed disabled:opacity-40 sm:text-lg"
             >
               {actionPending ? "Wird verlassen …" : "Projekt verlassen"}
@@ -419,7 +464,7 @@ function ModalShell({
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8"
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 px-4 py-8"
       onClick={onClose}
     >
       <div

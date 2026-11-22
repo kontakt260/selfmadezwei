@@ -198,6 +198,45 @@ export type Database = {
           },
         ]
       }
+      chapter_contributors: {
+        Row: {
+          chapter_id: string
+          first_contributed_at: string
+          user_id: string
+        }
+        Insert: {
+          chapter_id: string
+          first_contributed_at?: string
+          user_id: string
+        }
+        Update: {
+          chapter_id?: string
+          first_contributed_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      storage_cleanup_queue: {
+        Row: {
+          attempts: number
+          created_at: string
+          last_error: string | null
+          project_id: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          last_error?: string | null
+          project_id: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          last_error?: string | null
+          project_id?: string
+        }
+        Relationships: []
+      }
       mail_retry_queue: {
         Row: {
           attempts: number
@@ -585,7 +624,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      account_deletion_overview: {
+        Args: { p_email: string; p_user_id: string }
+        Returns: Json
+      }
       account_exists: { Args: { p_email: string }; Returns: boolean }
+      leave_project: {
+        Args: {
+          p_project_id: string
+          p_successor_user_id?: string | null
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      prepare_account_deletion: {
+        Args: {
+          p_confirmed_delete: string[]
+          p_email: string
+          p_successors: Json
+          p_user_id: string
+        }
+        Returns: Json
+      }
       am_i_pl_of: { Args: { p_project_id: string }; Returns: boolean }
       get_my_project_ids: { Args: never; Returns: string[] }
       rate_limit_hit: {

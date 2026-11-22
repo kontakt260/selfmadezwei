@@ -30,6 +30,10 @@ vi.mock("@/lib/rate-limit", async (importOriginal) => ({
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn(() => { throw new Error("REDIRECT"); }) }));
+const notifyProjectHandoverMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/email/send-project-handover", () => ({
+  notifyProjectHandover: notifyProjectHandoverMock,
+}));
 
 // Service-Role-Mock: wir tracken INSERT/UPDATE-Aufrufe und liefern
 // deterministische Antworten zurück.
@@ -39,12 +43,14 @@ const serviceRoleMockState: {
   nextInsertError: { code?: string } | null;
   rpcCalls: Array<{ name: string; args: Record<string, unknown> }>;
   lookupRow: Record<string, unknown> | null;
+  leaveResponse: { data: unknown; error: { message: string } | null };
 } = {
   inserts: [],
   updates: [],
   nextInsertError: null,
   rpcCalls: [],
   lookupRow: null,
+  leaveResponse: { data: { handover: null }, error: null },
 };
 
 vi.mock("@/lib/supabase/serviceRole", () => ({
@@ -53,6 +59,7 @@ vi.mock("@/lib/supabase/serviceRole", () => ({
     // (Migration 20261119210000_lookup_invitation_service_role_only).
     rpc: (name: string, args: Record<string, unknown>) => {
       serviceRoleMockState.rpcCalls.push({ name, args });
+      if (name === "leave_project") return Promise.resolve(serviceRoleMockState.leaveResponse);
       return {
         maybeSingle: () =>
           Promise.resolve({ data: serviceRoleMockState.lookupRow, error: null }),
@@ -137,6 +144,7 @@ beforeEach(() => {
   serviceRoleMockState.nextInsertError = null;
   serviceRoleMockState.rpcCalls = [];
   serviceRoleMockState.lookupRow = null;
+  serviceRoleMockState.leaveResponse = { data: { handover: null }, error: null };
 });
 
 // ─── createInvitationAction ──────────────────────────────────────────────────
@@ -303,22 +311,59 @@ describe("leaveProjectAction", () => {
   function fd(o: Record<string, string> = {}) {
     const f = new FormData();
     f.set("projectId", o.projectId ?? PROJECT_ID);
+    if (o.successorUserId) f.set("successorUserId", o.successorUserId);
     return f;
   }
 
   it("rejects when not authenticated", async () => {
     vi.mocked(createClient).mockResolvedValue(makeMockClient({ user: null }) as never);
     expect(await leaveProjectAction(fd())).toEqual({ error: "Nicht angemeldet." });
+    expect(serviceRoleMockState.rpcCalls).toEqual([]);
   });
 
-  it("translates trigger 23514 into Last-PL-Self-Leave-Fehlermeldung", async () => {
-    const client = makeMockClient();
-    client.from.mockReturnValueOnce(
-      makeBuilder({ error: { code: "23514", message: "Letzter PL" } }),
-    );
-    vi.mocked(createClient).mockResolvedValue(client as never);
+  it("rejects a malformed successor", async () => {
+    vi.mocked(createClient).mockResolvedValue(makeMockClient() as never);
+    const result = await leaveProjectAction(fd({ successorUserId: "kein-uuid" }));
+    expect(result.error).toBeDefined();
+    expect(serviceRoleMockState.rpcCalls).toEqual([]);
+  });
+
+  it.each([
+    ["successor_required", /wer das Projekt weiterführen/],
+    ["last_member", /einzige Person/],
+    ["not_member", /nicht gefunden/],
+    ["boom", /nicht verlassen/],
+  ])("translates %s into a message", async (message, expected) => {
+    vi.mocked(createClient).mockResolvedValue(makeMockClient() as never);
+    serviceRoleMockState.leaveResponse = { data: null, error: { message } };
     const result = await leaveProjectAction(fd());
-    expect(result.error).toMatch(/Befördern Sie zuerst eine andere Person/);
+    expect(result.error).toMatch(expected);
+    expect(notifyProjectHandoverMock).not.toHaveBeenCalled();
+  });
+
+  it("leaves with the person from the session and informs the successor", async () => {
+    const handover = {
+      projectId: PROJECT_ID,
+      title: "Omas Lebensbuch",
+      to: "co@example.com",
+      fullName: "Co Autorin",
+    };
+    vi.mocked(createClient).mockResolvedValue(makeMockClient() as never);
+    serviceRoleMockState.leaveResponse = { data: { handover }, error: null };
+
+    await expect(leaveProjectAction(fd({ successorUserId: CO_USER_ID }))).rejects.toThrow("REDIRECT");
+
+    expect(serviceRoleMockState.rpcCalls).toEqual([
+      {
+        name: "leave_project",
+        args: {
+          p_project_id: PROJECT_ID,
+          p_user_id: PL_USER_ID,
+          p_successor_user_id: CO_USER_ID,
+        },
+      },
+    ]);
+    expect(notifyProjectHandoverMock).toHaveBeenCalledWith(handover);
   });
 });
 
