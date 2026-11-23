@@ -231,7 +231,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] **Interne Kennungen in Kundentexten entfernen:** In der Projektübersicht stehen noch „(PROJ-12)" bei „Erzählen per Sprachnachricht" und „(PROJ-6)" beim Projektzugang vor der ersten Zahlung. Beide Texte vor dem Go-live ersetzen.
 - [ ] **PROJ-24 und PROJ-12 nur gemeinsam live:** Das neue Onboarding fragt Kontaktdaten für Erzähl-Impulse ab. Ohne den Versand aus PROJ-12 würde es Nachrichten versprechen, die nie ankommen. Die Migration aus PROJ-24 kommt in Production vor dem Code-Deploy.
 - [ ] **Stripe-Produkt prüfen (PROJ-24):** Produktname und Beschreibung im Stripe-Testmodus und im Live-Modus müssen das erste gedruckte Hardcover-Buch nennen, weil sie auf Checkout und Rechnung erscheinen.
-- [ ] **Server-Region auf Europa stellen (PROJ-30):** Die Vercel-Funktionen laufen aktuell in Washington (`iad1`), die Datenbank in Europa. Das bremst jede Seite und schickt personenbezogene Inhalte über US-Server. Vor dem Go-live auf Frankfurt (`fra1`) umstellen und in der Datenschutzerklärung korrekt nennen.
+- [ ] **Server-Region Frankfurt in Production prüfen (PROJ-30):** `vercel.json` legt die Funktionen auf `fra1`, direkt neben die Datenbank (`eu-central-1`). Auf Stage ist das aktiv, Production bekommt es mit dem Merge auf `main`. Danach im Deployment prüfen, dass die Funktionen in `fra1` laufen, und den Standort in der Datenschutzerklärung korrekt nennen.
 - [ ] PROJ-13 Fehler-Monitoring (Sentry) — dann `SENTRY_DSN` o. ä. hier ergänzen.
 - [ ] PROJ-12 Paket „Erzähl-Einstellungen": Onboarding-Schritt „Wie soll [Name] die wöchentlichen Erzähl-Impulse erhalten? — Telefon, E-Mail oder beides" samt Kontaktdaten, plus Sektion in der Projektübersicht. Ohne ihn fehlen bei Geschenk-Käufen die Kontaktdaten der erzählenden Person (Jakob, 2026-11-19).
 - [x] Mail-Design aus Figma (Datei „NARRAVIT Mails") in `src/emails/` übertragen; Logo dafür hosten. Erledigt 2026-11-19 (Bilder siehe Abschnitt 5).
@@ -267,7 +267,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
-| 2026-11-23 | PROJ-30 angelegt: Vercel-Region `iad1` als Go-live-Punkt eingetragen. |
+| 2026-11-23 | PROJ-30: Vercel-Funktionen per `vercel.json` von `iad1` nach `fra1` verlegt, zuerst nur auf Stage. |
 | 2026-11-23 | PROJ-24 Anpassungen: Einverständnis-Häkchen entfernt, Ablehnen und Widerrufen ab der ersten Nachricht als Go-live-Blocker für PROJ-12 eingetragen. |
 | 2026-11-23 | PROJ-24 Frontend: neues Paket `libphonenumber-js`. Der Schritt „Erzähl-Impulse" speichert bis zum Backend noch nichts. Keine Migration, keine neuen Env-Werte. |
 | 2026-11-23 | PROJ-24 Tech Design: gemeinsamer Go-live mit PROJ-12 und Stripe-Produkttext ergänzt. |
