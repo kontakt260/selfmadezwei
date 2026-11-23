@@ -324,6 +324,26 @@ describe.each(templates)("$name", ({ element, mustContain }) => {
   });
 });
 
+describe("ReminderEmail Aufbewahrung (PROJ-28)", () => {
+  it.each(["30", "7"] as const)("nennt in der %s-Tage-Mail die Löschung", async (variant) => {
+    const html = await render(
+      ReminderEmail({
+        projectName: "Omas Lebensbuch",
+        expiresAtFormatted: "12. November 2026",
+        daysLeft: Number(variant),
+        variant,
+        renewUrl: `${siteUrl}/projektuebersicht/p1`,
+        siteUrl,
+      }),
+    );
+    const text = html.replace(/<!--.*?-->/g, "").replace(/\s+/g, " ");
+
+    expect(text).toContain("Der Zugang läuft dann aus.");
+    expect(text).toContain("Ihr Projekt bleibt danach noch 90 Tage lesbar und wird anschließend gelöscht.");
+    expect(text).not.toContain("kurzzeitig");
+  });
+});
+
 describe("WelcomeEmail discount", () => {
   it("shows amount and code when a discount is passed", async () => {
     const text = await render(

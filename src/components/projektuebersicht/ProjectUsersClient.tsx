@@ -45,6 +45,8 @@ type Props = {
   projectId: string;
   members: MemberDisplay[];
   myRole: "projektleiter" | "co_author";
+  /** PROJ-28: Einladen ist gesperrt, Entfernen und Verlassen bleiben möglich. */
+  readOnly?: boolean;
 };
 
 const ROLE_LABEL: Record<MemberDisplay["role"], string> = {
@@ -68,7 +70,7 @@ function initialOf(name: string): string {
   return trimmed.length > 0 ? trimmed.charAt(0).toUpperCase() : "?";
 }
 
-export function ProjectUsersClient({ projectId, members, myRole }: Props) {
+export function ProjectUsersClient({ projectId, members, myRole, readOnly = false }: Props) {
   const router = useRouter();
   const isPL = myRole === "projektleiter";
   const plCount = plCountOf(members);
@@ -170,7 +172,9 @@ export function ProjectUsersClient({ projectId, members, myRole }: Props) {
           <button
             type="button"
             onClick={openAdd}
-            className="inline-flex h-12 items-center justify-center gap-2 bg-[#D0BCA6] px-5 text-base font-bold text-[#0a0909] transition-colors hover:bg-[#c0ad98] sm:text-lg"
+            disabled={readOnly}
+            title={readOnly ? "Der Projektzugang ist abgelaufen." : undefined}
+            className="inline-flex h-12 items-center justify-center gap-2 bg-[#D0BCA6] px-5 text-base font-bold text-[#0a0909] transition-colors hover:bg-[#c0ad98] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#D0BCA6] sm:text-lg"
           >
             <PlusIcon /> Nutzer hinzufügen
           </button>

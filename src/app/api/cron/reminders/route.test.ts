@@ -43,6 +43,15 @@ vi.mock("@/lib/projects/trash", () => ({
   },
 }));
 
+const emptyRetention = { due: 0, moved: 0, skipped: 0, failed: 0, braked: false };
+const retentionMock = vi.fn(async () => emptyRetention);
+vi.mock("@/lib/projects/retention", () => ({
+  moveExpiredProjectsToTrash: () => {
+    callOrder.push("retention");
+    return retentionMock();
+  },
+}));
+
 // Service-Role-Client-Mock — chained Supabase builders.
 type FakeRow = Record<string, unknown>;
 let accessRows: FakeRow[] = [];
@@ -122,6 +131,7 @@ beforeEach(() => {
   storageCleanupMock.mockReset().mockResolvedValue({ processed: 0, cleaned: 0, failed: 0 });
   chapterCleanupMock.mockReset().mockResolvedValue({ processed: 0, cleaned: 0, failed: 0 });
   trashPurgeMock.mockReset().mockResolvedValue({ projects: 0, chapters: 0 });
+  retentionMock.mockReset().mockResolvedValue(emptyRetention);
   callOrder.length = 0;
 });
 
@@ -302,7 +312,7 @@ describe("/api/cron/reminders — happy path", () => {
     const res = await GET(makeRequest({ "x-cron-secret": "test_cron_secret_123" }));
     const json = await res.json();
 
-    expect(callOrder).toEqual(["purge", "storage", "chapters"]);
+    expect(callOrder).toEqual(["retention", "purge", "storage", "chapters"]);
     expect(json.trashPurge).toEqual({ projects: 1, chapters: 2 });
     expect(json.chapterStorageCleanup).toEqual({ processed: 2, cleaned: 2, failed: 0 });
   });
@@ -312,6 +322,30 @@ describe("/api/cron/reminders — happy path", () => {
 
     expect(res.status).toBe(401);
     expect(trashPurgeMock).not.toHaveBeenCalled();
+    expect(retentionMock).not.toHaveBeenCalled();
+  });
+
+  it("reports the retention run (PROJ-28)", async () => {
+    const run = { due: 2, moved: 1, skipped: 1, failed: 0, braked: false };
+    retentionMock.mockResolvedValueOnce(run);
+
+    const res = await GET(makeRequest({ "x-cron-secret": "test_cron_secret_123" }));
+    const json = await res.json();
+
+    expect(json.retention).toEqual(run);
+  });
+
+  it("keeps running when the retention run crashes (PROJ-28)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    retentionMock.mockRejectedValueOnce(new Error("db down"));
+
+    const res = await GET(makeRequest({ "x-cron-secret": "test_cron_secret_123" }));
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.retention).toEqual(emptyRetention);
+    expect(trashPurgeMock).toHaveBeenCalledTimes(1);
+    expect(storageCleanupMock).toHaveBeenCalledTimes(1);
   });
 
   it("keeps running when the trash purge crashes (PROJ-26)", async () => {

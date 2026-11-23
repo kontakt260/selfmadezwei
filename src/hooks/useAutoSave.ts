@@ -18,7 +18,14 @@ type SaveFn<T> = (value: T) => Promise<void>;
 //   - Schließt oder lädt er den Tab neu, während noch etwas aussteht,
 //     fragt der Browser nach; zusätzlich wird beim Verlassen ein letzter
 //     Speicherversuch gestartet.
-export function useAutoSave<T>(value: T, saveFn: SaveFn<T>, debounceMs = 2_000) {
+//   - Mit `enabled = false` wird nie gespeichert (PROJ-28, Lesemodus). Der
+//     Editor meldet beim Öffnen sonst die berechnete Seitenzahl als Änderung.
+export function useAutoSave<T>(
+  value: T,
+  saveFn: SaveFn<T>,
+  debounceMs = 2_000,
+  enabled = true,
+) {
   const [savedValue, setSavedValue] = useState(value);
   const [hasSaved, setHasSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +73,7 @@ export function useAutoSave<T>(value: T, saveFn: SaveFn<T>, debounceMs = 2_000) 
       isFirstRun.current = false;
       return;
     }
+    if (!enabled) return;
     dirtyRef.current = true;
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
@@ -77,7 +85,7 @@ export function useAutoSave<T>(value: T, saveFn: SaveFn<T>, debounceMs = 2_000) 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [value, debounceMs, save]);
+  }, [value, debounceMs, save, enabled]);
 
   // Verlassen der Seite innerhalb der App.
   useEffect(() => flush, [flush]);
@@ -104,7 +112,15 @@ export function useAutoSave<T>(value: T, saveFn: SaveFn<T>, debounceMs = 2_000) 
   };
 
   const pending = !Object.is(value, savedValue);
-  const state: SaveState = error ? "error" : pending ? "saving" : hasSaved ? "saved" : "idle";
+  const state: SaveState = !enabled
+    ? "idle"
+    : error
+      ? "error"
+      : pending
+        ? "saving"
+        : hasSaved
+          ? "saved"
+          : "idle";
 
   return { state, error, retry };
 }

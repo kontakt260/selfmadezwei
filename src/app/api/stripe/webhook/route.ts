@@ -8,7 +8,11 @@ import { sendRenewalInfoMail, sendRenewalMail } from "@/lib/email/send-renewal";
 import { sendInvitationMail } from "@/lib/email/send-invitation";
 import { sendGuestPurchaseMail } from "@/lib/email/send-guest-purchase";
 import { sendDeletedProjectPaymentAlert } from "@/lib/email/send-deleted-project-alert";
-import { isProjectInTrash } from "@/lib/projects/trash";
+import {
+  isProjectInTrash,
+  restorePaidProject,
+  type PaidRestoreStatus,
+} from "@/lib/projects/trash";
 import { formatEur, formatGermanDate } from "@/lib/email/format";
 import { fulfillInitialPurchase, PROJECT_DEFAULT_TITLE } from "@/lib/purchases/fulfill-initial";
 import {
@@ -515,16 +519,32 @@ async function handleRenewal(
     throw new Error(accessWrite.error.message);
   }
 
-  // PROJ-26: Das Projekt wurde zwischen Checkout und Zahlung gelöscht. Die
-  // Zahlung bleibt gebucht, der Support klärt den Fall.
+  // PROJ-28: Lag das Projekt wegen Ablauf im Papierkorb, holt die Zahlung es
+  // zurück. Hat eine Person es gelöscht (PROJ-26), bleibt die Zahlung gebucht
+  // und der Support klärt den Fall. Die Person bekommt dann keine Mail
+  // „verlängert" für ein Projekt, das sie gerade nicht öffnen kann.
+  let restore: PaidRestoreStatus | "check_failed";
   try {
-    if (await isProjectInTrash(supabase, projectId)) {
-      await sendDeletedProjectPaymentAlert({ projectId, stripeSessionId: session.id });
-    }
+    restore = await restorePaidProject(supabase, projectId);
   } catch (err) {
     console.error(
       `[stripe-webhook] trash check failed for session ${session.id}: ${err instanceof Error ? err.message : String(err)}`,
     );
+    const inTrash = await isProjectInTrash(supabase, projectId).catch(() => true);
+    restore = inTrash ? "check_failed" : "not_in_trash";
+  }
+
+  if (restore === "gone") {
+    await sendDeletedProjectPaymentAlert({
+      projectId,
+      stripeSessionId: session.id,
+      finallyDeleted: true,
+    });
+    return;
+  }
+  if (restore !== "restored" && restore !== "not_in_trash") {
+    await sendDeletedProjectPaymentAlert({ projectId, stripeSessionId: session.id });
+    return;
   }
 
   // PROJ-11: Bestätigung an die Person, die verlängert hat, und Info an

@@ -353,7 +353,7 @@ test.describe("PROJ-6 — Zugriffsregeln (nur Stage)", () => {
     }
   });
 
-  test("G6: Lesen bleibt möglich, die Seite führt zur Verlängerung", async () => {
+  test("G6: Lesen bleibt möglich, die Übersicht bietet die Verlängerung an", async () => {
     const read = await rest(`chapters?select=title&id=eq.${project.chapter}`, { method: "GET" }, tokenC);
     expect(await read.json()).toEqual([{ title: "Aktiv" }]);
 
@@ -363,8 +363,8 @@ test.describe("PROJ-6 — Zugriffsregeln (nur Stage)", () => {
     expect(file.data?.signedUrl).toBeTruthy();
 
     await pageC.goto(`/projektuebersicht/${project.id}`);
-    await pageC.waitForURL(/\/zugang-abgelaufen/, { timeout: 15_000 });
-    await expect(pageC.getByRole("heading", { name: "Ihr Zugang ist abgelaufen" })).toBeVisible();
+    await expect(pageC.getByText(/Abgelaufen am/)).toBeVisible();
+    await expect(pageC.getByRole("button", { name: /Um 12 Monate verlängern/ })).toBeEnabled();
   });
 
   test("Bezahlschranke: Niemand verlängert sich selbst", async () => {

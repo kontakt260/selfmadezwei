@@ -6,6 +6,7 @@ import { CoverEditorClient } from "@/components/cover/CoverEditorClient";
 import { DEFAULT_COLOR_ID } from "@/lib/cover-colors";
 import { DEFAULT_THEME_ID } from "@/lib/cover-themes";
 import type { CoverData, CoverRowRaw } from "@/lib/cover-types";
+import { isProjectReadOnly } from "@/lib/projects/project-access";
 
 function IconArrowLeft() {
   return (
@@ -59,6 +60,8 @@ export default async function CoverBearbeitenPage({
 
   if (!project || !membership) notFound();
 
+  const readOnly = await isProjectReadOnly(supabase, project_id);
+
   // Cover-Row als sicheres CoverRowRaw casten — Supabase liefert metadata
   // als Json|null; wir vertrauen unserem Save-Action-Schema (schema_version 1).
   const raw: CoverRowRaw | null = coverRow
@@ -105,11 +108,12 @@ export default async function CoverBearbeitenPage({
               Zurück zur Projektübersicht
             </Link>
             <h1 className="[font-family:var(--font-merriweather)] mt-1 text-3xl font-medium leading-10 text-[#3E3831] sm:mt-2 sm:text-4xl sm:leading-[1.2] md:text-5xl">
-              Cover bearbeiten
+              {readOnly ? "Cover ansehen" : "Cover bearbeiten"}
             </h1>
             <p className="text-lg leading-8 text-[#535252] sm:text-xl sm:leading-9">
-              Gestalten Sie die Vorderseite Ihres Buches. Änderungen werden
-              automatisch gespeichert.
+              {readOnly
+                ? "Ihr Projektzugang ist abgelaufen. Das Cover bleibt sichtbar, lässt sich aber nicht mehr ändern."
+                : "Gestalten Sie die Vorderseite Ihres Buches. Änderungen werden automatisch gespeichert."}
             </p>
           </header>
 
@@ -118,6 +122,7 @@ export default async function CoverBearbeitenPage({
               projectId={project_id}
               initialData={initialData}
               initialImagePath={initialImagePath}
+              readOnly={readOnly}
             />
           </section>
         </div>

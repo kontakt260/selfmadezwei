@@ -27,6 +27,8 @@ export { MailFailureAlertEmail } from "./MailFailureAlertEmail";
 export type { MailFailureAlertEmailProps } from "./MailFailureAlertEmail";
 export { DeletedProjectPaymentAlertEmail } from "./DeletedProjectPaymentAlertEmail";
 export type { DeletedProjectPaymentAlertEmailProps } from "./DeletedProjectPaymentAlertEmail";
+export { RetentionBrakeAlertEmail } from "./RetentionBrakeAlertEmail";
+export type { RetentionBrakeAlertEmailProps } from "./RetentionBrakeAlertEmail";
 
 export { ReminderEmail } from "./ReminderEmail";
 export type {

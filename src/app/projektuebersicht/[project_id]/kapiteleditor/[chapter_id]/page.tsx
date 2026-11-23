@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PhoneNotice } from "@/components/kapiteleditor/PhoneNotice";
 import { EditorClient } from "@/components/kapiteleditor/EditorClient";
+import { isProjectReadOnly } from "@/lib/projects/project-access";
 import {
   EMPTY_IMAGE_SECTIONS,
   type ChapterImage,
@@ -77,6 +78,8 @@ export default async function KapiteleditorPage({
 
   if (!chapter || !membership) notFound();
 
+  const readOnly = await isProjectReadOnly(supabase, project_id);
+
   const initialImageSections = parseImageSections(chapter.image_sections);
 
   // Signed URLs für alle gespeicherten Bilder erzeugen (1h gültig). Falls die
@@ -137,6 +140,7 @@ export default async function KapiteleditorPage({
           initialImageSections={initialImageSections}
           initialStartPage={chapter.start_page ?? 1}
           initialImpulse={initialImpulse}
+          readOnly={readOnly}
         />
       </div>
     </>

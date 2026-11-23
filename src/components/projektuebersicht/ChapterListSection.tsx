@@ -5,6 +5,8 @@ import type { ErzaehlImpuls } from "@/lib/projektuebersicht-erzaehl-impulse";
 type Props = {
   projectId: string;
   initialChapters: Chapter[];
+  /** PROJ-28: Der Zugang ist abgelaufen, die Liste ist nur noch lesbar. */
+  readOnly: boolean;
   /** PROJ-8: server-geladener Impuls-Katalog. Wird als Prop an den Client
    * gereicht — das Modal öffnet ohne Roundtrip. */
   impulses: ErzaehlImpuls[];
@@ -18,6 +20,7 @@ type Props = {
 export function ChapterListSection({
   projectId,
   initialChapters,
+  readOnly,
   impulses,
   addChapterAction,
   addImpulseChapterAction,
@@ -38,6 +41,7 @@ export function ChapterListSection({
       key={chapterSetKey}
       projectId={projectId}
       initialChapters={initialChapters}
+      readOnly={readOnly}
       impulses={impulses}
       addChapterAction={addChapterAction}
       addImpulseChapterAction={addImpulseChapterAction}

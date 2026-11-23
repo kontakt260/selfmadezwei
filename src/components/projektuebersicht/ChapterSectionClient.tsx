@@ -14,6 +14,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { ReadOnlyScope } from "@/components/ReadOnlyScope";
 import { type Chapter, reorderChapters } from "@/lib/projektuebersicht-chapters";
 import type { ErzaehlImpuls } from "@/lib/projektuebersicht-erzaehl-impulse";
 
@@ -127,6 +128,8 @@ type AddImpulseChapterAction = (formData: FormData) => Promise<{ chapterId?: str
 type Props = {
   projectId: string;
   initialChapters: Chapter[];
+  /** PROJ-28: Zugang abgelaufen. Kapitel lassen sich nur noch ansehen. */
+  readOnly: boolean;
   /** PROJ-8: Server-geladener Impuls-Katalog (UUIDs aus impulse_catalog).
    * Wird vom Shuffle-Modal genutzt — beim „Impuls übernehmen" geht die
    * UUID als impulseId zur Server-Action und landet in chapters.source_impulse_id. */
@@ -141,6 +144,7 @@ type Props = {
 export function ChapterSectionClient({
   projectId,
   initialChapters,
+  readOnly,
   impulses,
   addChapterAction,
   addImpulseChapterAction,
@@ -695,6 +699,7 @@ export function ChapterSectionClient({
       {editModal}
       {addModal}
       {impulseModal}
+      <ReadOnlyScope readOnly={readOnly}>
       <SectionHeader
         icon={<IconBook />}
         title="Kapitel"
@@ -759,9 +764,9 @@ export function ChapterSectionClient({
             <div
               key={chapter.id}
               role="listitem"
-              onDragOver={onDragOver(index)}
-              onDragLeave={onDragLeave}
-              onDrop={onDrop(index)}
+              onDragOver={readOnly ? undefined : onDragOver(index)}
+              onDragLeave={readOnly ? undefined : onDragLeave}
+              onDrop={readOnly ? undefined : onDrop(index)}
               className={`flex flex-col gap-4 border border-transparent bg-[#FAF8F6] p-5 py-5 transition-[opacity,box-shadow] sm:min-h-[6rem] sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:p-7 ${
                 dragIndex === index ? "opacity-60" : ""
               } ${
@@ -771,14 +776,24 @@ export function ChapterSectionClient({
               }`}
             >
               <div
-                draggable
-                onDragStart={onDragStart(index)}
-                onDragEnd={onDragEnd}
-                className="flex min-w-0 flex-1 cursor-grab flex-row items-center gap-3 sm:gap-4 active:cursor-grabbing"
-                aria-grabbed={dragIndex === index}
-                aria-label={`Kapitel ${index + 1}: ${chapter.title} — zum Umsortieren ziehen`}
+                draggable={!readOnly}
+                onDragStart={readOnly ? undefined : onDragStart(index)}
+                onDragEnd={readOnly ? undefined : onDragEnd}
+                className={`flex min-w-0 flex-1 flex-row items-center gap-3 sm:gap-4 ${
+                  readOnly ? "" : "cursor-grab active:cursor-grabbing"
+                }`}
+                aria-grabbed={readOnly ? undefined : dragIndex === index}
+                aria-label={
+                  readOnly
+                    ? `Kapitel ${index + 1}: ${chapter.title}`
+                    : `Kapitel ${index + 1}: ${chapter.title} — zum Umsortieren ziehen`
+                }
               >
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center text-[#B5B5B5] sm:h-7 sm:w-7">
+                <span
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center text-[#B5B5B5] sm:h-7 sm:w-7 ${
+                    readOnly ? "opacity-40" : ""
+                  }`}
+                >
                   <IconDrag className="h-full w-full" />
                 </span>
                 <span className="w-8 shrink-0 text-lg leading-7 text-[#B5B5B5] sm:w-9 sm:text-xl sm:leading-8">
@@ -835,7 +850,7 @@ export function ChapterSectionClient({
                     onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
                     className="relative z-20 inline-flex h-12 w-full min-w-0 cursor-pointer items-center justify-center bg-[#0A0909]/5 px-4 text-base font-bold leading-6 text-[#534B42] transition-colors hover:bg-[#0A0909]/10 sm:w-auto sm:text-lg"
                   >
-                    Bearbeiten
+                    {readOnly ? "Ansehen" : "Bearbeiten"}
                   </Link>
                 )}
               </div>
@@ -843,6 +858,7 @@ export function ChapterSectionClient({
           ))}
         </div>
       )}
+      </ReadOnlyScope>
     </>
   );
 }

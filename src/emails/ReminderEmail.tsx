@@ -60,7 +60,7 @@ const TONE: Record<ReminderVariant, (daysLeft: number, projectName: string) => R
     </>
   ),
   "7": (d) =>
-    `nur noch ${daysNominative(d)}: Ihr Projektzugang läuft am unten genannten Datum ab. Wenn Sie weiter am Projekt arbeiten möchten, verlängern Sie den Zugang bitte rechtzeitig, sonst verlieren Sie kurzzeitig den Zugriff.`,
+    `nur noch ${daysNominative(d)}: Ihr Projektzugang läuft am unten genannten Datum ab. Wenn Sie weiter am Projekt arbeiten möchten, verlängern Sie den Zugang bitte rechtzeitig.`,
 };
 
 const CTA_LABEL: Record<ReminderVariant, string> = {
@@ -116,9 +116,8 @@ export function ReminderEmail({
 
       <MailParagraph>
         Falls Sie das Projekt nicht weiterführen möchten, müssen Sie nichts
-        unternehmen — der Zugang läuft dann einfach aus, Ihre Inhalte
-        bleiben noch {CONTENT_RETENTION_DAYS} weitere Tage erhalten und können
-        bei einer späteren Verlängerung wieder bearbeitet werden.
+        unternehmen. Der Zugang läuft dann aus. Ihr Projekt bleibt danach noch{" "}
+        {CONTENT_RETENTION_DAYS} Tage lesbar und wird anschließend gelöscht.
       </MailParagraph>
     </Layout>
   );

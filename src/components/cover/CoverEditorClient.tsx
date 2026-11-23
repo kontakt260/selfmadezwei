@@ -28,6 +28,7 @@ import {
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { CoverRender } from "@/components/cover/CoverRender";
+import { ReadOnlyScope } from "@/components/ReadOnlyScope";
 import { COVER_COLORS } from "@/lib/cover-colors";
 import { COVER_THEMES } from "@/lib/cover-themes";
 import type { CoverData } from "@/lib/cover-types";
@@ -53,6 +54,8 @@ type Props = {
   // Der Storage-Pfad (NICHT die signed URL). Wird beim Auto-Save mit
   // gepostet. Beim Foto-Wechsel überschreibt der Client diesen lokal.
   initialImagePath: string | null;
+  // PROJ-28: Zugang abgelaufen. Das Cover bleibt sichtbar, Felder sind gesperrt.
+  readOnly?: boolean;
 };
 
 type SaveState =
@@ -75,6 +78,7 @@ export function CoverEditorClient({
   projectId,
   initialData,
   initialImagePath,
+  readOnly = false,
 }: Props) {
   const router = useRouter();
 
@@ -195,6 +199,7 @@ export function CoverEditorClient({
       initialMountRef.current = false;
       return;
     }
+    if (readOnly) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(performSave, AUTOSAVE_DEBOUNCE_MS);
     return () => {
@@ -208,6 +213,7 @@ export function CoverEditorClient({
     colorId,
     imagePath,
     performSave,
+    readOnly,
   ]);
 
   // ── Foto-Upload ────────────────────────────────────────────────────────
@@ -310,6 +316,7 @@ export function CoverEditorClient({
 
   // ── Render ─────────────────────────────────────────────────────────────
   const saveLabel = (() => {
+    if (readOnly) return "Nur zum Ansehen";
     if (saveState.kind === "pending" || isPending) return "Speichern …";
     if (saveState.kind === "saved")
       return `Gespeichert ${formatSavedTime(saveState.at)}`;
@@ -322,6 +329,7 @@ export function CoverEditorClient({
   return (
     <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[1fr_minmax(280px,440px)] lg:items-start lg:gap-10">
       {/* ─── Eingabe-Spalte ─────────────────────────────────────── */}
+      <ReadOnlyScope readOnly={readOnly}>
       <div className="flex flex-col gap-6">
         {/* Titel */}
         <FieldShell
@@ -505,6 +513,7 @@ export function CoverEditorClient({
           </div>
         </FieldShell>
       </div>
+      </ReadOnlyScope>
 
       {/* ─── Vorschau-Spalte ────────────────────────────────────── */}
       <div className="flex flex-col gap-4">

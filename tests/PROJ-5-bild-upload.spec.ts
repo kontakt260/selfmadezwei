@@ -58,6 +58,10 @@ test("AC-Img-1: ein großes Foto (~5 MB) lässt sich hochladen und bleibt nach d
   await expect(uploaded.first()).toBeVisible({ timeout: 45_000 });
   await expect(page.getByText(/Upload fehlgeschlagen|Bild-Upload fehlgeschlagen/)).toHaveCount(0);
 
+  // Das Bild wird per Auto-Save (2 s Verzögerung) dem Kapitel zugeordnet.
+  // Erst danach darf neu geladen werden, sonst testet der Lauf einen Abbruch.
+  await expect(page.getByText("Gespeichert", { exact: true })).toBeVisible({ timeout: 15_000 });
+
   await page.reload();
   await waitForEditorReady(page);
   await expect(page.locator('img[src*="chapter-heroes"]').first()).toBeVisible({ timeout: 20_000 });

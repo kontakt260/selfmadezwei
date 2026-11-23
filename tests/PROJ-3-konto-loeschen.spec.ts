@@ -765,8 +765,8 @@ test.describe("PROJ-3 — echte Kontolöschung (nur Stage)", () => {
 
     try {
       await pageB.goto("/");
-      await expect(pageB).toHaveURL(/\/zugang-abgelaufen/);
-      await pageB.getByRole("link", { name: "Zum persönlichen Bereich" }).click();
+      await expect(pageB).not.toHaveURL(/\/zugang-abgelaufen/);
+      await pageB.goto("/persoenlicher-bereich");
       await expect(pageB).toHaveURL(/\/persoenlicher-bereich/);
       await expect(pageB.locator("#account-email")).toHaveValue(B.email);
       await pageB.getByRole("button", { name: "Account löschen", exact: true }).click();

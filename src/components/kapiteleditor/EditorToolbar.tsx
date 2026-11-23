@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ReadOnlyScope } from "@/components/ReadOnlyScope";
 import { cn } from "@/lib/utils";
 
 // Verhindert, dass der Browser beim Klick auf ein Toolbar-Element den Fokus
@@ -40,7 +41,13 @@ import { cn } from "@/lib/utils";
 // nachträglich wieder auf den Button zieht.
 const keepEditorFocus = (e: React.MouseEvent) => e.preventDefault();
 
-export function EditorToolbar({ editor }: { editor: Editor | null }) {
+export function EditorToolbar({
+  editor,
+  readOnly = false,
+}: {
+  editor: Editor | null;
+  readOnly?: boolean;
+}) {
   if (!editor) return <ToolbarSkeleton />;
 
   const currentLineHeight = (editor.getAttributes("paragraph").lineHeight as string) ?? "1.5";
@@ -65,7 +72,13 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
 
   return (
     <div className="editor-chrome sticky top-0 z-[60] flex w-full justify-center border-b border-[#e0dcd5] bg-[#ece6df] py-1.5 shadow-sm">
-    <div className="flex w-fit max-w-full flex-wrap items-center gap-1 px-2">
+    <div
+      className={cn(
+        "flex w-fit max-w-full flex-wrap items-center gap-1 px-2",
+        readOnly && "[&_button:disabled:not([data-state=on])]:text-[#848484]",
+      )}
+    >
+      <ReadOnlyScope readOnly={readOnly}>
       <Toggle
         size="sm"
         pressed={editor.isActive("bold")}
@@ -175,7 +188,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
 
       <Sep />
 
-      <Select value={currentLineHeight} onValueChange={setLineHeight}>
+      <Select value={currentLineHeight} onValueChange={setLineHeight} disabled={readOnly}>
         <SelectTrigger
           className="h-8 w-[88px] gap-1 border-transparent text-xs hover:bg-accent/40"
           onMouseDown={keepEditorFocus}
@@ -256,6 +269,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
       >
         <Redo2 className="h-4 w-4" />
       </Button>
+      </ReadOnlyScope>
       </div>
     </div>
   );

@@ -47,6 +47,9 @@ type Props = {
   // mehr existiert. Frontend-Phase reicht null durch (kein DB-Lookup);
   // /backend befüllt es nach der Schema-Migration.
   initialImpulse: { title: string; leadingQuestions: readonly string[] } | null;
+  // PROJ-28: Zugang abgelaufen. Das Kapitel bleibt sichtbar, aber nichts
+  // lässt sich ändern und es wird nichts gespeichert.
+  readOnly?: boolean;
 };
 
 export function EditorClient({
@@ -57,6 +60,7 @@ export function EditorClient({
   initialImageSections,
   initialStartPage,
   initialImpulse,
+  readOnly = false,
 }: Props) {
   const [title, setTitle] = useState(initialTitle);
   const [body, setBody] = useState<unknown>(initialBody);
@@ -75,6 +79,7 @@ export function EditorClient({
   const editor = useEditor({
     extensions: editorExtensions,
     content: initialBody ?? undefined,
+    editable: !readOnly,
     editorProps: {
       attributes: {
         class: "tiptap-editor focus:outline-none",
@@ -155,7 +160,7 @@ export function EditorClient({
     [projectId, chapterId],
   );
 
-  const { state, retry } = useAutoSave(draft, saveDraft, 2_000);
+  const { state, retry } = useAutoSave(draft, saveDraft, 2_000, !readOnly);
 
   // Trigger PaginationDecorations (ProseMirror plugin) bei React-State-
   // Änderungen, die keine Doc-Transaktion auslösen — sonst zeigen Image-
@@ -292,7 +297,7 @@ export function EditorClient({
   // (Editor, Bild-Sektion, Kopf behalten ihre eigene Klick-Logik); der
   // Handler hängt deshalb an Stack UND Vordergrund-Layer.
   const handleBlankAreaMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target !== e.currentTarget || !editor || e.button !== 0) return;
+    if (readOnly || e.target !== e.currentTarget || !editor || e.button !== 0) return;
     e.preventDefault();
     if (!placeCaretNearPoint(editor.view, e.clientX, e.clientY, e.shiftKey)) {
       editor.commands.focus("end");
@@ -312,7 +317,7 @@ export function EditorClient({
       {/* Toolbar an top:0 — direkt im Document-Flow, kein verschachtelter
           Parent. Sticky funktioniert immer, weil document.scrollingElement
           die nächste scroll-Ancestor ist. */}
-      <EditorToolbar editor={editor} />
+      <EditorToolbar editor={editor} readOnly={readOnly} />
 
       {/* Chrome unter der Toolbar — scrollt natürlich weg */}
       <header className="flex flex-col gap-2 border-b border-[#e0dcd5] bg-[#ece6df] px-4 py-3 sm:px-6 md:flex-row md:items-center md:justify-between">
@@ -327,23 +332,36 @@ export function EditorClient({
           {/* Wrapper-Label: das Stift-Icon sitzt als Affordance NEBEN dem
               Input. Click auf das Icon fokussiert den Input (label-für-
               input-Verhalten). */}
-          <label className="flex w-full max-w-md items-center justify-center gap-2 cursor-text">
+          <label
+            className={`flex w-full max-w-md items-center justify-center gap-2 ${
+              readOnly ? "" : "cursor-text"
+            }`}
+          >
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              readOnly={readOnly}
               placeholder="Kapitel-Titel"
-              className="[font-family:var(--font-merriweather)] flex-1 border-0 border-b border-transparent bg-transparent px-1 py-1 text-center text-lg text-[#3E3831] outline-none transition-colors focus:border-[#96B897] md:text-xl"
+              className={`[font-family:var(--font-merriweather)] flex-1 border-0 border-b border-transparent bg-transparent px-1 py-1 text-center text-lg text-[#3E3831] outline-none transition-colors md:text-xl ${
+                readOnly ? "cursor-default" : "focus:border-[#96B897]"
+              }`}
               aria-label="Kapitel-Titel"
             />
-            <Pencil
-              className="h-4 w-4 shrink-0 text-[#848484]"
-              aria-hidden
-            />
+            {!readOnly && (
+              <Pencil
+                className="h-4 w-4 shrink-0 text-[#848484]"
+                aria-hidden
+              />
+            )}
           </label>
         </div>
         <div className="flex shrink-0 items-center justify-end gap-2 md:min-w-[12rem]">
-          <SaveStatus state={state} onRetry={retry} />
+          {readOnly ? (
+            <span className="text-sm text-[#848484]">Nur zum Ansehen</span>
+          ) : (
+            <SaveStatus state={state} onRetry={retry} />
+          )}
         </div>
       </header>
 
@@ -418,6 +436,7 @@ export function EditorClient({
               onChange={updateSection("start")}
               onUpload={uploadImage("start")}
               onDelete={deleteImage("start")}
+              readOnly={readOnly}
             />
             <EditorContent editor={editor} />
             <ImageSection
@@ -425,6 +444,7 @@ export function EditorClient({
               onChange={updateSection("end")}
               onUpload={uploadImage("end")}
               onDelete={deleteImage("end")}
+              readOnly={readOnly}
             />
           </div>
           {/* Seitenzahl-Overlay: über FG, damit Zahlen nicht von Bildern

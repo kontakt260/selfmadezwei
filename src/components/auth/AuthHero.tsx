@@ -9,7 +9,6 @@ const AUTH_ROUTES = [
   "/passwort-vergessen",
   "/passwort-zuruecksetzen",
   "/email-bestaetigen",
-  "/zugang-abgelaufen",
 ] as const;
 
 function isAuthRoute(pathname: string) {

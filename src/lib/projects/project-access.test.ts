@@ -3,8 +3,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import {
   PROJECT_EXPIRED_ERROR,
+  accessResultIsReadOnly,
   isAccessExpired,
-  projectIdFromPath,
+  isProjectReadOnly,
   projectWriteBlockedError,
 } from "./project-access";
 
@@ -31,16 +32,35 @@ describe("isAccessExpired", () => {
   });
 });
 
-describe("projectIdFromPath", () => {
-  it("findet die Projekt-ID auch in Unterseiten", () => {
-    expect(projectIdFromPath(`/projektuebersicht/${ID}`)).toBe(ID);
-    expect(projectIdFromPath(`/projektuebersicht/${ID}/kapiteleditor/x`)).toBe(ID);
-    expect(projectIdFromPath(`/projektuebersicht/${ID}/cover-bearbeiten`)).toBe(ID);
+describe("accessResultIsReadOnly (PROJ-28 BUG-6)", () => {
+  it("sperrt bei einem Lesefehler", () => {
+    expect(accessResultIsReadOnly({ data: null, error: { message: "down" } })).toBe(true);
   });
-  it("ignoriert andere Pfade", () => {
-    expect(projectIdFromPath("/")).toBeNull();
-    expect(projectIdFromPath("/projektuebersicht/kein-projekt")).toBeNull();
-    expect(projectIdFromPath(`/andere/${ID}`)).toBeNull();
+  it("sperrt ein abgelaufenes Projekt", () => {
+    const past = new Date(Date.now() - 86_400_000).toISOString();
+    expect(accessResultIsReadOnly({ data: { expires_at: past }, error: null })).toBe(true);
+  });
+  it("lässt ein aktives Projekt und ein Projekt ohne Eintrag offen", () => {
+    const future = new Date(Date.now() + 86_400_000).toISOString();
+    expect(accessResultIsReadOnly({ data: { expires_at: future }, error: null })).toBe(false);
+    expect(accessResultIsReadOnly({ data: null, error: null })).toBe(false);
+  });
+});
+
+describe("isProjectReadOnly (PROJ-28)", () => {
+  it("aktiv: bearbeitbar", async () => {
+    const future = new Date(Date.now() + 86_400_000).toISOString();
+    expect(await isProjectReadOnly(client({ data: { expires_at: future }, error: null }), ID)).toBe(false);
+  });
+  it("abgelaufen: nur lesen", async () => {
+    const past = new Date(Date.now() - 86_400_000).toISOString();
+    expect(await isProjectReadOnly(client({ data: { expires_at: past }, error: null }), ID)).toBe(true);
+  });
+  it("ohne Ablaufdatum: bearbeitbar", async () => {
+    expect(await isProjectReadOnly(client({ data: { expires_at: null }, error: null }), ID)).toBe(false);
+  });
+  it("Datenbankfehler: lieber nur lesen", async () => {
+    expect(await isProjectReadOnly(client({ data: null, error: { message: "down" } }), ID)).toBe(true);
   });
 });
 

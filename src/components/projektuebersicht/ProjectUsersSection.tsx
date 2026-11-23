@@ -12,15 +12,18 @@ type Props = {
   projectId: string;
   members: MemberDisplay[];
   myRole: "projektleiter" | "co_author";
+  /** PROJ-28: Im Lesemodus sind keine neuen Einladungen möglich. */
+  readOnly?: boolean;
 };
 
-export function ProjectUsersSection({ projectId, members, myRole }: Props) {
+export function ProjectUsersSection({ projectId, members, myRole, readOnly = false }: Props) {
   return (
     <section className="flex flex-col gap-5 bg-white p-5 sm:gap-6 sm:p-8">
       <ProjectUsersClient
         projectId={projectId}
         members={members}
         myRole={myRole}
+        readOnly={readOnly}
       />
     </section>
   );

@@ -33,6 +33,22 @@ describe("useAutoSave", () => {
     expect(result.current.state).toBe("idle");
   });
 
+  it("speichert im Lesemodus nie, auch wenn sich der Wert ändert (PROJ-28)", async () => {
+    const saveFn = vi.fn<(value: Draft) => Promise<void>>().mockResolvedValue(undefined);
+    const { result, rerender, unmount } = renderHook(
+      ({ value }: { value: Draft }) => useAutoSave(value, saveFn, 2_000, false),
+      { initialProps: { value: { text: "a" } } },
+    );
+
+    rerender({ value: { text: "b" } });
+    expect(result.current.state).toBe("idle");
+    await advance(5_000);
+    window.dispatchEvent(new Event("pagehide"));
+    unmount();
+
+    expect(saveFn).not.toHaveBeenCalled();
+  });
+
   it("zeigt sofort „saving“, solange eine Änderung noch nicht gespeichert ist", async () => {
     const { saveFn, result, rerender } = setup();
     const next = { text: "b" };

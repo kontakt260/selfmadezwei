@@ -26,6 +26,55 @@ export async function purgeDueTrash(): Promise<TrashPurgeResult> {
   return purgeResultSchema.parse(data);
 }
 
+const paidRestoreSchema = z.object({
+  status: z.enum([
+    "restored",
+    "not_in_trash",
+    "gone",
+    "deleted_by_customer",
+    "not_paid",
+    "lead_required",
+  ]),
+});
+
+export type PaidRestoreStatus = z.infer<typeof paidRestoreSchema>["status"];
+
+/**
+ * PROJ-28: Eine Zahlung holt ein wegen Ablauf verschobenes Projekt zurück.
+ * Von Personen gelöschte Projekte bleiben liegen, das klärt der Support.
+ */
+export async function restorePaidProject(
+  supabase: SupabaseClient<Database>,
+  projectId: string,
+): Promise<PaidRestoreStatus> {
+  const { data, error } = await supabase.rpc("retention_restore_paid", {
+    p_project_id: projectId,
+  });
+  if (error) throw new Error(error.message);
+  return paidRestoreSchema.parse(data).status;
+}
+
+/**
+ * PROJ-28: Bis wann eine Schonfrist das Projekt vor dem Löschlauf schützt.
+ * Nur nach geprüfter Mitgliedschaft aufrufen, die Tabelle ist für Kunden gesperrt.
+ */
+export async function getRetentionHoldUntil(projectId: string): Promise<string | null> {
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from("project_retention_holds")
+    .select("hold_until")
+    .eq("project_id", projectId)
+    .gt("hold_until", new Date().toISOString())
+    .order("hold_until", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error(`[retention] hold lookup failed: ${error.message}`);
+    return null;
+  }
+  return data?.hold_until ?? null;
+}
+
 /** Wirft bei einem Datenbankfehler, damit niemand aus Versehen weitermacht. */
 export async function isProjectInTrash(
   supabase: SupabaseClient<Database>,

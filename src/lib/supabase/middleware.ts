@@ -1,7 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
-import { isAccessExpired, projectIdFromPath } from "@/lib/projects/project-access";
 
 const PUBLIC_ROUTES = [
   "/anmelden",
@@ -22,7 +21,6 @@ const PUBLIC_ROUTES = [
   // Link aus der Kauf-Mail: legt nur das Geheimnis als Cookie ab und leitet
   // zur Anmeldung bzw. Registrierung weiter.
   "/kauf-zuordnen",
-  "/zugang-abgelaufen",
   // Konto-Bereich umgeht die „kein-Projekt → Onboarding"-Weiterleitung,
   // damit Nutzer ihr Konto auch nach Projekt-Löschung erreichen können.
   // Die Seite selbst (page.tsx) erzwingt weiterhin Login.
@@ -132,27 +130,17 @@ export async function updateSession(request: NextRequest) {
     // (das wäre client-UPDATE-bar gewesen), sondern in der strikt
     // service_role-write-only `project_access`-Tabelle. RLS-SELECT-Policy
     // filtert automatisch auf Projekte des eingeloggten Users.
+    // PROJ-28: Abgelaufene Projekte bleiben erreichbar und zeigen sich selbst
+    // im Lesemodus. Das Schreiben sperren Server Actions und Datenbank.
     const { data: accessRows } = await supabase
       .from("project_access")
       .select("project_id, expires_at")
       .limit(50);
 
-    const now = Date.now();
     const hasNeverPaid =
       !accessRows ||
       accessRows.length === 0 ||
       accessRows.every((r) => r.expires_at === null);
-    const allExpired =
-      !!accessRows &&
-      accessRows.length > 0 &&
-      accessRows.every((r) => isAccessExpired(r.expires_at, now));
-    // Auch mit einem anderen aktiven Projekt bleibt ein abgelaufenes gesperrt.
-    const routeProjectId = projectIdFromPath(pathname);
-    const routeProjectExpired =
-      !!routeProjectId &&
-      !!accessRows?.some(
-        (r) => r.project_id === routeProjectId && isAccessExpired(r.expires_at, now),
-      );
 
     if (hasNeverPaid) {
       // Kein Projekt: erst prüfen, ob ein Kauf ohne Konto auf dieses Konto
@@ -161,15 +149,6 @@ export async function updateSession(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = "/kauf-einloesen";
       url.search = "";
-      return NextResponse.redirect(url);
-    }
-
-    if (allExpired || routeProjectExpired) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/zugang-abgelaufen";
-      if (routeProjectExpired && routeProjectId) {
-        url.searchParams.set("project", routeProjectId);
-      }
       return NextResponse.redirect(url);
     }
   }

@@ -1,5 +1,6 @@
 "use client";
 
+import { CONTENT_RETENTION_DAYS } from "@/lib/projects/project-access";
 import { CheckoutButton } from "./CheckoutButton";
 
 // Client-Komponente für die zahlungsbezogene Stat-Karte der
@@ -20,15 +21,21 @@ type Props = {
   // Verbleibende volle Tage, serverseitig berechnet (`daysUntil`);
   // null, wenn noch nicht aktiviert.
   daysLeft: number | null;
+  // PROJ-28: fertig formatiertes Ablaufdatum, wenn der Zugang abgelaufen ist.
+  expiredOn: string | null;
+  // PROJ-28: Löschdatum nach einer Rettung durch den Support, sonst null.
+  deletesOn: string | null;
 };
 
-export function PaywallStats({ projectId, portalExpiresAt, daysLeft }: Props) {
+export function PaywallStats({ projectId, portalExpiresAt, daysLeft, expiredOn, deletesOn }: Props) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:gap-6">
       <PortalAccessStat
         projectId={projectId}
         expiresAt={portalExpiresAt}
         daysLeft={daysLeft}
+        expiredOn={expiredOn}
+        deletesOn={deletesOn}
       />
     </div>
   );
@@ -38,34 +45,50 @@ function PortalAccessStat({
   projectId,
   expiresAt,
   daysLeft,
+  expiredOn,
+  deletesOn,
 }: {
   projectId: string;
   expiresAt: string | null;
   daysLeft: number | null;
+  expiredOn: string | null;
+  deletesOn: string | null;
 }) {
+  const expired = expiredOn !== null;
   return (
     <StatCard
       icon={<IconCalendar />}
-      label="NARRAVIT-Projektzugang endet in"
-      value={daysLeft === null ? "—" : `${daysLeft} Tagen`}
+      label={expired ? "NARRAVIT-Projektzugang" : "NARRAVIT-Projektzugang endet in"}
+      value={
+        expired
+          ? `Abgelaufen am ${expiredOn}`
+          : daysLeft === null
+            ? "—"
+            : `${daysLeft} Tagen`
+      }
       hint={
-        daysLeft === null || expiresAt === null
-          ? "Wird nach abgeschlossener Zahlung angezeigt (PROJ-6)"
-          : daysLeft < 30
-            ? "Verlängern Sie jetzt, damit Ihr Zugang ohne Unterbrechung weiterläuft."
-            : "Bezahlt bis " +
-              new Date(expiresAt).toLocaleDateString("de-DE", {
-                day: "2-digit",
-                month: "long",
-                year: "numeric",
-              }) + "."
+        expired
+          ? deletesOn
+            ? `Das Projekt wird am ${deletesOn} gelöscht.`
+            : `${CONTENT_RETENTION_DAYS} Tage nach dem Ablauf wird das Projekt gelöscht.`
+          : daysLeft === null || expiresAt === null
+            ? "Wird nach abgeschlossener Zahlung angezeigt (PROJ-6)"
+            : daysLeft < 30
+              ? "Verlängern Sie jetzt, damit Ihr Zugang ohne Unterbrechung weiterläuft."
+              : "Bezahlt bis " +
+                new Date(expiresAt).toLocaleDateString("de-DE", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                }) + "."
       }
       action={
         <CheckoutButton
           label="Um 12 Monate verlängern — 99 €"
           loadingLabel="Wird vorbereitet …"
           input={{ productType: "renewal", projectId }}
-          disabled={daysLeft === null}
+          disabled={!expired && daysLeft === null}
+          className={expired ? "bg-[#D0BCA6] text-[#0a0909] hover:bg-[#c0ad98]" : undefined}
         />
       }
     />

@@ -23,6 +23,7 @@ SELECT * FROM public.trash_find();
 | `item_type` | `chapter` oder `project` |
 | `item_id` | Die ID für die nächsten Schritte |
 | `title` / `project_title` | Titel des Eintrags und des Projekts |
+| `delete_reason` | `customer` = von einer Person gelöscht, `expired` = automatisch 90 Tage nach dem Ablauf |
 | `deleted_at` | Wann gelöscht wurde |
 | `purge_at` | Ab wann die endgültige Löschung fällig ist |
 | `deleted_by_email` | Wer gelöscht hat (leer, wenn das Konto nicht mehr existiert) |
@@ -55,6 +56,10 @@ SELECT public.trash_restore_project('PROJEKT-ID');
 
 Projekt, Kapitel, Cover, Mitglieder und Rollen kommen zurück. Das Ablaufdatum des Zugangs ändert sich nicht. Kapitel, die schon vorher einzeln gelöscht wurden, bleiben im Papierkorb und lassen sich danach einzeln zurückholen.
 
+**Abgelaufene Projekte:** Das Projekt ist danach im Lesemodus sichtbar. Die Antwort nennt in `holdUntil` das Datum, bis zu dem der automatische Lauf es in Ruhe lässt (14 Tage). Bitte der Person mitteilen, dass sie bis dahin verlängern muss, sonst kommt es wieder in den Papierkorb.
+
+**Projekt ohne Mitglieder** (z. B. nie angenommenes Geschenk): Es meldet `lead_required` und lässt sich so nicht wiederherstellen, weil niemand die Leitung übernehmen kann.
+
 **Fehler `lead_required`:** Die bisherige Projektleitung hat ihr Konto gelöscht. Dann eine verbliebene Person als neue Leitung nennen. Ihre Nutzer-ID steht in der Tabelle `trash_project_members`:
 
 ```sql
@@ -77,10 +82,33 @@ Die Datensätze sind sofort weg, die Dateien entfernt der nächste tägliche Lau
 
 ## 6. Zahlung für ein gelöschtes Projekt
 
-Kommt die Mail „Zahlung für ein gelöschtes Projekt", wurde kurz nach dem Löschen noch eine Verlängerung bezahlt. Die Zahlung ist gebucht.
+Wurde ein Projekt **wegen Ablauf** verschoben und danach bezahlt, kommt es automatisch zurück und es gibt keine Mail.
 
-- **Projekt liegt im Papierkorb:** Mit der Person klären, ob es wiederhergestellt (Abschnitt 4) oder die Zahlung in Stripe erstattet werden soll.
+Kommt die Mail „Zahlung für ein gelöschtes Projekt", konnte das nicht automatisch passieren. Die Zahlung ist gebucht, die Person hat keine Bestätigung bekommen und sollte deshalb eine Antwort von uns erhalten.
+
+- **Projekt liegt im Papierkorb, `delete_reason` ist `customer`:** Jemand hat es selbst gelöscht. Mit der Person klären, ob es wiederhergestellt (Abschnitt 4) oder die Zahlung in Stripe erstattet werden soll. **Bis zum `purge_at` entscheiden**, danach ist es endgültig weg.
+- **Projekt liegt im Papierkorb, `delete_reason` ist `expired`:** Meist fehlt die Projektleitung, weil ihr Konto gelöscht wurde. Mit einer verbliebenen Person als neuer Leitung wiederherstellen (Abschnitt 4). Solange der bezahlte Zugang läuft, löscht der tägliche Lauf dieses Projekt nicht.
 - **Projekt ist endgültig gelöscht:** Die Zahlung in Stripe erstatten. Die Mail nennt diesen Fall ausdrücklich.
+
+## 7. Automatischer Löschlauf angehalten (PROJ-28)
+
+Der tägliche Lauf legt Projekte 90 Tage nach dem Ablauf in den Papierkorb. Sind mehr als 50 fällig, verschiebt er **kein einziges** und schickt die Mail „Automatischer Löschlauf angehalten". Das kann ein Fehler sein, zum Beispiel falsche Ablaufdaten.
+
+1. Fällige Projekte ansehen. Die Liste zeigt nur IDs und Daten:
+
+```sql
+SELECT * FROM public.retention_due();
+```
+
+2. Prüfen, ob die Daten stimmen. **Im Zweifel nichts freigeben.** Der Lauf versucht es jeden Tag neu und löscht nichts, solange die Bremse greift.
+
+3. Stimmen die Daten, den Lauf **einmalig** freigeben. Die Zahl muss genau der Anzahl aus Schritt 1 entsprechen:
+
+```sql
+SELECT public.retention_move_due(73);
+```
+
+Hat sich die Anzahl inzwischen geändert, passiert nichts und die Antwort zeigt `braked: true` mit der neuen Zahl. Bei Erfolg steht in `moved`, wie viele Projekte im Papierkorb liegen. Sie lassen sich 14 Tage lang wiederherstellen (Abschnitt 4).
 
 ## Fehlermeldungen
 
@@ -90,3 +118,4 @@ Kommt die Mail „Zahlung für ein gelöschtes Projekt", wurde kurz nach dem Lö
 | `project_in_trash` | Das Kapitel gehört zu einem gelöschten Projekt. Zuerst das Projekt wiederherstellen |
 | `lead_required` | Es gibt keine Projektleitung mehr, siehe Abschnitt 4 |
 | `lead_not_member` | Die genannte Person war nicht Mitglied des Projekts |
+| `invalid_confirmation` | Die Zahl für die Freigabe muss mindestens 1 sein, siehe Abschnitt 7 |

@@ -49,11 +49,14 @@ export function ImageSection({
   onChange,
   onUpload,
   onDelete,
+  readOnly = false,
 }: {
   data: ImageSectionData;
   onChange: (next: ImageSectionData) => void;
   onUpload: (img: UploadedImage) => Promise<ChapterImage>;
   onDelete: (image: ChapterImage) => Promise<void>;
+  // PROJ-28: Bilder bleiben sichtbar, ohne Bedienelemente.
+  readOnly?: boolean;
 }) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<ChapterImage | null>(null);
@@ -152,7 +155,7 @@ export function ImageSection({
       {/* Controls erscheinen nur wenn Bilder da sind UND auf Hover.
        * Hover-Bridge + Delay-on-Leave verhindert, dass das Menu beim
        * Cursor-Übergang vom Bild zu den Buttons zu früh verschwindet. */}
-      {hasImages && (
+      {hasImages && !readOnly && (
         <>
           <div
             className="absolute -top-8 left-0 right-0 h-8 z-[5]"
@@ -193,17 +196,19 @@ export function ImageSection({
         <button
           type="button"
           onClick={() => setUploadOpen(true)}
+          disabled={readOnly}
           aria-label="Bild hinzufügen"
-          className="image-section-empty"
+          className={cn("image-section-empty", readOnly && "cursor-not-allowed opacity-40")}
           data-paginate-row
         >
           <ImagePlus className="h-3.5 w-3.5" />
           Bild hinzufügen
         </button>
-      ) : !mounted ? (
+      ) : !mounted || readOnly ? (
         // Pre-Hydration: Static-Render der Image-Slots ohne DnD-Attribute.
         // Verhindert Hydration-Mismatch durch @dnd-kit's globalen
         // aria-describedby-Counter, der SSR ↔ Client divergieren kann.
+        // PROJ-28: Der Lesemodus nutzt dieselbe Ansicht ohne Verschieben.
         <>
           {rows.map((row, rowIdx) => (
             <div

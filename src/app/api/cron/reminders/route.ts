@@ -11,6 +11,7 @@ import {
   processStorageCleanup,
   type StorageCleanupResult,
 } from "@/lib/projects/storage-cleanup";
+import { moveExpiredProjectsToTrash, type RetentionResult } from "@/lib/projects/retention";
 import { purgeDueTrash, type TrashPurgeResult } from "@/lib/projects/trash";
 
 // PROJ-11 — Reminder-Cron.
@@ -32,10 +33,13 @@ import { purgeDueTrash, type TrashPurgeResult } from "@/lib/projects/trash";
 //   4. Vorher: gescheiterte Kauf- und Einladungs-Mails nachholen (BUG-13)
 //      und Dateien gelöschter Projekte aus dem Speicher entfernen (PROJ-3).
 //      Fällige Inhalte aus dem Papierkorb werden davor endgültig gelöscht,
-//      damit ihre Dateien im selben Lauf verschwinden (PROJ-26).
+//      damit ihre Dateien im selben Lauf verschwinden (PROJ-26). Noch davor
+//      kommen Projekte, die seit 90 Tagen abgelaufen sind, in den Papierkorb
+//      (PROJ-28).
 //
 // Antwort: JSON mit `processed`, `sent`, `skipped`, `mailRetries`,
-// `trashPurge`, `storageCleanup` und `chapterStorageCleanup` für Monitoring.
+// `retention`, `trashPurge`, `storageCleanup` und `chapterStorageCleanup`
+// für Monitoring.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -115,6 +119,15 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error(
       `[cron/reminders] mail retry failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  let retention: RetentionResult = { due: 0, moved: 0, skipped: 0, failed: 0, braked: false };
+  try {
+    retention = await moveExpiredProjectsToTrash();
+  } catch (err) {
+    console.error(
+      `[cron/reminders] retention failed: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 
@@ -236,6 +249,7 @@ export async function GET(req: NextRequest) {
     sent,
     skipped,
     mailRetries,
+    retention,
     trashPurge,
     storageCleanup,
     chapterStorageCleanup,

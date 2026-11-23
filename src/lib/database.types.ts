@@ -339,18 +339,42 @@ export type Database = {
           deleted_by: string | null
           project_id: string
           purge_at: string
+          reason: string
         }
         Insert: {
           deleted_at?: string
           deleted_by?: string | null
           project_id: string
           purge_at?: string
+          reason?: string
         }
         Update: {
           deleted_at?: string
           deleted_by?: string | null
           project_id?: string
           purge_at?: string
+          reason?: string
+        }
+        Relationships: []
+      }
+      project_retention_holds: {
+        Row: {
+          created_at: string
+          hold_until: string
+          project_id: string
+          reason: string
+        }
+        Insert: {
+          created_at?: string
+          hold_until: string
+          project_id: string
+          reason: string
+        }
+        Update: {
+          created_at?: string
+          hold_until?: string
+          project_id?: string
+          reason?: string
         }
         Relationships: []
       }
@@ -763,12 +787,23 @@ export type Database = {
         }
         Returns: Json
       }
+      retention_due: {
+        Args: { p_project_id?: string | null }
+        Returns: {
+          delete_due_at: string
+          expires_at: string
+          project_id: string
+        }[]
+      }
+      retention_move_due: { Args: { p_confirm_count?: number | null }; Returns: Json }
+      retention_restore_paid: { Args: { p_project_id: string }; Returns: Json }
       trash_delete_chapter_now: { Args: { p_chapter_id: string }; Returns: Json }
       trash_delete_project_now: { Args: { p_project_id: string }; Returns: Json }
       trash_find: {
         Args: { p_search?: string | null }
         Returns: {
           contributor_emails: string | null
+          delete_reason: string
           deleted_at: string
           deleted_by_email: string | null
           item_id: string

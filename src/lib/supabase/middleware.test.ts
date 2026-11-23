@@ -38,10 +38,11 @@ beforeEach(() => {
   ];
 });
 
-describe("Ablauf pro Projekt", () => {
-  it("sperrt das abgelaufene Projekt, auch wenn ein anderes aktiv ist", async () => {
-    const res = await visit(`/projektuebersicht/${EXPIRED}/kapiteleditor/x`);
-    expect(target(res)).toBe(`https://app.test/zugang-abgelaufen?project=${EXPIRED}`);
+describe("Ablauf pro Projekt (PROJ-28: Lesemodus statt Umleitung)", () => {
+  it("lässt das abgelaufene Projekt mit allen Unterseiten durch", async () => {
+    expect(target(await visit(`/projektuebersicht/${EXPIRED}`))).toBeNull();
+    expect(target(await visit(`/projektuebersicht/${EXPIRED}/kapiteleditor/x`))).toBeNull();
+    expect(target(await visit(`/projektuebersicht/${EXPIRED}/cover-bearbeiten`))).toBeNull();
   });
 
   it("lässt das aktive Projekt und die Startseite durch", async () => {
@@ -49,17 +50,18 @@ describe("Ablauf pro Projekt", () => {
     expect(target(await visit("/"))).toBeNull();
   });
 
-  it("Abbruch im Checkout: der Hinweis bleibt in der Umleitung erhalten", async () => {
-    const res = await visit(`/projektuebersicht/${EXPIRED}?checkout=cancelled`);
-    const url = new URL(target(res)!);
-    expect(url.pathname).toBe("/zugang-abgelaufen");
-    expect(url.searchParams.get("checkout")).toBe("cancelled");
-    expect(url.searchParams.get("project")).toBe(EXPIRED);
+  it("Abbruch im Checkout: die Person bleibt in der Projektübersicht", async () => {
+    expect(target(await visit(`/projektuebersicht/${EXPIRED}?checkout=cancelled`))).toBeNull();
   });
 
-  it("alle Projekte abgelaufen: Startseite führt zur Verlängerung", async () => {
+  it("alle Projekte abgelaufen: die Startseite bleibt erreichbar", async () => {
     state.rows = [{ project_id: EXPIRED, expires_at: past() }];
-    expect(target(await visit("/"))).toBe("https://app.test/zugang-abgelaufen");
+    expect(target(await visit("/"))).toBeNull();
+  });
+
+  it("noch nie bezahlt: weiter zum Einlösen", async () => {
+    state.rows = [];
+    expect(target(await visit("/"))).toBe("https://app.test/kauf-einloesen");
   });
 
   it("der Link aus der Kauf-Mail ist ohne Anmeldung erreichbar", async () => {
@@ -67,8 +69,8 @@ describe("Ablauf pro Projekt", () => {
     expect(target(await visit("/kauf-zuordnen?code=x&ziel=anmelden"))).toBeNull();
   });
 
-  it("die Seite zur Verlängerung selbst bleibt erreichbar", async () => {
-    state.rows = [{ project_id: EXPIRED, expires_at: past() }];
-    expect(target(await visit(`/zugang-abgelaufen?project=${EXPIRED}`))).toBeNull();
+  it("die alte Abgelaufen-Seite verlangt eine Anmeldung", async () => {
+    state.user = null;
+    expect(target(await visit("/zugang-abgelaufen"))).toBe("https://app.test/anmelden");
   });
 });

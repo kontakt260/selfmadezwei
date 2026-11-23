@@ -6,6 +6,9 @@ import { Navbar } from "@/components/Navbar";
 import { ChapterListSection } from "@/components/projektuebersicht/ChapterListSection";
 import { PaywallStats } from "@/components/projektuebersicht/PaywallStats";
 import { daysUntil } from "@/lib/dates";
+import { formatGermanDate } from "@/lib/email/format";
+import { accessResultIsReadOnly } from "@/lib/projects/project-access";
+import { getRetentionHoldUntil } from "@/lib/projects/trash";
 import { ProjectUsersSection } from "@/components/projektuebersicht/ProjectUsersSection";
 import type { MemberDisplay } from "@/components/projektuebersicht/ProjectUsersClient";
 import { CheckoutCancelToast } from "@/components/CheckoutCancelToast";
@@ -119,7 +122,7 @@ export default async function ProjektuebersichtPage({
   const [
     { data: project },
     { data: membership },
-    { data: accessRow },
+    accessResult,
     { data: coverRow },
   ] = await Promise.all([
     supabase.from("projects").select("id, title").eq("id", project_id).single(),
@@ -143,6 +146,7 @@ export default async function ProjektuebersichtPage({
 
   // project not found OR user is not a member → 404 (avoids leaking project existence)
   if (!project || !membership) notFound();
+  const accessRow = accessResult.data;
 
   // PROJ-10: Cover-Daten in CoverData übersetzen + signed URL erzeugen.
   const coverRaw: CoverRowRaw | null = coverRow
@@ -183,6 +187,14 @@ export default async function ProjektuebersichtPage({
   // (sonst Hydration-Abweichung, wenn Server und Client um Mitternacht
   // unterschiedliche Tage sehen).
   const portalDaysLeft = portalExpiresAt === null ? null : daysUntil(portalExpiresAt);
+
+  // PROJ-28: Der Lesemodus hängt am echten Ablaufdatum, nicht am Erstkauf.
+  const readOnly = accessResultIsReadOnly(accessResult);
+  const expiredOn =
+    readOnly && accessRow?.expires_at ? formatGermanDate(accessRow.expires_at) : null;
+  // Nach einer Rettung durch den Support gilt die Schonfrist statt der 90 Tage.
+  const holdUntil = expiredOn ? await getRetentionHoldUntil(project_id) : null;
+  const deletesOn = holdUntil ? formatGermanDate(holdUntil) : null;
 
   const { data: rawChapters } = await supabase
     .from("chapters")
@@ -267,7 +279,7 @@ export default async function ProjektuebersichtPage({
               {project.title}
             </h1>
             <p className="text-lg leading-8 text-[#535252] sm:text-xl sm:leading-9">
-              Projekt bearbeiten und verwalten
+              {readOnly ? "Projekt ansehen und verwalten" : "Projekt bearbeiten und verwalten"}
             </p>
           </header>
 
@@ -275,7 +287,7 @@ export default async function ProjektuebersichtPage({
           <SectionShell>
             <div className="flex flex-col gap-10 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-10">
               <div className="flex min-w-0 flex-col gap-3 sm:gap-4">
-                <SectionHeader icon={<IconEye />} title="Cover bearbeiten" />
+                <SectionHeader icon={<IconEye />} title={readOnly ? "Cover ansehen" : "Cover bearbeiten"} />
                 <Link
                   href={`/projektuebersicht/${project_id}/cover-bearbeiten`}
                   className="group flex flex-col items-stretch gap-4 bg-[#FAF8F6] p-5 transition-colors hover:bg-[#f5f3ee] sm:flex-row sm:items-center sm:gap-6 sm:p-7"
@@ -286,8 +298,9 @@ export default async function ProjektuebersichtPage({
                   </div>
                   <div className="flex min-w-0 flex-1 flex-col gap-3">
                     <p className="text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
-                      Gestalten Sie die Vorderseite Ihres Buches: Titel,
-                      Untertitel, Foto, Muster und Farbe.
+                      {readOnly
+                        ? "Die Vorderseite Ihres Buches auf dem letzten Stand."
+                        : "Gestalten Sie die Vorderseite Ihres Buches: Titel, Untertitel, Foto, Muster und Farbe."}
                     </p>
                     <span className="inline-flex h-12 w-fit items-center justify-center bg-[#D0BCA6] px-5 text-lg font-bold leading-6 text-[#0a0909] transition-colors group-hover:bg-[#c0ad98]">
                       Cover öffnen
@@ -311,6 +324,7 @@ export default async function ProjektuebersichtPage({
             <ChapterListSection
               projectId={project_id}
               initialChapters={chapters}
+              readOnly={readOnly}
               impulses={impulses}
               addChapterAction={addChapterAction}
               addImpulseChapterAction={addImpulseChapterAction}
@@ -325,6 +339,8 @@ export default async function ProjektuebersichtPage({
             projectId={project_id}
             portalExpiresAt={portalExpiresAt}
             daysLeft={portalDaysLeft}
+            expiredOn={expiredOn}
+            deletesOn={deletesOn}
           />
 
           {/* PROJ-9: Mitgliederverwaltung */}
@@ -332,6 +348,7 @@ export default async function ProjektuebersichtPage({
             projectId={project_id}
             members={members}
             myRole={membership.role}
+            readOnly={readOnly}
           />
 
         </div>

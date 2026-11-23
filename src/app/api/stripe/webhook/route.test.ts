@@ -93,6 +93,7 @@ type FakeRows = {
 let fakeDb: FakeRows;
 let failNextAccessWrite = false;
 let failNextPaymentReference = false;
+let failNextRestore = false;
 
 // Builder, der sowohl direkt-awaitbar ist als auch .select().single()
 // unterstützt. Push passiert genau einmal — entweder im `then` der
@@ -132,6 +133,18 @@ function makeInsertBuilder(table: keyof FakeRows, row: Record<string, unknown> |
 }
 
 const supabaseMock = {
+  // PROJ-28: Eine Zahlung holt wegen Ablauf verschobene Projekte zurück.
+  rpc: async (_name: string, args: { p_project_id: string }) => {
+    if (failNextRestore) {
+      failNextRestore = false;
+      return { data: null, error: { message: "db down" } };
+    }
+    const entry = fakeDb.trash_projects.find((row) => row.project_id === args.p_project_id);
+    if (!entry) return { data: { status: "not_in_trash" }, error: null };
+    if (entry.reason !== "expired") return { data: { status: "deleted_by_customer" }, error: null };
+    fakeDb.trash_projects = fakeDb.trash_projects.filter((row) => row !== entry);
+    return { data: { status: "restored" }, error: null };
+  },
   from: (table: keyof FakeRows) => ({
     select: (_cols: string) => ({
       eq: (col: string, val: unknown) => ({
@@ -574,6 +587,82 @@ describe("Stripe webhook — purchase mails (PROJ-11)", () => {
     expect(fakeDb.payments).toHaveLength(1);
     expect(sendDeletedProjectAlertMock).toHaveBeenCalledTimes(1);
     expect(sendDeletedProjectAlertMock.mock.calls[0][0]).toMatchObject({ projectId: "proj-1" });
+    expect(fakeDb.trash_projects).toHaveLength(1);
+    expect(sendRenewalMailMock).not.toHaveBeenCalled();
+  });
+
+  it("renewal for a project moved because it expired brings it back (PROJ-28 BUG-2)", async () => {
+    fakeDb.trash_projects.push({ project_id: "proj-1", reason: "expired" });
+    fakeDb.project_access.push({
+      project_id: "proj-1",
+      expires_at: new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: makeSession({
+          metadata: { product_type: "renewal", user_id: "user-1", project_id: "proj-1" },
+          amount_total: 9900,
+        }),
+      },
+    });
+
+    const res = await callPost("body", "valid-sig");
+
+    expect(res.status).toBe(200);
+    expect(fakeDb.payments).toHaveLength(1);
+    expect(fakeDb.trash_projects).toHaveLength(0);
+    expect(new Date(fakeDb.project_access[0].expires_at as string).getTime()).toBeGreaterThan(Date.now());
+    expect(sendDeletedProjectAlertMock).not.toHaveBeenCalled();
+    expect(sendRenewalMailMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells support when the restore fails for a project in the trash (PROJ-28 BUG-2)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    failNextRestore = true;
+    fakeDb.trash_projects.push({ project_id: "proj-1", reason: "expired" });
+    fakeDb.project_access.push({
+      project_id: "proj-1",
+      expires_at: new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: makeSession({
+          metadata: { product_type: "renewal", user_id: "user-1", project_id: "proj-1" },
+          amount_total: 9900,
+        }),
+      },
+    });
+
+    const res = await callPost("body", "valid-sig");
+
+    expect(res.status).toBe(200);
+    expect(fakeDb.payments).toHaveLength(1);
+    expect(sendDeletedProjectAlertMock).toHaveBeenCalledTimes(1);
+    expect(sendRenewalMailMock).not.toHaveBeenCalled();
+  });
+
+  it("a failed check on a normal project still confirms the renewal (PROJ-28)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    failNextRestore = true;
+    fakeDb.project_access.push({
+      project_id: "proj-1",
+      expires_at: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: makeSession({
+          metadata: { product_type: "renewal", user_id: "user-1", project_id: "proj-1" },
+          amount_total: 9900,
+        }),
+      },
+    });
+
+    await callPost("body", "valid-sig");
+
+    expect(sendDeletedProjectAlertMock).not.toHaveBeenCalled();
     expect(sendRenewalMailMock).toHaveBeenCalledTimes(1);
   });
 
