@@ -230,6 +230,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] **PROJ-29 Webflow-Seite:** auf `narravit.de` und `www.narravit.de` veröffentlichen. Schriften lokal hosten, sie laden derzeit extern von Google (`fonts.googleapis.com`, `ajax.googleapis.com`). Cookie-Banner nur nötig, wenn Tracking oder Marketing dazukommt, dann vor dem Laden einwilligen lassen. Meta-Beschreibungen ergänzen, „per Telefon" in der Startseiten-Beschreibung ersetzen, Open-Graph-Bilder und strukturierte Daten setzen, die Seite „Not live" aus der Sitemap nehmen.
 - [ ] **PROJ-22 Druck-Karte (Jakob, 2026-11-23):** Die Karte „Buch in den Druck geben" in der Projektübersicht ist bis PROJ-16 ein Platzhalter mit gesperrten Buttons. Sie darf so nicht live gehen: Vor dem Go-live ist PROJ-16 fertig, oder die Karte wird für Production ausgeblendet.
 - [ ] **PROJ-22 in Safari und Firefox ansehen:** Automatisiert ist das neue Design nur in Chromium geprüft, WebKit startet auf dem Entwicklungs-Mac nicht. Startseite, Projektübersicht und Persönlichen Bereich vor dem Go-live einmal in beiden Browsern und auf einem echten iPad öffnen.
+- [ ] **PROJ-24 in Safari und Firefox ansehen:** Das Onboarding ist automatisiert nur in Chromium geprüft. Vor dem Go-live alle Schritte in beiden Browsern durchgehen, vor allem die Handynummer und die Rückkehr nach einem Stripe-Abbruch.
 - [ ] **Interne Kennungen in Kundentexten entfernen:** In der Projektübersicht stehen noch „(PROJ-12)" bei „Erzählen per Sprachnachricht" und „(PROJ-6)" beim Projektzugang vor der ersten Zahlung. Beide Texte vor dem Go-live ersetzen.
 - [ ] **PROJ-24 und PROJ-12 nur gemeinsam live:** Das neue Onboarding fragt Kontaktdaten für Erzähl-Impulse ab. Ohne den Versand aus PROJ-12 würde es Nachrichten versprechen, die nie ankommen. Migration `20261123120000_proj24_narration.sql` in Production vor dem Code-Deploy einspielen.
 - [ ] **Stripe-Produkt prüfen (PROJ-24):** Produktname und Beschreibung im Stripe-Testmodus und im Live-Modus müssen das erste gedruckte Hardcover-Buch nennen, weil sie auf Checkout und Rechnung erscheinen.
@@ -269,6 +270,7 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
+| 2026-11-23 | PROJ-24 Approved: echter Stripe-Testkauf auf Stage bestanden. Offen vor dem Go-live: Prüfung in Safari und Firefox. |
 | 2026-11-23 | PROJ-24 QA-Fixes: Migration `20261123130000_proj24_gift_email_draft.sql`, auf Stage und Production jeweils vor dem Code-Deploy einspielen. Die E-Mail der beschenkten Person geht nicht mehr an Stripe. Keine neuen Env-Werte, keine neuen Stripe-Events. |
 | 2026-11-23 | PROJ-24 Backend: Migration `20261123120000_proj24_narration.sql`, auf Stage und Production jeweils vor dem Code-Deploy einspielen. Keine neuen Env-Werte, keine neuen Stripe-Events. |
 | 2026-11-23 | PROJ-30: Vercel-Funktionen per `vercel.json` von `iad1` nach `fra1` verlegt, zuerst nur auf Stage. |

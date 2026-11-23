@@ -381,7 +381,6 @@ function InitialGiftPhoneComputerContent({
         <span className="font-semibold">
           {recipientEmail || "die angegebene Adresse"}
         </span>
-        . Das Geschenk bleibt gültig, solange der Projektzugang läuft.
       </p>
       <p className="text-base leading-7 text-[#535252]">
         {buyerRetainsAccess ? (

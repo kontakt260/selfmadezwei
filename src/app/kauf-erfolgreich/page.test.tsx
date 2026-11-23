@@ -88,7 +88,8 @@ describe("/kauf-erfolgreich — Geschenk mit eigenem Zugang", () => {
     const { container } = await show();
     const text = container.textContent ?? "";
     expect(text).toContain("Wir haben das Geschenk versendet — sobald die beschenkte Person es empfängt");
-    expect(text).toContain("Geschenk-Mail unterwegs an oma@example.com. Das Geschenk bleibt gültig, solange der Projektzugang läuft.");
+    expect(text).toContain("Geschenk-Mail unterwegs an oma@example.com");
+    expect(text).not.toContain("bleibt gültig");
     expect(text).toContain("mitschreiben, die Geschichten lesen & das Projekt verwalten");
     expect(text).not.toMatch(/Einladung/);
     expect(screen.getByRole("link", { name: "Zum Projekt" })).toBeTruthy();

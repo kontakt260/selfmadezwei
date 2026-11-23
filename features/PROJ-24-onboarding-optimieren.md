@@ -1,6 +1,6 @@
 # PROJ-24: Onboarding optimieren
 
-## Status: In Review
+## Status: Approved
 **Created:** 2026-11-23
 **Last Updated:** 2026-11-23
 **Freigabe:** Von Jakob am 2026-11-23 freigegeben.
@@ -276,7 +276,11 @@ Geprüft werden alle sechs Kombinationen aus Weg und Erzähl-Impulsen, bezahlte 
 **App URL:** http://localhost:3000 (Production-Build gegen die Stage-Datenbank)
 **Tester:** QA Engineer (AI)
 **Browser:** nur Chromium. WebKit startet auf diesem Mac nicht, der Playwright-Firefox ist nicht installiert.
-**Nicht geprüft:** ein echter Kauf über die Stripe-Seite. Zahlungen wurden als signierte Webhook-Events gegen den lokalen Server simuliert. Der echte Testkauf braucht den Code auf Stage.
+**Echter Testkauf:** Jakob hat am 2026-11-23 auf Stage ein Geschenk „Auch am Computer" mit der Stripe-Testkarte gekauft. Zahlung, Einladung und Erzähl-Einstellungen stimmen, die Kauf-Vorbereitung ist gelöscht, die Mail kam an. Die übrigen Kaufwege wurden mit signierten Webhook-Events gegen Stage geprüft.
+
+**Nach dem Testkauf geändert (Jakob):** Der Satz „Das Geschenk bleibt gültig, solange der Projektzugang läuft." ist von der Geschenk-Bestätigung entfernt.
+
+**Nicht geprüft:** Safari und Firefox, steht als Punkt in `docs/production/prod-umzug.md`.
 
 ### Acceptance Criteria Status
 
@@ -372,5 +376,5 @@ Geprüft werden alle sechs Kombinationen aus Weg und Erzähl-Impulsen, bezahlte 
 - **Acceptance Criteria:** 29/29 passed
 - **Bugs Found:** 5 total (0 critical, 1 high, 2 medium, 2 low), alle behoben
 - **Security:** Pass
-- **Production Ready:** Noch nicht. Es fehlen ein echter Stripe-Testkauf auf Stage und die Prüfung in Safari und Firefox. Live geht PROJ-24 außerdem nur zusammen mit PROJ-12
-- **Recommendation:** Auf Stage bringen, echten Stripe-Testkauf machen, danach Status Approved
+- **Production Ready:** Ja für Stage, keine offenen Critical- oder High-Bugs. Vor dem Go-live fehlt die Prüfung in Safari und Firefox, live geht PROJ-24 nur zusammen mit PROJ-12
+- **Recommendation:** Approved. Mit PROJ-12 gemeinsam live nehmen
