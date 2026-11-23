@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
+import { assertLoaded, isUuid } from "@/lib/supabase/page-data";
 import { createClient } from "@/lib/supabase/server";
 import { Navbar } from "@/components/Navbar";
 import { ChapterListSection } from "@/components/projektuebersicht/ChapterListSection";
@@ -99,6 +100,7 @@ export default async function ProjektuebersichtPage({
   params: Promise<{ project_id: string }>;
 }) {
   const { project_id } = await params;
+  if (!isUuid(project_id)) notFound();
 
   const supabase = await createClient();
   const {
@@ -106,25 +108,27 @@ export default async function ProjektuebersichtPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/anmelden");
 
-  // Fetch project + user membership + paywall-state + cover in one go.
-  // PROJ-6: expires_at liegt jetzt in `project_access` (RLS-SELECT-Policy
-  // erlaubt nur Mitgliedern den Lesezugriff — kein client-seitiges
-  // UPDATE möglich, nur der Stripe-Webhook über service_role schreibt).
-  // PROJ-10: project_covers wird mitgeladen, damit die "Cover bearbeiten"-
-  // Karte direkt eine Vorschau zeigt (gilt auch für Default-Cover ohne Row).
+  // PROJ-30: Alles, was nicht voneinander abhängt, läuft gleichzeitig. RLS
+  // filtert jede Abfrage selbst, ausgegeben wird erst nach der Mitgliedsprüfung.
+  // PROJ-6: expires_at liegt in `project_access`, nur der Stripe-Webhook schreibt.
+  // PROJ-8: Der Impuls-Katalog kommt mit, damit das Modal ohne Roundtrip öffnet.
   const [
-    { data: project },
-    { data: membership },
+    projectResult,
+    membershipResult,
     accessResult,
-    { data: coverRow },
+    coverResult,
+    paymentsResult,
+    chaptersResult,
+    impulsesResult,
+    membersResult,
   ] = await Promise.all([
-    supabase.from("projects").select("id, title").eq("id", project_id).single(),
+    supabase.from("projects").select("id, title").eq("id", project_id).maybeSingle(),
     supabase
       .from("project_members")
       .select("role")
       .eq("project_id", project_id)
       .eq("user_id", user.id)
-      .single(),
+      .maybeSingle(),
     supabase
       .from("project_access")
       .select("expires_at")
@@ -135,13 +139,71 @@ export default async function ProjektuebersichtPage({
       .select("image_url, theme, metadata")
       .eq("project_id", project_id)
       .maybeSingle(),
+    // Ablaufdatum nur anzeigen, wenn der Zugang wirklich bezahlt wurde.
+    supabase
+      .from("payments")
+      .select("type, status")
+      .eq("project_id", project_id)
+      .eq("status", "completed")
+      .eq("type", "initial_portal_access")
+      .limit(1),
+    // PROJ-30: Ohne `body`, die Wortzahl ist gespeichert.
+    supabase
+      .from("chapters")
+      .select("id, title, chapter_origin, word_count, sort_order, page_count")
+      .eq("project_id", project_id)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("impulse_catalog")
+      .select("id, title, category, leading_questions")
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("project_members")
+      .select("id, user_id, role")
+      .eq("project_id", project_id)
+      .order("created_at", { ascending: true }),
   ]);
 
+  assertLoaded(projectResult, membershipResult, coverResult, chaptersResult, membersResult);
+  const project = projectResult.data;
   // project not found OR user is not a member → 404 (avoids leaking project existence)
-  if (!project || !membership) notFound();
+  if (!project || !membershipResult.data) notFound();
+  const membership = membershipResult.data;
   const accessRow = accessResult.data;
+  const coverRow = coverResult.data;
+  const rawChapters = chaptersResult.data ?? [];
+  const rawMembers = membersResult.data ?? [];
 
-  // PROJ-10: Cover-Daten in CoverData übersetzen + signed URL erzeugen.
+  // PROJ-28: Der Lesemodus hängt am echten Ablaufdatum, nicht am Erstkauf.
+  const readOnly = accessResultIsReadOnly(accessResult);
+  const expiredOn =
+    readOnly && accessRow?.expires_at ? formatGermanDate(accessRow.expires_at) : null;
+
+  // Zweite Runde: alles, was die Ergebnisse der ersten braucht.
+  const uncountedIds = rawChapters.filter((c) => c.word_count === null).map((c) => c.id);
+  const [signedCover, profilesResult, holdUntil, uncountedResult] = await Promise.all([
+    coverRow?.image_url
+      ? supabase.storage.from("project-covers").createSignedUrl(coverRow.image_url, 60 * 60)
+      : null,
+    rawMembers.length > 0
+      ? supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .in(
+            "id",
+            rawMembers.map((m) => m.user_id),
+          )
+      : null,
+    // Nach einer Rettung durch den Support gilt die Schonfrist statt der 90 Tage.
+    expiredOn ? getRetentionHoldUntil(project_id) : null,
+    // PROJ-30: Nur Kapitel ohne gespeicherte Zahl werden noch live gezählt.
+    uncountedIds.length > 0
+      ? supabase.from("chapters").select("id, body").in("id", uncountedIds).not("body", "is", null)
+      : null,
+  ]);
+  assertLoaded(profilesResult, uncountedResult);
+
+  // PROJ-10: Cover-Daten in CoverData übersetzen.
   const coverRaw: CoverRowRaw | null = coverRow
     ? {
         image_url: coverRow.image_url,
@@ -149,114 +211,63 @@ export default async function ProjektuebersichtPage({
         metadata: (coverRow.metadata as CoverRowRaw["metadata"]) ?? null,
       }
     : null;
-  let coverSignedUrl: string | null = null;
-  if (coverRaw?.image_url) {
-    const { data: signed } = await supabase.storage
-      .from("project-covers")
-      .createSignedUrl(coverRaw.image_url, 60 * 60);
-    coverSignedUrl = signed?.signedUrl ?? null;
-  }
   const coverData: CoverData = {
     title: project.title,
     subtitle: coverRaw?.metadata?.subtitle ?? "",
     authorLine: coverRaw?.metadata?.author_line ?? "",
     themeId: coverRaw?.theme ?? DEFAULT_THEME_ID,
     colorId: coverRaw?.metadata?.background_color ?? DEFAULT_COLOR_ID,
-    imageUrl: coverSignedUrl,
+    imageUrl: signedCover?.data?.signedUrl ?? null,
   };
 
-  // Ablaufdatum nur anzeigen, wenn das Projekt einen erfolgreich
-  // abgeschlossenen initial_portal_access-Payment hat (= Zugang aktiviert).
-  const { data: payments } = await supabase
-    .from("payments")
-    .select("type, status")
-    .eq("project_id", project_id)
-    .eq("status", "completed")
-    .eq("type", "initial_portal_access")
-    .limit(1);
-  const hasInitialPayment = (payments ?? []).length > 0;
+  const hasInitialPayment = (paymentsResult.data ?? []).length > 0;
   const portalExpiresAt = hasInitialPayment ? accessRow?.expires_at ?? null : null;
   // Restlaufzeit serverseitig berechnen: die Client-Karte liest keine Uhr
   // (sonst Hydration-Abweichung, wenn Server und Client um Mitternacht
   // unterschiedliche Tage sehen).
   const portalDaysLeft = portalExpiresAt === null ? null : daysUntil(portalExpiresAt);
-
-  // PROJ-28: Der Lesemodus hängt am echten Ablaufdatum, nicht am Erstkauf.
-  const readOnly = accessResultIsReadOnly(accessResult);
-  const expiredOn =
-    readOnly && accessRow?.expires_at ? formatGermanDate(accessRow.expires_at) : null;
-  // Nach einer Rettung durch den Support gilt die Schonfrist statt der 90 Tage.
-  const holdUntil = expiredOn ? await getRetentionHoldUntil(project_id) : null;
   const deletesOn = holdUntil ? formatGermanDate(holdUntil) : null;
 
-  const { data: rawChapters } = await supabase
-    .from("chapters")
-    .select("id, title, chapter_origin, body, sort_order, page_count")
-    .eq("project_id", project_id)
-    .order("sort_order", { ascending: true });
-
-  const chapters: Chapter[] = (rawChapters ?? []).map((c) => ({
+  const liveWordCounts = new Map(
+    (uncountedResult?.data ?? []).map((row) => [row.id, countWordsFromBody(row.body)]),
+  );
+  const chapters: Chapter[] = rawChapters.map((c) => ({
     id: c.id,
     title: c.title,
     source: c.chapter_origin === "catalog_impulse" ? "Erzähl-Impuls" : "Eigenes Kapitel",
-    words: countWordsFromBody(c.body),
+    words: c.word_count ?? liveWordCounts.get(c.id) ?? 0,
   }));
   // PROJ-22: Kennzahlen für Cover-Karte und Druck-Karte.
   const chapterCount = chapters.length;
-  const pageCount = (rawChapters ?? []).reduce((sum, c) => sum + c.page_count, 0);
+  const pageCount = rawChapters.reduce((sum, c) => sum + c.page_count, 0);
   const openChapterCount = chapters.filter((c) => c.words === 0).length;
   const bookSummary =
     chapterCount === 0
       ? "Noch keine Kapitel"
       : `${chapterCount} Kapitel, ${pageCount === 1 ? "1 Seite" : `${pageCount} Seiten`} im A5-Format`;
 
-  // PROJ-8: Erzähl-Impuls-Katalog für das Shuffle-Modal. RLS erlaubt
-  // SELECT für authenticated; jeder Nutzer sieht den vollständigen Katalog.
-  // Wir reichen den Katalog als Prop an die Client-Komponente — kein
-  // Roundtrip beim Öffnen des Modals.
-  const { data: rawImpulses } = await supabase
-    .from("impulse_catalog")
-    .select("id, title, category, leading_questions")
-    .order("sort_order", { ascending: true });
-
-  const impulses = (rawImpulses ?? []).map((i) => ({
+  const impulses = (impulsesResult.data ?? []).map((i) => ({
     id: i.id,
     title: i.title,
     category: i.category,
     leading_questions: i.leading_questions ?? [],
   }));
 
-  // PROJ-9: Mitglieder + Profile parallel laden. RLS lässt nur Mitglieder
-  // ihres eigenen Projekts sehen — kein zusätzlicher Filter nötig.
-  const { data: rawMembers } = await supabase
-    .from("project_members")
-    .select("id, user_id, role")
-    .eq("project_id", project_id)
-    .order("created_at", { ascending: true });
-
-  let members: MemberDisplay[] = [];
-  if (rawMembers && rawMembers.length > 0) {
-    const memberUserIds = rawMembers.map((m) => m.user_id);
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, full_name, email")
-      .in("id", memberUserIds);
-    const profileMap = new Map<string, { full_name: string | null; email: string | null }>();
-    (profiles ?? []).forEach((p) => {
-      profileMap.set(p.id, { full_name: p.full_name, email: p.email });
-    });
-    members = rawMembers.map((m) => {
-      const p = profileMap.get(m.user_id);
-      return {
-        memberId: m.id,
-        userId: m.user_id,
-        fullName: p?.full_name ?? "",
-        email: p?.email ?? "",
-        role: m.role,
-        isMe: m.user_id === user.id,
-      };
-    });
-  }
+  // PROJ-9: RLS lässt nur Mitglieder ihres eigenen Projekts sehen.
+  const profileMap = new Map(
+    (profilesResult?.data ?? []).map((p) => [p.id, { full_name: p.full_name, email: p.email }]),
+  );
+  const members: MemberDisplay[] = rawMembers.map((m) => {
+    const p = profileMap.get(m.user_id);
+    return {
+      memberId: m.id,
+      userId: m.user_id,
+      fullName: p?.full_name ?? "",
+      email: p?.email ?? "",
+      role: m.role,
+      isMe: m.user_id === user.id,
+    };
+  });
 
   return (
     <>

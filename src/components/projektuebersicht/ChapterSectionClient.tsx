@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import * as React from "react";
 import { createPortal } from "react-dom";
 import {
@@ -15,6 +14,7 @@ import {
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ReadOnlyScope } from "@/components/ReadOnlyScope";
+import { ChapterOpenLink } from "./ChapterOpenLink";
 import { type Chapter, reorderChapters } from "@/lib/projektuebersicht-chapters";
 import type { ErzaehlImpuls } from "@/lib/projektuebersicht-erzaehl-impulse";
 
@@ -162,6 +162,18 @@ export function ChapterSectionClient({
   // Drag state
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
+
+  // PROJ-30: Neuer Stand vom Server (Wortzahl, Titel, Reihenfolge) wird
+  // übernommen, zum Beispiel nach der Zurück-Taste. Nur nicht mitten im Ziehen.
+  const serverVersion = initialChapters
+    .map((chapter) => `${chapter.id}|${chapter.title}|${chapter.words}`)
+    .join("\n");
+  const [appliedVersion, setAppliedVersion] = useState(serverVersion);
+  if (serverVersion !== appliedVersion && dragIndex === null) {
+    setAppliedVersion(serverVersion);
+    setChapters(initialChapters);
+    setSavedOrderIds(initialChapters.map((chapter) => chapter.id));
+  }
 
   // Modal state
   const [deleteTarget, setDeleteTarget] = useState<Chapter | null>(null);
@@ -842,14 +854,14 @@ export function ChapterSectionClient({
                     Wird angelegt …
                   </button>
                 ) : (
-                  <Link
+                  <ChapterOpenLink
                     href={`/projektuebersicht/${projectId}/kapiteleditor/${chapter.id}`}
                     draggable={false}
                     onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                    className="relative z-20 inline-flex h-12 w-full min-w-0 cursor-pointer items-center justify-center bg-[#0A0909]/5 px-4 text-base font-bold leading-6 text-[#534B42] transition-colors hover:bg-[#0A0909]/10 sm:w-auto sm:text-lg"
+                    className="relative z-20 inline-flex h-12 w-full min-w-0 cursor-pointer items-center justify-center bg-[#0A0909]/5 px-4 text-base font-bold leading-6 text-[#534B42] transition-colors hover:bg-[#0A0909]/10 sm:w-auto sm:min-w-[10.5rem] sm:text-lg"
                   >
                     {readOnly ? "Ansehen" : "Bearbeiten"}
-                  </Link>
+                  </ChapterOpenLink>
                 )}
               </div>
             </div>

@@ -23,6 +23,8 @@ import { hyphenateText } from "@/lib/hyphenation";
 //   - Hyphenation in Überschriften (CSS hyphens: none auf h1/h2 — Bug 4).
 //   - Hyphenation in Blockzitaten (visuell zu unruhig in schmalen Spalten).
 
+export const HYPHENATION_META = "narravitHyphenation";
+
 export const HyphenationOnLoad = Extension.create({
   name: "hyphenationOnLoad",
   onCreate() {
@@ -65,6 +67,8 @@ export const HyphenationOnLoad = Extension.create({
     // Soft-Hyphens dürfen nicht in der Undo-History landen — sie sind
     // rein typografisch und sollen für den User unsichtbar bleiben.
     tr.setMeta("addToHistory", false);
+    // PROJ-30: Das ist keine Änderung der Person und löst kein Speichern aus.
+    tr.setMeta(HYPHENATION_META, true);
     editor.view.dispatch(tr);
   },
 });

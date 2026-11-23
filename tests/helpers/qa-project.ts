@@ -45,6 +45,8 @@ export async function deleteQaChapters(page: Page, title?: string): Promise<void
   for (let guard = 0; guard < 30; guard++) {
     await page.goto(`/projektuebersicht/${QA_PROJECT_ID}`);
     await page.waitForLoadState("networkidle");
+    // PROJ-30: Hinter der Ladeansicht erscheint der Inhalt erst kurz nach `load`.
+    await page.locator("main h1").first().waitFor();
     const trigger = page.getByRole("button", { name });
     if ((await trigger.count()) === 0) return;
     await trigger.first().click();

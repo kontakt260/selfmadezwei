@@ -31,6 +31,7 @@ export type Database = {
           start_page: number
           title: string
           updated_at: string
+          word_count: number | null
         }
         Insert: {
           body?: Json | null
@@ -48,6 +49,7 @@ export type Database = {
           start_page?: number
           title: string
           updated_at?: string
+          word_count?: number | null
         }
         Update: {
           body?: Json | null
@@ -65,6 +67,7 @@ export type Database = {
           start_page?: number
           title?: string
           updated_at?: string
+          word_count?: number | null
         }
         Relationships: [
           {

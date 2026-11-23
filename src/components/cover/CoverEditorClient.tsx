@@ -31,6 +31,7 @@ import { CoverRender } from "@/components/cover/CoverRender";
 import { ReadOnlyScope } from "@/components/ReadOnlyScope";
 import { COVER_COLORS } from "@/lib/cover-colors";
 import { COVER_THEMES } from "@/lib/cover-themes";
+import { trackSave } from "@/lib/pending-saves";
 import type { CoverData } from "@/lib/cover-types";
 import {
   saveCoverAction,
@@ -120,6 +121,10 @@ export function CoverEditorClient({
     imagePath: initialImagePath,
   });
 
+  // PROJ-30: Eine Änderung, die noch auf das verzögerte Speichern wartet. Sie
+  // geht beim Verlassen der Seite sofort zum Server.
+  const unsavedRef = useRef<SaveCoverInput | null>(null);
+
   // ── CoverData für den Renderer ─────────────────────────────────────────
   const previewData: CoverData = useMemo(
     () => ({
@@ -144,6 +149,8 @@ export function CoverEditorClient({
       colorId,
       imagePath,
     };
+
+    unsavedRef.current = null;
 
     // Wenn der Titel nach Trim leer wäre, blockieren wir den Save —
     // die UI zeigt eine Inline-Validierung.
@@ -170,7 +177,7 @@ export function CoverEditorClient({
 
     setSaveState({ kind: "pending" });
     startTransition(async () => {
-      const result = await saveCoverAction(payload);
+      const result = await trackSave(saveCoverAction(payload));
       if (result.error) {
         setSaveState({ kind: "error", message: result.error });
         return;
@@ -200,6 +207,15 @@ export function CoverEditorClient({
       return;
     }
     if (readOnly) return;
+    unsavedRef.current = {
+      projectId,
+      title: title.trim(),
+      subtitle: subtitle.trim(),
+      authorLine: authorLine.trim(),
+      themeId,
+      colorId,
+      imagePath,
+    };
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(performSave, AUTOSAVE_DEBOUNCE_MS);
     return () => {
@@ -213,8 +229,36 @@ export function CoverEditorClient({
     colorId,
     imagePath,
     performSave,
+    projectId,
     readOnly,
   ]);
+
+  // PROJ-30: Beim Verlassen der Seite nichts verlieren.
+  useEffect(() => {
+    const flush = () => {
+      const payload = unsavedRef.current;
+      unsavedRef.current = null;
+      if (!payload || payload.title.length === 0) return;
+      const last = lastSavedRef.current;
+      if (
+        last.title === payload.title &&
+        last.subtitle === payload.subtitle &&
+        last.authorLine === payload.authorLine &&
+        last.themeId === payload.themeId &&
+        last.colorId === payload.colorId &&
+        last.imagePath === payload.imagePath
+      ) {
+        return;
+      }
+      lastSavedRef.current = payload;
+      void trackSave(saveCoverAction(payload));
+    };
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, []);
 
   // ── Foto-Upload ────────────────────────────────────────────────────────
   const onPickFile = useCallback(() => {

@@ -25,18 +25,5 @@ export function reorderChapters(
   return next;
 }
 
-/** Extracts word count from a TipTap/ProseMirror JSON body. */
-export function countWordsFromBody(body: unknown): number {
-  if (!body || typeof body !== "object" || Array.isArray(body)) return 0;
-  const node = body as { type?: string; text?: string; content?: unknown[] };
-  let count = 0;
-  if (node.type === "text" && node.text) {
-    count += node.text.trim().split(/\s+/).filter(Boolean).length;
-  }
-  if (Array.isArray(node.content)) {
-    for (const child of node.content) {
-      count += countWordsFromBody(child);
-    }
-  }
-  return count;
-}
+// PROJ-30: Übersicht und Editor zählen mit derselben Regel.
+export { countWordsFromBody } from "./kapiteleditor/countWords";

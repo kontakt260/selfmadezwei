@@ -1,5 +1,7 @@
 import { redirect, notFound } from "next/navigation";
+import { assertLoaded, isUuid } from "@/lib/supabase/page-data";
 import { createClient } from "@/lib/supabase/server";
+import { FreshAfterHistory } from "@/components/HistoryFreshness";
 import { PhoneNotice } from "@/components/kapiteleditor/PhoneNotice";
 import { EditorClient } from "@/components/kapiteleditor/EditorClient";
 import { isProjectReadOnly } from "@/lib/projects/project-access";
@@ -54,6 +56,7 @@ export default async function KapiteleditorPage({
   params: Promise<{ project_id: string; chapter_id: string }>;
 }) {
   const { project_id, chapter_id } = await params;
+  if (!isUuid(project_id) || !isUuid(chapter_id)) notFound();
 
   const supabase = await createClient();
   const {
@@ -61,24 +64,29 @@ export default async function KapiteleditorPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/anmelden");
 
-  const [{ data: chapter }, { data: membership }] = await Promise.all([
+  // PROJ-30: Gleichzeitig statt nacheinander. Der Impuls fürs Banner (PROJ-8)
+  // kommt direkt mit dem Kapitel.
+  const [chapterResult, membershipResult, readOnly] = await Promise.all([
     supabase
       .from("chapters")
-      .select("id, title, body, image_sections, project_id, start_page, source_impulse_id")
+      .select(
+        "id, title, body, image_sections, project_id, start_page, page_count, updated_at, impulse_catalog(title, leading_questions)",
+      )
       .eq("id", chapter_id)
       .eq("project_id", project_id)
-      .single(),
+      .maybeSingle(),
     supabase
       .from("project_members")
       .select("role")
       .eq("project_id", project_id)
       .eq("user_id", user.id)
-      .single(),
+      .maybeSingle(),
+    isProjectReadOnly(supabase, project_id),
   ]);
 
-  if (!chapter || !membership) notFound();
-
-  const readOnly = await isProjectReadOnly(supabase, project_id);
+  assertLoaded(chapterResult, membershipResult);
+  const chapter = chapterResult.data;
+  if (!chapter || !membershipResult.data) notFound();
 
   const initialImageSections = parseImageSections(chapter.image_sections);
 
@@ -107,24 +115,11 @@ export default async function KapiteleditorPage({
     }));
   }
 
-  // PROJ-8: wenn das Kapitel auf einen Impuls verweist, laden wir den
-  // referenzierten Impuls für das Banner mit. Bei NULL (PROJ-4-Bestand
-  // ODER Eigenes-Kapitel) bleibt initialImpulse null und das Banner
-  // wird nicht gerendert.
-  let initialImpulse: { title: string; leadingQuestions: string[] } | null = null;
-  if (chapter.source_impulse_id) {
-    const { data: impulseRow } = await supabase
-      .from("impulse_catalog")
-      .select("title, leading_questions")
-      .eq("id", chapter.source_impulse_id)
-      .maybeSingle();
-    if (impulseRow) {
-      initialImpulse = {
-        title: impulseRow.title,
-        leadingQuestions: impulseRow.leading_questions ?? [],
-      };
-    }
-  }
+  // PROJ-8: Ohne Impuls (eigenes Kapitel oder Impuls gelöscht) kein Banner.
+  const impulse = chapter.impulse_catalog;
+  const initialImpulse = impulse
+    ? { title: impulse.title, leadingQuestions: impulse.leading_questions ?? [] }
+    : null;
 
   return (
     <>
@@ -132,16 +127,19 @@ export default async function KapiteleditorPage({
         <PhoneNotice projectId={project_id} />
       </div>
       <div className="hidden md:block">
-        <EditorClient
-          projectId={project_id}
-          chapterId={chapter_id}
-          initialTitle={chapter.title}
-          initialBody={chapter.body}
-          initialImageSections={initialImageSections}
-          initialStartPage={chapter.start_page ?? 1}
-          initialImpulse={initialImpulse}
-          readOnly={readOnly}
-        />
+        <FreshAfterHistory version={chapter.updated_at}>
+          <EditorClient
+            projectId={project_id}
+            chapterId={chapter_id}
+            initialTitle={chapter.title}
+            initialBody={chapter.body}
+            initialImageSections={initialImageSections}
+            initialStartPage={chapter.start_page ?? 1}
+            initialPageCount={chapter.page_count}
+            initialImpulse={initialImpulse}
+            readOnly={readOnly}
+          />
+        </FreshAfterHistory>
       </div>
     </>
   );

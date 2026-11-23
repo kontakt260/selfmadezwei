@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Lato, Merriweather, PT_Serif } from "next/font/google";
 import { AuthHero } from "@/components/auth/AuthHero";
+import { HistoryFreshness } from "@/components/HistoryFreshness";
+import { NavigationFeedback } from "@/components/NavigationFeedback";
+import { OfflineNotice } from "@/components/OfflineNotice";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -45,7 +48,10 @@ export default function RootLayout({
     >
       <body className="flex min-h-[100dvh] flex-col bg-background text-foreground">
         <AuthHero />
-        {children}
+        <HistoryFreshness>
+          <NavigationFeedback>{children}</NavigationFeedback>
+        </HistoryFreshness>
+        <OfflineNotice />
         <Toaster richColors position="top-center" />
       </body>
     </html>

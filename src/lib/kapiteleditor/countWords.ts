@@ -28,11 +28,19 @@ function countByType(node: TipTapNode, type: string): number {
   return count;
 }
 
-function extractText(node: TipTapNode): string {
-  if (!node) return "";
-  if (typeof node.text === "string") return node.text + " ";
-  if (Array.isArray(node.content)) {
-    return node.content.map(extractText).join("");
+// Ohne Rekursion: Der Server zählt auch Inhalte, die von außen kommen. Sehr tief
+// verschachteltes JSON darf das Speichern nicht zum Absturz bringen.
+function extractText(root: TipTapNode): string {
+  const parts: string[] = [];
+  const stack: unknown[] = [root];
+  while (stack.length > 0) {
+    const node = stack.pop() as TipTapNode | null | undefined;
+    if (!node || typeof node !== "object") continue;
+    if (typeof node.text === "string") {
+      parts.push(node.text);
+    } else if (Array.isArray(node.content)) {
+      for (let i = node.content.length - 1; i >= 0; i--) stack.push(node.content[i]);
+    }
   }
-  return "";
+  return parts.join(" ");
 }

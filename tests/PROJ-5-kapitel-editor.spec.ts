@@ -1,5 +1,6 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { QA_PROJECT_ID, deleteQaChapters } from "./helpers/qa-project";
+import { waitForPage } from "./helpers/page-ready";
 import {
   auditEditor,
   blockquote,
@@ -90,6 +91,7 @@ test.beforeAll(async ({ browser }) => {
   page = await context.newPage();
   await deleteQaChapters(page, CHAPTER_TITLE);
   await page.goto(PROJECT_URL);
+  await waitForPage(page);
   await page.locator("button", { hasText: "Eigenes Kapitel" }).first().click();
   await page.getByPlaceholder("z. B. Reisen und Begegnungen").fill(CHAPTER_TITLE);
   await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();

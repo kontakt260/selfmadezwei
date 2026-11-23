@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { restoreQaProjectTitle } from "./helpers/qa-project";
+import { waitForPage } from "./helpers/page-ready";
 
 // PROJ-10 — Cover-Editor Browser-Smoke gegen Stage-DB.
 //
@@ -97,6 +98,7 @@ test.describe("PROJ-10 — Cover-Editor Route", () => {
     page,
   }) => {
     await page.goto(COVER_URL);
+    await waitForPage(page);
     const titleInput = page.getByLabel("Buchtitel");
     await titleInput.fill("Mein Testbuch");
     // Vorschau (role="img") sollte den neuen Titel im aria-label enthalten.
@@ -109,6 +111,7 @@ test.describe("PROJ-10 — Cover-Editor Route", () => {
     page,
   }) => {
     await page.goto(COVER_URL);
+    await waitForPage(page);
     const titleInput = page.getByLabel("Buchtitel");
     await titleInput.fill(`AutoTest-${Date.now() % 100000}`);
     // Auto-Save Debounce: ~2 Sek; wir geben großzügig 6 Sek.
@@ -119,6 +122,7 @@ test.describe("PROJ-10 — Cover-Editor Route", () => {
 
   test("AC-Page-8: leerer Titel zeigt Inline-Fehler", async ({ page }) => {
     await page.goto(COVER_URL);
+    await waitForPage(page);
     const titleInput = page.getByLabel("Buchtitel");
     await titleInput.fill("");
     await expect(
@@ -151,6 +155,6 @@ test.describe("PROJ-10 — Auth-Gate", () => {
     const ALIEN_ID = "11111111-2222-3333-4444-555555555555";
     await page.goto(`/projektuebersicht/${ALIEN_ID}/cover-bearbeiten`);
     // notFound() → 404-Seite
-    await expect(page.getByText(/404|nicht gefunden|not found/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Diese Seite gibt es nicht" })).toBeVisible();
   });
 });

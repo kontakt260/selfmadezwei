@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { waitForPage } from "./helpers/page-ready";
 
 // PROJ-9 — Mitgliederverwaltung Browser-Smoke gegen Stage-DB.
 //
@@ -67,6 +68,7 @@ test.describe("PROJ-9 — AddUser-Modal", () => {
     page,
   }) => {
     await page.goto(QA_PROJECT_URL);
+    await waitForPage(page);
     await page.getByRole("button", { name: /Person einladen/ }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await expect(page.getByLabel("E-Mail-Adresse")).toBeVisible();
@@ -78,6 +80,7 @@ test.describe("PROJ-9 — AddUser-Modal", () => {
     page,
   }) => {
     await page.goto(QA_PROJECT_URL);
+    await waitForPage(page);
     await page.getByRole("button", { name: /Person einladen/ }).click();
     await page.getByLabel("E-Mail-Adresse").fill("proj9-e2e@example.com");
     // Rolle bleibt Default „Co-Autor"

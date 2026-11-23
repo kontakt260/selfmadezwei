@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { waitForPage } from "./helpers/page-ready";
 
 // PROJ-28 — QA gegen die echte Stage-Datenbank: Wege am Lesemodus vorbei und
 // der Zustand von Personen, deren letztes Projekt automatisch entfernt wurde.
@@ -299,6 +300,7 @@ test.describe("PROJ-28 — QA (nur Stage)", () => {
 
   test("AC-7: Mitglied entfernen funktioniert im Lesemodus", async () => {
     await pageL.goto(`/projektuebersicht/${expired.id}`);
+    await waitForPage(pageL);
     await pageL.getByRole("button", { name: new RegExp(`Mitglied .${R.name}. entfernen`) }).click();
     await pageL.getByRole("button", { name: "Endgültig entfernen" }).click();
     await expect
@@ -311,6 +313,7 @@ test.describe("PROJ-28 — QA (nur Stage)", () => {
 
   test("AC-7: Projekt löschen funktioniert im Lesemodus", async () => {
     await pageL.goto("/");
+    await waitForPage(pageL);
     const card = pageL.getByRole("link", { name: new RegExp(`Projekt .${deletable.title}. öffnen`) });
     await card.hover();
     await pageL.getByRole("button", { name: new RegExp(`Projekt .${deletable.title}. löschen`) }).click({ force: true });

@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { waitForPage } from "./helpers/page-ready";
 
 // PROJ-3 — echte Kontolöschung gegen die Stage-Datenbank.
 //
@@ -742,6 +743,7 @@ test.describe("PROJ-3 — echte Kontolöschung (nur Stage)", () => {
 
   test("Verlassen: Einzige Leitung übergibt an die Nachfolge", async () => {
     await pageA.goto(`/projektuebersicht/${leaveTestProject}`);
+    await waitForPage(pageA);
     await pageA.getByRole("button", { name: "Projekt verlassen" }).click();
     const dialog = pageA.getByRole("dialog");
     await expect(dialog.getByText(/Wer soll das Projekt weiterführen/)).toBeVisible();

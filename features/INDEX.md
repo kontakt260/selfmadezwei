@@ -39,7 +39,7 @@
 | PROJ-26 | Papierkorb (serverseitig, 14 Tage) | P0 | Approved | PROJ-1, PROJ-3, PROJ-4, PROJ-5, PROJ-6, PROJ-7, PROJ-9, PROJ-10, PROJ-11 | [Spec](PROJ-26-papierkorb.md) | 2026-11-22 |
 | PROJ-28 | Aufbewahrung, Lesemodus und automatische Löschung | P0 | Approved | PROJ-3, PROJ-5, PROJ-6, PROJ-9, PROJ-10, PROJ-11, PROJ-26 | [Spec](PROJ-28-aufbewahrung-automatische-loeschung.md) | 2026-11-22 |
 | PROJ-29 | Webflow-Landingpage gemeinsam prüfen und überarbeiten (über MCP) | P1 | Roadmap | — | — | 2026-11-23 |
-| PROJ-30 | Ladezeiten verbessern (Server-Region, weniger Datenbankaufrufe) | P1 | Roadmap | — | — | 2026-11-23 |
+| PROJ-30 | Ladezeiten verbessern (Ladeansicht, weniger Datenbankaufrufe) | P1 | In Review | PROJ-3, PROJ-4, PROJ-5, PROJ-10, PROJ-22, PROJ-28 | [Spec](PROJ-30-ladezeiten.md) | 2026-11-23 |
 | PROJ-31 | Code aufräumen und Tests verschlanken | P2 | Roadmap | PROJ-24, PROJ-30 | — | 2026-11-23 |
 
 <!-- Add features above this line -->

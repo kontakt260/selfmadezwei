@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { waitForPage } from "./helpers/page-ready";
 
 // PROJ-8 — Erzähl-Impulse Browser-Smoke gegen Stage-DB.
 //
@@ -20,6 +21,8 @@ const QA_PROJECT_URL = `/projektuebersicht/${QA_PROJECT_ID}`;
 async function wipeAllChaptersInQaProject(p: import("@playwright/test").Page) {
   await p.goto(QA_PROJECT_URL);
   await p.waitForLoadState("networkidle");
+  // PROJ-30: Hinter der Ladeansicht erscheint der Inhalt erst kurz nach `load`.
+  await p.locator("main h1").first().waitFor();
   const anyDelete = p.getByRole("button", { name: /Kapitel „.*" löschen/ });
   let count = await anyDelete.count();
   while (count > 0) {
@@ -56,6 +59,7 @@ test.describe("PROJ-8 — Erzähl-Impuls-Modal", () => {
     page,
   }) => {
     await page.goto(QA_PROJECT_URL);
+    await waitForPage(page);
     await page.getByRole("button", { name: /Erzähl-Impuls/ }).first().click();
     // Live-Region mit aria-atomic ist der Impuls-Body.
     const region = page.locator("[aria-live='polite'][aria-atomic='true']").first();
@@ -74,6 +78,7 @@ test.describe("PROJ-8 — Erzähl-Impuls-Modal", () => {
     page,
   }) => {
     await page.goto(QA_PROJECT_URL);
+    await waitForPage(page);
     await page.getByRole("button", { name: /Erzähl-Impuls/ }).first().click();
     const region = page.locator("[aria-live='polite'][aria-atomic='true']").first();
     const first = await region.textContent();
@@ -98,6 +103,7 @@ test.describe("PROJ-8 — Impuls übernehmen", () => {
     page,
   }) => {
     await page.goto(QA_PROJECT_URL);
+    await page.locator("main h1").first().waitFor();
     const beforeRows = await page.getByRole("button", { name: /Kapitel „.*" löschen/ }).count();
     await page.getByRole("button", { name: /Erzähl-Impuls/ }).first().click();
     await page.getByRole("button", { name: /Impuls übernehmen/ }).click();
@@ -123,6 +129,7 @@ async function createImpulseChapterAndOpenEditor(
   page: import("@playwright/test").Page,
 ) {
   await page.goto(QA_PROJECT_URL);
+  await page.locator("main h1").first().waitFor();
   const editLinks = page.getByRole("link", { name: "Bearbeiten", exact: true });
   const linksBefore = await editLinks.count();
   await page.getByRole("button", { name: /Erzähl-Impuls/ }).first().click();
@@ -150,6 +157,7 @@ test.describe("PROJ-8 — Editor-Banner", () => {
     page,
   }) => {
     await page.goto(QA_PROJECT_URL);
+    await waitForPage(page);
     await page.getByRole("button", { name: /Eigenes Kapitel/ }).first().click();
     await page.getByPlaceholder("z. B. Reisen und Begegnungen").fill("PROJ-8 No-Banner-Test");
     await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();

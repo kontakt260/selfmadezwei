@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { waitForEditorReady, waitForSaved } from "./helpers/editor-audit";
+import { waitForPage } from "./helpers/page-ready";
 
 // PROJ-28 — Lesemodus abgelaufener Projekte im echten Browser gegen Stage.
 //
@@ -283,6 +284,7 @@ test.describe("PROJ-28 — Lesemodus (nur Stage)", () => {
 
   test("AC-6: Kapitel lassen sich nicht umsortieren", async () => {
     await pageL.goto(`/projektuebersicht/${expired.id}`);
+    await waitForPage(pageL);
     const list = pageL.getByRole("list", { name: "Kapitelreihenfolge" });
     await pageL.getByLabel("Kapitel 1: Kapitel 1", { exact: true }).dragTo(list.getByRole("listitem").nth(1));
     await expect(pageL.getByRole("button", { name: "Reihenfolge speichern" })).toHaveCount(0);
@@ -391,6 +393,7 @@ test.describe("PROJ-28 — Lesemodus (nur Stage)", () => {
 
   test("Edge: Läuft der Zugang beim Schreiben ab, scheitert das Speichern sichtbar", async () => {
     await pageL.goto(`/projektuebersicht/${active.id}/kapiteleditor/${active.chapters[1]}`);
+    await waitForPage(pageL);
     await waitForEditorReady(pageL);
     const editor = pageL.locator(".ProseMirror").first();
     await editor.click();
@@ -444,6 +447,7 @@ test.describe("PROJ-28 — Lesemodus (nur Stage)", () => {
     await expect(pageC.locator("#account-email")).toHaveText(C.email);
 
     await pageC.goto(`/projektuebersicht/${expired.id}`);
+    await waitForPage(pageC);
     await pageC.getByRole("button", { name: "Projekt verlassen" }).click();
     await pageC.getByRole("dialog").getByRole("button", { name: /verlassen/i }).click();
     await pageC.waitForURL((url) => !url.pathname.includes(expired.id), { timeout: 20_000 });

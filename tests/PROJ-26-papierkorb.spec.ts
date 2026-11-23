@@ -7,6 +7,7 @@ import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { waitForEditorReady, waitForSaved } from "./helpers/editor-audit";
+import { waitForPage } from "./helpers/page-ready";
 
 // PROJ-26 — echter Papierkorb gegen die Stage-Datenbank und den Dateispeicher.
 //
@@ -237,6 +238,7 @@ async function waitForServerAction(page: Page, action: () => Promise<void>): Pro
 
 async function deleteChapterInUi(page: Page, project: TestProject, title: string) {
   await page.goto(`/projektuebersicht/${project.id}`);
+  await waitForPage(page);
   await page.getByRole("button", { name: `Kapitel „${title}" löschen` }).click();
   await expect(page.getByText("Eine Wiederherstellung ist nicht möglich.")).toBeVisible();
   const confirm = page.getByRole("button", { name: /Endgültig löschen/ });
@@ -246,6 +248,7 @@ async function deleteChapterInUi(page: Page, project: TestProject, title: string
 
 async function deleteProjectInUi(page: Page, project: TestProject) {
   await page.goto("/");
+  await waitForPage(page);
   await page.getByRole("button", { name: `Projekt „${project.title}" löschen` }).click();
   await expect(page.getByText("unwiderruflich und endgültig")).toBeVisible();
   await page.getByRole("button", { name: "Weiter zur Bestätigung" }).click();
@@ -480,13 +483,16 @@ test.describe("PROJ-26 — Papierkorb (nur Stage)", () => {
   });
 
   test("AC-10: Link auf gelöschtes Kapitel verhält sich wie ein nicht vorhandenes", async () => {
+    const notFound = pageL.getByRole("heading", { name: "Diese Seite gibt es nicht" });
     const gone = await pageL.goto(
       `/projektuebersicht/${shared.id}/kapiteleditor/${shared.chapters[0]}`,
     );
+    await expect(notFound).toBeVisible();
     const goneText = await pageL.locator("body").innerText();
     const unknown = await pageL.goto(
       `/projektuebersicht/${shared.id}/kapiteleditor/${crypto.randomUUID()}`,
     );
+    await expect(notFound).toBeVisible();
     const unknownText = await pageL.locator("body").innerText();
 
     expect(gone?.status()).toBe(404);
@@ -638,6 +644,7 @@ test.describe("PROJ-26 — Papierkorb (nur Stage)", () => {
   test("Edge: Autosave meldet Fehler und holt ein gelöschtes Kapitel nicht zurück", async () => {
     const chapter = shared.chapters[2];
     await pageC.goto(`/projektuebersicht/${shared.id}/kapiteleditor/${chapter}`);
+    await waitForPage(pageC);
     await waitForEditorReady(pageC);
     const editor = pageC.locator(".ProseMirror").first();
     await editor.click();

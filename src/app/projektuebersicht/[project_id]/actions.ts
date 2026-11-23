@@ -96,6 +96,7 @@ export async function addChapterAction(
       sort_order: nextSortOrder,
       chapter_origin: "custom",
       body: null,
+      word_count: 0,
     })
     .select("id")
     .single();
@@ -180,6 +181,7 @@ export async function addImpulseChapterAction(
       chapter_origin: "catalog_impulse",
       source_impulse_id: impulseId,
       body: null,
+      word_count: 0,
     })
     .select("id")
     .single();

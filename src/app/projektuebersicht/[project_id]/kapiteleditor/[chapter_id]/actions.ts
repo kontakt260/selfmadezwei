@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { countWordsFromBody } from "@/lib/kapiteleditor/countWords";
 import { projectWriteBlockedError } from "@/lib/projects/project-access";
 import type { ImageSections, ChapterImage } from "@/lib/kapiteleditor/types";
 
@@ -40,6 +41,12 @@ const autosaveSchema = z.object({
   // keinen Wert; der Server lässt page_count dann unverändert (kein
   // Reset auf 1). Range matched chapters_page_count_range-CHECK.
   pageCount: z.number().int().min(1).max(999).optional(),
+});
+
+const pageCountSchema = z.object({
+  projectId: uuidSchema,
+  chapterId: uuidSchema,
+  pageCount: z.number().int().min(1).max(999),
 });
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 h
@@ -122,9 +129,12 @@ export async function chapterAutosaveAction(input: {
   // PROJ-7: page_count nur ins UPDATE-Set aufnehmen, wenn der Client einen
   // Wert geliefert hat — sonst bleibt der DB-Wert unverändert (verhindert
   // Reset auf 1 durch alte Builds, die das Feld nicht senden).
+  // PROJ-30: Die Wortzahl zählt der Server selbst, der Client liefert sie nicht.
+  const wordCount = countWordsFromBody(body);
   const updatePayload: Record<string, unknown> = {
     title,
     body: (body ?? null) as never,
+    word_count: wordCount,
     image_sections: stripped as never,
     color_page_count: colorPageCount,
     updated_at: new Date().toISOString(),
@@ -138,10 +148,59 @@ export async function chapterAutosaveAction(input: {
     .update(updatePayload as never)
     .eq("id", chapterId)
     .eq("project_id", projectId)
-    .select("id");
+    .select("id, word_count, updated_at");
 
   // PROJ-26: Ohne Treffer wurde das Kapitel inzwischen gelöscht. Das darf nicht
   // als „Gespeichert" erscheinen, sonst schreibt jemand unbemerkt ins Leere.
+  if (error || !savedRows || savedRows.length === 0) {
+    return { error: "Speichern fehlgeschlagen." };
+  }
+
+  // PROJ-30: Bleibt die Wortzahl gleich (zum Beispiel ein Tippfehler), kann die
+  // Datenbank das nicht von einem Schreibweg ohne Zählung unterscheiden und
+  // leert sie. Dann wird sie nachgetragen, aber nur, wenn inzwischen niemand
+  // anderes gespeichert hat. Scheitert das, zählt die Übersicht dieses Kapitel live.
+  const saved = savedRows[0] as { word_count: number | null; updated_at: string };
+  if (saved.word_count === null) {
+    const { error: countError } = await supabase
+      .from("chapters")
+      .update({ word_count: wordCount })
+      .eq("id", chapterId)
+      .eq("project_id", projectId)
+      .eq("updated_at", saved.updated_at);
+    if (countError) console.error(`[chapter-autosave] word count failed: ${countError.message}`);
+  }
+  return { ok: true };
+}
+
+/**
+ * PROJ-30: Schreibt nur die Seitenzahl. Das bloße Öffnen eines Kapitels darf
+ * Text, Titel und Bilder nie anfassen, sie könnten inzwischen neuer sein.
+ */
+export async function chapterPageCountAction(input: {
+  projectId: string;
+  chapterId: string;
+  pageCount: number;
+}): Promise<{ ok?: true; error?: string }> {
+  const parsed = pageCountSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+  const { projectId, chapterId, pageCount } = parsed.data;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Nicht angemeldet." };
+
+  const accessError = await projectWriteBlockedError(supabase, projectId);
+  if (accessError) return { error: accessError };
+
+  const { data: savedRows, error } = await supabase
+    .from("chapters")
+    .update({ page_count: pageCount })
+    .eq("id", chapterId)
+    .eq("project_id", projectId)
+    .select("id");
   if (error || !savedRows || savedRows.length === 0) {
     return { error: "Speichern fehlgeschlagen." };
   }

@@ -98,6 +98,7 @@ Stage = Projekt-Ref `kdjhxqitfxnsavhiafdn`. Production = Haupt-Projekt (`main`) 
 - [ ] Migration `20261123110000_proj28_qa_fixes.sql` (abgelaufene Projekte sperren auch das Löschen von Kapiteln und Dateien, eine Zahlung holt ein wegen Ablauf verschobenes Projekt zurück, der Papierkorb-Lauf löscht kein bezahltes Projekt). **Änderung an RLS, von Jakob am 2026-11-23 freigegeben.** Nach `20261123100000` und **vor** dem Code-Deploy einspielen. Das Einspielen selbst verschiebt und löscht nichts. Datei im SQL-Editor ausführen, dann `insert into supabase_migrations.schema_migrations (version, name) values ('20261123110000', 'proj28_qa_fixes');`. Stage: am 2026-11-23 eingespielt und geprüft.
 - [ ] Migration `20261123120000_proj24_narration.sql` (Erzähl-Einstellungen und kurzlebige Kauf-Vorbereitung, beide per RLS ohne Policies nur für die Service-Role, von Jakob freigegeben). **Vor dem Code-Deploy einspielen**, sonst gehen Kontaktdaten aus dem Onboarding verloren. Der Kauf selbst funktioniert auch ohne sie. Stage: am 2026-11-23 eingespielt, Rechte und RLS geprüft.
 - [ ] Migration `20261123130000_proj24_gift_email_draft.sql` (Adresse für die Geschenk-Einladung liegt in der Kauf-Vorbereitung statt bei Stripe, RLS unverändert). Direkt nach `20261123120000_proj24_narration.sql` und **vor dem Code-Deploy** einspielen, sonst startet kein Geschenk „Auch am Computer“ mehr und Erzähl-Kontakte gehen verloren.
+- [ ] Migration `20261123140000_proj30_word_count.sql` (optionale Wortzahl je Kapitel und eine Schutzregel, RLS unverändert, bestehende Kapitel werden nicht umgeschrieben). **Vor dem Code-Deploy einspielen**, sonst scheitern Buchprojekt und Speichern im Editor.
 
 ### Auth → URL Configuration
 
@@ -231,6 +232,8 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] **PROJ-22 Druck-Karte (Jakob, 2026-11-23):** Die Karte „Buch in den Druck geben" in der Projektübersicht ist bis PROJ-16 ein Platzhalter mit gesperrten Buttons. Sie darf so nicht live gehen: Vor dem Go-live ist PROJ-16 fertig, oder die Karte wird für Production ausgeblendet.
 - [ ] **PROJ-22 in Safari und Firefox ansehen:** Automatisiert ist das neue Design nur in Chromium geprüft, WebKit startet auf dem Entwicklungs-Mac nicht. Startseite, Projektübersicht und Persönlichen Bereich vor dem Go-live einmal in beiden Browsern und auf einem echten iPad öffnen.
 - [ ] **PROJ-24 in Safari und Firefox ansehen:** Das Onboarding ist automatisiert nur in Chromium geprüft. Vor dem Go-live alle Schritte in beiden Browsern durchgehen, vor allem die Handynummer und die Rückkehr nach einem Stripe-Abbruch.
+- [ ] **PROJ-30 Datenverlust im Editor (Critical):** Nach der Zurück-Taste oder bei langsamem Speichern konnte alter Text neueren überschreiben. Im Code behoben, der Fix muss mit dem PROJ-30-Stand auf Production. Production ist noch nicht betroffen, weil dort dieser Editor noch nicht läuft.
+- [ ] **PROJ-30 in Safari und Firefox ansehen:** Automatisiert nur in Chromium geprüft. Vor dem Go-live vor allem Zurück-Taste, Speichern beim Verlassen, Ladeansicht und Offline-Hinweis durchgehen.
 - [ ] **Interne Kennungen in Kundentexten entfernen:** In der Projektübersicht stehen noch „(PROJ-12)" bei „Erzählen per Sprachnachricht" und „(PROJ-6)" beim Projektzugang vor der ersten Zahlung. Beide Texte vor dem Go-live ersetzen.
 - [ ] **PROJ-24 und PROJ-12 nur gemeinsam live:** Das neue Onboarding fragt Kontaktdaten für Erzähl-Impulse ab. Ohne den Versand aus PROJ-12 würde es Nachrichten versprechen, die nie ankommen. Migration `20261123120000_proj24_narration.sql` in Production vor dem Code-Deploy einspielen.
 - [ ] **Stripe-Produkt prüfen (PROJ-24):** Produktname und Beschreibung im Stripe-Testmodus und im Live-Modus müssen das erste gedruckte Hardcover-Buch nennen, weil sie auf Checkout und Rechnung erscheinen.
@@ -270,6 +273,9 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
+| 2026-11-23 | PROJ-30 QA-Fixes: Datenverlust bei langsamem Speichern, Seitenzahl auf dem Handy, Cover beim Verlassen, Ladeansicht und deutsche 404-Seite behoben. Keine weitere Migration, keine neuen Env-Werte. |
+| 2026-11-23 | PROJ-30 Backend: Migration `20261123140000_proj30_word_count.sql`, auf Stage und Production jeweils vor dem Code-Deploy einspielen. Keine neuen Env-Werte. |
+| 2026-11-23 | PROJ-30 Tech Design: Datenverlust durch die Zurück-Taste im Editor als Go-live-Blocker eingetragen. Geplant ist eine kleine Migration für die Wortzahl, noch nicht gebaut. |
 | 2026-11-23 | PROJ-24 Approved: echter Stripe-Testkauf auf Stage bestanden. Offen vor dem Go-live: Prüfung in Safari und Firefox. |
 | 2026-11-23 | PROJ-24 QA-Fixes: Migration `20261123130000_proj24_gift_email_draft.sql`, auf Stage und Production jeweils vor dem Code-Deploy einspielen. Die E-Mail der beschenkten Person geht nicht mehr an Stripe. Keine neuen Env-Werte, keine neuen Stripe-Events. |
 | 2026-11-23 | PROJ-24 Backend: Migration `20261123120000_proj24_narration.sql`, auf Stage und Production jeweils vor dem Code-Deploy einspielen. Keine neuen Env-Werte, keine neuen Stripe-Events. |

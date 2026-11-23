@@ -5,6 +5,7 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import { mkdirSync, existsSync } from "node:fs";
 import sharp from "sharp";
+import { waitForPage } from "./helpers/page-ready";
 
 // PROJ-5 — Bild-Upload im Kapitel-Editor.
 //
@@ -35,6 +36,7 @@ test.beforeAll(async ({ browser }) => {
   page = await context.newPage();
   await deleteQaChapters(page, CHAPTER_TITLE);
   await page.goto(PROJECT_URL);
+  await waitForPage(page);
   await page.locator("button", { hasText: "Eigenes Kapitel" }).first().click();
   await page.getByPlaceholder("z. B. Reisen und Begegnungen").fill(CHAPTER_TITLE);
   await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();

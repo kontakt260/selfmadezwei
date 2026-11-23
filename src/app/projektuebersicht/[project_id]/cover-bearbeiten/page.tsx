@@ -1,5 +1,7 @@
+import { FreshAfterHistory } from "@/components/HistoryFreshness";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import { assertLoaded, isUuid } from "@/lib/supabase/page-data";
 import { createClient } from "@/lib/supabase/server";
 import { Navbar } from "@/components/Navbar";
 import { CoverEditorClient } from "@/components/cover/CoverEditorClient";
@@ -28,6 +30,7 @@ export default async function CoverBearbeitenPage({
   params: Promise<{ project_id: string }>;
 }) {
   const { project_id } = await params;
+  if (!isUuid(project_id)) notFound();
 
   const supabase = await createClient();
   const {
@@ -35,32 +38,30 @@ export default async function CoverBearbeitenPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/anmelden");
 
-  // Projekt + Mitgliedschaft in einem Schwung — wenn Mitgliedschaft fehlt,
-  // wird notFound() ausgelöst (kein Leak, dass das Projekt überhaupt
-  // existiert).
-  const [{ data: project }, { data: membership }, { data: coverRow }] =
-    await Promise.all([
-      supabase
-        .from("projects")
-        .select("id, title")
-        .eq("id", project_id)
-        .single(),
-      supabase
-        .from("project_members")
-        .select("role")
-        .eq("project_id", project_id)
-        .eq("user_id", user.id)
-        .single(),
-      supabase
-        .from("project_covers")
-        .select("image_url, theme, metadata")
-        .eq("project_id", project_id)
-        .maybeSingle(),
-    ]);
+  // Projekt, Mitgliedschaft, Cover und Zugang in einem Schwung. Fehlt die
+  // Mitgliedschaft, folgt notFound() (kein Leak, dass das Projekt existiert).
+  const [projectResult, membershipResult, coverResult, readOnly] = await Promise.all([
+    supabase.from("projects").select("id, title").eq("id", project_id).maybeSingle(),
+    supabase
+      .from("project_members")
+      .select("role")
+      .eq("project_id", project_id)
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("project_covers")
+      .select("image_url, theme, metadata, updated_at")
+      .eq("project_id", project_id)
+      .maybeSingle(),
+    isProjectReadOnly(supabase, project_id),
+  ]);
 
-  if (!project || !membership) notFound();
-
-  const readOnly = await isProjectReadOnly(supabase, project_id);
+  // PROJ-30: Ohne geladenes Cover würde der Editor mit Standardwerten starten
+  // und beim nächsten Speichern das echte Cover überschreiben.
+  assertLoaded(projectResult, membershipResult, coverResult);
+  const project = projectResult.data;
+  const coverRow = coverResult.data;
+  if (!project || !membershipResult.data) notFound();
 
   // Cover-Row als sicheres CoverRowRaw casten — Supabase liefert metadata
   // als Json|null; wir vertrauen unserem Save-Action-Schema (schema_version 1).
@@ -118,12 +119,14 @@ export default async function CoverBearbeitenPage({
           </header>
 
           <section className="flex flex-col gap-5 bg-white p-5 sm:gap-6 sm:p-8">
-            <CoverEditorClient
-              projectId={project_id}
-              initialData={initialData}
-              initialImagePath={initialImagePath}
-              readOnly={readOnly}
-            />
+            <FreshAfterHistory version={`${project.title}|${coverRow?.updated_at ?? ""}`}>
+              <CoverEditorClient
+                projectId={project_id}
+                initialData={initialData}
+                initialImagePath={initialImagePath}
+                readOnly={readOnly}
+              />
+            </FreshAfterHistory>
           </section>
         </div>
       </main>

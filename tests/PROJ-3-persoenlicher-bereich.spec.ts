@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { waitForPage } from "./helpers/page-ready";
 
 // All tests in this file run as the stage QA test user (qa-test@narravit.de).
 // Auth state is created by globalSetup (tests/global-setup.ts) and stored in
@@ -55,6 +56,7 @@ test.describe("PROJ-3 — Account-Übersicht", () => {
 
   test("AC-7: Name speichern — zu kurzer Name zeigt Validierungsfehler", async ({ page }) => {
     await page.goto("/persoenlicher-bereich");
+    await waitForPage(page);
     const nameInput = page.locator("#account-name");
     await nameInput.fill("A");
     await page.getByRole("button", { name: "Name speichern" }).click();
@@ -85,6 +87,7 @@ test.describe("PROJ-3 — Sicherheit", () => {
 
   test("AC-14: Passwort-zurücksetzen zeigt Bestätigungshinweis nach Klick", async ({ page }) => {
     await page.goto("/persoenlicher-bereich");
+    await waitForPage(page);
     await page.getByRole("button", { name: "Passwort zurücksetzen" }).click();
     await expect(page.getByText(/Link zum Zurücksetzen/)).toBeVisible();
     // Button becomes disabled after success
@@ -104,6 +107,7 @@ test.describe("PROJ-3 — Konto löschen", () => {
 
   test("AC-15: Löschen-Button öffnet AlertDialog", async ({ page }) => {
     await page.goto("/persoenlicher-bereich");
+    await waitForPage(page);
     await triggerSelector(page).click();
     await expect(page.getByRole("alertdialog")).toBeVisible();
     await expect(page.getByText("Konto wirklich löschen?")).toBeVisible();
@@ -111,6 +115,7 @@ test.describe("PROJ-3 — Konto löschen", () => {
 
   test("AC-16: Löschen-Button im Dialog ist deaktiviert bis 'LÖSCHEN' eingetippt", async ({ page }) => {
     await page.goto("/persoenlicher-bereich");
+    await waitForPage(page);
     await triggerSelector(page).click();
 
     const submitBtn = page.getByRole("button", { name: "Konto endgültig löschen" });
@@ -127,6 +132,7 @@ test.describe("PROJ-3 — Konto löschen", () => {
 
   test("AC-17: Abbrechen schließt Dialog und setzt Eingabe zurück", async ({ page }) => {
     await page.goto("/persoenlicher-bereich");
+    await waitForPage(page);
     await triggerSelector(page).click();
     await page.locator('input#delete-confirm').fill("LÖSCHEN");
     await page.getByRole("button", { name: "Abbrechen" }).click();
@@ -143,6 +149,7 @@ test.describe("PROJ-3 — Konto löschen", () => {
   // ein Klick würde das QA-Konto samt QA-Projekt auf Stage wirklich löschen.
   test("AC-18: Dialog zeigt vor der Löschung, was gelöscht wird", async ({ page }) => {
     await page.goto("/persoenlicher-bereich");
+    await waitForPage(page);
     await triggerSelector(page).click();
 
     await expect(page.getByText("Wird gelöscht")).toBeVisible();

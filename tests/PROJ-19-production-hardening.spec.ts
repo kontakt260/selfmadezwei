@@ -5,6 +5,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { waitForEditorReady } from "./helpers/editor-audit";
 import { QA_PROJECT_ID, deleteQaChapters } from "./helpers/qa-project";
+import { waitForPage } from "./helpers/page-ready";
 
 // PROJ-19 — Sicherheits-Header und Beobachtung der Content-Security-Policy.
 
@@ -205,6 +206,7 @@ test.describe("PROJ-19 — CSP in den wichtigen Abläufen", () => {
     await deleteQaChapters(page, UPLOAD_CHAPTER);
     try {
       await page.goto(`/projektuebersicht/${QA_PROJECT_ID}`);
+      await waitForPage(page);
       await page.locator("button", { hasText: "Eigenes Kapitel" }).first().click();
       await page.getByPlaceholder("z. B. Reisen und Begegnungen").fill(UPLOAD_CHAPTER);
       await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();
@@ -231,6 +233,7 @@ test.describe("PROJ-19 — CSP in den wichtigen Abläufen", () => {
     await page.waitForLoadState("networkidle");
     await page.goto(`/projektuebersicht/${QA_PROJECT_ID}`);
     await page.waitForLoadState("networkidle");
+    await page.locator("main h1").first().waitFor();
 
     const chapterLink = page.locator(`a[href*="/projektuebersicht/${QA_PROJECT_ID}/kapiteleditor/"]`).first();
     if ((await chapterLink.count()) > 0) {

@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { deleteQaChapters } from "./helpers/qa-project";
+import { waitForPage } from "./helpers/page-ready";
 
 // PROJ-7 — Buchweite Seitenzahl, Browser-Smoke gegen Stage-DB.
 //
@@ -31,6 +32,7 @@ async function waitForPageNumberOverlay(
 // Editor des frisch angelegten Kapitels stehen.
 async function createTestChapter(page: import("@playwright/test").Page) {
   await page.goto(QA_PROJECT_URL);
+  await waitForPage(page);
   await page.locator("button", { hasText: "Eigenes Kapitel" }).first().click();
   await page.getByPlaceholder("z. B. Reisen und Begegnungen").fill(TEST_CHAPTER_TITLE);
   await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();
@@ -71,6 +73,7 @@ test.describe("PROJ-7 — Editor-Anzeige", () => {
     // wenn alle bestehenden je 1 Seite haben (Default page_count=1).
     await page.goto(QA_PROJECT_URL);
     await page.waitForLoadState("networkidle");
+    await page.locator("main h1").first().waitFor();
     const priorDeleteButtons = await page
       .getByRole("button", { name: /Kapitel „.*" löschen/ })
       .count();

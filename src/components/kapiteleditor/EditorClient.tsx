@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { editorExtensions } from "./tiptap/extensions";
+import { HYPHENATION_META } from "./tiptap/Hyphenation";
 import { placeCaretNearPoint } from "./tiptap/caretPlacement";
 import { EditorToolbar } from "./EditorToolbar";
 import { FirstPageHeader } from "./FirstPageTemplate";
@@ -13,9 +14,12 @@ import { SaveStatus } from "./SaveStatus";
 import { WordCount } from "./WordCount";
 import { ImpulseHintBanner } from "./ImpulseHintBanner";
 import { ZoomControl, DEFAULT_ZOOM, type ZoomLevel } from "./ZoomControl";
+import { useHistoryRefreshPending } from "@/components/HistoryFreshness";
 import { useAutoSave } from "@/hooks/useAutoSave";
+import { trackSave } from "@/lib/pending-saves";
 import { countWordsFromBody } from "@/lib/kapiteleditor/countWords";
 import { maxGroupScale, planRowGroups } from "@/lib/kapiteleditor/imageRowLayout";
+import { planChapterSave, type SavedChapterState } from "@/lib/kapiteleditor/save-plan";
 import {
   EMPTY_IMAGE_SECTIONS,
   type ChapterDraft,
@@ -25,6 +29,7 @@ import {
 import type { UploadedImage } from "./ImageUploadDialog";
 import {
   chapterAutosaveAction,
+  chapterPageCountAction,
   chapterImageUploadPrepareAction,
   chapterImageUploadCommitAction,
   chapterImageDeleteAction,
@@ -42,6 +47,9 @@ type Props = {
   // Vom Server beim Laden geliefert; bleibt während der Editor-Session
   // konstant (kein Realtime-Push aus anderen Tabs — Spec-Entscheidung).
   initialStartPage: number;
+  // PROJ-30: gespeicherte Seitenzahl. Nur wenn die Pagination davon abweicht,
+  // wird nach dem Öffnen etwas geschrieben.
+  initialPageCount: number;
   // PROJ-8: optionaler Impuls für das Banner. Null wenn das Kapitel
   // keinen source_impulse_id hat ODER der referenzierte Impuls nicht
   // mehr existiert. Frontend-Phase reicht null durch (kein DB-Lookup);
@@ -59,9 +67,14 @@ export function EditorClient({
   initialBody,
   initialImageSections,
   initialStartPage,
+  initialPageCount,
   initialImpulse,
   readOnly = false,
 }: Props) {
+  // PROJ-30: Nach Zurück oder Vorwärts kann der geladene Text veraltet sein.
+  // Bis der aktuelle Stand da ist, ist keine Eingabe und kein Speichern möglich.
+  const historyRefreshPending = useHistoryRefreshPending();
+  const inputLocked = readOnly || historyRefreshPending;
   const [title, setTitle] = useState(initialTitle);
   const [body, setBody] = useState<unknown>(initialBody);
   const [imageSections, setImageSections] = useState<ImageSections>(
@@ -75,11 +88,14 @@ export function EditorClient({
   // Stack solange aus, bis Layout + Image-Loads beruhigt sind, und
   // fadeen ihn DANN in einem Schwung ein.
   const [editorReady, setEditorReady] = useState(false);
+  // PROJ-30: Der Inhalt erscheint, sobald das Layout ruhig ist. `editorReady`
+  // wartet weiter die langen Settling-Passes ab, bevor die Seitenzahl zählt.
+  const [contentVisible, setContentVisible] = useState(false);
 
   const editor = useEditor({
     extensions: editorExtensions,
     content: initialBody ?? undefined,
-    editable: !readOnly,
+    editable: !inputLocked,
     editorProps: {
       attributes: {
         class: "tiptap-editor focus:outline-none",
@@ -92,12 +108,18 @@ export function EditorClient({
       // unten (sonst kann ein nachträglich eingefügter Spacer den Cursor
       // wieder aus dem Viewport schieben).
     },
-    onUpdate: ({ editor }) => {
+    onUpdate: ({ editor, transaction }) => {
+      // PROJ-30: Silbentrennung beim Öffnen ändert den Text der Person nicht.
+      if (transaction.getMeta(HYPHENATION_META)) return;
       setBody(editor.getJSON());
       keepCursorInView(editor);
     },
     immediatelyRender: false,
   });
+
+  useEffect(() => {
+    editor?.setEditable(!inputLocked, false);
+  }, [editor, inputLocked]);
 
   // Cleanup blob URLs on unmount
   useEffect(() => {
@@ -120,6 +142,7 @@ export function EditorClient({
     fgRef,
     imageSectionsDeps: imageSections,
     titleDep: title,
+    initialPageCount,
   });
 
   // PROJ-7: Buch-Offset bleibt während der Editor-Session konstant
@@ -144,23 +167,49 @@ export function EditorClient({
     [title, body, imageSections, pageCount, editorReady],
   );
 
+  // PROJ-30: Stand, den der Server sicher kennt. Text, Titel und Bilder gehen
+  // nur zum Server, wenn sie sich davon unterscheiden.
+  const lastSavedRef = useRef<SavedChapterState>({
+    title: initialTitle,
+    body: initialBody,
+    imageSections,
+    pageCount: initialPageCount,
+  });
+
   const saveDraft = useCallback(
     async (d: ChapterDraft): Promise<void> => {
-      const res = await chapterAutosaveAction({
-        projectId,
-        chapterId,
+      const plan = planChapterSave(d, lastSavedRef.current);
+      if (plan === "none") return;
+      if (plan === "page-count" && d.pageCount !== undefined) {
+        const pageCount = d.pageCount;
+        const res = await trackSave(chapterPageCountAction({ projectId, chapterId, pageCount }));
+        if (res.error) throw new Error(res.error);
+        lastSavedRef.current = { ...lastSavedRef.current, pageCount };
+        return;
+      }
+      const res = await trackSave(
+        chapterAutosaveAction({
+          projectId,
+          chapterId,
+          title: d.title,
+          body: d.body,
+          imageSections: d.imageSections,
+          colorPageCount: d.colorPageCount,
+          pageCount: d.pageCount,
+        }),
+      );
+      if (res.error) throw new Error(res.error);
+      lastSavedRef.current = {
         title: d.title,
         body: d.body,
         imageSections: d.imageSections,
-        colorPageCount: d.colorPageCount,
-        pageCount: d.pageCount,
-      });
-      if (res.error) throw new Error(res.error);
+        pageCount: d.pageCount ?? lastSavedRef.current.pageCount,
+      };
     },
     [projectId, chapterId],
   );
 
-  const { state, retry } = useAutoSave(draft, saveDraft, 2_000, !readOnly);
+  const { state, retry } = useAutoSave(draft, saveDraft, 2_000, !inputLocked);
 
   // Trigger PaginationDecorations (ProseMirror plugin) bei React-State-
   // Änderungen, die keine Doc-Transaktion auslösen — sonst zeigen Image-
@@ -210,6 +259,41 @@ export function EditorClient({
       cancelled = true;
       clearTimeout(fallback);
       for (const img of imgs) img.removeEventListener("load", onLoad);
+    };
+  }, [editor]);
+
+  // PROJ-30: Früher blieb jedes Kapitel über fünf Sekunden ausgeblendet. Jetzt
+  // erscheint es, sobald Schriften geladen sind und sich die Höhe nicht mehr
+  // ändert, spätestens nach CONTENT_REVEAL_MAX_MS.
+  useEffect(() => {
+    if (!editor) return;
+    let cancelled = false;
+    let checkTimer: ReturnType<typeof setTimeout> | undefined;
+    let lastHeight = -1;
+    let stableChecks = 0;
+    const reveal = () => {
+      if (!cancelled) setContentVisible(true);
+    };
+    const fallback = setTimeout(reveal, CONTENT_REVEAL_MAX_MS);
+    const check = () => {
+      if (cancelled) return;
+      const fg = fgRef.current;
+      const height = fg?.getBoundingClientRect().height ?? 0;
+      const imagesDone =
+        !fg || Array.from(fg.querySelectorAll("img")).every((img) => img.complete);
+      stableChecks = height === lastHeight && imagesDone ? stableChecks + 1 : 0;
+      lastHeight = height;
+      if (stableChecks >= CONTENT_STABLE_CHECKS) {
+        reveal();
+        return;
+      }
+      checkTimer = setTimeout(check, CONTENT_CHECK_MS);
+    };
+    void document.fonts.ready.then(check);
+    return () => {
+      cancelled = true;
+      clearTimeout(fallback);
+      if (checkTimer) clearTimeout(checkTimer);
     };
   }, [editor]);
 
@@ -297,7 +381,7 @@ export function EditorClient({
   // (Editor, Bild-Sektion, Kopf behalten ihre eigene Klick-Logik); der
   // Handler hängt deshalb an Stack UND Vordergrund-Layer.
   const handleBlankAreaMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (readOnly || e.target !== e.currentTarget || !editor || e.button !== 0) return;
+    if (inputLocked || e.target !== e.currentTarget || !editor || e.button !== 0) return;
     e.preventDefault();
     if (!placeCaretNearPoint(editor.view, e.clientX, e.clientY, e.shiftKey)) {
       editor.commands.focus("end");
@@ -317,7 +401,7 @@ export function EditorClient({
       {/* Toolbar an top:0 — direkt im Document-Flow, kein verschachtelter
           Parent. Sticky funktioniert immer, weil document.scrollingElement
           die nächste scroll-Ancestor ist. */}
-      <EditorToolbar editor={editor} readOnly={readOnly} />
+      <EditorToolbar editor={editor} readOnly={inputLocked} />
 
       {/* Chrome unter der Toolbar — scrollt natürlich weg */}
       <header className="flex flex-col gap-2 border-b border-[#e0dcd5] bg-[#ece6df] px-4 py-3 sm:px-6 md:flex-row md:items-center md:justify-between">
@@ -341,7 +425,7 @@ export function EditorClient({
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              readOnly={readOnly}
+              readOnly={inputLocked}
               placeholder="Kapitel-Titel"
               className={`[font-family:var(--font-merriweather)] flex-1 border-0 border-b border-transparent bg-transparent px-1 py-1 text-center text-lg text-[#3E3831] outline-none transition-colors md:text-xl ${
                 readOnly ? "cursor-default" : "focus:border-[#96B897]"
@@ -376,37 +460,20 @@ export function EditorClient({
             leadingQuestions={initialImpulse.leadingQuestions}
           />
         )}
-        {!editorReady && (
-          // Lade-Animation während Initial-Mount + Pagination-Settling.
-          // Wir blenden ein zentriertes Spinner-Element über dem Tisch
-          // ein. Der A5-Stack selbst ist unsichtbar (opacity 0), bis
-          // das Layout stabil ist — verhindert das „zerstückelte"
-          // Initial-Rendering (Text → Pagination-Shifts → Image-Loads).
-          <div
-            className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-[var(--a5-desk-color)] transition-opacity duration-300"
-            aria-hidden
-          >
-            <div className="flex flex-col items-center gap-3 text-[#3E3831]/70">
-              <svg
-                className="h-6 w-6 animate-spin"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-              </svg>
-              <p className="text-sm">Kapitel wird vorbereitet …</p>
-            </div>
+        {!contentVisible && (
+          // Der A5-Stack bleibt unsichtbar, bis das Layout ruhig ist. Das
+          // verhindert das „zerstückelte" Erscheinen beim Öffnen.
+          <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-[var(--a5-desk-color)]">
+            <p role="status" className="text-lg text-[#4A453F]">
+              Wird geladen …
+            </p>
           </div>
         )}
         <div
-          className="a5-stack a5-stack--loading"
+          className="a5-stack"
           data-chapter-id={chapterId}
           data-ready={editorReady ? "1" : "0"}
+          data-visible={contentVisible ? "1" : "0"}
           ref={stackRef}
           onMouseDown={handleBlankAreaMouseDown}
           style={{
@@ -436,7 +503,7 @@ export function EditorClient({
               onChange={updateSection("start")}
               onUpload={uploadImage("start")}
               onDelete={deleteImage("start")}
-              readOnly={readOnly}
+              readOnly={inputLocked}
             />
             <EditorContent editor={editor} />
             <ImageSection
@@ -444,7 +511,7 @@ export function EditorClient({
               onChange={updateSection("end")}
               onUpload={uploadImage("end")}
               onDelete={deleteImage("end")}
-              readOnly={readOnly}
+              readOnly={inputLocked}
             />
           </div>
           {/* Seitenzahl-Overlay: über FG, damit Zahlen nicht von Bildern
@@ -506,22 +573,37 @@ export function EditorClient({
 // vorherige Seite passen würde, bleibt der Push bestehen → akkumulierte
 // Leerseiten. Lösung kommt in v2 (Reset-on-Shrink mit Snap-Back-Detection).
 
+const CONTENT_CHECK_MS = 60;
+const CONTENT_STABLE_CHECKS = 3;
+const CONTENT_REVEAL_MAX_MS = 900;
+
 type PaginationDeps = {
   editor: Editor | null;
   stackRef: React.RefObject<HTMLDivElement | null>;
   fgRef: React.RefObject<HTMLDivElement | null>;
   imageSectionsDeps: ImageSections;
   titleDep: string;
+  initialPageCount: number;
 };
 
-function usePagination({ editor, stackRef, fgRef, imageSectionsDeps, titleDep }: PaginationDeps) {
-  const [pageCount, setPageCount] = useState(1);
+function usePagination({
+  editor,
+  stackRef,
+  fgRef,
+  imageSectionsDeps,
+  titleDep,
+  initialPageCount,
+}: PaginationDeps) {
+  // PROJ-30: Start mit der gespeicherten Zahl. Ohne sichtbares Layout (Phone)
+  // bleibt sie stehen, statt als 1 gemessen und gespeichert zu werden.
+  const [pageCount, setPageCount] = useState(initialPageCount);
   const rafRef = useRef<number | null>(null);
 
   const recalc = useCallback(() => {
     const fg = fgRef.current;
     const stack = stackRef.current;
     if (!fg || !stack) return;
+    if (fg.getClientRects().length === 0) return;
 
     const root = document.documentElement;
     const rootFont = parseFloat(getComputedStyle(root).fontSize) || 16;

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import { assertLoaded } from "@/lib/supabase/page-data";
 import { createClient } from "@/lib/supabase/server";
 import { BrandName } from "@/components/BrandName";
 import { Navbar } from "@/components/Navbar";
@@ -43,35 +44,23 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/anmelden");
 
-  const { data: memberships } = await supabase
-    .from("project_members")
-    .select("role, projects(id, title, updated_at, chapters(id, updated_at))")
-    .eq("user_id", user.id)
-    .order("updated_at", { referencedTable: "projects", ascending: false });
-
-  // PROJ-10: Cover-Daten als Batch (kein N+1). Wir lesen project_covers
-  // für alle Projekte des Users in einer Query und mappen sie pro ID.
-  const projectIds = (memberships ?? [])
-    .map((m) => m.projects?.id)
-    .filter((id): id is string => typeof id === "string");
-
-  const { data: coverRows } =
-    projectIds.length > 0
-      ? await supabase
-          .from("project_covers")
-          .select("project_id, image_url, theme, metadata")
-          .in("project_id", projectIds)
-      : { data: [] as { project_id: string; image_url: string | null; theme: string | null; metadata: CoverRowRaw["metadata"] | null }[] };
-
-  // PROJ-22: Ablaufdaten aller Projekte in einer Abfrage. Schlägt sie fehl,
-  // zeigen die Karten neutral „Öffnen" und die Projektseite prüft selbst.
-  const { data: accessRows, error: accessError } =
-    projectIds.length > 0
-      ? await supabase
-          .from("project_access")
-          .select("project_id, expires_at")
-          .in("project_id", projectIds)
-      : { data: [] as { project_id: string; expires_at: string | null }[], error: null };
+  // PROJ-30: Gleichzeitig statt nacheinander. RLS liefert Cover und Ablaufdaten
+  // ohnehin nur für die eigenen Projekte. Schlägt das Ablaufdatum fehl, zeigen
+  // die Karten neutral „Öffnen" und die Projektseite prüft selbst (PROJ-22).
+  const [membershipsResult, coversResult, accessResult] = await Promise.all([
+    supabase
+      .from("project_members")
+      .select("role, projects(id, title, updated_at, chapters(id, updated_at))")
+      .eq("user_id", user.id)
+      .order("updated_at", { referencedTable: "projects", ascending: false }),
+    supabase.from("project_covers").select("project_id, image_url, theme, metadata").limit(500),
+    supabase.from("project_access").select("project_id, expires_at").limit(500),
+  ]);
+  assertLoaded(membershipsResult);
+  const memberships = membershipsResult.data;
+  const coverRows = coversResult.data;
+  const accessRows = accessResult.data;
+  const accessError = accessResult.error;
   const expiresAtByProject = new Map(
     (accessRows ?? []).map((row) => [row.project_id, row.expires_at]),
   );

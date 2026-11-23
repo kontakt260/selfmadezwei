@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { QA_PROJECT_TITLE, restoreQaProjectTitle } from "./helpers/qa-project";
+import { waitForPage } from "./helpers/page-ready";
 
 // All tests run as the QA test user (qa-test@narravit.de), role: projektleiter.
 // Auth state from globalSetup. Stage DB: project "QA-Testprojekt".
@@ -19,6 +20,8 @@ test.beforeAll(async ({ browser }) => {
   const p = await ctx.newPage();
   await p.goto(PROJECT_URL);
   await p.waitForLoadState("networkidle");
+  // PROJ-30: Hinter der Ladeansicht erscheint der Inhalt erst kurz nach `load`.
+  await p.locator("main h1").first().waitFor();
   const deleteButtons = p.getByRole("button", { name: /Kapitel „.*" löschen/ });
   let count = await deleteButtons.count();
   console.log(`Starting PROJ-4 cleanup: found ${count} leftover chapters.`);
@@ -153,6 +156,7 @@ test.describe("PROJ-4 — Kapitel CRUD", () => {
 
   test("AC-Ch-1: 'Eigenes Kapitel' öffnet Modal mit Titel-Input", async ({ page }) => {
     await page.goto(PROJECT_URL);
+    await waitForPage(page);
     await page.locator("button", { hasText: "Eigenes Kapitel" }).first().click();
     const input = page.getByPlaceholder("z. B. Reisen und Begegnungen");
     await expect(input).toBeVisible();
@@ -161,6 +165,7 @@ test.describe("PROJ-4 — Kapitel CRUD", () => {
 
   test("AC-Ch-2: 'Hinzufügen'-Button disabled wenn Titel leer", async ({ page }) => {
     await page.goto(PROJECT_URL);
+    await waitForPage(page);
     await page.locator("button", { hasText: "Eigenes Kapitel" }).first().click();
     const addButton = page.getByRole("button", { name: "Hinzufügen", exact: true });
     await expect(addButton).toBeDisabled();
@@ -168,6 +173,7 @@ test.describe("PROJ-4 — Kapitel CRUD", () => {
 
   test("AC-Ch-3: Kapitel anlegen → Redirect zum Kapiteleditor", async ({ page }) => {
     await page.goto(PROJECT_URL);
+    await waitForPage(page);
     await page.locator("button", { hasText: "Eigenes Kapitel" }).first().click();
     await page.getByPlaceholder("z. B. Reisen und Begegnungen").fill("QA-Testkapitel");
     await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();
@@ -179,6 +185,7 @@ test.describe("PROJ-4 — Kapitel CRUD", () => {
 
   test("AC-Ch-4: Kapiteleditor-Seite zeigt PROJ-5 Platzhalter und Zurück-Link", async ({ page }) => {
     await page.goto(PROJECT_URL);
+    await waitForPage(page);
     await page.getByRole("link", { name: "Bearbeiten", exact: true }).first().click();
     await page.waitForURL(/kapiteleditor/);
     await expect(page.getByPlaceholder("Kapitel-Titel")).toBeVisible();
@@ -195,6 +202,7 @@ test.describe("PROJ-4 — Kapitel CRUD", () => {
 
   test("AC-Ch-6: 'Erzähl-Impuls' Modal öffnet mit Impuls-Titel und Shuffle-Button", async ({ page }) => {
     await page.goto(PROJECT_URL);
+    await waitForPage(page);
     await page.locator("button", { hasText: "Erzähl-Impuls" }).first().click();
     // Modal opens — check for its action buttons (modal uses role="presentation", not "dialog")
     await expect(page.getByRole("button", { name: "Anderen Vorschlag" })).toBeVisible();
@@ -203,6 +211,7 @@ test.describe("PROJ-4 — Kapitel CRUD", () => {
 
   test("AC-Ch-7: 'Anderen Vorschlag' Button zeigt neuen Impuls-Titel", async ({ page }) => {
     await page.goto(PROJECT_URL);
+    await waitForPage(page);
     await page.locator("button", { hasText: "Erzähl-Impuls" }).first().click();
     // aria-atomic="true" distinguishes the impulse live region from Sonner's aria-live container
     const liveRegion = page.locator("[aria-live='polite'][aria-atomic='true']");
@@ -217,6 +226,7 @@ test.describe("PROJ-4 — Kapitel CRUD", () => {
 
   test("AC-Ch-8: Erzähl-Impuls übernehmen → Kapitel erscheint in Liste, kein Redirect", async ({ page }) => {
     await page.goto(PROJECT_URL);
+    await waitForPage(page);
     await page.locator("button", { hasText: "Erzähl-Impuls" }).first().click();
     // Die Live-Region enthält seit PROJ-8 Kategorie + Titel + Leitfrage —
     // der Kapiteltitel ist nur ein Teil davon.
@@ -239,6 +249,7 @@ test.describe("PROJ-4 — Kapitel CRUD", () => {
 
   test("AC-Ch-9: Kapitel umbenennen — Modal öffnet mit aktuellem Titel, speichert neuen", async ({ page }) => {
     await page.goto(PROJECT_URL);
+    await waitForPage(page);
     await page.getByRole("button", { name: /Kapitel „QA-Testkapitel" umbenennen/ }).click();
     // Rename modal uses role="presentation" (BUG-3); find input by placeholder
     const input = page.getByPlaceholder("Kapitelname");
@@ -254,6 +265,7 @@ test.describe("PROJ-4 — Kapitel CRUD", () => {
 
   test("AC-Ch-10: Kapitel löschen — Countdown-Dialog, Button disabled für 3s, dann aktiv", async ({ page }) => {
     await page.goto(PROJECT_URL);
+    await page.locator("main h1").first().waitFor();
     const chaptersBeforeCount = await page.getByRole("link", { name: "Bearbeiten", exact: true }).count();
     const deleteButtons = page.getByRole("button", { name: /Kapitel „.*" löschen/ });
     await deleteButtons.last().click();
@@ -275,6 +287,7 @@ test.describe("PROJ-4 — Kapitel CRUD", () => {
 
   test("AC-Ch-11: Cleanup — verbleibendes Testkapitel löschen → Leerzustand", async ({ page }) => {
     await page.goto(PROJECT_URL);
+    await waitForPage(page);
     await page.getByRole("button", { name: /Kapitel „QA-Testkapitel \(umbenannt\)" löschen/ }).click();
     await page.waitForTimeout(3_500);
     const deleteButton = page.getByRole("button", { name: /Endgültig löschen/ });
@@ -314,6 +327,7 @@ test.describe("PROJ-4 — Sicherheit", () => {
 
   test("AC-Sec-4: Titel > 200 Zeichen wird server-seitig abgelehnt", async ({ page }) => {
     await page.goto(PROJECT_URL);
+    await waitForPage(page);
     await page.locator("button", { hasText: "Eigenes Kapitel" }).first().click();
     // Modal uses role="presentation" (BUG-3); find input by placeholder
     const input = page.getByPlaceholder("z. B. Reisen und Begegnungen");
@@ -328,6 +342,7 @@ test.describe("PROJ-4 — Sicherheit", () => {
 test.describe("PROJ-4 — Responsive & Navigation", () => {
   test("AC-Nav-1: Kapiteleditor-Route zeigt Kapiteltitel im Header", async ({ page }) => {
     await page.goto(PROJECT_URL);
+    await waitForPage(page);
     const editLink = page.getByRole("link", { name: "Bearbeiten", exact: true }).first();
     const hasChapters = await editLink.isVisible().catch(() => false);
     if (hasChapters) {

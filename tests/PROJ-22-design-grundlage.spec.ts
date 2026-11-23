@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { waitForPage } from "./helpers/page-ready";
 
 // PROJ-22 — Design-Grundlage im echten Browser gegen Stage.
 //
@@ -409,6 +410,7 @@ test.describe("PROJ-22 — Design-Grundlage (nur Stage)", () => {
 
   test("AC-20: Kapitel lassen sich per Drag and Drop umsortieren", async () => {
     await pageL.goto(`/projektuebersicht/${main.id}`);
+    await waitForPage(pageL);
     const rows = pageL.locator('[role="listitem"]');
     await rows.nth(2).locator('[draggable="true"]').dragTo(rows.nth(0));
     await pageL.getByRole("button", { name: "Reihenfolge speichern" }).click();
@@ -422,6 +424,7 @@ test.describe("PROJ-22 — Design-Grundlage (nur Stage)", () => {
 
   test("AC-21: Erzähl-Impulse ansehen öffnet den bisherigen Dialog", async () => {
     await pageL.goto(`/projektuebersicht/${main.id}`);
+    await waitForPage(pageL);
     await pageL.getByRole("button", { name: "Erzähl-Impulse ansehen" }).click();
     await expect(pageL.getByText("Erzähl-Impuls wählen")).toBeVisible();
     await pageL.keyboard.press("Escape");
@@ -437,6 +440,7 @@ test.describe("PROJ-22 — Design-Grundlage (nur Stage)", () => {
 
   test("AC-24: Sprachnachricht und Projektzugang stehen nebeneinander", async () => {
     await pageL.goto(`/projektuebersicht/${main.id}`);
+    await expect(pageL.getByRole("heading", { name: "Erzählen per Sprachnachricht" })).toBeVisible();
     const voice = await pageL
       .getByRole("heading", { name: "Erzählen per Sprachnachricht" })
       .boundingBox();
@@ -498,6 +502,7 @@ test.describe("PROJ-22 — Design-Grundlage (nur Stage)", () => {
 
   test("AC-29: Der Name lässt sich ändern", async () => {
     await pageL.goto("/persoenlicher-bereich");
+    await waitForPage(pageL);
     await pageL.locator("#account-name").fill("Lena Neuname");
     await pageL.getByRole("button", { name: "Name speichern" }).click();
     await expect
@@ -511,6 +516,7 @@ test.describe("PROJ-22 — Design-Grundlage (nur Stage)", () => {
 
   test("AC-33, AC-34: Lösch-Dialog nennt das Konto und bleibt gesperrt", async () => {
     await pageL.goto("/persoenlicher-bereich");
+    await waitForPage(pageL);
     await pageL.getByRole("button", { name: "Konto löschen", exact: true }).click();
     const dialog = pageL.getByRole("alertdialog");
     await expect(dialog.getByRole("heading", { name: "Konto wirklich löschen?" })).toBeVisible();
@@ -523,6 +529,7 @@ test.describe("PROJ-22 — Design-Grundlage (nur Stage)", () => {
   test("AC-37, BUG-1: Dialoge bleiben bei 200 % Zoom vollständig erreichbar", async () => {
     await pageL.setViewportSize({ width: 720, height: 500 });
     await pageL.goto(`/projektuebersicht/${main.id}`);
+    await waitForPage(pageL);
     await pageL.getByRole("button", { name: "Erzähl-Impulse ansehen" }).click();
     const impulseTitle = pageL.getByRole("heading", { name: "Erzähl-Impuls wählen" });
     const takeOver = pageL.getByRole("button", { name: "Impuls übernehmen" });
@@ -533,6 +540,7 @@ test.describe("PROJ-22 — Design-Grundlage (nur Stage)", () => {
     await pageL.keyboard.press("Escape");
 
     await pageL.goto("/");
+    await waitForPage(pageL);
     await pageL.getByRole("button", { name: `Projekt „${main.title}" löschen` }).click();
     await pageL.getByRole("button", { name: "Weiter zur Bestätigung" }).click();
     const finalDelete = pageL.getByRole("button", { name: "Endgültig löschen" });
@@ -547,6 +555,7 @@ test.describe("PROJ-22 — Design-Grundlage (nur Stage)", () => {
 
   test("AC-6, AC-7, AC-8, BUG-2: Nachfolge-Auswahl ist groß und gut lesbar", async () => {
     await pageL.goto("/persoenlicher-bereich");
+    await waitForPage(pageL);
     await pageL.getByRole("button", { name: "Konto löschen", exact: true }).click();
     const dialog = pageL.getByRole("alertdialog");
     await dialog.getByRole("combobox").first().click();
@@ -576,10 +585,12 @@ test.describe("PROJ-22 — Design-Grundlage (nur Stage)", () => {
     await pageL.setViewportSize({ width: 320, height: 640 });
     await pageL.goto("/persoenlicher-bereich");
     const email = pageL.locator("#account-email");
+    await expect(email).toBeVisible();
     await expect(email).toHaveText(L.email);
     expect(await email.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
 
     const name = pageL.locator("#account-name");
+    await expect(name).toBeVisible();
     const singleLine = (await name.boundingBox())!.height;
     await name.fill(longName);
     await expect
@@ -602,6 +613,7 @@ test.describe("PROJ-22 — Design-Grundlage (nur Stage)", () => {
   test("AC-36: Auf dem Handy stehen die Karten untereinander, das Buch bleibt sichtbar", async () => {
     await pageL.setViewportSize({ width: 375, height: 812 });
     await pageL.goto("/");
+    await expect(pageL.locator("main article").first()).toBeVisible();
     const first = await pageL.locator("main article").nth(0).boundingBox();
     const second = await pageL.locator("main article").nth(1).boundingBox();
     expect(second!.y).toBeGreaterThan(first!.y + first!.height - 1);
@@ -619,6 +631,7 @@ test.describe("PROJ-22 — Design-Grundlage (nur Stage)", () => {
       color: "creme",
     });
     await pageL.goto("/");
+    await waitForPage(pageL);
     await pageL.getByRole("button", { name: `Projekt „${temp.title}" löschen` }).click();
     await pageL.getByRole("button", { name: "Weiter zur Bestätigung" }).click();
     const phrase = (await pageL.locator("p.font-mono").innerText()).trim();
