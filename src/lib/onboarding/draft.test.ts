@@ -43,9 +43,9 @@ describe("Zwischenspeicher des Onboardings", () => {
   });
 
   it("verwirft beschädigte Daten", () => {
-    window.sessionStorage.setItem("narravit.onboarding.v1", "{kaputt");
+    window.sessionStorage.setItem("narravit.onboarding.v2", "{kaputt");
     expect(loadOnboardingDraft("konto-a")).toBeNull();
-    expect(window.sessionStorage.getItem("narravit.onboarding.v1")).toBeNull();
+    expect(window.sessionStorage.getItem("narravit.onboarding.v2")).toBeNull();
   });
 
   it("löscht den Entwurf", () => {

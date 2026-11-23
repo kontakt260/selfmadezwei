@@ -216,12 +216,10 @@ test.describe("PROJ-2 — Onboarding wizard", () => {
     // Step 4: Erzähl-Impulse sind Pflicht
     await expect(page.getByRole("heading", { name: "Wie erreichen wir Oma Helga?" })).toBeVisible();
     await page.locator("#narrationEmail").fill("oma@example.com");
-    await page.getByLabel(/Ich bestätige, dass Oma Helga/).check();
     await page.getByRole("button", { name: "Weiter" }).click();
 
     // Step 5: Purchase step shows gift summary
-    await expect(page.getByText("Oma Helga")).toBeVisible();
-    await expect(page.getByText("Nur per Sprachnachricht")).toBeVisible();
+    await expect(page.locator("dd", { hasText: "Oma Helga" })).toBeVisible();
   });
 
   test("Path B2 (gift + phone+computer): 6 steps with role selection", async ({ page }) => {
@@ -251,7 +249,7 @@ test.describe("PROJ-2 — Onboarding wizard", () => {
 
     // Step 6: Purchase step
     await expect(page.getByText("oma@example.com")).toBeVisible();
-    await expect(page.getByText("Auch am Computer")).toBeVisible();
+    await expect(page.getByText("E-Mail für das Geschenk")).toBeVisible();
   });
 
   test("name step requires min. 2 characters", async ({ page }) => {

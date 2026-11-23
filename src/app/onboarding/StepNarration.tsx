@@ -1,23 +1,13 @@
 "use client";
 
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  PHONE_COUNTRIES,
   channelUsesEmail,
   channelUsesSms,
   narrationIsActive,
   narrationIsRequired,
   narrationUsesCheckoutEmail,
-  isPhoneCountry,
   type FieldErrors,
   type NarrationChannel,
   type WizardState,
@@ -50,14 +40,17 @@ export function StepNarration({ state, errors, isGuest, onChange }: Props) {
       ? `Soll ${name} regelmäßig Erzähl-Impulse bekommen?`
       : "Möchten Sie regelmäßig Erzähl-Impulse bekommen?";
 
+  // Ohne Portal-Zugang gibt es nur den Weg über die Sprachnachricht.
+  const intro = required
+    ? `${name} bekommt eine tiefgehende Leitfrage und kann die Antwort einfach per Sprachnachricht erzählen.`
+    : isGift
+      ? `${name} bekommt eine tiefgehende Leitfrage und kann die Antwort einfach per Sprachnachricht erzählen oder im Portal festhalten.`
+      : "Sie bekommen eine tiefgehende Leitfrage und können die Antwort einfach per Sprachnachricht erzählen oder im Portal festhalten.";
+
   return (
     <div>
       <h2 className="heading-style-h3 mb-3 [overflow-wrap:anywhere]">{heading}</h2>
-      <p className="mb-6 text-lg leading-7 text-[#4A453F]">
-        {isGift
-          ? `${name} bekommt eine Frage aus dem eigenen Leben und kann die Antwort einfach per Sprachnachricht erzählen.`
-          : "Sie bekommen eine Frage aus Ihrem Leben und können die Antwort einfach per Sprachnachricht erzählen."}
-      </p>
+      <p className="mb-6 text-lg leading-7 text-[#4A453F] [overflow-wrap:anywhere]">{intro}</p>
 
       {!required && (
         <div className="mb-8 grid gap-3 sm:grid-cols-2">
@@ -76,7 +69,9 @@ export function StepNarration({ state, errors, isGuest, onChange }: Props) {
             onClick={() => onChange("narrationEnabled", false)}
             title="Nein, danke"
             description={
-              isGift ? `${name} schreibt nur am Computer.` : "Ich möchte nur selbst schreiben."
+              isGift
+                ? `${name} nutzt zunächst nur den gängigen Projektzugang.`
+                : "Ich nutze zunächst nur den gängigen Projektzugang."
             }
           />
         </div>
@@ -129,52 +124,26 @@ export function StepNarration({ state, errors, isGuest, onChange }: Props) {
               <Label htmlFor="narrationPhone">
                 {isGift ? `Handynummer von ${name}` : "Ihre Handynummer"}
               </Label>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Select
-                  value={state.narrationPhoneCountry}
-                  onValueChange={(value) => {
-                    if (isPhoneCountry(value)) onChange("narrationPhoneCountry", value);
-                  }}
-                >
-                  <SelectTrigger
-                    aria-label="Ländervorwahl"
-                    className="h-12 w-full border-[#8E877E] bg-white text-base sm:w-56 sm:shrink-0"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PHONE_COUNTRIES.map((country) => (
-                      <SelectItem
-                        key={country.id}
-                        value={country.id}
-                        className="min-h-11 py-2 text-base focus:bg-[#EFEBE5] focus:text-[#1F1C19]"
-                      >
-                        {country.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  id="narrationPhone"
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete={isGift ? "off" : "tel"}
-                  placeholder="0171 1234567"
-                  value={state.narrationPhone}
-                  onChange={(event) => onChange("narrationPhone", event.target.value)}
-                  aria-invalid={!!errors.narrationPhone}
-                  aria-describedby={
-                    errors.narrationPhone
-                      ? "narrationPhone-error narrationPhone-hint"
-                      : "narrationPhone-hint"
-                  }
-                  data-invalid={errors.narrationPhone ? "true" : undefined}
-                  className="h-12 min-w-0 flex-1 border-[#8E877E] placeholder:text-[#6B655E]"
-                />
-              </div>
+              <Input
+                id="narrationPhone"
+                type="tel"
+                inputMode="tel"
+                autoComplete={isGift ? "off" : "tel"}
+                placeholder="+49 171 1234567"
+                value={state.narrationPhone}
+                onChange={(event) => onChange("narrationPhone", event.target.value)}
+                aria-invalid={!!errors.narrationPhone}
+                aria-describedby={
+                  errors.narrationPhone
+                    ? "narrationPhone-error narrationPhone-hint"
+                    : "narrationPhone-hint"
+                }
+                data-invalid={errors.narrationPhone ? "true" : undefined}
+                className="h-12 border-[#8E877E] placeholder:text-[#6B655E]"
+              />
               <FieldError id="narrationPhone-error" message={errors.narrationPhone} />
               <p id="narrationPhone-hint" className="text-base leading-6 text-[#5F5A54]">
-                Aus einem anderen Land? Geben Sie die Nummer mit + und Ländervorwahl ein.
+                Geben Sie die Nummer mit + und Ländervorwahl ein, zum Beispiel +49.
               </p>
             </div>
           )}
@@ -183,30 +152,6 @@ export function StepNarration({ state, errors, isGuest, onChange }: Props) {
             Die Erzähl-Impulse kommen jeden Sonntag. Der Rhythmus lässt sich später in der
             Projektübersicht ändern.
           </p>
-
-          {isGift && (
-            <div className="mt-6">
-              <label
-                htmlFor="narrationConsent"
-                className="flex min-h-11 cursor-pointer items-start gap-3 border border-[#BDB5AA] bg-[#FAF8F6] p-4 text-base leading-6 text-[#3E3831]"
-              >
-                <Checkbox
-                  id="narrationConsent"
-                  checked={state.narrationConsent}
-                  onCheckedChange={(checked) => onChange("narrationConsent", checked === true)}
-                  aria-invalid={!!errors.narrationConsent}
-                  aria-describedby={errors.narrationConsent ? "narrationConsent-error" : undefined}
-                  data-invalid={errors.narrationConsent ? "true" : undefined}
-                  className="mt-0.5 h-6 w-6 border-[#5F5A54] data-[state=checked]:border-[#3E3831] data-[state=checked]:bg-[#3E3831] data-[state=checked]:text-white"
-                />
-                <span className="[overflow-wrap:anywhere]">
-                  Ich bestätige, dass {name} damit einverstanden ist, regelmäßig Nachrichten von
-                  NARRAVIT zu erhalten.
-                </span>
-              </label>
-              <FieldError id="narrationConsent-error" message={errors.narrationConsent} />
-            </div>
-          )}
         </>
       )}
     </div>

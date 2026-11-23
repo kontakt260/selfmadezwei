@@ -3,11 +3,9 @@ import {
   INITIAL_WIZARD_STATE,
   buildSteps,
   changeForWhom,
-  changeRecipientName,
+  changeNarrationEmail,
   narrationIsActive,
-  narrationSummary,
   normalizeMobileNumber,
-  prefillInvitationEmail,
   validateStep,
   type WizardState,
 } from "./wizard";
@@ -52,42 +50,39 @@ describe("buildSteps", () => {
 
 describe("normalizeMobileNumber", () => {
   it.each([
-    ["DE", "0171 1234567", "+491711234567"],
-    ["DE", "0171/1234567", "+491711234567"],
-    ["DE", "+49 0171 1234567", "+491711234567"],
-    ["AT", "0664 1234567", "+436641234567"],
-    ["CH", "079 123 45 67", "+41791234567"],
-    ["DE", "+43 664 1234567", "+436641234567"],
-  ] as const)("%s %s", (country, raw, expected) => {
-    expect(normalizeMobileNumber(country, raw)).toBe(expected);
+    ["+49 171 1234567", "+491711234567"],
+    ["+49 0171 1234567", "+491711234567"],
+    ["0171 1234567", "+491711234567"],
+    ["0171/1234567", "+491711234567"],
+    ["+43 664 1234567", "+436641234567"],
+    ["+41 79 123 45 67", "+41791234567"],
+    ["+31 6 12345678", "+31612345678"],
+    ["+1 415 555 2671", "+14155552671"],
+  ])("%s", (raw, expected) => {
+    expect(normalizeMobileNumber(raw)).toBe(expected);
   });
 
-  it.each(["", "171", "030 1234567", "keine Nummer"])("lehnt „%s“ ab", (raw) => {
-    expect(normalizeMobileNumber("DE", raw)).toBeNull();
+  it.each(["", "171", "030 1234567", "+49 30 1234567", "keine Nummer"])("lehnt „%s“ ab", (raw) => {
+    expect(normalizeMobileNumber(raw)).toBeNull();
   });
 });
 
 describe("validateStep: Erzähl-Impulse", () => {
-  it("verlangt bei „Nur per Sprachnachricht“ Kontakt und Einverständnis", () => {
+  it("verlangt bei „Nur per Sprachnachricht“ einen Kontakt", () => {
     const errors = validateStep("narration", { ...phoneGift, narrationEnabled: false }, logged);
     expect(errors.narrationEmail).toBeTruthy();
-    expect(errors.narrationConsent).toContain("Oma Helga");
   });
 
-  it("akzeptiert eine gültige E-Mail mit Einverständnis", () => {
+  it("akzeptiert eine gültige E-Mail ohne weitere Bestätigung", () => {
     expect(
-      validateStep(
-        "narration",
-        { ...phoneGift, narrationEmail: "oma@example.test", narrationConsent: true },
-        logged,
-      ),
+      validateStep("narration", { ...phoneGift, narrationEmail: "oma@example.test" }, logged),
     ).toEqual({});
   });
 
   it("prüft bei „beides“ beide Felder", () => {
     const errors = validateStep(
       "narration",
-      { ...phoneGift, narrationChannel: "both", narrationEmail: "oma@example.test", narrationPhone: "123", narrationConsent: true },
+      { ...phoneGift, narrationChannel: "both", narrationEmail: "oma@example.test", narrationPhone: "123" },
       logged,
     );
     expect(Object.keys(errors)).toEqual(["narrationPhone"]);
@@ -100,12 +95,6 @@ describe("validateStep: Erzähl-Impulse", () => {
         state({ forWhom: "gift", giftMode: "phone-plus-computer", narrationEnabled: false }),
         logged,
       ),
-    ).toEqual({});
-  });
-
-  it("braucht beim Kauf für sich selbst kein Häkchen", () => {
-    expect(
-      validateStep("narration", state({ forWhom: "self", narrationEmail: "ich@example.test" }), logged),
     ).toEqual({});
   });
 
@@ -135,13 +124,12 @@ describe("validateStep: Zugang einrichten", () => {
 describe("Wegwechsel", () => {
   it("nimmt Kontaktdaten der beschenkten Person nicht in den eigenen Kauf mit", () => {
     const next = changeForWhom(
-      { ...phoneGift, narrationEmail: "oma@example.test", narrationPhone: "0171 1234567", narrationConsent: true },
+      { ...phoneGift, narrationEmail: "oma@example.test", narrationPhone: "0171 1234567" },
       "self",
       logged,
     );
     expect(next.narrationEmail).toBe(logged.buyerEmail);
     expect(next.narrationPhone).toBe("");
-    expect(next.narrationConsent).toBe(false);
   });
 
   it("behält die Daten, wenn derselbe Weg erneut gewählt wird", () => {
@@ -149,49 +137,40 @@ describe("Wegwechsel", () => {
     expect(changeForWhom(current, "gift", logged)).toBe(current);
   });
 
-  it("setzt das Einverständnis zurück, wenn sich der Name ändert", () => {
-    const next = changeRecipientName({ ...phoneGift, narrationConsent: true }, "Opa Karl");
-    expect(next.narrationConsent).toBe(false);
-  });
-
   it("hält die Impulse bei „Nur per Sprachnachricht“ immer aktiv", () => {
     expect(narrationIsActive({ ...phoneGift, narrationEnabled: false })).toBe(true);
   });
 });
 
-describe("prefillInvitationEmail", () => {
-  const computer = state({
-    forWhom: "gift",
-    giftMode: "phone-plus-computer",
-    narrationEmail: "oma@example.test",
+describe("changeNarrationEmail", () => {
+  const computer = state({ forWhom: "gift", giftMode: "phone-plus-computer" });
+
+  it("füllt die Adresse für das Geschenk mit", () => {
+    expect(changeNarrationEmail(computer, "oma@example.test").giftRecipientEmail).toBe(
+      "oma@example.test",
+    );
   });
 
-  it("übernimmt die Adresse aus den Erzähl-Impulsen", () => {
-    expect(prefillInvitationEmail(computer).giftRecipientEmail).toBe("oma@example.test");
+  it("zieht eine spätere Korrektur mit", () => {
+    const first = changeNarrationEmail(computer, "oma@example.tes");
+    expect(changeNarrationEmail(first, "oma@example.test").giftRecipientEmail).toBe(
+      "oma@example.test",
+    );
   });
 
-  it("überschreibt keine eingetragene Adresse", () => {
-    const current = { ...computer, giftRecipientEmail: "andere@example.test" };
-    expect(prefillInvitationEmail(current).giftRecipientEmail).toBe("andere@example.test");
+  it("überschreibt keine bewusst andere Adresse", () => {
+    const current = {
+      ...changeNarrationEmail(computer, "oma@example.test"),
+      giftRecipientEmail: "andere@example.test",
+    };
+    expect(changeNarrationEmail(current, "neu@example.test").giftRecipientEmail).toBe(
+      "andere@example.test",
+    );
   });
 
-  it("übernimmt nichts bei „Nur SMS“", () => {
+  it("füllt beim Kauf für sich selbst nichts mit", () => {
     expect(
-      prefillInvitationEmail({ ...computer, narrationChannel: "sms" }).giftRecipientEmail,
+      changeNarrationEmail(state({ forWhom: "self" }), "ich@example.test").giftRecipientEmail,
     ).toBe("");
-  });
-});
-
-describe("narrationSummary", () => {
-  it.each([
-    ["email", "Per E-Mail, jeden Sonntag"],
-    ["sms", "Per SMS, jeden Sonntag"],
-    ["both", "Per E-Mail und SMS, jeden Sonntag"],
-  ] as const)("%s", (narrationChannel, expected) => {
-    expect(narrationSummary(state({ forWhom: "self", narrationChannel }))).toBe(expected);
-  });
-
-  it("nennt „Keine“ bei Nein", () => {
-    expect(narrationSummary(state({ forWhom: "self", narrationEnabled: false }))).toBe("Keine");
   });
 });

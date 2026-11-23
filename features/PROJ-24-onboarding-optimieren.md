@@ -20,6 +20,10 @@
 4. **Preis:** Die 249 € enthalten das **erste gedruckte Hardcover-Buch**.
 5. **Abbruch:** Wer bei Stripe zurückgeht oder die Seite neu lädt, verliert seine Angaben nicht.
 6. **Rhythmus:** Das Onboarding fragt nicht danach. Beim Kauf gilt „jeden Sonntag", geändert wird das später in der Projektübersicht.
+7. **Keine Einverständnis-Box:** Die Erzähl-Impulse sind eine Serviceleistung. Die Person wird ab der ersten Kontaktaufnahme informiert und kann dort ablehnen oder widerrufen. Das baut PROJ-12.
+8. **Handynummer:** ein einziges Feld für alle Länder, gespeichert als eine Nummer im internationalen Format.
+9. **Letzte Seite:** nur Name, Für wen, beschenkte Person und E-Mail für das Geschenk, dazu ein Buchbild als Platzhalter.
+10. **Wer „Nein" wählt, bleibt nicht auf das Schreiben festgelegt:** Die Person soll sich später im Portal für Erzähl-Impulse entscheiden oder sich selbst einen auslösen können, auch per Audio. Wie genau, klärt `/refine PROJ-12`.
 
 ## Neuer Ablauf
 
@@ -65,25 +69,29 @@ So sieht Schritt 4 je nach Weg aus:
 
 - [ ] AC-9: Bei „Nur per Sprachnachricht erzählen" sind die Erzähl-Impulse fest eingeschaltet. Ohne gültigen Kontaktweg geht es nicht weiter.
 - [ ] AC-10: Bei „Auch am Computer schreiben" und „Für mich selbst" gibt es eine Ja-oder-Nein-Frage, Ja ist vorausgewählt.
-- [ ] AC-11: Bei Nein verschwinden die Kontaktfelder und man kommt ohne weitere Angaben zum nächsten Schritt.
+- [ ] AC-11: Bei Nein verschwinden die Kontaktfelder und man kommt ohne weitere Angaben zum nächsten Schritt. Die Karte sagt: „[Name] nutzt zunächst nur den gängigen Projektzugang." Beim eigenen Kauf: „Ich nutze zunächst nur den gängigen Projektzugang."
+- [ ] AC-28: Der Untertitel lautet: „[Name] bekommt eine tiefgehende Leitfrage und kann die Antwort einfach per Sprachnachricht erzählen oder im Portal festhalten." Beim eigenen Kauf in der Sie-Form. Bei „Nur per Sprachnachricht" entfällt das Portal.
+- [ ] AC-29: „Für wen ist das Geschenk?" hat keinen Untertitel. Die Karte „Nur per Sprachnachricht erzählen" ergänzt: „Das ist vor allem für Personen geeignet, denen der Umgang mit dem Computer schwerfällt."
 - [ ] AC-12: Bei Ja wählt man **E-Mail**, **SMS** oder **beides**. Es erscheinen nur die dazu passenden Felder.
-- [ ] AC-13: Die Handynummer hat die Vorwahl +49 vorbelegt, andere Ländervorwahlen sind möglich. Ungültige Nummern werden direkt am Feld abgelehnt.
+- [ ] AC-13: Die Handynummer steht in einem einzigen Feld mit dem Hinweis „Geben Sie die Nummer mit + und Ländervorwahl ein, zum Beispiel +49." Nummern aller Länder werden angenommen und einheitlich gespeichert, ungültige direkt am Feld abgelehnt.
 - [ ] AC-14: Bei „Für mich selbst" ist die eigene E-Mail-Adresse vorbefüllt. Gäste ohne Konto tragen keine Adresse ein, die Impulse gehen an die Adresse, mit der sie bezahlen. Der Schritt sagt das so.
 - [ ] AC-15: Der Schritt sagt in einem Satz, dass die Erzähl-Impulse jeden Sonntag kommen und der Rhythmus später in der Projektübersicht änderbar ist.
-- [ ] AC-16: Bei Geschenken bestätigt der Käufer mit einem Häkchen, dass [Name] mit den Nachrichten von NARRAVIT einverstanden ist. Ohne Häkchen geht es nicht weiter. Bei „Für mich selbst" entfällt das Häkchen.
+- [ ] AC-16: Es gibt keine Einverständnis-Box. Information und Ablehnen kommen mit der ersten Nachricht (PROJ-12).
 - [ ] AC-17: Die Angaben werden erst nach erfolgreicher Zahlung dem Projekt zugeordnet. Kommt keine Zahlung zustande, werden sie automatisch gelöscht (Fristen im Tech Design).
 - [ ] AC-18: Durch PROJ-24 allein wird keine Nachricht verschickt. Der Versand kommt mit PROJ-12.
 
 ### C. Zugang einrichten
 
 - [ ] AC-19: Schalter „Eigener Zugang" und Rollenauswahl bleiben in Funktion und Regeln wie heute.
-- [ ] AC-20: Wurde in Schritt 4 eine E-Mail eingetragen, ist sie in Schritt 5 vorbefüllt und bleibt änderbar.
+- [ ] AC-20: Eine E-Mail aus Schritt 4 ist in Schritt 5 vorbefüllt und zieht spätere Korrekturen mit, bis dort bewusst eine andere Adresse steht.
 
 ### D. Kaufschritt
 
-- [ ] AC-21: Die Zusammenfassung zeigt zusätzlich, ob und wie die Erzähl-Impulse kommen, zum Beispiel „Per E-Mail und SMS, jeden Sonntag" oder „Keine".
+- [ ] AC-21: Die Zusammenfassung zeigt nur „Ihr Name", „Für wen", „Beschenkte Person" und „E-Mail für das Geschenk". Beim Kauf für sich selbst bleiben die ersten beiden.
 - [ ] AC-22: Das Buch steht im Preisfeld an erster Stelle. Der Preistext lautet: „Ihr erstes gedrucktes Hardcover-Buch, 12 Monate Projektzugang, Erzählen per Sprachnachricht und Editor."
 - [ ] AC-23: Die Karte „Buch in den Druck geben" aus PROJ-22 nennt passend dazu: „Ihr erstes gedrucktes Buch ist bereits bezahlt."
+
+- [ ] AC-27: Die letzte Seite zeigt ein Buch als Bild. Es ist ein Platzhalter und lässt sich später an einer Stelle gegen ein echtes Foto tauschen.
 
 ### E. Abbruch und Neuladen
 
@@ -116,9 +124,9 @@ So sieht Schritt 4 je nach Weg aus:
 
 - **Erzähl-Impulse an Dritte, anwaltlich prüfen:**
   1. Sind die Nachrichten ein Service zum gekauften Buch oder Werbung? Werbung per Mail oder SMS braucht die vorherige ausdrückliche Einwilligung der Empfänger selbst (§ 7 Abs. 2 Nr. 2 UWG).
-  2. Reicht das Häkchen des Käufers? Es ist nur seine Zusicherung. Bei Empfehlungs-Mails haftet laut BGH (I ZR 208/12) auch das Unternehmen, wenn ein Dritter den Versand auslöst.
+  2. Reicht es ohne Einverständnis-Box? Jakob hat sie als Serviceleistung entfernt. Bei Empfehlungs-Mails haftet laut BGH (I ZR 208/12) auch das Unternehmen, wenn ein Dritter den Versand auslöst. Deshalb dürfen die Nachrichten keine Werbung enthalten.
   3. Wie wird die Person informiert? Spätestens mit der ersten Nachricht braucht sie die Angaben nach Art. 14 DSGVO, darunter Herkunft der Daten und Widerspruchsrecht.
-  4. Kann es ohne Abmeldung bleiben? Die bisherige Produktentscheidung passt schlecht zum Widerspruchsrecht. Entschieden wird das in `/refine PROJ-12`.
+  4. Wie läuft das Ablehnen und Widerrufen? Es muss in den Nachrichten einfach möglich sein. Gebaut wird es mit PROJ-12.
 - **Datenschutz:** Die Datenschutzerklärung muss nennen, dass Käufer Kontaktdaten einer anderen Person angeben.
 - **Preis:** Website, AGB und PROJ-16 müssen dieselbe Leistung nennen: erstes gedrucktes Hardcover-Buch inklusive.
 
@@ -152,7 +160,6 @@ Onboarding
 |   +-- Auswahl E-Mail, SMS oder beides
 |   +-- Felder für E-Mail und Handynummer
 |   +-- Hinweis „jeden Sonntag"
-|   +-- Häkchen zum Einverständnis (nur bei Geschenken)
 +-- Zugang einrichten (wie heute, E-Mail vorbefüllt)
 +-- Bereit zum Start? (Zusammenfassung, neuer Preistext)
 +-- Zwischenspeicher im Browser-Tab
@@ -172,7 +179,6 @@ Nach „Jetzt kaufen"
 - Name der erzählenden Person, E-Mail, Handynummer
 - Gewählte Wege: Mail, SMS oder beides
 - Wochentag und Rhythmus, Vorgabe jeden Sonntag
-- Zeitpunkt und Textversion des Einverständnisses, nur bei Geschenken
 
 Wer „Nein" wählt, bekommt keine Zeile. Das Projekt gilt dann als „nicht eingerichtet".
 
@@ -238,18 +244,17 @@ Geprüft werden alle sechs Kombinationen aus Weg und Erzähl-Impulsen, bezahlte 
 **Gebaut:**
 
 - **Eingaberegeln:** Schritte, Pflichtfelder, Handynummern und Wegwechsel liegen in `src/lib/onboarding/wizard.ts` und können später auch auf dem Server genutzt werden.
-- **Schritt „Erzähl-Impulse":** Ja oder Nein, E-Mail, SMS oder beides, Einverständnis bei Geschenken, Hinweis auf den Sonntag.
+- **Schritt „Erzähl-Impulse":** Ja oder Nein, E-Mail, SMS oder beides, ein Feld für die Handynummer, Hinweis auf den Sonntag.
 - **Zwischenspeicher:** `src/lib/onboarding/draft.ts` hält die Angaben im Browser-Tab, gebunden an das Konto. Nach dem Kauf und beim Abmelden werden sie gelöscht.
 - **Lesbarkeit:** Schrittanzeige, Texte, Felder und Buttons, Fehlermeldungen direkt am Feld, keine Glaseffekte mehr.
-- **Kaufschritt und Druck-Karte:** neue Zusammenfassung, Preistext mit dem Buch zuerst, Hinweis auf das bereits bezahlte Buch.
+- **Kaufschritt und Druck-Karte:** kurze Zusammenfassung, Buchbild als Platzhalter (`PURCHASE_BOOK` in `OnboardingWizard.tsx`), Preistext mit dem Buch zuerst, Hinweis auf das bereits bezahlte Buch.
 
 **Noch nicht gebaut (`/backend`):** Die Angaben aus dem Schritt „Erzähl-Impulse" gehen beim Kauf noch nicht an den Server. Ein Testkauf auf Stage speichert sie also noch nicht.
 
 **Ergänzungen beim Bau:**
 
-- Die Vorwahl wird aus Deutschland, Österreich und der Schweiz gewählt. Andere Länder gehen über die Eingabe mit `+`.
+- Eine Nummer ohne + wird als deutsche Nummer gelesen, zum Beispiel 0171 1234567.
 - Der Zwischenspeicher verfällt zusätzlich nach 24 Stunden, auch wenn der Tab offen bleibt.
-- Ändert sich der Name der beschenkten Person, muss das Einverständnis neu bestätigt werden.
 
 ## QA Test Results
 _To be added by /qa_

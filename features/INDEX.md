@@ -39,10 +39,12 @@
 | PROJ-26 | Papierkorb (serverseitig, 14 Tage) | P0 | Approved | PROJ-1, PROJ-3, PROJ-4, PROJ-5, PROJ-6, PROJ-7, PROJ-9, PROJ-10, PROJ-11 | [Spec](PROJ-26-papierkorb.md) | 2026-11-22 |
 | PROJ-28 | Aufbewahrung, Lesemodus und automatische Löschung | P0 | Approved | PROJ-3, PROJ-5, PROJ-6, PROJ-9, PROJ-10, PROJ-11, PROJ-26 | [Spec](PROJ-28-aufbewahrung-automatische-loeschung.md) | 2026-11-22 |
 | PROJ-29 | Webflow-Landingpage gemeinsam prüfen und überarbeiten (über MCP) | P1 | Roadmap | — | — | 2026-11-23 |
+| PROJ-30 | Ladezeiten verbessern (Server-Region, weniger Datenbankaufrufe) | P1 | Roadmap | — | — | 2026-11-23 |
+| PROJ-31 | Code aufräumen und Tests verschlanken | P2 | Roadmap | PROJ-24, PROJ-30 | — | 2026-11-23 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-30
+## Next Available ID: PROJ-32
 
 > PROJ-20, PROJ-21, PROJ-23, PROJ-25 und PROJ-27 sind für geplante Themen reserviert und haben noch keine Spec.
 

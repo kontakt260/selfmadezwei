@@ -10,20 +10,21 @@ import {
   useTransition,
 } from "react";
 import { Check, Loader2 } from "lucide-react";
+import { BookView } from "@/components/cover/BookView";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { startCheckoutAction } from "@/app/checkout/actions";
+import { DEFAULT_THEME_ID } from "@/lib/cover-themes";
+import type { CoverData } from "@/lib/cover-types";
 import { loadOnboardingDraft, saveOnboardingDraft } from "@/lib/onboarding/draft";
 import {
   INITIAL_WIZARD_STATE,
   buildSteps,
   changeForWhom,
-  changeRecipientName,
-  narrationSummary,
-  prefillInvitationEmail,
+  changeNarrationEmail,
   validateStep,
   type FieldErrors,
   type FieldKey,
@@ -36,6 +37,17 @@ import {
 } from "@/lib/onboarding/wizard";
 import { StepNarration } from "./StepNarration";
 import { ChoiceCard, FieldError } from "./wizard-ui";
+
+// PROJ-24: Platzhalter für die Kaufseite. Sobald es echte Buchfotos gibt, wird
+// nur dieses Motiv ausgetauscht (`imageUrl` zeigt ein Foto auf dem Cover).
+const PURCHASE_BOOK: CoverData = {
+  title: "Ihr Lebensbuch",
+  subtitle: "",
+  authorLine: "",
+  themeId: DEFAULT_THEME_ID,
+  colorId: "sand",
+  imageUrl: null,
+};
 
 type WizardProps = {
   defaultFullName: string;
@@ -195,7 +207,6 @@ function WizardForm({
     }
     setFieldErrors({});
     setError(null);
-    if (currentStep === "narration") setState(prefillInvitationEmail);
     setStepIndex(Math.min(safeIndex + 1, steps.length - 1));
   };
 
@@ -208,7 +219,7 @@ function WizardForm({
   const update = <K extends keyof WizardState>(key: K, value: WizardState[K]) => {
     setState((current) => {
       if (key === "forWhom") return changeForWhom(current, value as ForWhom, context);
-      if (key === "giftRecipientName") return changeRecipientName(current, value as string);
+      if (key === "narrationEmail") return changeNarrationEmail(current, value as string);
       const nextState = { ...current, [key]: value };
       if (key === "buyerWantsAccess" && value === false) {
         nextState.giftRecipientRole = "projektleiter";
@@ -484,10 +495,7 @@ function StepGiftDetails({
 }) {
   return (
     <div>
-      <h2 className="heading-style-h3 mb-3">Für wen ist das Geschenk?</h2>
-      <p className="mb-6 text-lg leading-7 text-[#4A453F]">
-        Erzählen Sie uns ein bisschen über die beschenkte Person.
-      </p>
+      <h2 className="heading-style-h3 mb-6">Für wen ist das Geschenk?</h2>
 
       <div className="grid gap-2">
         <Label htmlFor="recipientName">Name der beschenkten Person</Label>
@@ -515,7 +523,7 @@ function StepGiftDetails({
           selected={giftMode === "phone-only"}
           onClick={() => onChangeMode("phone-only")}
           title="Nur per Sprachnachricht erzählen"
-          description="Die beschenkte Person bekommt jede Woche einen Erzähl-Impuls und erzählt per Sprachnachricht. Wir machen daraus den Text."
+          description="Die beschenkte Person bekommt jede Woche einen Erzähl-Impuls und erzählt per Sprachnachricht. Wir machen daraus den Text. Das ist vor allem für Personen geeignet, denen der Umgang mit dem Computer schwerfällt."
         />
         <ChoiceCard
           selected={giftMode === "phone-plus-computer"}
@@ -625,26 +633,9 @@ function StepPurchase({ state, isGuest }: { state: WizardState; isGuest: boolean
     { label: "Für wen", value: isGift ? "Als Geschenk" : "Für mich selbst" },
   ];
 
-  if (isGift) {
-    summary.push({ label: "Beschenkte Person", value: state.giftRecipientName });
-    summary.push({
-      label: "Erzählweise",
-      value: withComputer ? "Auch am Computer" : "Nur per Sprachnachricht",
-    });
-  }
-  summary.push({ label: "Erzähl-Impulse", value: narrationSummary(state) });
+  if (isGift) summary.push({ label: "Beschenkte Person", value: state.giftRecipientName });
   if (withComputer) {
-    summary.push({ label: "E-Mail für die Einladung", value: state.giftRecipientEmail });
-    summary.push({
-      label: "Rolle der beschenkten Person",
-      value: state.giftRecipientRole === "projektleiter" ? "Projektleiter" : "Co-Autor",
-    });
-    summary.push({
-      label: "Ihr eigener Zugang",
-      value: state.buyerWantsAccess ? "Ja, als Projektleiter" : "Nein",
-    });
-  } else if (isGift) {
-    summary.push({ label: "Ihr eigener Zugang", value: "Ja, als Projektleiter" });
+    summary.push({ label: "E-Mail für das Geschenk", value: state.giftRecipientEmail });
   }
 
   // Geschenk ohne eigenen Zugang: Ohne Anmeldung ist gar kein Konto nötig.
@@ -672,12 +663,17 @@ function StepPurchase({ state, isGuest }: { state: WizardState; isGuest: boolean
         ))}
       </dl>
 
-      <div className="border border-[#e0dcd5] bg-[#FAF8F6] p-5 sm:p-7">
-        <p className="heading-style-h4">249 €</p>
-        <p className="mt-2 text-lg leading-7 text-[#3E3831]">
-          Ihr erstes gedrucktes Hardcover-Buch, 12 Monate Projektzugang, Erzählen per Sprachnachricht
-          und Editor.
-        </p>
+      <div className="flex flex-col border border-[#e0dcd5] sm:flex-row">
+        <div className="flex items-center justify-center overflow-hidden bg-[#EFEAE3] px-6 py-7 sm:w-56 sm:shrink-0">
+          <BookView data={PURCHASE_BOOK} className="max-w-[150px]" />
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col justify-center bg-[#FAF8F6] p-5 sm:p-7">
+          <p className="heading-style-h4">249 €</p>
+          <p className="mt-2 text-lg leading-7 text-[#3E3831]">
+            Ihr erstes gedrucktes Hardcover-Buch, 12 Monate Projektzugang, Erzählen per
+            Sprachnachricht und Editor.
+          </p>
+        </div>
       </div>
     </div>
   );

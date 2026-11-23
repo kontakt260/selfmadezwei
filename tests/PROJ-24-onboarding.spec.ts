@@ -33,6 +33,8 @@ const auditCard = () => {
   for (const el of Array.from(root.querySelectorAll("*"))) {
     const rect = el.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0 || el.closest("header, .sr-only")) continue;
+    // Das Buch ist ein Bild: Seine Schrift skaliert mit dem Cover.
+    if (el.closest('[class*="container-type"]')) continue;
     const own = Array.from(el.childNodes).some((n) => n.nodeType === 3 && n.textContent!.trim());
     if (own && parseFloat(getComputedStyle(el).fontSize) < 16) {
       problems.push(`klein: ${(el.textContent ?? "").slice(0, 30)}`);
@@ -53,19 +55,20 @@ test.describe("PROJ-24 — Onboarding als Gast", () => {
     ).toBeVisible();
     await expect(page.locator("#narrationEmail")).toHaveCount(0);
     await expect(page.getByText(/mit der Sie gleich bezahlen/)).toBeVisible();
-    await expect(page.getByLabel(/Ich bestätige/)).toHaveCount(0);
+    await expect(page.getByText(/nutze zunächst nur den gängigen Projektzugang/)).toBeVisible();
+    await expect(page.getByText(/tiefgehende Leitfrage.*im Portal festhalten/)).toBeVisible();
     await weiter(page);
     await expect(page.getByRole("heading", { name: "Bereit zum Start?" })).toBeVisible();
-    await expect(page.getByText("Per E-Mail, jeden Sonntag")).toBeVisible();
   });
 
-  test("AC-9, AC-16: Nur per Sprachnachricht verlangt Kontakt und Einverständnis", async ({ page }) => {
+  test("AC-9: Nur per Sprachnachricht verlangt einen Kontakt und keine Box", async ({ page }) => {
     await toNarration(page, "phone-only");
     await expect(page.getByRole("heading", { name: "Wie erreichen wir Oma Helga?" })).toBeVisible();
     await expect(page.getByRole("button", { name: /Nein, danke/ })).toHaveCount(0);
     await weiter(page);
     await expect(page.getByText("Bitte geben Sie eine gültige E-Mail-Adresse an.")).toBeVisible();
-    await expect(page.getByText("Bitte bestätigen Sie, dass Oma Helga einverstanden ist.")).toBeVisible();
+    await expect(page.getByRole("checkbox")).toHaveCount(0);
+    await expect(page.getByText(/im Portal festhalten/)).toHaveCount(0);
     await expect(page.locator("#narrationEmail")).toBeFocused();
   });
 
@@ -73,13 +76,16 @@ test.describe("PROJ-24 — Onboarding als Gast", () => {
     await toNarration(page, "phone-only");
     await page.getByRole("button", { name: "Per SMS", exact: true }).click();
     await expect(page.locator("#narrationEmail")).toHaveCount(0);
-    await page.locator("#narrationPhone").fill("030 1234567");
-    await page.getByLabel(/Ich bestätige/).check();
+    await expect(page.getByRole("combobox")).toHaveCount(0);
+    await expect(
+      page.getByText("Geben Sie die Nummer mit + und Ländervorwahl ein, zum Beispiel +49."),
+    ).toBeVisible();
+    await page.locator("#narrationPhone").fill("+49 30 1234567");
     await weiter(page);
     await expect(page.getByText(/gültige Handynummer/)).toBeVisible();
-    await page.locator("#narrationPhone").fill("0171 1234567");
+    await page.locator("#narrationPhone").fill("+31 6 12345678");
     await weiter(page);
-    await expect(page.getByText("Per SMS, jeden Sonntag")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Bereit zum Start?" })).toBeVisible();
   });
 
   test("AC-12: Bei beidem erscheinen beide Felder", async ({ page }) => {
@@ -95,31 +101,46 @@ test.describe("PROJ-24 — Onboarding als Gast", () => {
       page.getByRole("heading", { name: "Soll Oma Helga regelmäßig Erzähl-Impulse bekommen?" }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: /Ja, gerne/ })).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.getByText("Oma Helga nutzt zunächst nur den gängigen Projektzugang."),
+    ).toBeVisible();
     await page.getByRole("button", { name: /Nein, danke/ }).click();
     await expect(page.locator("#narrationEmail")).toHaveCount(0);
     await weiter(page);
     await expect(page.getByRole("heading", { name: "Zugang einrichten" })).toBeVisible();
     await page.locator("#recipientEmail").fill("oma@example.test");
     await weiter(page);
-    await expect(page.locator("dd", { hasText: /^Keine$/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Bereit zum Start?" })).toBeVisible();
   });
 
   test("AC-20: Die E-Mail wandert vorbefüllt in die Einladung", async ({ page }) => {
     await toNarration(page, "computer");
     await page.locator("#narrationEmail").fill("oma@example.test");
-    await page.getByLabel(/Ich bestätige/).check();
     await weiter(page);
     await expect(page.locator("#recipientEmail")).toHaveValue("oma@example.test");
+    await page.getByRole("button", { name: "Zurück" }).click();
+    await page.locator("#narrationEmail").fill("helga@example.test");
+    await weiter(page);
+    await expect(page.locator("#recipientEmail")).toHaveValue("helga@example.test");
   });
 
-  test("AC-21, AC-22: Preistext nennt das Buch zuerst", async ({ page }) => {
-    await toNarration(page, "self");
+  test("AC-21, AC-22, AC-27: Letzte Seite ist kurz, mit Buch und Preistext", async ({ page }) => {
+    await toNarration(page, "computer");
+    await page.locator("#narrationEmail").fill("oma@example.test");
+    await weiter(page);
     await weiter(page);
     await expect(
       page.getByText(
         "Ihr erstes gedrucktes Hardcover-Buch, 12 Monate Projektzugang, Erzählen per Sprachnachricht und Editor.",
       ),
     ).toBeVisible();
+    await expect(page.getByRole("img", { name: /Buchcover: Ihr Lebensbuch/ })).toBeVisible();
+    await expect(page.locator("dt")).toHaveText([
+      "Ihr Name",
+      "Für wen",
+      "Beschenkte Person",
+      "E-Mail für das Geschenk",
+    ]);
   });
 
   test("AC-24, AC-25: Neuladen und Abbruch bei Stripe behalten die Angaben", async ({ page }) => {
@@ -127,7 +148,6 @@ test.describe("PROJ-24 — Onboarding als Gast", () => {
     await page.locator("#narrationEmail").fill("oma@example.test");
     await page.reload();
     await expect(page.locator("#narrationEmail")).toHaveValue("oma@example.test");
-    await page.getByLabel(/Ich bestätige/).check();
     await weiter(page);
     await page.goto("/onboarding?checkout=cancelled");
     await expect(page.getByRole("heading", { name: "Bereit zum Start?" })).toBeVisible();
@@ -164,8 +184,7 @@ test.describe("PROJ-24 — Onboarding als Gast", () => {
       await page.getByRole("button", { name: "Per E-Mail und SMS" }).click();
       expect(await page.evaluate(auditCard), `Erzähl-Impulse bei ${width}`).toEqual([]);
       await page.locator("#narrationEmail").fill("oma@example.test");
-      await page.locator("#narrationPhone").fill("0171 1234567");
-      await page.getByLabel(/Ich bestätige/).check();
+      await page.locator("#narrationPhone").fill("+49 171 1234567");
       await weiter(page);
       expect(await page.evaluate(auditCard), `Zugang bei ${width}`).toEqual([]);
       await weiter(page);
@@ -188,7 +207,7 @@ test.describe("PROJ-24 — Onboarding angemeldet", () => {
     await page.goto("/onboarding");
     await page.evaluate(() => {
       window.sessionStorage.setItem(
-        "narravit.onboarding.v1",
+        "narravit.onboarding.v2",
         JSON.stringify({
           ownerId: "00000000-0000-4000-8000-000000000000",
           savedAt: Date.now(),
@@ -204,9 +223,7 @@ test.describe("PROJ-24 — Onboarding angemeldet", () => {
             narrationEnabled: true,
             narrationChannel: "email",
             narrationEmail: "fremd@example.test",
-            narrationPhoneCountry: "DE",
             narrationPhone: "",
-            narrationConsent: false,
           },
         }),
       );

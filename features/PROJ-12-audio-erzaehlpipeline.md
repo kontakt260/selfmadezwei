@@ -187,6 +187,9 @@ Neuer Ablauf (Schritte in Klammern nur bedingt):
 - Jede Aufforderung bietet **zwei Wege**, in dieser Reihenfolge: zuerst **per Audio erzählen** (Handy, Tablet oder Laptop), danach **im Kapitel-Editor tippen**.
 - Welche Wege angeboten werden, soll einstellbar sein.
 - **Erst erzählt, dann getippt geht. Erst getippt, dann erzählt geht nicht**, weil sich die Inhalte sonst kaum zusammenführen lassen.
+- **Kein Einverständnis-Häkchen beim Kauf (PROJ-24):** Die Erzähl-Impulse gelten als Serviceleistung. Das ersetzt alle älteren Kriterien zum Häkchen.
+- **Information und Ablehnen ab der ersten Nachricht:** Die erzählende Person erfährt mit der ersten Kontaktaufnahme, wer sie angegeben hat und was passiert, und kann ablehnen oder widerrufen. Das ersetzt die frühere Regel „keine Abmelde-Funktion".
+- **Wer beim Kauf „Nein" wählt:** Die Person soll sich später im Portal für Erzähl-Impulse entscheiden oder sich selbst einen auslösen können, auch per Audio. Die genaue Lösung ist noch offen.
 
 ### Welche Wege wer bekommt (Vorschlag)
 
@@ -218,11 +221,11 @@ Die Sperre während der Verarbeitung ist neu. Mit zwei Links in derselben Mail w
 ### Offene Entscheidungen für `/refine PROJ-12`
 
 1. **Ausschalten:** Darf die Projektleitung die Aufforderungen auch wieder ausschalten? Empfehlung: ja. Das ändert die bisherige Regel „kein Pausieren" und entschärft zugleich die rechtliche Frage zur fehlenden Abmeldung.
-2. **Abmeldung der erzählenden Person:** Braucht sie selbst eine Möglichkeit, keine Nachrichten mehr zu bekommen? Anwaltlich klären, besonders bei SMS an Dritte.
+2. **Abmeldung der erzählenden Person:** Entschieden am 2026-11-23: Sie kann ab der ersten Nachricht ablehnen und widerrufen. Offen bleibt der genaue Ablauf, den Text prüft der Anwalt, besonders bei SMS an Dritte.
 3. **Inhalte:** Gelten auch eigene Kapitel als Thema? Empfehlung: ja, wie oben beschrieben.
 4. **Rhythmus:** Welche Stufen? Empfehlung: wöchentlich und alle 2 Wochen.
 5. **Standard beim Kauf:** Empfehlung: bei „Nur per Sprachnachricht" immer an, sonst Auswahl im Onboarding.
-6. **Von Hand auslösen:** Der Wunsch vom 2026-11-19 ist noch offen und bleibt bis zur Entscheidung ausgeschlossen.
+6. **Von Hand auslösen:** Der Wunsch vom 2026-11-19 ist noch offen. Am 2026-11-23 kam dazu: Wer beim Kauf „Nein" wählt, soll sich im Portal selbst einen Impuls auslösen können. Das ändert die bisherige Regel „kein manueller Versand".
 
 ---
 

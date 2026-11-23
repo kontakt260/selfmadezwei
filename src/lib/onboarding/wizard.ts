@@ -1,4 +1,4 @@
-import { parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/mobile";
+import { parsePhoneNumberFromString } from "libphonenumber-js/mobile";
 
 // PROJ-24: Regeln des Kauf-Assistenten. Reine Logik ohne Oberfläche, damit
 // Browser und später der Server dieselben Prüfungen verwenden. Bewusst ohne
@@ -9,7 +9,6 @@ export type ForWhom = "self" | "gift";
 export type GiftMode = "phone-only" | "phone-plus-computer";
 export type RecipientRole = "projektleiter" | "co_author";
 export type NarrationChannel = "email" | "sms" | "both";
-export type PhoneCountry = "DE" | "AT" | "CH";
 export type StepId =
   | "for-whom"
   | "name"
@@ -17,12 +16,6 @@ export type StepId =
   | "narration"
   | "gift-computer"
   | "purchase";
-
-export const PHONE_COUNTRIES: ReadonlyArray<{ id: PhoneCountry; label: string }> = [
-  { id: "DE", label: "Deutschland (+49)" },
-  { id: "AT", label: "Österreich (+43)" },
-  { id: "CH", label: "Schweiz (+41)" },
-];
 
 export type WizardState = {
   fullName: string;
@@ -35,9 +28,7 @@ export type WizardState = {
   narrationEnabled: boolean;
   narrationChannel: NarrationChannel;
   narrationEmail: string;
-  narrationPhoneCountry: PhoneCountry;
   narrationPhone: string;
-  narrationConsent: boolean;
 };
 
 const STEP_IDS: readonly string[] = [
@@ -51,10 +42,6 @@ const STEP_IDS: readonly string[] = [
 
 export function isStepId(value: unknown): value is StepId {
   return typeof value === "string" && STEP_IDS.includes(value);
-}
-
-export function isPhoneCountry(value: unknown): value is PhoneCountry {
-  return value === "DE" || value === "AT" || value === "CH";
 }
 
 function isText(value: unknown, maxLength: number): value is string {
@@ -76,9 +63,7 @@ export function isWizardState(value: unknown): value is WizardState {
     typeof v.narrationEnabled === "boolean" &&
     (v.narrationChannel === "email" || v.narrationChannel === "sms" || v.narrationChannel === "both") &&
     isText(v.narrationEmail, 320) &&
-    isPhoneCountry(v.narrationPhoneCountry) &&
-    isText(v.narrationPhone, 40) &&
-    typeof v.narrationConsent === "boolean"
+    isText(v.narrationPhone, 40)
   );
 }
 
@@ -89,8 +74,7 @@ export type FieldKey =
   | "giftMode"
   | "giftRecipientEmail"
   | "narrationEmail"
-  | "narrationPhone"
-  | "narrationConsent";
+  | "narrationPhone";
 export type FieldErrors = Partial<Record<FieldKey, string>>;
 
 export type WizardContext = {
@@ -112,9 +96,7 @@ export const INITIAL_WIZARD_STATE: WizardState = {
   narrationEnabled: true,
   narrationChannel: "email",
   narrationEmail: "",
-  narrationPhoneCountry: "DE",
   narrationPhone: "",
-  narrationConsent: false,
 };
 
 export function buildSteps(state: WizardState, skipForWhom: boolean): StepId[] {
@@ -150,11 +132,14 @@ export function channelUsesSms(channel: NarrationChannel): boolean {
   return channel !== "email";
 }
 
-/** Liefert die Handynummer im internationalen Format oder `null`, wenn sie ungültig ist. */
-export function normalizeMobileNumber(country: PhoneCountry, raw: string): string | null {
+/**
+ * Liefert die Handynummer im internationalen Format oder `null`, wenn sie
+ * ungültig ist. Eine Nummer ohne + wird als deutsche Nummer gelesen.
+ */
+export function normalizeMobileNumber(raw: string): string | null {
   const value = raw.trim();
   if (!value) return null;
-  const parsed = parsePhoneNumberFromString(value, country as CountryCode);
+  const parsed = parsePhoneNumberFromString(value, "DE");
   return parsed?.isValid() ? parsed.number : null;
 }
 
@@ -172,14 +157,9 @@ function narrationErrors(state: WizardState, context: WizardContext): FieldError
   ) {
     errors.narrationEmail = "Bitte geben Sie eine gültige E-Mail-Adresse an.";
   }
-  if (
-    channelUsesSms(state.narrationChannel) &&
-    !normalizeMobileNumber(state.narrationPhoneCountry, state.narrationPhone)
-  ) {
-    errors.narrationPhone = "Bitte geben Sie eine gültige Handynummer an, zum Beispiel 0171 1234567.";
-  }
-  if (state.forWhom === "gift" && !state.narrationConsent) {
-    errors.narrationConsent = `Bitte bestätigen Sie, dass ${state.giftRecipientName.trim()} einverstanden ist.`;
+  if (channelUsesSms(state.narrationChannel) && !normalizeMobileNumber(state.narrationPhone)) {
+    errors.narrationPhone =
+      "Bitte geben Sie eine gültige Handynummer mit Ländervorwahl an, zum Beispiel +49 171 1234567.";
   }
   return errors;
 }
@@ -239,39 +219,21 @@ export function changeForWhom(
     narrationEnabled: true,
     narrationChannel: "email",
     narrationEmail: forWhom === "self" ? context.buyerEmail : "",
-    narrationPhoneCountry: "DE",
     narrationPhone: "",
-    narrationConsent: false,
   };
 }
 
-/** Das Einverständnis gilt nur für die Person, deren Name dabei angegeben war. */
-export function changeRecipientName(state: WizardState, name: string): WizardState {
-  if (state.giftRecipientName === name) return state;
-  return { ...state, giftRecipientName: name, narrationConsent: false };
-}
-
-/** Übernimmt die E-Mail aus den Erzähl-Impulsen in die Portal-Einladung. */
-export function prefillInvitationEmail(state: WizardState): WizardState {
-  if (
-    state.forWhom !== "gift" ||
-    state.giftMode !== "phone-plus-computer" ||
-    state.giftRecipientEmail.trim() ||
-    !narrationIsActive(state) ||
-    !channelUsesEmail(state.narrationChannel)
-  ) {
-    return state;
-  }
-  return { ...state, giftRecipientEmail: state.narrationEmail.trim() };
-}
-
-export function narrationSummary(state: WizardState): string {
-  if (!narrationIsActive(state)) return "Keine";
-  const channel =
-    state.narrationChannel === "both"
-      ? "Per E-Mail und SMS"
-      : state.narrationChannel === "sms"
-        ? "Per SMS"
-        : "Per E-Mail";
-  return `${channel}, jeden Sonntag`;
+/**
+ * Die E-Mail aus den Erzähl-Impulsen füllt auch die Adresse für das Geschenk,
+ * solange dort keine eigene, abweichende Adresse eingetragen wurde.
+ */
+export function changeNarrationEmail(state: WizardState, email: string): WizardState {
+  const inSync =
+    !state.giftRecipientEmail.trim() || state.giftRecipientEmail === state.narrationEmail;
+  return {
+    ...state,
+    narrationEmail: email,
+    giftRecipientEmail:
+      inSync && state.forWhom === "gift" ? email : state.giftRecipientEmail,
+  };
 }
