@@ -285,7 +285,9 @@ export function ProjectCard({ project, deleteProjectAction, featured = false }: 
       {modal}
       <article
         className={`relative flex min-w-0 border border-[#E0DCD5] bg-white transition-colors hover:border-[#BDB5AA] ${
-          featured ? "flex-col md:flex-row" : "flex-col"
+          featured
+            ? "flex-col shadow-[0_24px_60px_rgba(43,39,34,0.28)] md:flex-row"
+            : "flex-col shadow-[0_10px_28px_rgba(43,39,34,0.12)]"
         }`}
       >
         <Link
@@ -310,7 +312,7 @@ export function ProjectCard({ project, deleteProjectAction, featured = false }: 
         >
           <div className="flex min-w-0 flex-col gap-1">
             <p className="text-lg leading-7 text-[#5F5A54]">
-              {featured ? "Ihr Buch" : roleLabel}
+              {featured ? "Ihr Projekt" : roleLabel}
             </p>
             <Heading
               className={`[overflow-wrap:anywhere] text-[#3E3831] ${

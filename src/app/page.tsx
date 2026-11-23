@@ -30,7 +30,7 @@ function BuyMoreLink() {
     >
       <Link href="/onboarding">
         <IconPlus className="shrink-0" />
-        Weiteren Projektzugang kaufen
+        Weiteren Projektzugang sichern
       </Link>
     </Button>
   );
@@ -187,13 +187,15 @@ export default async function HomePage() {
                 deleteProjectAction={deleteProjectAction}
                 featured
               />
-              <section className="flex flex-col gap-4 border border-[#E0DCD5] bg-white p-6 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+              <section className="relative flex flex-col gap-4 border border-[#E0DCD5] bg-white p-6 sm:flex-row sm:items-center sm:justify-between sm:px-7">
                 <div className="flex min-w-0 flex-col gap-1">
                   <h2 className="text-[1.625rem] leading-tight text-[#3E3831]">
-                    Ein weiteres Buch beginnen
+                    Weiteres Buchprojekt beginnen
                   </h2>
                   <p className="text-lg leading-normal text-[#5F5A54]">
-                    Zum Beispiel als Geschenk für einen Menschen, dessen Geschichte bleiben soll.
+                    Wenn Sie mit unserem Service zufrieden sind und einen weiteren Menschen in
+                    Ihrem Umfeld haben, dessen Geschichte erhalten bleiben soll, können Sie ihm
+                    hier ein Geschenk machen.
                   </p>
                 </div>
                 <BuyMoreLink />

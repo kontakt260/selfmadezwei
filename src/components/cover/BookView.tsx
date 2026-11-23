@@ -22,7 +22,7 @@ export function BookView({ data, size = "overview", className }: Props) {
 
   return (
     <div className={cn("w-full [container-type:inline-size]", className)}>
-      <div className="flex w-full shadow-[0_14px_28px_rgba(62,56,49,0.3)]">
+      <div className="flex w-full shadow-[0_18px_36px_rgba(43,39,34,0.38)]">
         <div
           aria-hidden
           className="relative w-[8cqw] shrink-0 border-r"

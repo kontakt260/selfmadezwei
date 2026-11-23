@@ -59,9 +59,9 @@ test.describe("PROJ-4 — Home-Seite (/)", () => {
     ).toBeVisible();
   });
 
-  test("AC-Home-2: 'Weiteren Projektzugang kaufen' verlinkt auf /onboarding", async ({ page }) => {
+  test("AC-Home-2: 'Weiteren Projektzugang sichern' verlinkt auf /onboarding", async ({ page }) => {
     await page.goto("/");
-    const link = page.getByRole("link", { name: /Weiteren Projektzugang kaufen/ });
+    const link = page.getByRole("link", { name: /Weiteren Projektzugang sichern/ });
     await expect(link).toBeVisible();
     await expect(link).toHaveAttribute("href", "/onboarding");
   });
@@ -99,7 +99,7 @@ test.describe("PROJ-4 — Projektübersicht", () => {
     await expect(backLink).toHaveAttribute("href", "/");
   });
 
-  test("AC-PÜ-3: Sektionen Cover-Karte, Sprachnachricht-Platzhalter, Wer an diesem Buch mitschreibt sichtbar", async ({ page }) => {
+  test("AC-PÜ-3: Sektionen Cover-Karte, Sprachnachricht-Platzhalter, Wer an diesem Buch beteiligt ist sichtbar", async ({ page }) => {
     await page.goto(PROJECT_URL);
     await expect(page.getByRole("link", { name: "Cover bearbeiten" })).toBeVisible();
     // PROJ-10 ersetzt den alten Cover-Editor-Placeholder durch die echte
@@ -114,8 +114,8 @@ test.describe("PROJ-4 — Projektübersicht", () => {
       page.getByRole("heading", { name: "Erzählen per Sprachnachricht" }),
     ).toBeVisible();
     // PROJ-9 ersetzt den alten „Projektmitglieder"-Placeholder durch die
-    // echte „Wer an diesem Buch mitschreibt"-Sektion mit Mitglieder-Liste.
-    await expect(page.getByRole("heading", { name: "Wer an diesem Buch mitschreibt" })).toBeVisible();
+    // echte „Wer an diesem Buch beteiligt ist"-Sektion mit Mitglieder-Liste.
+    await expect(page.getByRole("heading", { name: "Wer an diesem Buch beteiligt ist" })).toBeVisible();
   });
 
   test("AC-PÜ-4: Stat-Karten Platzhalter sichtbar", async ({ page }) => {

@@ -20,12 +20,12 @@ const QA_PROJECT_URL = `/projektuebersicht/${QA_PROJECT_ID}`;
 // ─── Mitgliederliste — Anzeige + PL-Controls ───────────────────────────────
 
 test.describe("PROJ-9 — Mitgliederliste", () => {
-  test("AC-List-1: Wer an diesem Buch mitschreibt-Sektion sichtbar mit eigenem Eintrag", async ({
+  test("AC-List-1: Wer an diesem Buch beteiligt ist-Sektion sichtbar mit eigenem Eintrag", async ({
     page,
   }) => {
     await page.goto(QA_PROJECT_URL);
     await expect(
-      page.getByRole("heading", { name: "Wer an diesem Buch mitschreibt" }),
+      page.getByRole("heading", { name: "Wer an diesem Buch beteiligt ist" }),
     ).toBeVisible();
     await expect(page.getByText("qa-test@narravit.de").first()).toBeVisible();
     await expect(page.getByText("(Sie)")).toBeVisible();

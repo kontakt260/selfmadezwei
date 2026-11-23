@@ -61,7 +61,7 @@
 - [x] AC-14: Aktive Projekte haben den Button „Weiterschreiben".
 - [x] AC-15: Abgelaufene Projekte zeigen „Abgelaufen am [Datum]" und den Button „Ansehen".
 - [x] AC-16: „Projekt löschen" ist ein dezenter Textlink, nur für die Projektleitung, mit dem bisherigen Sicherheitsdialog.
-- [x] AC-17: „Weiteren Projektzugang kaufen" bleibt erreichbar, aber als zweitrangiger Button.
+- [x] AC-17: „Weiteren Projektzugang sichern" bleibt erreichbar, aber als zweitrangiger Button.
 
 ### C. Projektübersicht
 
@@ -70,7 +70,7 @@
 - [x] AC-20: Die Kapitelliste behält Aussehen und Funktion: Drag and Drop, Titel bearbeiten, Löschen und „Bearbeiten".
 - [x] AC-21: Der Button heißt „Erzähl-Impulse ansehen". Bis zur Bibliothek aus PROJ-8 öffnet er den bisherigen Dialog.
 - [x] AC-22: Die Nutzerliste behält Aussehen und Funktion, inklusive farbiger Personen-Icons, Entfernen und „Projekt verlassen".
-- [x] AC-23: Die Nutzerliste heißt „Wer an diesem Buch mitschreibt", der Einladen-Button „Person einladen".
+- [x] AC-23: Die Nutzerliste heißt „Wer an diesem Buch beteiligt ist", der Einladen-Button „Person einladen".
 - [x] AC-24: Die Karten „Erzählen per Sprachnachricht" und „NARRAVIT-Projektzugang" stehen nebeneinander, ihr Inhalt bleibt wie heute.
 - [x] AC-25: Die neue Karte „Buch in den Druck geben" zeigt die Schritte Inhalt, Cover und Lieferadresse.
 - [x] AC-26: Diese Karte ist bis PROJ-16 ein **Platzhalter**. Der Druckauftrag ist gesperrt, es wird nichts gespeichert und es gibt keinen PDF-Download.
@@ -151,7 +151,7 @@ Startseite
 |   +-- Buchansicht, Titel, Rolle, Kapitel, letzte Bearbeitung
 |   +-- „Weiterschreiben" oder bei Ablauf „Ansehen"
 |   +-- „Projekt löschen" nur für die Projektleitung, bisheriger Dialog
-+-- „Weiteren Projektzugang kaufen"
++-- „Weiteren Projektzugang sichern"
 
 Projektübersicht
 +-- Cover-Karte: große Buchansicht, Titel, Autor, Kapitel, Seiten
@@ -241,7 +241,7 @@ Die Druck-Karte darf nicht als funktionsloser Platzhalter live gehen. Bis dahin 
 - **Schriften:** Überschriften zentral in `globals.css` (PT Serif, H1 -2 %, sonst -1 %). `.a5-stack` und `.a5-page` behalten Merriweather und normalen Zeichenabstand, damit Seitenumbrüche gleich bleiben. `BrandName` setzt NARRAVIT in Überschriften in Merriweather.
 - **Buchansicht:** `BookView` legt einen Rücken neben das unveränderte `CoverRender`. Die Rückenfarbe wird aus der Coverfarbe berechnet und nirgends gespeichert.
 - **Startseite:** Foto mit dunkler Ebene, große Karte bei einem Projekt, „Ihre Bücher" bei mehreren. Ablaufdaten kommen in einer Abfrage. Schlägt sie fehl, zeigt die Karte neutral „Öffnen". „Zuletzt bearbeitet" zählt Kalendertage in deutscher Zeit (`project-card-status.ts`).
-- **Projektübersicht:** Cover-Karte, Kapitelliste mit „Erzähl-Impulse ansehen", `PrintOrderCard` außerhalb von `ReadOnlyScope`, Sprachnachricht und Projektzugang nebeneinander, Nutzerliste mit „Wer an diesem Buch mitschreibt" und „Person einladen". Icon-Buttons sind jetzt 44 px groß, Hinweise dunkler und mindestens 16 px.
+- **Projektübersicht:** Cover-Karte, Kapitelliste mit „Erzähl-Impulse ansehen", `PrintOrderCard` außerhalb von `ReadOnlyScope`, Sprachnachricht und Projektzugang nebeneinander, Nutzerliste mit „Wer an diesem Buch beteiligt ist" und „Person einladen". Icon-Buttons sind jetzt 44 px groß, Hinweise dunkler und mindestens 16 px.
 - **Persönlicher Bereich:** eine Spalte ohne Foto, E-Mail fest ohne Support-Hinweis, nur noch der Rechnungshinweis, durchgehend „Konto". Passwort- und Lösch-Logik sind unverändert.
 
 **Abweichungen vom Entwurf:**
@@ -253,6 +253,8 @@ Die Druck-Karte darf nicht als funktionsloser Platzhalter live gehen. Bis dahin 
 **Geprüft am 2026-11-23 (Production-Build gegen Stage):** Typprüfung, Lint ohne Fehler, Unit-Tests grün, E2E 170 + 50 + 14 bestanden. Alte Texte in den Tests wurden angepasst. Screens bei 1440, 768, 375 px und 200 % Zoom ohne horizontales Scrollen. Mehrere Projekte, Ablauf und Lesemodus liefen mit temporären Stage-Konten, die danach gelöscht wurden.
 
 **Hinweis für QA:** Der Lesemodus sperrt „Erzähl-Impulse ansehen" wie zuvor, weil der bisherige Dialog ein Kapitel anlegt. Das ändert sich erst mit der Bibliothek aus PROJ-8.
+
+**Nachträge von Jakob (2026-11-23):** Das Buch-Element auf der Startseite bekommt einen deutlichen Schatten. Der Abschnitt heißt „Weiteres Buchprojekt beginnen", der Button „Weiteren Projektzugang sichern". Die Nutzerliste heißt „Wer an diesem Buch beteiligt ist". Über dem Titel der großen Karte steht „Ihr Projekt".
 
 ## QA Test Results
 

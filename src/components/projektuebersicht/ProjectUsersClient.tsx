@@ -166,7 +166,7 @@ export function ProjectUsersClient({ projectId, members, myRole, readOnly = fals
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="[font-family:var(--font-pt-serif)] text-2xl leading-8 text-[#3E3831] sm:text-3xl sm:leading-10">
-          Wer an diesem Buch mitschreibt
+          Wer an diesem Buch beteiligt ist
         </h2>
         {isPL && (
           <button

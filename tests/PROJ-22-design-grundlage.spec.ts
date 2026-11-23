@@ -336,6 +336,7 @@ test.describe("PROJ-22 — Design-Grundlage (nur Stage)", () => {
     ).toBeVisible();
     const article = pageS.locator("main article");
     await expect(article).toHaveCount(1);
+    await expect(article).toContainText("Ihr Projekt");
     await expect(article).toContainText("1 Kapitel");
     await expect(article).toContainText("Zuletzt bearbeitet: heute");
     await expect(article.getByRole("link", { name: "Weiterschreiben" })).toBeVisible();
@@ -370,7 +371,7 @@ test.describe("PROJ-22 — Design-Grundlage (nur Stage)", () => {
 
   test("AC-17: Weiterer Kauf bleibt als zweitrangiger Button erreichbar", async () => {
     await pageL.goto("/");
-    await expect(pageL.getByRole("link", { name: "Weiteren Projektzugang kaufen" })).toHaveAttribute(
+    await expect(pageL.getByRole("link", { name: "Weiteren Projektzugang sichern" })).toHaveAttribute(
       "href",
       "/onboarding",
     );
@@ -428,7 +429,7 @@ test.describe("PROJ-22 — Design-Grundlage (nur Stage)", () => {
 
   test("AC-22, AC-23: Nutzerliste hat neue Überschrift und Person einladen", async () => {
     await pageL.goto(`/projektuebersicht/${main.id}`);
-    await expect(pageL.getByRole("heading", { name: "Wer an diesem Buch mitschreibt" })).toBeVisible();
+    await expect(pageL.getByRole("heading", { name: "Wer an diesem Buch beteiligt ist" })).toBeVisible();
     await expect(pageL.getByRole("button", { name: "Person einladen" })).toBeEnabled();
     await expect(pageL.getByRole("button", { name: /Mitglied „Test co" entfernen/ })).toBeEnabled();
     await expect(pageL.getByRole("button", { name: "Projekt verlassen" })).toBeEnabled();
