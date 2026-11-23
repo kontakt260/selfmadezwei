@@ -166,13 +166,13 @@ test.describe("PROJ-2 — Onboarding wizard", () => {
   // against the dev server's Turbopack compiler exceed the 30s timeout.
   test.describe.configure({ mode: "serial" });
 
-  // Step order after commit 535f502 ("change onboarding order for better flow"):
-  // for-whom → name → [gift-details] → [gift-computer] → purchase
-  // Path A (self):              for-whom → name → purchase            (3 steps)
-  // Path B1 (gift+phone-only):  for-whom → name → gift-details → purchase  (4 steps)
-  // Path B2 (gift+computer):    for-whom → name → gift-details → gift-computer → purchase (5 steps)
+  // Reihenfolge seit PROJ-24:
+  // for-whom → name → [gift-details] → narration → [gift-computer] → purchase
+  // Path A (self):              for-whom → name → narration → purchase (4 steps)
+  // Path B1 (gift+phone-only):  for-whom → name → gift-details → narration → purchase (5 steps)
+  // Path B2 (gift+computer):    for-whom → name → gift-details → narration → gift-computer → purchase (6 steps)
 
-  test("Path A (self): for-whom → name → purchase (3 steps)", async ({ page }) => {
+  test("Path A (self): for-whom → name → narration → purchase (4 steps)", async ({ page }) => {
     await page.goto("/onboarding");
 
     // Step 1: For whom?
@@ -183,14 +183,18 @@ test.describe("PROJ-2 — Onboarding wizard", () => {
     await page.locator('input[id="fullName"]').fill("Max Mustermann");
     await page.getByRole("button", { name: "Weiter" }).click();
 
-    // Step 3: Purchase CTA
+    // Step 3: Erzähl-Impulse, die eigene Adresse ist vorbefüllt
+    await expect(page.locator("#narrationEmail")).toHaveValue("qa-test@narravit.de");
+    await page.getByRole("button", { name: "Weiter" }).click();
+
+    // Step 4: Purchase CTA
     await expect(page.getByRole("heading", { name: /Bereit zum Start/ })).toBeVisible();
     await expect(page.getByText("Max Mustermann")).toBeVisible();
     await expect(page.getByText("Für mich selbst")).toBeVisible();
     await expect(page.getByRole("button", { name: /Jetzt kaufen/ })).toBeVisible();
   });
 
-  test("Path B1 (gift + phone-only): 4 steps", async ({ page }) => {
+  test("Path B1 (gift + phone-only): 5 steps", async ({ page }) => {
     await page.goto("/onboarding");
 
     // Step 1: For whom?
@@ -209,12 +213,18 @@ test.describe("PROJ-2 — Onboarding wizard", () => {
     await expect(page.getByText(/vollen Zugriff auf das Projekt/)).toBeVisible();
     await page.getByRole("button", { name: "Weiter" }).click();
 
-    // Step 4: Purchase step shows gift summary
+    // Step 4: Erzähl-Impulse sind Pflicht
+    await expect(page.getByRole("heading", { name: "Wie erreichen wir Oma Helga?" })).toBeVisible();
+    await page.locator("#narrationEmail").fill("oma@example.com");
+    await page.getByLabel(/Ich bestätige, dass Oma Helga/).check();
+    await page.getByRole("button", { name: "Weiter" }).click();
+
+    // Step 5: Purchase step shows gift summary
     await expect(page.getByText("Oma Helga")).toBeVisible();
-    await expect(page.getByText("Nur Sprachnachricht")).toBeVisible();
+    await expect(page.getByText("Nur per Sprachnachricht")).toBeVisible();
   });
 
-  test("Path B2 (gift + phone+computer): 5 steps with role selection", async ({ page }) => {
+  test("Path B2 (gift + phone+computer): 6 steps with role selection", async ({ page }) => {
     await page.goto("/onboarding");
 
     // Step 1: For whom?
@@ -230,14 +240,18 @@ test.describe("PROJ-2 — Onboarding wizard", () => {
     await page.getByRole("button", { name: /Auch am Computer schreiben/ }).click();
     await page.getByRole("button", { name: "Weiter" }).click();
 
-    // Step 4: Gift computer — email + role + buyer-access toggle
+    // Step 4: Erzähl-Impulse sind hier freiwillig
+    await page.getByRole("button", { name: /Nein, danke/ }).click();
+    await page.getByRole("button", { name: "Weiter" }).click();
+
+    // Step 5: Gift computer — email + role + buyer-access toggle
     await page.locator('input[id="recipientEmail"]').fill("oma@example.com");
     await page.getByRole("button", { name: /^Projektleiter/ }).first().click();
     await page.getByRole("button", { name: "Weiter" }).click();
 
-    // Step 5: Purchase step
+    // Step 6: Purchase step
     await expect(page.getByText("oma@example.com")).toBeVisible();
-    await expect(page.getByText("Auch Computer")).toBeVisible();
+    await expect(page.getByText("Auch am Computer")).toBeVisible();
   });
 
   test("name step requires min. 2 characters", async ({ page }) => {
@@ -270,6 +284,8 @@ test.describe("PROJ-2 — Onboarding wizard", () => {
     await page.locator('input[id="recipientName"]').fill("Oma Helga");
     await page.getByRole("button", { name: /Auch am Computer schreiben/ }).click();
     await page.getByRole("button", { name: "Weiter" }).click();
+    await page.getByRole("button", { name: /Nein, danke/ }).click();
+    await page.getByRole("button", { name: "Weiter" }).click();
 
     await page.locator('input[id="recipientEmail"]').fill("not-an-email");
     await page.getByRole("button", { name: "Weiter" }).click();
@@ -278,13 +294,13 @@ test.describe("PROJ-2 — Onboarding wizard", () => {
 
   test("back button returns to previous step and preserves state", async ({ page }) => {
     await page.goto("/onboarding");
-    // Path A: for-whom → name → purchase
+    // Path A: for-whom → name → narration → purchase
     await page.getByRole("button", { name: /Für mich selbst/ }).click();
     await page.getByRole("button", { name: "Weiter" }).click();
     await page.locator('input[id="fullName"]').fill("Max Mustermann");
     await page.getByRole("button", { name: "Weiter" }).click();
 
-    // We're at purchase (step 3). Go back once → name step.
+    // We're at narration (step 3). Go back once → name step.
     await page.getByRole("button", { name: "Zurück" }).click();
     await expect(page.locator('input[id="fullName"]')).toHaveValue("Max Mustermann");
 

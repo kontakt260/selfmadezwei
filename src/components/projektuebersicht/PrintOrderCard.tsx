@@ -72,7 +72,8 @@ export function PrintOrderCard({
           Buch in den Druck geben
         </h2>
         <p className="max-w-[820px] text-lg leading-normal text-[#4A453F] sm:text-[1.1875rem]">
-          Wenn Ihr Buch fertig ist, geben Sie hier den Druckauftrag.
+          Wenn Ihr Buch fertig ist, geben Sie hier den Druckauftrag. Ihr erstes gedrucktes Buch
+          ist bereits bezahlt.
         </p>
       </div>
 

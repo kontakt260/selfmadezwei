@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { clearOnboardingDraft } from "@/lib/onboarding/draft-key";
 
 function normalizePathForMatch(path: string) {
   try {
@@ -184,6 +185,7 @@ export function Navbar() {
 
   const confirmLogout = useCallback(async () => {
     setLogoutPending(true);
+    clearOnboardingDraft();
     const supabase = createClient();
     await supabase.auth.signOut();
     setLogoutOpen(false);

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { clearOnboardingDraft } from "@/lib/onboarding/draft-key";
 
 export function SignOutButton() {
   const [pending, setPending] = useState(false);
@@ -10,6 +11,7 @@ export function SignOutButton() {
 
   const handleSignOut = async () => {
     setPending(true);
+    clearOnboardingDraft();
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/anmelden");

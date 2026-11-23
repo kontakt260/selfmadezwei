@@ -7,6 +7,7 @@ import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { isDirectGiftSession, isGuestSession } from "@/lib/purchases/guest-purchase";
 import { BackdropScreen, type BackdropKey } from "@/components/BackdropScreen";
 import { BrandName } from "@/components/BrandName";
+import { ClearOnboardingDraft } from "@/app/onboarding/ClearOnboardingDraft";
 import { DirectGiftScreen } from "./DirectGiftScreen";
 import { SuccessIcon } from "./SuccessIcon";
 
@@ -132,6 +133,7 @@ export default async function KaufErfolgreichPage({
   if (paymentPending) {
     return (
       <SuccessScreen backdrop="kauf" icon={false}>
+        <ClearOnboardingDraft />
         <h1 className="text-2xl font-normal text-[#3E3831] sm:text-3xl">
           Ihre Zahlung wird bearbeitet
         </h1>
@@ -146,7 +148,12 @@ export default async function KaufErfolgreichPage({
 
   // Geschenk ohne eigenen Zugang: Alles ist erledigt, kein Konto nötig.
   if (isDirectGift && variant.type === "initial-gift-phone-computer") {
-    return <DirectGiftScreen recipientEmail={variant.recipientEmail} buyerEmail={buyerEmail} />;
+    return (
+      <>
+        <ClearOnboardingDraft />
+        <DirectGiftScreen recipientEmail={variant.recipientEmail} buyerEmail={buyerEmail} />
+      </>
+    );
   }
 
   const supabase = await createClient();
@@ -168,6 +175,7 @@ export default async function KaufErfolgreichPage({
   if (isGuest && !user) {
     return (
       <SuccessScreen backdrop={isGiftVariant(variant) ? "geschenk" : "kauf"}>
+        <ClearOnboardingDraft />
         <GuestAccountContent variant={variant} buyerEmail={buyerEmail} />
       </SuccessScreen>
     );
@@ -175,6 +183,7 @@ export default async function KaufErfolgreichPage({
 
   return (
     <SuccessScreen backdrop={isGiftVariant(variant) ? "geschenk" : "kauf"}>
+      {variant.type !== "renewal" && <ClearOnboardingDraft />}
       {variant.type === "initial-self" && <InitialSelfContent />}
       {variant.type === "initial-gift-phone-only" && (
         <InitialGiftPhoneOnlyContent recipientName={variant.recipientName} />

@@ -91,6 +91,9 @@ test.describe("PROJ-6 — Kauf ohne Konto", () => {
     await page.getByRole("button", { name: "Weiter" }).click();
     await page.getByLabel("Vor- und Nachnamen").fill("Gerda Gast");
     await page.getByRole("button", { name: "Weiter" }).click();
+    // PROJ-24: Erzähl-Impulse, Gäste zahlen später mit ihrer E-Mail-Adresse.
+    await expect(page.getByText(/mit der Sie gleich bezahlen/)).toBeVisible();
+    await page.getByRole("button", { name: "Weiter" }).click();
 
     await expect(page.getByRole("heading", { name: "Bereit zum Start?" })).toBeVisible();
     await expect(

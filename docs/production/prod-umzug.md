@@ -201,6 +201,8 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] **AGB nach Rollen (Jakob, 2026-11-22):** Käufer, Projektleitung, Co-Autor, beschenkte Person und später die erzählende Person ohne Konto (PROJ-12) haben unterschiedliche Rechte und Pflichten. Die AGB regeln mindestens, wer Vertragspartner ist, wer einladen, übergeben und löschen darf und was mit Beiträgen nach dem Verlassen oder der Kontolöschung passiert. Für gemeinsame Projekte: einfaches, auf dieses Buch begrenztes Nutzungsrecht, die Nutzungsarten ausdrücklich nennen (speichern, bearbeiten, drucken). Das Urheberrecht selbst bleibt bei der Person, die den Text geschrieben hat (§ 29 UrhG). Anwaltlich prüfen lassen.
 - [ ] **Zustimmung zu den AGB einbauen:** Heute stimmt niemand Bedingungen zu, weder bei der Registrierung noch beim Kauf noch beim Annehmen einer Einladung (geprüft 2026-11-22). Ohne wirksame Einbeziehung (§ 305 Abs. 2 BGB) gilt die Nutzungsrechte-Klausel nicht, vor allem nicht für Co-Autoren, die selbst nichts gekauft haben.
 - [ ] **Anfragen zu Löschung und Kopie über den Support:** Sonderfälle wie das Entfernen eigener Texte aus einem gemeinsamen Projekt oder eine Kopie der eigenen Inhalte werden auf Anfrage geklärt. Antwort binnen eines Monats (Art. 12 DSGVO), Entscheidung und Begründung dokumentieren, bei einer Ablehnung auf das Beschwerderecht hinweisen. Die AGB können Löschung und Kopie nach Art. 15, 17 und 20 DSGVO nicht ausschließen. Eine Kopie umfasst die eigenen Texte und selbst hochgeladenen Bilder in einem gängigen Format, die erste ist kostenlos; druckfertige Dateien, Satz, Layout und Cover gehören nicht dazu. Die Datenschutzerklärung muss diese Rechte nennen (Art. 13 DSGVO), der Lösch-Dialog nicht.
+- [ ] **Kontaktdaten Dritter (PROJ-24, PROJ-12):** Käufer geben beim Geschenk E-Mail oder Handynummer der beschenkten Person an. Anwaltlich klären: Service oder Werbung (§ 7 Abs. 2 Nr. 2 UWG), Wirkung des Häkchens (BGH I ZR 208/12), Information spätestens mit der ersten Nachricht (Art. 14 DSGVO) und ob es ohne Abmeldung bleiben kann. Datenschutzerklärung ergänzen.
+- [ ] **Leistung im Preis (Jakob, 2026-11-23):** Die 249 € enthalten das erste gedruckte Hardcover-Buch. Website, AGB, Kaufschritt und PROJ-16 müssen dasselbe sagen, die Druckkosten sind mit der Druckerei abzusichern.
 - [ ] Kein Abmelde-Link in Erzähl-Aufforderungen (Produktentscheidung) — rechtlich prüfen lassen (PROJ-12).
 
 ---
@@ -227,6 +229,8 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 - [ ] **PROJ-22 Druck-Karte (Jakob, 2026-11-23):** Die Karte „Buch in den Druck geben" in der Projektübersicht ist bis PROJ-16 ein Platzhalter mit gesperrten Buttons. Sie darf so nicht live gehen: Vor dem Go-live ist PROJ-16 fertig, oder die Karte wird für Production ausgeblendet.
 - [ ] **PROJ-22 in Safari und Firefox ansehen:** Automatisiert ist das neue Design nur in Chromium geprüft, WebKit startet auf dem Entwicklungs-Mac nicht. Startseite, Projektübersicht und Persönlichen Bereich vor dem Go-live einmal in beiden Browsern und auf einem echten iPad öffnen.
 - [ ] **Interne Kennungen in Kundentexten entfernen:** In der Projektübersicht stehen noch „(PROJ-12)" bei „Erzählen per Sprachnachricht" und „(PROJ-6)" beim Projektzugang vor der ersten Zahlung. Beide Texte vor dem Go-live ersetzen.
+- [ ] **PROJ-24 und PROJ-12 nur gemeinsam live:** Das neue Onboarding fragt Kontaktdaten für Erzähl-Impulse ab. Ohne den Versand aus PROJ-12 würde es Nachrichten versprechen, die nie ankommen. Die Migration aus PROJ-24 kommt in Production vor dem Code-Deploy.
+- [ ] **Stripe-Produkt prüfen (PROJ-24):** Produktname und Beschreibung im Stripe-Testmodus und im Live-Modus müssen das erste gedruckte Hardcover-Buch nennen, weil sie auf Checkout und Rechnung erscheinen.
 - [ ] PROJ-13 Fehler-Monitoring (Sentry) — dann `SENTRY_DSN` o. ä. hier ergänzen.
 - [ ] PROJ-12 Paket „Erzähl-Einstellungen": Onboarding-Schritt „Wie soll [Name] die wöchentlichen Erzähl-Impulse erhalten? — Telefon, E-Mail oder beides" samt Kontaktdaten und Einverständnis, plus Sektion in der Projektübersicht. Ohne ihn fehlen bei Geschenk-Käufen die Kontaktdaten der erzählenden Person (Jakob, 2026-11-19).
 - [x] Mail-Design aus Figma (Datei „NARRAVIT Mails") in `src/emails/` übertragen; Logo dafür hosten. Erledigt 2026-11-19 (Bilder siehe Abschnitt 5).
@@ -262,6 +266,9 @@ Stage läuft im **Test-Modus**. Production braucht den **Live-Modus** — alle O
 
 | Datum | Eintrag |
 |---|---|
+| 2026-11-23 | PROJ-24 Frontend: neues Paket `libphonenumber-js`. Der Schritt „Erzähl-Impulse" speichert bis zum Backend noch nichts. Keine Migration, keine neuen Env-Werte. |
+| 2026-11-23 | PROJ-24 Tech Design: gemeinsamer Go-live mit PROJ-12 und Stripe-Produkttext ergänzt. |
+| 2026-11-23 | PROJ-24 spezifiziert: Kontaktdaten Dritter und Leistung im Preis als Rechtspunkte ergänzt. |
 | 2026-11-23 | PROJ-22 QA: Prüfung in Safari und Firefox als Go-live-Punkt ergänzt. |
 | 2026-11-23 | PROJ-22 Frontend: Druck-Karte als Go-live-Blocker eingetragen, interne Kennungen in zwei Kundentexten vermerkt. Keine Migration, keine neuen Env-Werte. |
 | 2026-11-23 | PROJ-22 spezifiziert. Umsatzsteuer für Österreich und Schweiz ergänzt. |

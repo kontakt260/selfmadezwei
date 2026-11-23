@@ -1,7 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState, useTransition } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,43 +16,32 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { startCheckoutAction } from "@/app/checkout/actions";
+import { loadOnboardingDraft, saveOnboardingDraft } from "@/lib/onboarding/draft";
+import {
+  INITIAL_WIZARD_STATE,
+  buildSteps,
+  changeForWhom,
+  changeRecipientName,
+  narrationSummary,
+  prefillInvitationEmail,
+  validateStep,
+  type FieldErrors,
+  type FieldKey,
+  type ForWhom,
+  type GiftMode,
+  type RecipientRole,
+  type StepId,
+  type WizardContext,
+  type WizardState,
+} from "@/lib/onboarding/wizard";
+import { StepNarration } from "./StepNarration";
+import { ChoiceCard, FieldError } from "./wizard-ui";
 
-type ForWhom = "self" | "gift";
-type GiftMode = "phone-only" | "phone-plus-computer";
-type RecipientRole = "projektleiter" | "co_author";
-
-type WizardState = {
-  fullName: string;
-  forWhom: ForWhom | null;
-  giftRecipientName: string;
-  giftMode: GiftMode | null;
-  giftRecipientEmail: string;
-  giftRecipientRole: RecipientRole;
-  buyerWantsAccess: boolean;
-};
-
-type StepId = "name" | "for-whom" | "gift-details" | "gift-computer" | "purchase";
-
-const INITIAL_STATE: WizardState = {
-  fullName: "",
-  forWhom: null,
-  giftRecipientName: "",
-  giftMode: null,
-  giftRecipientEmail: "",
-  giftRecipientRole: "co_author",
-  buyerWantsAccess: true,
-};
-
-export function OnboardingWizard({
-  defaultFullName,
-  buyerEmail,
-  initialForWhom,
-  backUrl = "https://www.narravit.de",
-  showPersonalAreaLink = false,
-  isGuest = false,
-}: {
+type WizardProps = {
   defaultFullName: string;
   buyerEmail: string;
+  /** Konto, dem der Zwischenspeicher gehört. Bei Gästen `null`. */
+  userId?: string | null;
   initialForWhom?: ForWhom | null;
   backUrl?: string;
   showPersonalAreaLink?: boolean;
@@ -54,111 +50,18 @@ export function OnboardingWizard({
    * zuerst, das Konto wird direkt danach angelegt.
    */
   isGuest?: boolean;
-}) {
-  const [state, setState] = useState<WizardState>({
-    ...INITIAL_STATE,
-    fullName: defaultFullName,
-    forWhom: initialForWhom ?? null,
-  });
-  const [stepIndex, setStepIndex] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const shouldSkipForWhomStep = initialForWhom !== null && initialForWhom !== undefined;
+};
 
-  const steps = useMemo<StepId[]>(() => {
-    const base: StepId[] = shouldSkipForWhomStep ? ["name"] : ["for-whom", "name"];
-    if (state.forWhom === "gift") {
-      base.push("gift-details");
-      if (state.giftMode === "phone-plus-computer") {
-        base.push("gift-computer");
-      }
-    }
-    base.push("purchase");
-    return base;
-  }, [shouldSkipForWhomStep, state.forWhom, state.giftMode]);
+const subscribeNever = () => () => {};
 
-  const currentStep = steps[stepIndex];
-  const isLast = stepIndex === steps.length - 1;
-  const isFirst = stepIndex === 0;
-
-  const validateCurrent = (): string | null => {
-    switch (currentStep) {
-      case "name":
-        if (state.fullName.trim().length < 2) return "Bitte geben Sie Ihren Namen an (mind. 2 Zeichen).";
-        return null;
-      case "for-whom":
-        if (!state.forWhom) return "Bitte treffen Sie eine Auswahl.";
-        return null;
-      case "gift-details":
-        if (state.giftRecipientName.trim().length < 2) return "Name der beschenkten Person fehlt.";
-        if (!state.giftMode) return "Bitte wählen Sie, wie geschrieben werden soll.";
-        return null;
-      case "gift-computer": {
-        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(state.giftRecipientEmail)) {
-          return "Bitte eine gültige E-Mail-Adresse angeben.";
-        }
-        if (
-          state.giftRecipientEmail.trim().toLowerCase() === buyerEmail.trim().toLowerCase()
-        ) {
-          return "Bitte eine andere E-Mail-Adresse angeben.";
-        }
-        return null;
-      }
-      default:
-        return null;
-    }
-  };
-
-  const next = () => {
-    const err = validateCurrent();
-    if (err) {
-      setError(err);
-      return;
-    }
-    setError(null);
-    setStepIndex((i) => Math.min(i + 1, steps.length - 1));
-  };
-
-  const back = () => {
-    setError(null);
-    setStepIndex((i) => Math.max(i - 1, 0));
-  };
-
-  const update = <K extends keyof WizardState>(key: K, value: WizardState[K]) => {
-    setState((s) => {
-      const nextState = { ...s, [key]: value };
-      if (key === "buyerWantsAccess" && value === false) {
-        nextState.giftRecipientRole = "projektleiter";
-      }
-      return nextState;
-    });
-    setError(null);
-  };
-
-  const [isPending, startTransition] = useTransition();
-  const handlePurchase = () => {
-    setError(null);
-    startTransition(async () => {
-      const res = await startCheckoutAction({
-        productType: "initial",
-        metadata: {
-          fullName: state.fullName,
-          isGift: state.forWhom === "gift",
-          giftRecipientName: state.giftRecipientName || undefined,
-          giftRecipientEmail: state.giftRecipientEmail || undefined,
-          giftMode: state.giftMode ?? undefined,
-          giftRecipientRole: state.giftRecipientRole,
-          buyerRetainsAccess: state.buyerWantsAccess,
-        },
-      });
-      if (!res.ok) {
-        setError(res.error);
-        return;
-      }
-      // Stripe Hosted Checkout — Vollredirect (kein router.push, sonst
-      // ratet Next.js die Route als interne Navigation).
-      window.location.href = res.checkoutUrl;
-    });
-  };
+export function OnboardingWizard(props: WizardProps) {
+  // Der Zwischenspeicher existiert nur im Browser. Das Formular startet deshalb
+  // nach dem ersten Rendern einmal neu und liest ihn dann direkt ein.
+  const inBrowser = useSyncExternalStore(
+    subscribeNever,
+    () => true,
+    () => false,
+  );
 
   return (
     <section className="relative flex min-h-screen flex-col overflow-hidden bg-[#FAF8F6] text-[#3E3831]">
@@ -174,7 +77,7 @@ export function OnboardingWizard({
         <div className="absolute inset-0 bg-[#FAF8F6]/60" />
       </div>
 
-      <header className="relative z-10 border-b border-[#e0dcd5]/80 bg-[#FAF8F6]/75 px-[5%] py-4 backdrop-blur-sm">
+      <header className="relative z-10 border-b border-[#e0dcd5] bg-[#FAF8F6] px-[5%] py-4">
         <div className="flex items-center gap-4">
           <Image src="/logo.svg" alt="" width={72} height={64} className="h-14 w-auto" priority />
           <span className="[font-family:var(--font-merriweather)] text-3xl font-normal leading-none tracking-[0.02em] text-[#2f3b30]">
@@ -184,135 +87,323 @@ export function OnboardingWizard({
       </header>
 
       <div className="relative z-10 flex flex-1 items-center justify-center px-[5%] py-12 md:py-20">
-        <div className="w-full max-w-3xl border border-[#e0dcd5] bg-white/95 p-7 shadow-[0_18px_48px_rgba(62,56,49,0.12)] backdrop-blur-sm sm:p-10 md:p-12">
-          <ProgressBar total={steps.length} current={stepIndex} />
-
-          <div className="mt-8">
-            {currentStep === "name" && (
-              <StepName fullName={state.fullName} onChange={(v) => update("fullName", v)} />
-            )}
-            {currentStep === "for-whom" && (
-              <StepForWhom value={state.forWhom} onChange={(v) => update("forWhom", v)} />
-            )}
-            {currentStep === "gift-details" && (
-              <StepGiftDetails
-                recipientName={state.giftRecipientName}
-                giftMode={state.giftMode}
-                onChangeName={(v) => update("giftRecipientName", v)}
-                onChangeMode={(v) => update("giftMode", v)}
-              />
-            )}
-            {currentStep === "gift-computer" && (
-              <StepGiftComputer
-                email={state.giftRecipientEmail}
-                role={state.giftRecipientRole}
-                buyerWantsAccess={state.buyerWantsAccess}
-                onChangeEmail={(v) => update("giftRecipientEmail", v)}
-                onChangeRole={(v) => update("giftRecipientRole", v)}
-                onChangeBuyerAccess={(v) => update("buyerWantsAccess", v)}
-              />
-            )}
-            {currentStep === "purchase" && <StepPurchase state={state} isGuest={isGuest} />}
-          </div>
-
-          {error && (
-            <p className="mt-4 text-sm text-destructive" role="alert">
-              {error}
-            </p>
-          )}
-
-          <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between sm:gap-4">
-            {isFirst ? (
-              <Button asChild variant="outline" className="h-12 w-full sm:w-auto sm:min-w-32">
-                <a href={backUrl}>Zurück</a>
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={back}
-                className="h-12 w-full sm:w-auto sm:min-w-32"
-              >
-                Zurück
-              </Button>
-            )}
-
-            {isLast ? (
-              <Button
-                type="button"
-                onClick={handlePurchase}
-                disabled={isPending}
-                className="h-12 w-full sm:w-auto sm:min-w-44"
-              >
-                {isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Wird vorbereitet …
-                  </>
-                ) : (
-                  "Jetzt kaufen — 249 €"
-                )}
-              </Button>
-            ) : (
-              <Button type="button" onClick={next} className="h-12 w-full sm:w-auto sm:min-w-32">
-                Weiter
-              </Button>
-            )}
-          </div>
-
-          {isGuest && (
-            <p className="mt-8 border-t border-[#e0dcd5] pt-6 text-center text-sm text-[#848484]">
-              Sie haben bereits ein Konto?{" "}
-              <a
-                href="/anmelden?next=%2Fonboarding"
-                className="text-[#3E3831] underline underline-offset-4 hover:no-underline"
-              >
-                Anmelden
-              </a>
-            </p>
-          )}
-
-          {showPersonalAreaLink && (
-            <p className="mt-8 border-t border-[#e0dcd5] pt-4 text-center text-base">
-              <a
-                href="/persoenlicher-bereich"
-                className="inline-flex min-h-11 items-center text-[#3E3831] underline underline-offset-4 hover:no-underline"
-              >
-                Zum persönlichen Bereich
-              </a>
-            </p>
-          )}
+        <div className="w-full max-w-3xl border border-[#e0dcd5] bg-white p-6 shadow-[0_18px_48px_rgba(62,56,49,0.12)] sm:p-10 md:p-12">
+          <WizardForm key={inBrowser ? "browser" : "server"} {...props} restoreDraft={inBrowser} />
         </div>
       </div>
     </section>
   );
 }
 
+function createInitialState(
+  defaultFullName: string,
+  initialForWhom: ForWhom | null | undefined,
+  context: WizardContext,
+): WizardState {
+  const base = { ...INITIAL_WIZARD_STATE, fullName: defaultFullName };
+  return initialForWhom ? changeForWhom(base, initialForWhom, context) : base;
+}
+
+function restoreDraft(
+  userId: string | null,
+  initialForWhom: ForWhom | null | undefined,
+  context: WizardContext,
+): { state: WizardState; stepId: StepId } | null {
+  const draft = loadOnboardingDraft(userId);
+  if (!draft) return null;
+  // Ein Link von der Website mit anderem Weg geht vor.
+  if (initialForWhom && draft.state.forWhom !== initialForWhom) return null;
+  // Gast hat sich mittendrin angemeldet: Jetzt ist die eigene Adresse bekannt.
+  const needsOwnEmail =
+    draft.state.forWhom === "self" && !context.isGuest && !draft.state.narrationEmail.trim();
+  return {
+    stepId: draft.stepId,
+    state: needsOwnEmail
+      ? { ...draft.state, narrationEmail: context.buyerEmail }
+      : draft.state,
+  };
+}
+
+function WizardForm({
+  defaultFullName,
+  buyerEmail,
+  userId = null,
+  initialForWhom,
+  backUrl = "https://www.narravit.de",
+  showPersonalAreaLink = false,
+  isGuest = false,
+  restoreDraft: shouldRestore,
+}: WizardProps & { restoreDraft: boolean }) {
+  const context = useMemo<WizardContext>(() => ({ buyerEmail, isGuest }), [buyerEmail, isGuest]);
+  const shouldSkipForWhomStep = initialForWhom !== null && initialForWhom !== undefined;
+
+  const [initial] = useState(() => {
+    const restored = shouldRestore ? restoreDraft(userId, initialForWhom, context) : null;
+    const state = restored?.state ?? createInitialState(defaultFullName, initialForWhom, context);
+    const index = restored ? buildSteps(state, shouldSkipForWhomStep).indexOf(restored.stepId) : 0;
+    return { state, stepIndex: Math.max(index, 0) };
+  });
+  const [state, setState] = useState<WizardState>(initial.state);
+  const [stepIndex, setStepIndex] = useState(initial.stepIndex);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [error, setError] = useState<string | null>(null);
+  const [focusRequest, setFocusRequest] = useState(0);
+  const formRef = useRef<HTMLDivElement>(null);
+  const previousStep = useRef(initial.stepIndex);
+
+  const steps = useMemo(
+    () => buildSteps(state, shouldSkipForWhomStep),
+    [state, shouldSkipForWhomStep],
+  );
+  const safeIndex = Math.min(stepIndex, steps.length - 1);
+  const currentStep = steps[safeIndex]!;
+  const isLast = safeIndex === steps.length - 1;
+  const isFirst = safeIndex === 0;
+
+  useEffect(() => {
+    if (!shouldRestore) return;
+    saveOnboardingDraft(userId, { stepId: currentStep, state });
+  }, [shouldRestore, userId, currentStep, state]);
+
+  useEffect(() => {
+    if (focusRequest === 0) return;
+    formRef.current?.querySelector<HTMLElement>('[data-invalid="true"]')?.focus();
+  }, [focusRequest]);
+
+  useEffect(() => {
+    if (previousStep.current === safeIndex) return;
+    previousStep.current = safeIndex;
+    window.scrollTo({ top: 0 });
+  }, [safeIndex]);
+
+  // Rückkehr von Stripe über den Browser: Die eingefrorene Seite könnte einen
+  // gesperrten Kauf-Button zeigen. Neu laden holt den Stand aus dem Speicher.
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) window.location.reload();
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
+
+  const next = () => {
+    const errors = validateStep(currentStep, state, context);
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setFocusRequest((value) => value + 1);
+      return;
+    }
+    setFieldErrors({});
+    setError(null);
+    if (currentStep === "narration") setState(prefillInvitationEmail);
+    setStepIndex(Math.min(safeIndex + 1, steps.length - 1));
+  };
+
+  const back = () => {
+    setFieldErrors({});
+    setError(null);
+    setStepIndex(Math.max(safeIndex - 1, 0));
+  };
+
+  const update = <K extends keyof WizardState>(key: K, value: WizardState[K]) => {
+    setState((current) => {
+      if (key === "forWhom") return changeForWhom(current, value as ForWhom, context);
+      if (key === "giftRecipientName") return changeRecipientName(current, value as string);
+      const nextState = { ...current, [key]: value };
+      if (key === "buyerWantsAccess" && value === false) {
+        nextState.giftRecipientRole = "projektleiter";
+      }
+      return nextState;
+    });
+    setFieldErrors((current) => {
+      if (key === "narrationChannel" || key === "narrationEnabled") return {};
+      const nextErrors = { ...current };
+      delete nextErrors[key as FieldKey];
+      return nextErrors;
+    });
+    setError(null);
+  };
+
+  const [isPending, startTransition] = useTransition();
+  const handlePurchase = () => {
+    setError(null);
+    const isGift = state.forWhom === "gift";
+    const withComputer = isGift && state.giftMode === "phone-plus-computer";
+    startTransition(async () => {
+      const res = await startCheckoutAction({
+        productType: "initial",
+        metadata: {
+          fullName: state.fullName,
+          isGift,
+          giftRecipientName: isGift ? state.giftRecipientName || undefined : undefined,
+          giftRecipientEmail: withComputer ? state.giftRecipientEmail || undefined : undefined,
+          giftMode: isGift ? (state.giftMode ?? undefined) : undefined,
+          giftRecipientRole: state.giftRecipientRole,
+          buyerRetainsAccess: withComputer ? state.buyerWantsAccess : true,
+        },
+      });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      // Stripe Hosted Checkout — Vollredirect (kein router.push, sonst
+      // ratet Next.js die Route als interne Navigation).
+      window.location.href = res.checkoutUrl;
+    });
+  };
+
+  return (
+    <div ref={formRef}>
+      <ProgressBar total={steps.length} current={safeIndex} />
+
+      <div className="mt-8">
+        {currentStep === "name" && (
+          <StepName
+            fullName={state.fullName}
+            error={fieldErrors.fullName}
+            onChange={(value) => update("fullName", value)}
+          />
+        )}
+        {currentStep === "for-whom" && (
+          <StepForWhom
+            value={state.forWhom}
+            error={fieldErrors.forWhom}
+            onChange={(value) => update("forWhom", value)}
+          />
+        )}
+        {currentStep === "gift-details" && (
+          <StepGiftDetails
+            recipientName={state.giftRecipientName}
+            giftMode={state.giftMode}
+            nameError={fieldErrors.giftRecipientName}
+            modeError={fieldErrors.giftMode}
+            onChangeName={(value) => update("giftRecipientName", value)}
+            onChangeMode={(value) => update("giftMode", value)}
+          />
+        )}
+        {currentStep === "narration" && (
+          <StepNarration state={state} errors={fieldErrors} isGuest={isGuest} onChange={update} />
+        )}
+        {currentStep === "gift-computer" && (
+          <StepGiftComputer
+            email={state.giftRecipientEmail}
+            emailError={fieldErrors.giftRecipientEmail}
+            role={state.giftRecipientRole}
+            buyerWantsAccess={state.buyerWantsAccess}
+            onChangeEmail={(value) => update("giftRecipientEmail", value)}
+            onChangeRole={(value) => update("giftRecipientRole", value)}
+            onChangeBuyerAccess={(value) => update("buyerWantsAccess", value)}
+          />
+        )}
+        {currentStep === "purchase" && <StepPurchase state={state} isGuest={isGuest} />}
+      </div>
+
+      {error && (
+        <p className="mt-4 text-base font-bold text-[#9C1C1C]" role="alert">
+          {error}
+        </p>
+      )}
+
+      <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between sm:gap-4">
+        {isFirst ? (
+          <Button asChild variant="outline" className="h-12 w-full text-lg sm:w-auto sm:min-w-32">
+            <a href={backUrl}>Zurück</a>
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={back}
+            className="h-12 w-full text-lg sm:w-auto sm:min-w-32"
+          >
+            Zurück
+          </Button>
+        )}
+
+        {isLast ? (
+          <Button
+            type="button"
+            onClick={handlePurchase}
+            disabled={isPending}
+            className="h-12 w-full text-lg sm:w-auto sm:min-w-44"
+          >
+            {isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Wird vorbereitet …
+              </>
+            ) : (
+              "Jetzt kaufen — 249 €"
+            )}
+          </Button>
+        ) : (
+          <Button type="button" onClick={next} className="h-12 w-full text-lg sm:w-auto sm:min-w-32">
+            Weiter
+          </Button>
+        )}
+      </div>
+
+      {isGuest && (
+        <p className="mt-8 border-t border-[#e0dcd5] pt-4 text-center text-base text-[#5F5A54]">
+          Sie haben bereits ein Konto?{" "}
+          <a
+            href="/anmelden?next=%2Fonboarding"
+            className="inline-flex min-h-11 items-center text-[#3E3831] underline underline-offset-4 hover:no-underline"
+          >
+            Anmelden
+          </a>
+        </p>
+      )}
+
+      {showPersonalAreaLink && (
+        <p className="mt-8 border-t border-[#e0dcd5] pt-4 text-center text-base">
+          <a
+            href="/persoenlicher-bereich"
+            className="inline-flex min-h-11 items-center text-[#3E3831] underline underline-offset-4 hover:no-underline"
+          >
+            Zum persönlichen Bereich
+          </a>
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ProgressBar({ total, current }: { total: number; current: number }) {
   return (
-    <div className="relative mx-auto flex w-fit max-w-full justify-center gap-2 before:absolute before:left-4 before:right-4 before:top-1/2 before:z-0 before:h-px before:-translate-y-1/2 before:bg-[#e0dcd5] sm:gap-8 sm:before:left-5 sm:before:right-5">
-      {Array.from({ length: total }, (_, index) => (
-        <div
-          key={index}
-          className={cn(
-            "relative z-10 flex h-8 w-8 items-center justify-center border text-sm font-bold sm:h-10 sm:w-10 sm:text-base",
-            current >= index
-              ? "border-[#96B897] bg-[#96B897] text-white"
-              : "border-[#e0dcd5] bg-white text-[#848484]",
-          )}
-        >
-          {current > index ? <Check className="h-4 w-4 sm:h-5 sm:w-5" /> : index + 1}
-        </div>
-      ))}
-    </div>
+    <>
+      <p className="sr-only">
+        Schritt {current + 1} von {total}
+      </p>
+      <div
+        aria-hidden
+        className="relative mx-auto flex w-fit max-w-full justify-center gap-1.5 before:absolute before:left-4 before:right-4 before:top-1/2 before:z-0 before:h-px before:-translate-y-1/2 before:bg-[#BDB5AA] sm:gap-8 sm:before:left-5 sm:before:right-5"
+      >
+        {Array.from({ length: total }, (_, index) => (
+          <div
+            key={index}
+            className={cn(
+              "relative z-10 flex h-8 w-8 items-center justify-center border text-base font-bold sm:h-10 sm:w-10",
+              current >= index
+                ? "border-[#96B897] bg-[#96B897] text-[#1F2A20]"
+                : "border-[#BDB5AA] bg-white text-[#5F5A54]",
+            )}
+          >
+            {current > index ? <Check className="h-4 w-4 sm:h-5 sm:w-5" /> : index + 1}
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 
 function StepName({
   fullName,
+  error,
   onChange,
 }: {
   fullName: string;
+  error?: string;
   onChange: (value: string) => void;
 }) {
   return (
@@ -324,11 +415,15 @@ function StepName({
           id="fullName"
           type="text"
           value={fullName}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(event) => onChange(event.target.value)}
           autoComplete="name"
-          className="h-12"
+          aria-invalid={!!error}
+          aria-describedby={error ? "fullName-error" : undefined}
+          data-invalid={error ? "true" : undefined}
+          className="h-12 border-[#8E877E]"
           autoFocus
         />
+        <FieldError id="fullName-error" message={error} />
       </div>
     </div>
   );
@@ -336,18 +431,24 @@ function StepName({
 
 function StepForWhom({
   value,
+  error,
   onChange,
 }: {
   value: ForWhom | null;
+  error?: string;
   onChange: (value: ForWhom) => void;
 }) {
   return (
     <div>
       <h2 className="heading-style-h3 mb-3">Für wen ist das Lebensbuch?</h2>
-      <p className="mb-6 text-[#535252]">
+      <p className="mb-6 text-lg leading-7 text-[#4A453F]">
         Sie können es für sich selbst anlegen oder als Geschenk für jemanden.
       </p>
-      <div className="grid gap-3">
+      <div
+        className="grid gap-3 outline-none"
+        tabIndex={error ? -1 : undefined}
+        data-invalid={error ? "true" : undefined}
+      >
         <ChoiceCard
           selected={value === "self"}
           onClick={() => onChange("self")}
@@ -361,6 +462,7 @@ function StepForWhom({
           description="Ich schenke jemand anderem ein Lebensbuch."
         />
       </div>
+      <FieldError id="forWhom-error" message={error} />
     </div>
   );
 }
@@ -368,18 +470,22 @@ function StepForWhom({
 function StepGiftDetails({
   recipientName,
   giftMode,
+  nameError,
+  modeError,
   onChangeName,
   onChangeMode,
 }: {
   recipientName: string;
   giftMode: GiftMode | null;
+  nameError?: string;
+  modeError?: string;
   onChangeName: (value: string) => void;
   onChangeMode: (value: GiftMode) => void;
 }) {
   return (
     <div>
       <h2 className="heading-style-h3 mb-3">Für wen ist das Geschenk?</h2>
-      <p className="mb-6 text-[#535252]">
+      <p className="mb-6 text-lg leading-7 text-[#4A453F]">
         Erzählen Sie uns ein bisschen über die beschenkte Person.
       </p>
 
@@ -389,19 +495,27 @@ function StepGiftDetails({
           id="recipientName"
           type="text"
           value={recipientName}
-          onChange={(e) => onChangeName(e.target.value)}
-          className="h-12"
+          onChange={(event) => onChangeName(event.target.value)}
+          aria-invalid={!!nameError}
+          aria-describedby={nameError ? "recipientName-error" : undefined}
+          data-invalid={nameError ? "true" : undefined}
+          className="h-12 border-[#8E877E]"
           autoFocus
         />
+        <FieldError id="recipientName-error" message={nameError} />
       </div>
 
-      <p className="mt-8 mb-3 text-sm font-medium">Wie soll erzählt werden?</p>
-      <div className="grid gap-3">
+      <p className="mb-3 mt-8 text-lg font-bold text-[#3E3831]">Wie soll erzählt werden?</p>
+      <div
+        className="grid gap-3 outline-none"
+        tabIndex={modeError ? -1 : undefined}
+        data-invalid={modeError ? "true" : undefined}
+      >
         <ChoiceCard
           selected={giftMode === "phone-only"}
           onClick={() => onChangeMode("phone-only")}
           title="Nur per Sprachnachricht erzählen"
-          description="Die beschenkte Person erzählt — wir transkribieren."
+          description="Die beschenkte Person bekommt jede Woche einen Erzähl-Impuls und erzählt per Sprachnachricht. Wir machen daraus den Text."
         />
         <ChoiceCard
           selected={giftMode === "phone-plus-computer"}
@@ -410,9 +524,10 @@ function StepGiftDetails({
           description="Die beschenkte Person kann zusätzlich selbst im Portal schreiben."
         />
       </div>
+      <FieldError id="giftMode-error" message={modeError} />
 
       {giftMode === "phone-only" && (
-        <p className="mt-6 border border-[#e0dcd5] bg-[#FAF8F6] p-5 text-base text-[#535252]">
+        <p className="mt-6 border border-[#e0dcd5] bg-[#FAF8F6] p-5 text-base leading-7 text-[#4A453F]">
           Hinweis: Sie erhalten als Käufer vollen Zugriff auf das Projekt (Projektleiter).
         </p>
       )}
@@ -422,6 +537,7 @@ function StepGiftDetails({
 
 function StepGiftComputer({
   email,
+  emailError,
   role,
   buyerWantsAccess,
   onChangeEmail,
@@ -429,6 +545,7 @@ function StepGiftComputer({
   onChangeBuyerAccess,
 }: {
   email: string;
+  emailError?: string;
   role: RecipientRole;
   buyerWantsAccess: boolean;
   onChangeEmail: (value: string) => void;
@@ -438,7 +555,7 @@ function StepGiftComputer({
   return (
     <div>
       <h2 className="heading-style-h3 mb-3">Zugang einrichten</h2>
-      <p className="mb-6 text-[#535252]">
+      <p className="mb-6 text-lg leading-7 text-[#4A453F]">
         Wir senden das Geschenk per E-Mail an die beschenkte Person.
       </p>
 
@@ -448,23 +565,32 @@ function StepGiftComputer({
           id="recipientEmail"
           type="email"
           value={email}
-          onChange={(e) => onChangeEmail(e.target.value)}
-          className="h-12"
+          onChange={(event) => onChangeEmail(event.target.value)}
+          aria-invalid={!!emailError}
+          aria-describedby={emailError ? "recipientEmail-error" : undefined}
+          data-invalid={emailError ? "true" : undefined}
+          className="h-12 border-[#8E877E]"
           autoFocus
         />
+        <FieldError id="recipientEmail-error" message={emailError} />
       </div>
 
-      <div className="mt-8 flex items-start justify-between border border-[#e0dcd5] bg-[#FAF8F6] p-5">
-        <div className="pr-6">
-          <p className="font-medium">Möchten Sie selbst Zugang zum Projekt?</p>
-          <p className="mt-1 text-base text-[#535252]">
+      <div className="mt-8 flex items-center justify-between gap-4 border border-[#e0dcd5] bg-[#FAF8F6] p-5">
+        <div className="min-w-0">
+          <p className="text-lg font-bold">Möchten Sie selbst Zugang zum Projekt?</p>
+          <p className="mt-1 text-base leading-6 text-[#4A453F]">
             Wenn ja, werden Sie als Projektleiter eingetragen.
           </p>
         </div>
-        <Switch checked={buyerWantsAccess} onCheckedChange={onChangeBuyerAccess} />
+        <Switch
+          checked={buyerWantsAccess}
+          onCheckedChange={onChangeBuyerAccess}
+          aria-label="Selbst Zugang zum Projekt erhalten"
+          className="h-11 w-20 rounded-none data-[state=checked]:bg-[#557559] data-[state=unchecked]:bg-[#77716A] [&>span]:h-10 [&>span]:w-10 [&>span]:rounded-none [&>span]:bg-white [&>span]:data-[state=checked]:translate-x-9"
+        />
       </div>
 
-      <p className="mt-8 mb-3 text-sm font-medium">Rolle der beschenkten Person</p>
+      <p className="mb-3 mt-8 text-lg font-bold text-[#3E3831]">Rolle der beschenkten Person</p>
       <div className="grid gap-3">
         <ChoiceCard
           selected={role === "projektleiter"}
@@ -482,9 +608,9 @@ function StepGiftComputer({
       </div>
 
       {!buyerWantsAccess && (
-        <p className="mt-4 border border-[#e0dcd5] bg-[#FAF8F6] p-5 text-base text-[#535252]">
-          Da Sie selbst keinen Zugang möchten, wird die beschenkte Person automatisch Projektleiter
-          — jedes Projekt braucht mindestens eine:n Projektleiter:in.
+        <p className="mt-4 border border-[#e0dcd5] bg-[#FAF8F6] p-5 text-base leading-7 text-[#4A453F]">
+          Da Sie selbst keinen Zugang möchten, wird die beschenkte Person automatisch Projektleiter,
+          denn jedes Projekt braucht eine Projektleitung.
         </p>
       )}
     </div>
@@ -492,46 +618,42 @@ function StepGiftComputer({
 }
 
 function StepPurchase({ state, isGuest }: { state: WizardState; isGuest: boolean }) {
+  const isGift = state.forWhom === "gift";
+  const withComputer = isGift && state.giftMode === "phone-plus-computer";
   const summary: { label: string; value: string }[] = [
-    { label: "Name", value: state.fullName },
-    {
-      label: "Geschenk?",
-      value: state.forWhom === "gift" ? "Als Geschenk" : "Für mich selbst",
-    },
+    { label: "Ihr Name", value: state.fullName },
+    { label: "Für wen", value: isGift ? "Als Geschenk" : "Für mich selbst" },
   ];
 
-  if (state.forWhom === "gift") {
+  if (isGift) {
     summary.push({ label: "Beschenkte Person", value: state.giftRecipientName });
     summary.push({
       label: "Erzählweise",
-      value: state.giftMode === "phone-only" ? "Nur Sprachnachricht" : "Auch Computer",
+      value: withComputer ? "Auch am Computer" : "Nur per Sprachnachricht",
     });
-    if (state.giftMode === "phone-plus-computer") {
-      summary.push({ label: "E-Mail Beschenkte:r", value: state.giftRecipientEmail });
-      summary.push({
-        label: "Rolle Beschenkte:r",
-        value: state.giftRecipientRole === "projektleiter" ? "Projektleiter" : "Co-Autor",
-      });
-      summary.push({
-        label: "Eigener Zugang",
-        value: state.buyerWantsAccess ? "Ja (Projektleiter)" : "Nein",
-      });
-    } else {
-      summary.push({ label: "Ihr Zugang", value: "Projektleiter (Standard)" });
-    }
+  }
+  summary.push({ label: "Erzähl-Impulse", value: narrationSummary(state) });
+  if (withComputer) {
+    summary.push({ label: "E-Mail für die Einladung", value: state.giftRecipientEmail });
+    summary.push({
+      label: "Rolle der beschenkten Person",
+      value: state.giftRecipientRole === "projektleiter" ? "Projektleiter" : "Co-Autor",
+    });
+    summary.push({
+      label: "Ihr eigener Zugang",
+      value: state.buyerWantsAccess ? "Ja, als Projektleiter" : "Nein",
+    });
+  } else if (isGift) {
+    summary.push({ label: "Ihr eigener Zugang", value: "Ja, als Projektleiter" });
   }
 
   // Geschenk ohne eigenen Zugang: Ohne Anmeldung ist gar kein Konto nötig.
-  const isDirectGift =
-    isGuest &&
-    state.forWhom === "gift" &&
-    state.giftMode === "phone-plus-computer" &&
-    !state.buyerWantsAccess;
+  const isDirectGift = isGuest && withComputer && !state.buyerWantsAccess;
 
   return (
     <div>
       <h2 className="heading-style-h3 mb-3">Bereit zum Start?</h2>
-      <p className="mb-6 text-[#535252]">
+      <p className="mb-6 text-lg leading-7 text-[#4A453F]">
         {isDirectGift
           ? "Nach der Zahlung senden wir das Geschenk direkt an die beschenkte Person. Ein Konto brauchen Sie dafür nicht."
           : isGuest
@@ -541,55 +663,22 @@ function StepPurchase({ state, isGuest }: { state: WizardState; isGuest: boolean
 
       <dl className="mb-8 grid gap-4 border border-[#e0dcd5] bg-white p-4 sm:gap-3 sm:p-6">
         {summary.map(({ label, value }) => (
-          <div
-            key={label}
-            className="grid gap-1 text-base sm:flex sm:justify-between sm:gap-5"
-          >
-            <dt className="text-[#848484]">{label}</dt>
-            <dd className="min-w-0 break-words font-medium sm:text-right">{value || "—"}</dd>
+          <div key={label} className="grid gap-1 text-base sm:flex sm:justify-between sm:gap-5">
+            <dt className="shrink-0 text-[#5F5A54]">{label}</dt>
+            <dd className="min-w-0 font-bold [overflow-wrap:anywhere] sm:text-right">
+              {value || "—"}
+            </dd>
           </div>
         ))}
       </dl>
 
       <div className="border border-[#e0dcd5] bg-[#FAF8F6] p-5 sm:p-7">
-        <p className="text-base text-[#848484]">12 Monate Projektzugang</p>
-        <p className="heading-style-h4 mt-1">249 €</p>
-        <p className="mt-2 text-base text-[#535252]">
-          Inklusive Erzählen per Sprachnachricht, Editor und Druck-Vorbereitung.
+        <p className="heading-style-h4">249 €</p>
+        <p className="mt-2 text-lg leading-7 text-[#3E3831]">
+          Ihr erstes gedrucktes Hardcover-Buch, 12 Monate Projektzugang, Erzählen per Sprachnachricht
+          und Editor.
         </p>
       </div>
     </div>
-  );
-}
-
-function ChoiceCard({
-  selected,
-  onClick,
-  title,
-  description,
-  disabled = false,
-}: {
-  selected: boolean;
-  onClick: () => void;
-  title: string;
-  description: string;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        "w-full border p-5 text-left [font-family:var(--font-lato)] text-lg font-bold transition-colors",
-        selected
-          ? "border-[#96B897] bg-[#F3F7F3]"
-          : "border-[#e0dcd5] bg-white hover:border-[#96B897]",
-        disabled && "cursor-not-allowed opacity-50 hover:border-[#e0dcd5]",
-      )}
-    >
-      <p>{title}</p>
-      <p className="mt-2 text-base font-normal text-[#535252]">{description}</p>
-    </button>
   );
 }

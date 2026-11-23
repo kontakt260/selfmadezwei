@@ -70,7 +70,7 @@ Neuer Ablauf (Schritte in Klammern nur bedingt):
 - [ ] **Pfad „Auch am Computer schreiben":** Schritt 5 wie bisher (E-Mail für die Portal-Einladung Pflicht — vorbefüllt aus Schritt 4, falls dort angegeben —, eigener Zugang, Rolle). Die Aufforderungen aus Schritt 4 laufen zusätzlich.
 - [ ] **„Für mich selbst":** Schritt 4 erscheint mit der eigenen E-Mail vorbefüllt und der Option „Ich möchte nur selbst schreiben" (dann keine Aufforderungen).
 - [ ] Schritt 6: Zusammenfassung zeigt Erzählweise, Kanal und Wochentag. Der Preistext lautet ohne Vapi/Kontingent, z. B. „Inklusive Erzählen per Sprachnachricht, Editor und Druck-Vorbereitung."
-- [ ] Die Angaben werden wie die bisherigen Onboarding-Daten über den Checkout mitgegeben und beim Anlegen des Projekts (Stripe-Webhook) gespeichert.
+- [ ] Die Angaben werden beim Anlegen des Projekts gespeichert. **Geändert durch PROJ-24 (2026-11-23):** Kontaktdaten laufen nicht über Stripe, sondern über eine kurzlebige Kauf-Vorbereitung. Den Onboarding-Schritt baut PROJ-24.
 
 ### Einstellungen in der Projektübersicht
 - [ ] Die Platzhalter-Sektion „Code für das Telefonieren" wird ersetzt durch **„Erzählen per Sprachnachricht"**.
@@ -328,7 +328,7 @@ Alle Oberflächen nutzen die vorhandenen shadcn/ui-Bausteine (Dialog, Button, In
 10. **Täglicher Versand-Lauf nach dem Muster der Verlängerungs-Erinnerungen (PROJ-11).** Er läuft jeden Vormittag, wählt die Projekte mit passendem Wochentag (deutsche Zeit) und verschickt außerdem fällige Erinnerungen. Vor jeder Erinnerung wird geprüft, ob das Kapitel noch leer ist.
 11. **Anbieter hinter Adaptern.** SMS, Transkription und Textformulierung bekommen je eine schmale interne Schnittstelle. SMS: **seven.io** (deutscher Anbieter, Server in Deutschland). Transkription und Sprachmodell sind **bewusst noch offen** und werden nach einem Vergleichstest gewählt (siehe F). Ein späterer Wechsel betrifft nur den jeweiligen Adapter; PROJ-14 baut auf derselben Schnittstelle auf.
 12. **Mikrofon-Freigabe nur auf den Aufnahme-Seiten.** Überall sonst bleibt das Mikrofon per Sicherheits-Kopfzeile gesperrt (Abstimmung mit PROJ-19).
-13. **Onboarding-Angaben reisen wie bisher über den Stripe-Checkout** und werden beim Anlegen des Projekts gespeichert. Kein neuer Mechanismus.
+13. **Überholt durch PROJ-24 (2026-11-23):** Kontaktdaten reisen nicht über den Stripe-Checkout, weil Stripe sie dauerhaft speichern würde. Sie liegen bis zur Erfüllung in einer kurzlebigen Kauf-Vorbereitung.
 14. **Eigener Zugriffsschutz für die öffentlichen Endpunkte.** Begrenzung pro Link und pro Absender-Adresse. Da PROJ-17 (Rate-Limiting) noch nicht gebaut ist, wird PROJ-17 zur **Voraussetzung für den Live-Gang** von PROJ-12.
 
 ### D) Neue Abhängigkeiten
