@@ -40,9 +40,9 @@ export type ReserveResult =
  *
  * Wichtig: Stripe-Mails (portal_purchase, renewal) brauchen
  * KEIN reserve — der Stripe-Webhook ist bereits idempotent (UNIQUE
- * stripe_session_id im payments). Für diese Mails wird der mail_log nur
- * als Lookup-Tabelle befüllt (mit createNonIdempotentLogEntry), damit
- * Resend-Statistiken einen DB-Bezug haben.
+ * stripe_session_id im payments). Sie stehen nicht im mail_log: Den Versand
+ * zeigt das Resend-Dashboard, gescheiterte Mails holt `retry-queue.ts` nach
+ * (Entscheidung Jakob, 2026-11-23).
  */
 export async function reserveMailLog(
   input: ReserveInput,
@@ -179,28 +179,4 @@ export async function deleteAbandonedMailLog(input: {
     return false;
   }
   return (data ?? []).length > 0;
-}
-
-/**
- * Schreibt einen mail_log-Eintrag OHNE Idempotenz-Schutz (z. B. für
- * Stripe-Mails). Schlägt der Insert wegen Constraint-Verletzung fehl,
- * geben wir trotzdem `null` zurück — keine Exception.
- */
-export async function createNonIdempotentLogEntry(input: {
-  userId: string | null;
-  projectId: string | null;
-  mailType: MailType;
-}): Promise<string | null> {
-  const supabase = createServiceRoleClient();
-  const { data, error } = await supabase
-    .from("mail_log")
-    .insert({
-      user_id: input.userId,
-      project_id: input.projectId,
-      mail_type: input.mailType,
-    })
-    .select("id")
-    .single();
-  if (error) return null;
-  return data.id;
 }

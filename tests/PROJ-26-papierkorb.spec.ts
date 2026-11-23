@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { waitForEditorReady, waitForSaved } from "./helpers/editor-audit";
 import { waitForPage } from "./helpers/page-ready";
+import { accessToken, createTestAccount, readEnvLocal, restRequest, signIn, STAGE_HOST, storageFileExists } from "./helpers/stage";
 
 // PROJ-26 — echter Papierkorb gegen die Stage-Datenbank und den Dateispeicher.
 //
@@ -20,7 +21,6 @@ import { waitForPage } from "./helpers/page-ready";
 // wird nicht aufgerufen, weil er echte Erinnerungen verschicken könnte.
 
 const ENABLED = process.env.E2E_TRASH === "1";
-const STAGE_HOST = "kdjhxqitfxnsavhiafdn.supabase.co";
 // Die Adressen stehen in der Mitgliederliste, deshalb ohne das geprüfte Wort.
 const TEST_EMAIL_PREFIX = "e2e-loeschtest-";
 const RUN_ID = crypto.randomBytes(4).toString("hex");
@@ -57,27 +57,11 @@ const accounts: Account[] = [];
 const projectIds = new Set<string>();
 const uploaded: Array<{ bucket: string; path: string }> = [];
 
-function readEnvLocal(): Record<string, string> {
-  const values: Record<string, string> = {};
-  const content = fs.readFileSync(path.join(process.cwd(), ".env.local"), "utf8");
-  for (const line of content.split(/\r?\n/)) {
-    const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (match) values[match[1]] = match[2].trim().replace(/^['"]|['"]$/g, "");
-  }
-  return values;
-}
-
 async function createAccount(label: string, name: string): Promise<Account> {
-  const email = `${TEST_EMAIL_PREFIX}${label}-${RUN_ID}@example.test`;
-  const password = `${crypto.randomBytes(18).toString("base64url")}aA1!`;
-  const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { full_name: name },
+  const account = await createTestAccount(admin, {
+    email: `${TEST_EMAIL_PREFIX}${label}-${RUN_ID}@example.test`,
+    name: name,
   });
-  if (error || !data.user) throw new Error(`createUser failed: ${error?.message}`);
-  const account = { id: data.user.id, email, password, name };
   accounts.push(account);
   return account;
 }
@@ -152,48 +136,8 @@ async function createProject(input: {
   return { id, title, chapters };
 }
 
-async function signIn(page: Page, account: Account): Promise<void> {
-  await page.goto("/anmelden");
-  await page.locator('input[name="email"]').fill(account.email);
-  await page.locator('input[name="password"]').fill(account.password);
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () =>
-            (document.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement | null)
-              ?.value.length ?? 0,
-        ),
-      { timeout: 20_000 },
-    )
-    .toBeGreaterThan(0);
-  await page.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.includes("/anmelden"), { timeout: 45_000 });
-}
-
-function accessToken(cookies: Array<{ name: string; value: string }>): string {
-  const parts = cookies
-    .filter((cookie) => /^sb-.+-auth-token(\.\d+)?$/.test(cookie.name))
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
-    .map((cookie) => cookie.value)
-    .join("");
-  const raw = parts.startsWith("base64-")
-    ? Buffer.from(parts.slice("base64-".length), "base64url").toString("utf8")
-    : decodeURIComponent(parts);
-  return (JSON.parse(raw) as { access_token: string }).access_token;
-}
-
 function rest(pathname: string, init: RequestInit, token?: string): Promise<Response> {
-  return fetch(`${supabaseUrl}/rest/v1/${pathname}`, {
-    ...init,
-    headers: {
-      apikey: anonKey,
-      Authorization: `Bearer ${token ?? anonKey}`,
-      "Content-Type": "application/json",
-      Prefer: "return=minimal",
-      ...(init.headers ?? {}),
-    },
-  });
+  return restRequest({ supabaseUrl, anonKey, prefer: "return=minimal" }, pathname, init, token);
 }
 
 const asUser = (token: string): SupabaseClient =>
@@ -217,12 +161,8 @@ const count = async (table: string, column: string, value: string): Promise<numb
   return total ?? 0;
 };
 
-async function fileExists(bucket: string, file: string): Promise<boolean> {
-  const folder = file.slice(0, file.lastIndexOf("/"));
-  const name = file.slice(file.lastIndexOf("/") + 1);
-  const { data, error } = await admin.storage.from(bucket).list(folder, { limit: 100 });
-  if (error) throw new Error(error.message);
-  return (data ?? []).some((entry) => entry.name === name);
+function fileExists(bucket: string, file: string): Promise<boolean> {
+  return storageFileExists(admin, bucket, file);
 }
 
 async function waitForServerAction(page: Page, action: () => Promise<void>): Promise<void> {

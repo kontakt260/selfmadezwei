@@ -1,5 +1,7 @@
 # PROJ-24: Onboarding optimieren
 
+> **Kurzfassung (PROJ-31).** Das vollständige Tech Design, Bau-Notizen, QA-Protokolle und der Deployment-Verlauf stehen unverändert im [Archiv](archive/PROJ-24-onboarding-optimieren.md).
+
 ## Status: Approved
 **Created:** 2026-11-23
 **Last Updated:** 2026-11-23
@@ -138,243 +140,24 @@ So sieht Schritt 4 je nach Weg aus:
 - **Barrierearmut:** WCAG 2.1 AA für Kontrast, Tastaturbedienung und Beschriftungen.
 - **Browser:** Chrome, Firefox und Safari in aktuellen Versionen.
 
----
-<!-- Sections below are added by subsequent skills -->
-
-## Tech Design (Solution Architect)
-
-> Von Jakob am 2026-11-23 freigegeben, inklusive der neuen RLS-Regeln. Geprüft am vorhandenen Code.
-
-**Kurzfassung:** PROJ-24 braucht Frontend und Backend. Neu sind zwei geschützte Tabellen, eine Migration, ein Paket zur Prüfung von Handynummern und ein Aufräumschritt im täglichen Cron. Neue Env-Variablen und neue Stripe-Webhook-Events sind nicht nötig.
-
-### A) Aufbau
-
-```
-Onboarding
-+-- Schrittanzeige (besser lesbar)
-+-- Für wen ist das Lebensbuch?
-+-- Wie heißen Sie?
-+-- Für wen ist das Geschenk?
-+-- Erzähl-Impulse (neu)
-|   +-- Frage Ja oder Nein (nicht bei „Nur per Sprachnachricht")
-|   +-- Auswahl E-Mail, SMS oder beides
-|   +-- Felder für E-Mail und Handynummer
-|   +-- Hinweis „jeden Sonntag"
-+-- Zugang einrichten (wie heute, E-Mail vorbefüllt)
-+-- Bereit zum Start? (Zusammenfassung, neuer Preistext)
-+-- Zwischenspeicher im Browser-Tab
-
-Nach „Jetzt kaufen"
-+-- Der Server prüft alle Angaben
-+-- Kontaktdaten kommen in die Kauf-Vorbereitung
-+-- Stripe bekommt nur eine zufällige Kennung
-+-- Nach der Zahlung: Erzähl-Einstellungen am Projekt
-+-- Die Kauf-Vorbereitung wird gelöscht
-```
-
-### B) Daten
-
-**Erzähl-Einstellungen (neu, eine Zeile pro Projekt, Grundlage für PROJ-12):**
-
-- Name der erzählenden Person, E-Mail, Handynummer
-- Gewählte Wege: Mail, SMS oder beides
-- Wochentag und Rhythmus, Vorgabe jeden Sonntag
-
-Wer „Nein" wählt, bekommt keine Zeile. Das Projekt gilt dann als „nicht eingerichtet".
-
-**Kauf-Vorbereitung (neu, nur kurzlebig):** Sie hält dieselben Angaben, bis der Kauf erfüllt ist.
-
-| Zustand | Wird gelöscht |
-|---|---|
-| Keine Zahlung | nach 2 Tagen |
-| Zahlung läuft, zum Beispiel SEPA | beim Zahlungseingang, spätestens nach 21 Tagen |
-| Bezahlt, Konto noch nicht angelegt | beim Einlösen, spätestens nach 90 Tagen |
-| Kauf erfüllt | sofort |
-
-**Browser-Tab:** Der Zwischenspeicher hält die Eingaben und den aktuellen Schritt. Er gehört zum Konto, mit dem sie eingegeben wurden, und ist nach dem Kauf oder beim Schließen des Tabs weg.
+## Technische Entscheidungen
+_Kurzform. Die vollständige Begründung steht im Archiv._
 
 ### C) Technische Entscheidungen
 
-1. **Kontaktdaten gehen nicht über Stripe.** PROJ-12 sah das noch vor. Stripe speichert solche Angaben aber dauerhaft, auch bei abgebrochenen Käufen. Für Daten einer dritten Person ist das nicht sparsam genug.
-2. **Eine Stelle für alle Käufe.** Angemeldeter Kauf, Kauf ohne Konto und Geschenk ohne eigenen Zugang laufen schon heute über dieselbe Erfüllung. Dort werden auch die Erzähl-Einstellungen angelegt.
-3. **Erzähl-Kontakte verhindern nie einen Kauf.** Fehlt die Kauf-Vorbereitung, entsteht das Buch trotzdem. Das Erzählen ist dann „nicht eingerichtet" und lässt sich mit PROJ-12 in der Projektübersicht nachtragen. **Ausnahme seit BUG-3:** Lässt sich die Adresse für die Geschenk-Einladung nicht speichern, startet der Checkout gar nicht, damit niemand bezahlt, ohne dass die Einladung ankommen kann.
+1. **Kontaktdaten gehen nicht über Stripe.** PROJ-12 sah das noch vor. Stripe speichert solche Angaben aber dauerhaft, auch bei abgebrochenen Käufen.
+2. **Eine Stelle für alle Käufe.** Angemeldeter Kauf, Kauf ohne Konto und Geschenk ohne eigenen Zugang laufen schon heute über dieselbe Erfüllung.
+3. **Erzähl-Kontakte verhindern nie einen Kauf.** Fehlt die Kauf-Vorbereitung, entsteht das Buch trotzdem.
 4. **Vor der Zahlung wird niemand angeschrieben.** So lässt sich der offene Kaufweg nicht nutzen, um fremde Menschen mit Nachrichten zu belästigen.
-5. **Zugriff nur über den Server.** Beide Tabellen sind per RLS für Browser und angemeldete Nutzer komplett gesperrt. Lese- und Änderungsrechte für die Projektübersicht kommen erst mit PROJ-12. Diese RLS-Regeln hat Jakob am 2026-11-23 freigegeben.
+5. **Zugriff nur über den Server.** Beide Tabellen sind per RLS für Browser und angemeldete Nutzer komplett gesperrt.
 6. **Gleiche Prüfung im Browser und auf dem Server.** Handynummern werden international geprüft und einheitlich gespeichert, damit PROJ-12 sie direkt nutzen kann.
 7. **Der Zwischenspeicher bleibt im Browser.** Abgebrochene Eingaben landen dadurch nicht auf dem Server.
 
-### D) Stolperstellen, die der Bau mit löst
+### Spätere Entscheidungen
+- **Geschenk-Bestätigung (Jakob, 2026-11-23):** Der Satz „Das Geschenk bleibt gültig, solange der Projektzugang läuft.“ ist entfernt.
 
-| Stelle | Folge ohne Fix |
-|---|---|
-| Beim Kauf ohne Konto entsteht das Projekt erst beim Einlösen | Die Kontaktdaten wären bis dahin verloren |
-| SEPA-Zahlungen kommen erst Tage später an | Die Kauf-Vorbereitung wäre schon gelöscht |
-| Stripe wiederholt Webhooks bei Fehlern | Würde zu früh gelöscht, fehlen die Daten beim zweiten Versuch. Gelöscht wird erst nach vollständiger Erfüllung |
-| Der Gast kennt beim Kauf für sich selbst noch keine Konto-Adresse | Die E-Mail wird nach der Zahlung aus dem Stripe-Checkout übernommen |
-| Rückkehr von Stripe über den Browser | „Jetzt kaufen" könnte gesperrt bleiben und muss wieder aktiv sein |
-| Anderes Konto im selben Tab | Es sähe sonst die Eingaben der vorherigen Person |
-| Stripe-Produkt und Rechnung nennen das Buch vielleicht nicht | Kaufschritt und Rechnung würden Unterschiedliches sagen |
-
-### E) Bau-Reihenfolge
-
-1. `/frontend`: Lesbarkeit, Schritt „Erzähl-Impulse", Zusammenfassung, Preistext, Druck-Karte, Zwischenspeicher
-2. `/backend`: Migration, Prüfung beim Kauf, Übergabe ans Projekt, Aufräumen im Cron
-3. `/qa`: alle Kaufwege, Abbruch, SEPA, wiederholter Webhook, Sicherheit und Geräte
-
-### F) Tests
-
-Geprüft werden alle sechs Kombinationen aus Weg und Erzähl-Impulsen, bezahlte und abgebrochene Käufe, der Kauf ohne Konto bis zum Einlösen und das automatische Löschen. Echte SMS oder Mails werden dabei nicht verschickt.
-
-### G) Vor dem Go-live
-
-- **PROJ-24 und PROJ-12 gehen nur gemeinsam live.** Sonst verspricht das Onboarding Nachrichten, die nie ankommen.
-- Die Migration wird in Production vor dem Code-Deploy eingespielt.
+## Offene Punkte
+- Live nur zusammen mit PROJ-12.
+- Vor dem Go-live: Prüfung in Safari und Firefox.
+- In Production die Migration vor dem Code einspielen.
 - Produktname und Beschreibung bei Stripe müssen das erste gedruckte Buch nennen.
-- Die Rechtsfragen aus dem Abschnitt „Vor dem Go-live zu klären" sind beantwortet.
-
-### H) Abhängigkeiten
-
-- **Neue Pakete:** `libphonenumber-js` für die Prüfung von Handynummern
-- **Neue Env-Variablen:** keine
-- **Migration:** eine, reines ASCII, Jakob spielt sie im SQL-Editor auf Stage ein
-- **Nächste Schritte nach Freigabe:** `/frontend`, danach `/backend` und `/qa`
-
-## Implementation Notes (Frontend, 2026-11-23)
-
-**Gebaut:**
-
-- **Eingaberegeln:** Schritte, Pflichtfelder, Handynummern und Wegwechsel liegen in `src/lib/onboarding/wizard.ts` und können später auch auf dem Server genutzt werden.
-- **Schritt „Erzähl-Impulse":** Ja oder Nein, E-Mail, SMS oder beides, ein Feld für die Handynummer, Hinweis auf den Sonntag.
-- **Zwischenspeicher:** `src/lib/onboarding/draft.ts` hält die Angaben im Browser-Tab, gebunden an das Konto. Nach dem Kauf und beim Abmelden werden sie gelöscht.
-- **Lesbarkeit:** Schrittanzeige, Texte, Felder und Buttons, Fehlermeldungen direkt am Feld, keine Glaseffekte mehr.
-- **Kaufschritt und Druck-Karte:** kurze Zusammenfassung, Buchbild als Platzhalter (`PURCHASE_BOOK` in `OnboardingWizard.tsx`), Preistext mit dem Buch zuerst, Hinweis auf das bereits bezahlte Buch.
-
-
-**Ergänzungen beim Bau:**
-
-- Eine Nummer ohne + wird als deutsche Nummer gelesen, zum Beispiel 0171 1234567.
-- Der Zwischenspeicher verfällt zusätzlich nach 24 Stunden, auch wenn der Tab offen bleibt.
-
-## Implementation Notes (Backend, 2026-11-23)
-
-**Gebaut, nicht committet:**
-
-- **Migration `20261123120000_proj24_narration.sql`:** Tabellen `narration_settings` und `purchase_narration_drafts`, beide per RLS ohne Policies und ohne Rechte für `anon` und `authenticated`.
-- **Checkout:** Der Server prüft die Angaben selbst, legt die Kauf-Vorbereitung an und gibt Stripe nur deren Kennung. Scheitert Stripe, wird sie wieder gelöscht.
-- **Erfüllung:** Alle drei Kaufwege übertragen die Daten in `fulfillInitialPurchase` ans Projekt. Gelöscht wird die Vorbereitung erst nach dem Zahlungseintrag, damit ein wiederholter Webhook sie noch findet.
-- **Verzögerte Zahlung und Kauf ohne Konto:** Die Vorbereitung bekommt dann den Zustand `payment_pending` oder `paid` und damit die längere Frist.
-- **Cron:** Der tägliche Lauf löscht offene Einträge nach 2, laufende Zahlungen nach 21 und bezahlte, nicht eingelöste Käufe nach 90 Tagen.
-- **Fehlerverhalten:** Probleme mit den Kontaktdaten verhindern nie einen Kauf. Das Projekt gilt dann als „nicht eingerichtet". In den Logs stehen keine Kontaktdaten.
-
-**Geprüft am 2026-11-23:** Die Migration ist auf Stage eingespielt. Dort hat nur die Service-Role Zugriff, `anon` und `authenticated` haben keine Rechte, RLS ist aktiv. Unit-Tests 826/826, E2E 283 bestanden. Ein echter Testkauf über Stripe steht noch aus und gehört in `/qa`.
-
-**Nach der QA geändert (BUG-3):** Auch die E-Mail für die Portal-Einladung beim Weg „Auch am Computer" liegt jetzt in der Kauf-Vorbereitung (Migration `20261123130000_proj24_gift_email_draft.sql`), Stripe kennt nur die Kennung. Ältere Käufe mit der Adresse in den Metadaten funktionieren weiter. Ist die Adresse nach Ablauf der Frist nicht mehr da, behält der Käufer das Projekt und lädt selbst ein.
-
-## QA Test Results
-
-**Tested:** 2026-11-23
-**App URL:** http://localhost:3000 (Production-Build gegen die Stage-Datenbank)
-**Tester:** QA Engineer (AI)
-**Browser:** nur Chromium. WebKit startet auf diesem Mac nicht, der Playwright-Firefox ist nicht installiert.
-**Echter Testkauf:** Jakob hat am 2026-11-23 auf Stage ein Geschenk „Auch am Computer" mit der Stripe-Testkarte gekauft. Zahlung, Einladung und Erzähl-Einstellungen stimmen, die Kauf-Vorbereitung ist gelöscht, die Mail kam an. Die übrigen Kaufwege wurden mit signierten Webhook-Events gegen Stage geprüft.
-
-**Nach dem Testkauf geändert (Jakob):** Der Satz „Das Geschenk bleibt gültig, solange der Projektzugang läuft." ist von der Geschenk-Bestätigung entfernt.
-
-**Nicht geprüft:** Safari und Firefox, steht als Punkt in `docs/production/prod-umzug.md`.
-
-### Acceptance Criteria Status
-
-| Bereich | Ergebnis | Anmerkung |
-|---|---|---|
-| A. Ablauf und Lesbarkeit (AC-1 bis 8) | 8/8 | AC-6 nach BUG-2 bestanden. Lesbarkeit in fünf Größen ohne Befund |
-| B. Schritt „Erzähl-Impulse" (AC-9 bis 18, 28, 29) | 12/12 | Nummern aus mehreren Ländern, auch mit 00 und (0), werden korrekt gespeichert |
-| C. Zugang einrichten (AC-19, 20) | 2/2 | AC-20 nach BUG-1 bestanden |
-| D. Kaufschritt (AC-21 bis 23, 27) | 4/4 | |
-| E. Abbruch und Neuladen (AC-24 bis 26) | 3/3 | AC-25 nach BUG-2 bestanden |
-
-### Kaufwege (gegen Stage, simulierte Zahlung)
-
-- [x] Angemeldeter Kauf: Einstellungen am Projekt, Vorbereitung gelöscht
-- [x] Wiederholter Webhook: nichts doppelt
-- [x] SEPA: Daten warten bis zum Zahlungseingang
-- [x] Geschenk ohne eigenen Zugang und ohne Konto
-- [x] Kauf ohne Konto: Daten warten bis zum Einlösen und nutzen die Adresse aus der Zahlung
-- [x] Fehlende oder kaputte Kennung: Der Kauf läuft trotzdem durch
-- [x] Scheitert Stripe beim Start, bleibt keine Vorbereitung zurück
-- [x] Geschenk ohne Erzähl-Impulse: Nur die Einladungsadresse wartet, die Einladung entsteht, danach ist die Adresse gelöscht
-
-### Edge Cases Status
-
-- [x] Weg gewechselt von „Auch am Computer" zu „Nur per Sprachnachricht"
-- [x] Von Geschenk zu „Für mich selbst" und zurück: Die alte Einladungsadresse wird gelöscht (BUG-1 behoben)
-- [x] Nur SMS beim Weg „Auch am Computer"
-- [x] Eigene Adresse beim Geschenk
-- [x] Beides gewählt, ein Feld leer oder ungültig
-- [x] Checkout schlägt fehl
-- [x] Gast meldet sich mitten im Ablauf an
-- [x] Abmelden löscht den Zwischenspeicher, ein fremder Entwurf wird nicht gezeigt
-- [x] Vorbelegter Weg über den Link der Website
-
-### Security Audit Results
-
-- [x] RLS: Gäste und angemeldete Nutzer können beide Tabellen weder lesen noch ändern
-- [x] Auf Stage hat nur die Service-Role Rechte, auch nach der zweiten Migration
-- [x] Telefonnummern, Erzähl-Adressen und die Einladungsadresse gehen nicht an Stripe (BUG-3 behoben). Der Name der beschenkten Person steht weiter in den Stripe-Metadaten
-- [x] In den Server-Logs stehen keine Kontaktdaten
-- [x] Gespeichertes HTML im Namen wird nicht ausgeführt
-- [x] Beschädigter Zwischenspeicher wird verworfen
-- [x] Es wurden keine Mails oder SMS ausgelöst, die Testdaten sind wieder gelöscht
-
-### Bugs Found
-
-#### BUG-1: Nach einem Wegwechsel steht die alte Adresse in der Geschenk-Einladung
-- **Severity:** High
-- **Steps to Reproduce:**
-  1. Geschenk „Auch am Computer" für Oma mit oma@… bis Schritt 5 durchgehen
-  2. Zurück zu „Für wen", „Für mich selbst" wählen und wieder „Als Geschenk"
-  3. Als Person Opa mit opa@… eintragen und weiter
-  4. Expected: Schritt 5 zeigt opa@…
-  5. Actual: Schritt 5 zeigt weiter oma@…. Bleibt das unbemerkt, geht die Einladung nach dem Kauf an die falsche Person
-- **Priority:** Fix before deployment
-- **Status:** Behoben am 2026-11-23
-
-#### BUG-2: Zu lange Namen führen in eine Sackgasse
-- **Severity:** Medium
-- **Steps to Reproduce:**
-  1. Einen Namen mit mehr als 120 Zeichen eintragen und bis zum Kauf gehen
-  2. Expected: Das Feld begrenzt die Länge oder sagt direkt, was zu tun ist
-  3. Actual: Erst auf der letzten Seite erscheint „Bitte prüfen Sie Ihre Angaben", ohne Hinweis auf das Feld. Ab 200 Zeichen gehen beim Neuladen alle Angaben verloren
-- **Priority:** Fix before deployment
-- **Status:** Behoben am 2026-11-23
-
-#### BUG-3: Die Adresse für die Einladung liegt weiter bei Stripe
-- **Severity:** Medium
-- **Steps to Reproduce:** Beim Weg „Auch am Computer" steht die E-Mail der beschenkten Person weiter in den Stripe-Metadaten und in `purchase_claims`, auch bei abgebrochenen Käufen. Das widerspricht der Entscheidung, Kontaktdaten Dritter nicht bei Stripe zu speichern
-- **Priority:** Fix before deployment
-- **Status:** Behoben am 2026-11-23
-
-#### BUG-4: Ein verspätetes Stripe-Event verkürzt die Aufbewahrung
-- **Severity:** Low
-- **Steps to Reproduce:** Kommt beim Kauf ohne Konto das Event „unbezahlt" nach dem Zahlungseingang an, springt die Vorbereitung von `paid` auf `payment_pending`. Die Frist sinkt von 90 auf 21 Tage, danach gingen die Kontaktdaten verloren
-- **Priority:** Fix before deployment
-- **Status:** Behoben am 2026-11-23
-
-#### BUG-5: Ein fehlender Server-Schlüssel stoppt den Kauf
-- **Severity:** Low
-- **Steps to Reproduce:** Laut Code wird der Datenbank-Client für die Kauf-Vorbereitung außerhalb der Fehlerbehandlung erzeugt. Fehlt `SUPABASE_SERVICE_ROLE_KEY`, bricht der Kaufstart ab, obwohl Kontaktdaten nie einen Kauf verhindern sollen. Nicht im Browser ausgelöst
-- **Priority:** Nice to have
-- **Status:** Behoben am 2026-11-23
-
-### Automatisierte Tests
-
-- Nachtest nach allen fünf Fixes: Unit-Tests 845/845, E2E 300 Testläufe bestanden (185 Hauptlauf, 42 Design und Onboarding, 50 Lesemodus, Zugriff und Papierkorb, 14 Aufbewahrung, 9 Kaufwege)
-- Migration `20261123130000_proj24_gift_email_draft.sql` ist auf Stage eingespielt und geprüft. Die Testdaten sind wieder entfernt
-- Die echte Cron-Route wurde nicht aufgerufen, die Löschfristen sind per Unit-Test abgesichert
-
-### Summary
-
-- **Acceptance Criteria:** 29/29 passed
-- **Bugs Found:** 5 total (0 critical, 1 high, 2 medium, 2 low), alle behoben
-- **Security:** Pass
-- **Production Ready:** Ja für Stage, keine offenen Critical- oder High-Bugs. Vor dem Go-live fehlt die Prüfung in Safari und Firefox, live geht PROJ-24 nur zusammen mit PROJ-12
-- **Recommendation:** Approved. Mit PROJ-12 gemeinsam live nehmen

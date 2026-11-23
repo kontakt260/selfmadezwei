@@ -1,7 +1,7 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
+import { qaPassword } from "./helpers/stage";
 
 const QA_EMAIL = "qa-test@narravit.de";
-const QA_PASSWORD = "QA-Test-2026!";
 
 // PROJ-6 — Stripe-Zahlungen (Portal). Vapi-Paket zurückgebaut 2026-10-13.
 //
@@ -138,7 +138,7 @@ test.describe("PROJ-6 — Kauf ohne Konto", () => {
     await context.clearCookies();
     await page.goto(`/kauf-zuordnen?code=${"C".repeat(43)}&ziel=anmelden`);
     await page.locator('input[name="email"]').fill(QA_EMAIL);
-    await page.locator('input[name="password"]').fill(QA_PASSWORD);
+    await page.locator('input[name="password"]').fill(qaPassword());
     await page.locator('button[type="submit"]').click();
     await expect(page.getByText(/bereits einem Konto zugeordnet/)).toBeVisible({ timeout: 20_000 });
     const cookies = await context.cookies("http://localhost:3000/kauf-einloesen");

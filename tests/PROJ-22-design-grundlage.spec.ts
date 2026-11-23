@@ -1,9 +1,8 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
 import { waitForPage } from "./helpers/page-ready";
+import { createTestAccount, readEnvLocal, signIn, STAGE_HOST } from "./helpers/stage";
 
 // PROJ-22 — Design-Grundlage im echten Browser gegen Stage.
 //
@@ -15,7 +14,6 @@ import { waitForPage } from "./helpers/page-ready";
 // Das QA-Konto wird nicht angefasst, es werden keine Mails ausgelöst.
 
 const ENABLED = process.env.E2E_DESIGN === "1";
-const STAGE_HOST = "kdjhxqitfxnsavhiafdn.supabase.co";
 const TEST_EMAIL_PREFIX = "e2e-design-";
 const RUN_ID = crypto.randomBytes(4).toString("hex");
 const DAY_MS = 86_400_000;
@@ -44,27 +42,11 @@ let empty: TestProject;
 const accounts: Account[] = [];
 const projectIds = new Set<string>();
 
-function readEnvLocal(): Record<string, string> {
-  const values: Record<string, string> = {};
-  const content = fs.readFileSync(path.join(process.cwd(), ".env.local"), "utf8");
-  for (const line of content.split(/\r?\n/)) {
-    const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (match) values[match[1]] = match[2].trim().replace(/^['"]|['"]$/g, "");
-  }
-  return values;
-}
-
 async function createAccount(label: string): Promise<Account> {
-  const email = `${TEST_EMAIL_PREFIX}${label}-${RUN_ID}@example.test`;
-  const password = `${crypto.randomBytes(18).toString("base64url")}aA1!`;
-  const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { full_name: `Test ${label}` },
+  const account = await createTestAccount(admin, {
+    email: `${TEST_EMAIL_PREFIX}${label}-${RUN_ID}@example.test`,
+    name: `Test ${label}`,
   });
-  if (error || !data.user) throw new Error(`createUser failed: ${error?.message}`);
-  const account = { id: data.user.id, email, password };
   accounts.push(account);
   return account;
 }
@@ -125,25 +107,6 @@ async function createProject(input: {
     if (error) throw new Error(error.message);
   }
   return { id, title };
-}
-
-async function signIn(page: Page, account: Account): Promise<void> {
-  await page.goto("/anmelden");
-  await page.locator('input[name="email"]').fill(account.email);
-  await page.locator('input[name="password"]').fill(account.password);
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () =>
-            (document.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement | null)
-              ?.value.length ?? 0,
-        ),
-      { timeout: 20_000 },
-    )
-    .toBeGreaterThan(0);
-  await page.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.includes("/anmelden"), { timeout: 45_000 });
 }
 
 /** Sucht in `main` nach zu kleiner Schrift, zu kleinen Buttons, Rundungen und Überlauf. */

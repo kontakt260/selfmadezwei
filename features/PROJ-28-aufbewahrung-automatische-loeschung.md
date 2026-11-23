@@ -1,5 +1,7 @@
 # PROJ-28: Aufbewahrung, Lesemodus und automatische Löschung
 
+> **Kurzfassung (PROJ-31).** Das vollständige Tech Design, Bau-Notizen, QA-Protokolle und der Deployment-Verlauf stehen unverändert im [Archiv](archive/PROJ-28-aufbewahrung-automatische-loeschung.md).
+
 ## Status: Approved
 **Created:** 2026-11-22
 **Last Updated:** 2026-11-23
@@ -120,41 +122,8 @@
 - **AGB:** Die Löschung nach Ablauf und der Lesemodus sollten dort stehen, gehört zur anwaltlichen Beratung (PROJ-27).
 - **Rechnungs- und Zahlungsdaten:** Aufbewahrungsfristen mit Steuerberatung oder Anwalt bestätigen.
 
----
-<!-- Sections below are added by subsequent skills -->
-
-## Tech Design (Solution Architect)
-
-> Von Jakob am 2026-11-22 freigegeben, inklusive der neuen Texte. Geprüft am vorhandenen Code und am Schema von Stage, noch nicht als Prototyp getestet.
-
-### A) Aufbau
-
-```
-Projekt läuft ab
-|
-+-- Tag 0 bis 90: Lesemodus
-|   +-- Startseite: Projekt bleibt wie gewohnt sichtbar
-|   +-- Projektübersicht
-|   |   +-- Kapitelliste: ansehen und öffnen, alles andere ausgegraut
-|   |   +-- Cover: Vorschau und Öffnen
-|   |   +-- Zugangsfeld: „Abgelaufen am [Datum]", Hinweis, Verlängern aktiv
-|   |   +-- Mitglieder: Einladen ausgegraut, Entfernen und Verlassen aktiv
-|   +-- Kapitel-Editor: Text und Bilder sichtbar, Werkzeuge ausgegraut
-|   +-- Cover-Editor: Gestaltung sichtbar, Felder ausgegraut
-|
-+-- Tag 90: täglicher Lauf legt das Projekt in den Papierkorb
-|   +-- Sicherheitsbremse: mehr als 50 fällig, dann nichts löschen und Support informieren
-|
-+-- Tag 104: vorhandener Papierkorb-Lauf löscht Inhalte und Dateien endgültig
-```
-
-### B) Datenmodell
-
-**Papierkorb für Projekte (erweitert):** bekommt zusätzlich den Grund der Löschung, also „durch Kunden" oder „wegen Ablauf". Der Support sieht ihn in der Suche.
-
-**Schonfristen (neu):** Projekt, Datum, bis zu dem es nicht automatisch gelöscht wird, und Grund. Kunden haben darauf keinen Zugriff. Genutzt wird das für die 14 Tage nach einer Rettung durch den Support und später für laufende Druckaufträge aus PROJ-16.
-
-Das Ablaufdatum selbst bleibt unverändert in der vorhandenen Zugangstabelle. Das Löschdatum wird daraus berechnet und nicht extra gespeichert, damit beide nie auseinanderlaufen.
+## Technische Entscheidungen
+_Kurzform. Die vollständige Begründung steht im Archiv._
 
 ### C) Technische Entscheidungen
 
@@ -165,164 +134,14 @@ Das Ablaufdatum selbst bleibt unverändert in der vorhandenen Zugangstabelle. Da
 5. **Die Seite „Zugang abgelaufen" wird zur Weiterleitung auf die Startseite.** So laufen alte Links nicht ins Leere.
 6. **Die Löschung läuft im vorhandenen täglichen Cron**, direkt vor dem Papierkorb-Lauf. Es entsteht kein neuer Dienst.
 7. **Die Bremse gilt ganz oder gar nicht.** Sind mehr als 50 Projekte fällig, wird keines angefasst. Nach einer Prüfung gibt der Support den Lauf einmalig über die Anleitung frei.
-8. **Eine Zahlung gewinnt immer.** Vor dem Löschen prüft die Datenbank das Ablaufdatum unter Sperre noch einmal. Kommt die Zahlung zuerst, bleibt das Projekt. Kommt sie danach, holt sie das Projekt automatisch aus dem Papierkorb zurück (QA-Fix BUG-2).
+8. **Eine Zahlung gewinnt immer.** Vor dem Löschen prüft die Datenbank das Ablaufdatum unter Sperre noch einmal.
 
-### D) Zugriffsregeln
+### Spätere Entscheidungen
+- **Wortlaut (Jakob, 2026-11-23):** Das Zugangsfeld und die Hinweise sagen „abgelaufen“, nicht „ausgelaufen“. Der freigegebene Mailsatz „Der Zugang läuft dann aus“ bleibt.
+- **BUG-1:** Mit zwei zusätzlichen RESTRICTIVE-Regeln für `DELETE` behoben, von Jakob am 2026-11-23 freigegeben.
 
-- **Keine bestehende RLS-Regel ändert sich.**
-- **Neu:** eine Tabelle für Schonfristen ohne jeden Kundenzugriff.
-
-### E) Stolperstellen, die der Bau mit löst
-
-| Stelle | Folge ohne Fix |
-|---|---|
-| Autosave im Kapitel- und Cover-Editor | Fehlermeldung schon beim Öffnen eines abgelaufenen Projekts |
-| Zugangsfeld rechnet nur nach vorn | Es würde „-5 Tagen" anzeigen |
-| Anzeige hängt am Erstkauf-Eintrag | Der Lesemodus muss das echte Ablaufdatum nutzen, sonst bliebe ein abgelaufenes Projekt scheinbar bearbeitbar |
-| Text in den Erinnerungsmails | Sie erwähnen die Löschung nicht, obwohl sie jetzt die einzige Warnung sind |
-| Rettung durch den Support | Ohne Schonfrist würde der nächste Lauf das Projekt sofort wieder löschen |
-| Bestehende Tests erwarten die Umleitung | Sie werden auf den Lesemodus umgestellt |
-
-### F) Neue Texte (von Jakob freigegeben)
-
-**Zugangsfeld:** „Abgelaufen am 12. März 2027" und darunter „90 Tage nach dem Ablauf wird das Projekt gelöscht."
-
-**Erinnerung, Schlussabsatz (beide Mails):** „Falls Sie das Projekt nicht weiterführen möchten, müssen Sie nichts unternehmen. Der Zugang läuft dann aus. Ihr Projekt bleibt danach noch 90 Tage lesbar und wird anschließend gelöscht."
-
-**7-Tage-Mail, Einleitung:** „Nur noch [X] Tage: Ihr Projektzugang läuft am unten genannten Datum ab. Wenn Sie weiter am Projekt arbeiten möchten, verlängern Sie den Zugang bitte rechtzeitig."
-
-Die Mail-Texte werden vor dem Einbau mit der Figma-Datei abgeglichen.
-
-### G) Grenzen
-
-- Auf dem Handy bleibt der Kapitel-Editor wie bisher nicht verfügbar. Dort sind Übersicht und Zugangsfeld sichtbar.
-- Der Druckauftrag kommt erst mit PROJ-16. Die Schonfristen sind dafür schon vorbereitet.
-
-### H) Abhängigkeiten und Einspielen
-
-- **Neue Pakete:** keine
-- **Neue Env-Variablen:** keine
-- **Migration:** eine, von Jakob im SQL-Editor, reines ASCII, **vor** dem Code-Deploy
-- **Tests:** Datenbank-Szenarien, Unit-Tests für Status und Löschlauf, E2E für Lesemodus, Verlängerung, Bremse und gleichzeitige Zahlung
-
-## Implementation Notes (Frontend, 2026-11-23)
-
-**Gebaut:**
-- Abgelaufene Projekte werden nicht mehr auf „Zugang abgelaufen" umgeleitet. Die alte Adresse führt zur Startseite.
-- Projektübersicht, Kapitel-Editor und Cover-Editor bleiben sichtbar. Ein zentraler Lesemodus-Bereich sperrt alle verändernden Bedienelemente, das automatische Speichern ist aus.
-- Aktiv bleiben Verlängern, Projekt verlassen, Mitglied entfernen, Projekt löschen und Konto löschen.
-- Das Zugangsfeld zeigt „Abgelaufen am [Datum]" und den Hinweis auf die Löschung nach 90 Tagen. Der Verlängern-Button ist dort farbig, damit er sich klar von den gesperrten Buttons abhebt.
-- Beide Erinnerungsmails haben die freigegebenen Texte.
-
-**Geprüft auf lokalem Production-Build gegen Stage:** Typecheck, Lint ohne Fehler, 716 Unit-Tests, Lesemodus 11/11, Papierkorb und Zugriffsregeln 39/39, Regression 171 bestanden und 0 fehlgeschlagen. Desktop, Tablet und Handy ohne seitliches Scrollen.
-
-**Nebenbei behoben:** Der Test PROJ-5 AC-Img-1 lud die Seite neu, bevor das automatische Speichern gelaufen war, und schlug dadurch etwa jedes dritte Mal fehl. Er wartet jetzt auf „Gespeichert" (5/5 Wiederholungen).
-
-**Wortlaut (Jakob, 2026-11-23):** Das Zugangsfeld und die Hinweise sagen „abgelaufen", nicht „ausgelaufen". Der freigegebene Mailsatz „Der Zugang läuft dann aus" bleibt.
-
-## Implementation Notes (Backend, 2026-11-23)
-
-**Gebaut:**
-- Migration `20261123100000_proj28_retention.sql`, auf Stage eingespielt. Bestehende RLS-Regeln sind unverändert.
-- Der Papierkorb speichert den Grund der Löschung (`customer` oder `expired`), die Support-Suche zeigt ihn.
-- Neue Tabelle für Schonfristen ohne Kundenzugriff, vorbereitet für Support-Rettung und später für Druckaufträge (PROJ-16).
-- Der tägliche Cron verschiebt fällige Projekte vor dem Papierkorb-Lauf. Jedes Projekt wird unter Sperre noch einmal geprüft, ein Fehler bei einem Projekt hält die anderen nicht auf.
-- Bremse: Bei mehr als 50 fälligen Projekten wird keines verschoben, `kontakt@narravit.de` bekommt täglich einen Hinweis ohne personenbezogene Daten. Der Support gibt einen Lauf einmalig frei, indem er die genaue Anzahl bestätigt (`docs/production/support-papierkorb.md`, Abschnitt 7).
-- Nach einer Support-Rettung gelten 14 Tage Schonfrist. Das gilt auch für von Kunden gelöschte Projekte, deren Löschdatum in weniger als 14 Tagen erreicht wäre.
-
-**Geprüft:**
-- Lokale Datenbank mit allen echten Migrationen: 60 neue Szenarien, dazu Papierkorb 89, Zugriffsregeln 48, Konto-Löschen 53.
-- Stage-Datenbank: Löschlauf 7/7, darunter 25 Runden gleichzeitiger Zahlung (20 Mal kam die Zahlung zuerst, 5 Mal der Lauf, nie ging eine Zahlung verloren) und drei parallele Läufe.
-- Typecheck, Lint ohne Fehler, 725 Unit-Tests, Regression 171 bestanden und 0 fehlgeschlagen, Lesemodus, Papierkorb und Zugriffsregeln 50/50.
-- Auf Stage sind danach keine Testkonten, Testprojekte oder Testzahlungen übrig, das QA-Konto ist unverändert.
-
-**Nicht geprüft:**
-- Die echte Cron-Route lief nicht, um keine Erinnerungen auszulösen. Ihre Reihenfolge ist per Unit-Test abgesichert.
-- Der echte Stripe-Webhook lief nicht, weil lokal sein Secret fehlt. Der Test führt dieselben Datenbankschritte in derselben Reihenfolge aus.
-- Die Bremse ist nur lokal geprüft, die Hinweis-Mail nur als Unit-Test und nicht wirklich versendet.
-
-**Noch offen:**
-- **Frontend und Backend nur gemeinsam live nehmen**, weil das Zugangsfeld die Löschung ankündigt.
+## Offene Punkte
+- Frontend und Backend nur gemeinsam live nehmen, weil das Zugangsfeld die Löschung ankündigt.
 - Figma-Frames 08 und 09 enthalten noch den alten Mailtext.
-
-## QA Test Results
-
-**Stand:** 2026-11-23, lokaler Production-Build gegen die Stage-Datenbank, Chromium.
-**Ergebnis:** 24 von 24 Akzeptanzkriterien bestanden. Die QA fand 6 Bugs (2 High, 1 Medium, 3 Low), alle sind behoben und nachgetestet.
-**Produktionsreif:** Ja, es sind keine Critical- oder High-Bugs offen. Die Punkte unter „Nicht geprüft" stehen vor dem Go-live noch aus.
-
-### Akzeptanzkriterien
-
-| AC | Ergebnis | Nachweis |
-|---|---|---|
-| AC-1 bis AC-3 Fristen | Bestanden | Stage und lokale Datenbank |
-| AC-4, AC-5 Sichtbarkeit | Bestanden | Browser |
-| AC-6 Gesperrte Aktionen | Bestanden | Browser und direkte API-Aufrufe (nach Fix BUG-1) |
-| AC-7 Aktive Aktionen | Bestanden | Entfernen, Verlassen und Projekt löschen im Browser, Konto-Löschen in der lokalen Datenbank |
-| AC-8 Keine Änderung | Bestanden | Browser und direkte API-Aufrufe (nach Fix BUG-1) |
-| AC-9 Nach Verlängerung | Bestanden | Browser |
-| AC-10 bis AC-12 Zugangsfeld | Bestanden | Browser. Der echte Stripe-Checkout lief nicht, lokal fehlt der Schlüssel |
-| AC-13 Keine neuen Mails | Bestanden | Kein Eintrag im Mail-Protokoll nach dem Lauf |
-| AC-14 Erinnerungstexte | Bestanden | Unit-Test beider Mails |
-| AC-15 bis AC-19 Löschung | Bestanden | Stage und lokale Datenbank |
-| AC-20 Rettung durch Support | Bestanden | Stage |
-| AC-21 Gleichzeitige Zahlung | Bestanden | 25 Runden auf Stage, das bezahlte Projekt bleibt immer erhalten (nach Fix BUG-2) |
-| AC-22 Bremse | Bestanden | Lokale Datenbank und Unit-Test |
-| AC-23, AC-24 Wiederholung, Schutz | Bestanden | Stage |
-
-### Bugs
-
-**BUG-1 (High, behoben): Im Lesemodus lassen sich Kapitel und Dateien per API löschen.**
-- Schritte: Als Mitglied eines abgelaufenen Projekts mit dem eigenen Login direkt `DELETE` auf `chapters` oder Storage `remove` auf `chapter-heroes`, `project-covers` oder `project-logos` aufrufen.
-- Erwartet: Nichts ändert sich (AC-6, AC-8). Tatsächlich: Das Kapitel landet im Papierkorb, die Datei ist **sofort und endgültig weg**.
-- Ursache: Die Sperre aus PROJ-6 G6 gilt nur für Anlegen und Ändern.
-- Vorschlag: Zwei zusätzliche RESTRICTIVE-Regeln für `DELETE`. **Änderung an RLS, braucht Jakobs Freigabe.** Projekt löschen, Verlassen und Konto-Löschen bleiben davon unberührt.
-
-**BUG-2 (High, behoben): Ein bezahltes Projekt wird nach 14 Tagen trotzdem endgültig gelöscht.**
-- Schritte: Projekt kommt am Tag 90 in den Papierkorb, kurz danach trifft die Verlängerung ein, 14 Tage später läuft der Papierkorb-Lauf.
-- Erwartet: Das bezahlte Projekt bleibt erhalten. Tatsächlich: Es ist endgültig weg. Einziger Schutz ist eine Support-Mail, die bei einem Versandfehler nicht wiederholt wird.
-- Vorschlag: Trifft eine Zahlung für ein wegen Ablauf verschobenes Projekt ein, stellt der Server es automatisch wieder her. Der Papierkorb-Lauf löscht zusätzlich nie ein solches Projekt mit gültigem Zugang.
-
-**BUG-3 (Medium, behoben): Nach Tag 90 fehlt der Weg zum Konto.**
-- Schritte: Eine Person, deren einziges Projekt automatisch entfernt wurde, meldet sich an.
-- Erwartet: Sie kann ihr Konto finden und löschen. Tatsächlich: Sie landet im Onboarding ohne Link. Die Adresse `/persoenlicher-bereich` funktioniert nur, wenn man sie kennt.
-- Ursache: Der Link hängt an einem Merker, den nur das manuelle Löschen eines Projekts setzt.
-- Vorschlag: Der Link erscheint für alle angemeldeten Personen ohne Projekt.
-
-**BUG-4 (Low, behoben): Bestätigungsmail trotz Papierkorb.** Wer für ein Projekt im Papierkorb bezahlt, bekommt „verlängert", kann das Projekt aber nicht öffnen. Erledigt sich für abgelaufene Projekte mit dem Fix von BUG-2.
-
-**BUG-5 (Low, behoben): Hinweis nach einer Support-Rettung stimmt nicht mehr.** Das Zugangsfeld sagt weiter „90 Tage nach dem Ablauf wird das Projekt gelöscht", obwohl die 90 Tage vorbei sind und jetzt die 14 Tage Schonfrist gelten.
-
-**BUG-6 (Low, behoben): Projektübersicht wirkt bei einem Lesefehler bearbeitbar.** Schlägt die Abfrage des Zugangs fehl, sind die Buttons aktiv. Die Editoren sperren in diesem Fall, und das Speichern blockiert der Server trotzdem.
-
-### Sicherheits-Audit
-
-- Kunden können den Löschlauf weder auslösen noch verschieben, keine Schonfrist setzen und den Papierkorb weder lesen noch wiederherstellen (AC-24).
-- Nach dem Verschieben sind Projekt, Kapitel, Cover, Zugang und Dateien für frühere Mitglieder nicht mehr erreichbar.
-- Rollen und Ablaufdatum lassen sich nicht selbst ändern.
-- Supabase-Advisor: Neu ist nur der erwartete Info-Hinweis, dass die Schonfristen-Tabelle keine Kundenregeln hat.
-- BUG-1 ist mit zwei zusätzlichen RESTRICTIVE-Regeln behoben, von Jakob am 2026-11-23 freigegeben.
-
-### Weitere Prüfungen
-
-- Grenzfälle: Konto-Löschen während der Frist, mit Nachfolge, allein im Projekt und bei Projekten im Papierkorb bestanden. Eine offene Einladung lässt sich im Lesemodus annehmen.
-- Gleichzeitigkeit: 25 Runden Zahlung gegen Löschlauf, in beide Reihenfolgen. Drei parallele Läufe verschieben jedes Projekt genau einmal.
-- Automatisch: Typecheck, Lint ohne Fehler, 744 Unit-Tests, Regression 171 bestanden und 0 fehlgeschlagen, PROJ-28-QA und Löschlauf 14/14, Lesemodus, Papierkorb und Zugriffsregeln 50/50.
-- Responsive: 1440, 768 und 375 Pixel ohne seitliches Scrollen.
-
-### Nachtest nach den Fixes (2026-11-23)
-
-- Migration `20261123110000_proj28_qa_fixes.sql` ist auf Stage eingespielt.
-- BUG-1: Co-Autor und Projektleitung können im Lesemodus weder Kapitel noch Dateien löschen. In aktiven Projekten geht es weiter, Projekt löschen und Verlassen bleiben möglich.
-- BUG-2 und BUG-4: Eine Zahlung holt das Projekt zurück, in 25 Runden lag danach kein bezahltes Projekt im Papierkorb (15 Mal kam die Zahlung zuerst, 10 Mal der Lauf). Der Papierkorb-Lauf löscht es nicht. Von Personen gelöschte Projekte bleiben beim Support, die Person bekommt keine irreführende Bestätigung.
-- BUG-3: Personen ohne Projekt sehen im Onboarding den Link zum persönlichen Bereich.
-- BUG-5: Nach einer Rettung steht im Zugangsfeld „Das Projekt wird am [Datum] gelöscht.".
-- BUG-6: Die Projektübersicht bleibt bei einem Lesefehler gesperrt (Unit-Test).
-
-### Nicht geprüft
-
-- Safari und Firefox. Mobile Safari startet auf diesem Mac nicht, Firefox ist nicht installiert. Vor dem Go-live den Lesemodus einmal in Safari prüfen.
-- Echter Stripe-Checkout und Webhook, echte Cron-Route, echter Versand der Bremsen-Mail.
-
-## Deployment
-_To be added by /deploy_
+- Nicht geprüft: Safari und Firefox (Lesemodus vor dem Go-live einmal in Safari prüfen), echter Stripe-Checkout und Webhook, echte Cron-Route, echter Versand der Bremsen-Mail.
+- Der Druckauftrag kommt mit PROJ-16, die Schonfristen sind dafür vorbereitet.

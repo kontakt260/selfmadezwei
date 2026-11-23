@@ -1,7 +1,6 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getStripe, getPriceId, getSiteUrl } from "@/lib/stripe/server";
@@ -316,17 +315,4 @@ export async function startCheckoutAction(
     await discardNarrationDraft();
     return { ok: false, error: CHECKOUT_FAILED_MESSAGE };
   }
-}
-
-// Optionaler Helper: ruft die Action auf und macht direkt den Redirect.
-// Wird von einigen Server-Components/Forms verwendet, die kein UI-State-
-// Management um den Aufruf wickeln wollen.
-export async function startCheckoutAndRedirect(
-  input: StartCheckoutInput,
-): Promise<never> {
-  const res = await startCheckoutAction(input);
-  if (!res.ok) {
-    throw new Error(res.error);
-  }
-  redirect(res.checkoutUrl);
 }

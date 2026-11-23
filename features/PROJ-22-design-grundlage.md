@@ -1,5 +1,7 @@
 # PROJ-22: Design-Grundlage der Web-App
 
+> **Kurzfassung (PROJ-31).** Das vollständige Tech Design, Bau-Notizen, QA-Protokolle und der Deployment-Verlauf stehen unverändert im [Archiv](archive/PROJ-22-design-grundlage.md).
+
 ## Status: Approved
 **Created:** 2026-11-23
 **Last Updated:** 2026-11-23
@@ -128,242 +130,30 @@
 - **Tests:** Vorhandene E2E-Tests, die alte Texte oder Elemente erwarten, werden mit angepasst.
 - **Browser:** Chrome, Firefox und Safari in aktuellen Versionen.
 
----
-<!-- Sections below are added by subsequent skills -->
-
-## Tech Design (Solution Architect)
-
-> Von Jakob am 2026-11-23 freigegeben, geprüft am vorhandenen Code.
-
-**Kurzfassung:** Das ist ein reiner Umbau der Oberfläche. Es gibt keine neue Tabelle, keine Migration, keine neuen Rechte, keine neuen Pakete und keine neuen Env-Variablen. `/backend` ist nicht nötig.
-
-### A) Aufbau
-
-```
-Gemeinsame Grundlage
-+-- Schriftregeln: Überschriften, Text, Hinweise
-+-- Buchansicht: Cover mit angedeutetem Buchrücken (neu, wird zweimal genutzt)
-
-Startseite
-+-- Foto mit Weichzeichner und Begrüßung
-+-- Ein Projekt: große Karte mit Buch und „Weiterschreiben"
-+-- Mehrere Projekte: „Ihre Bücher" mit Karten nebeneinander
-|   +-- Buchansicht, Titel, Rolle, Kapitel, letzte Bearbeitung
-|   +-- „Weiterschreiben" oder bei Ablauf „Ansehen"
-|   +-- „Projekt löschen" nur für die Projektleitung, bisheriger Dialog
-+-- „Weiteren Projektzugang sichern"
-
-Projektübersicht
-+-- Cover-Karte: große Buchansicht, Titel, Autor, Kapitel, Seiten
-+-- Kapitel: bisherige Liste, neuer Button „Erzähl-Impulse ansehen"
-+-- Druck-Karte: Inhalt, Cover, Lieferadresse (Platzhalter)
-+-- Nebeneinander: Erzählen per Sprachnachricht, Projektzugang
-+-- Nutzerliste: bisherige Liste, neue Überschrift und neuer Button
-
-Persönlicher Bereich (eine Spalte)
-+-- Ihre Angaben: Name, E-Mail fest
-+-- Rechnungen: nur der Hinweis
-+-- Passwort
-+-- Konto löschen: bisheriger Ablauf
-```
-
-### B) Daten
-
-Es wird nichts Neues gespeichert. Zwei vorhandene Werte werden zusätzlich gelesen:
-
-- **Startseite:** das Ablaufdatum jedes Projekts, gesammelt in einer Abfrage, damit die Seite bei vielen Projekten schnell bleibt.
-- **Projektübersicht:** die Seitenzahl der Kapitel, die der Editor schon speichert.
-
-Der Status der Druck-Karte wird aus diesen vorhandenen Daten berechnet. Die Lieferadresse kommt erst mit PROJ-16.
+## Technische Entscheidungen
+_Kurzform. Die vollständige Begründung steht im Archiv._
 
 ### C) Technische Entscheidungen
 
 1. **Schriften an einer zentralen Stelle.** Überschriften werden einmal festgelegt statt in jeder Datei. So bleiben App und Website dauerhaft gleich.
-2. **Die neue Überschriftenschrift gilt für die ganze App.** Dazu zählen auch Anmeldung, Registrierung, Onboarding, Kauf und Einladung, sonst würde der Stil zwischen den Seiten springen. Deren Layout bleibt unverändert.
+2. **Die neue Überschriftenschrift gilt für die ganze App.** Dazu zählen auch Anmeldung, Registrierung, Onboarding, Kauf und Einladung, sonst würde der Stil zwischen den Seiten springen.
 3. **Das Buch bleibt ausgenommen.** Cover, Kapitelseiten und der Kapitel-Editor behalten Merriweather, damit sich Seitenumbrüche und Druck nicht verschieben.
 4. **Eine Buchansicht für alle Stellen.** Sie nutzt die vorhandene Cover-Darstellung und legt nur den Rücken daneben. Die Cover-Daten und das spätere Druck-PDF bleiben unberührt.
-5. **Kapitel- und Nutzerliste werden nicht neu gebaut.** Drag and Drop, Umbenennen, Löschen und Einladen bleiben im vorhandenen Code. Dort ändern sich nur Texte, Lesbarkeit und Kontrast.
+5. **Kapitel- und Nutzerliste werden nicht neu gebaut.** Drag and Drop, Umbenennen, Löschen und Einladen bleiben im vorhandenen Code.
 6. **Persönlicher Bereich: nur umordnen.** Name, Passwort und der Lösch-Ablauf behalten ihre Logik.
 7. **Die Druck-Karte liegt außerhalb der Lesemodus-Sperre.** PROJ-28 verlangt, dass der Druckauftrag auch in den 90 Tagen nach Ablauf möglich bleibt.
 8. **Der Markenname ist ein eigener Baustein.** So steht NARRAVIT in jeder Überschrift automatisch in Merriweather und muss nicht an jeder Stelle einzeln gepflegt werden.
 
-### D) Stolperstellen, die der Bau mit löst
+### Spätere Entscheidungen
+- **Nachträge von Jakob (2026-11-23):** Das Buch-Element auf der Startseite bekommt einen deutlichen Schatten. Der Abschnitt heißt „Weiteres Buchprojekt beginnen“, der Button „Weiteren Projektzugang sichern“. Die Nutzerliste heißt „Wer an diesem Buch beteiligt ist“. Über dem Titel der großen Karte steht „Ihr Projekt“.
+- **Keine Projekte:** Weiterleitung ins Onboarding, dort nur noch der Link „Zum persönlichen Bereich“ (Jakob, 2026-11-23).
+- Der Button heißt weiter „Name speichern“. Die Autorenzeile steht wie im Cover eingegeben, ohne vorangestelltes „von“.
 
-| Stelle | Folge ohne Fix |
-|---|---|
-| „Heute" wird als „innerhalb von 24 Stunden" berechnet | Gestern Abend bearbeitet stünde am Morgen als „heute" da. Künftig zählen Kalendertage in deutscher Zeit |
-| Überschriften sind an vielen Stellen einzeln festgelegt | Ohne Aufräumen bliebe die alte Schrift auf einzelnen Seiten stehen |
-| Die Startseite kennt das Ablaufdatum bisher nicht | Abgelaufene Projekte würden „Weiterschreiben" anzeigen |
-| Das Ablaufdatum lässt sich nicht laden | Die Karte zeigt neutral „Öffnen", die Projektseite entscheidet dann selbst über den Lesemodus |
-| Das Foto muss neben der Leiste und unter der Handy-Navigation sitzen | Es würde sonst verdeckt oder liefe unter die Leiste |
-| Viele graue Hinweise sind zu hell oder zu klein | Sie bleiben sonst für die Zielgruppe schlecht lesbar |
-| Die Druck-Karte ist bis PROJ-16 ohne Funktion | Beide Buttons sind gesperrt, dazu steht dort: „Der Druckauftrag wird gerade vorbereitet." |
-
-### E) Schriftregeln
-
-| Element | Schrift | Zeichenabstand |
-|---|---|---|
-| Hauptüberschrift | PT Serif, normal | etwa -2 % |
-| Zwischenüberschrift | PT Serif, normal | etwa -1 % |
-| Markenname NARRAVIT in Überschriften und Schriftzügen | Merriweather | normal |
-| Text, Navigation, Buttons | Lato | normal |
-| Hinweise | Lato, mindestens 16 px, dunkleres Grau | normal |
-| Buch, Cover, Kapitelseiten | wie bisher | wie bisher |
-
-### F) Bau-Reihenfolge
-
-1. Schriftregeln und Lesbarkeit
-2. Buchansicht
-3. Startseite
-4. Projektübersicht mit Druck-Platzhalter
-5. Persönlicher Bereich
-6. Tests anpassen und auf Desktop, Tablet und Handy prüfen
-
-### G) Tests
-
-Betroffen sind die E2E-Tests zu Konto, Kapiteln, Mitgliedern, Cover, Papierkorb und Lesemodus, weil sich Texte wie „Account löschen", „Nutzer hinzufügen" und „Öffnen" ändern. Vor und nach dem Umbau wird geprüft, dass Drag and Drop, Lesemodus, Konto-Löschen und die Seitenumbrüche im Editor gleich funktionieren.
-
-### H) Vor dem Go-live
-
-Die Druck-Karte darf nicht als funktionsloser Platzhalter live gehen. Bis dahin muss PROJ-16 fertig sein, oder die Karte wird für Production ausgeblendet.
-
-### I) Abhängigkeiten
-
-- **Neue Pakete:** keine
-- **Neue Env-Variablen:** keine
-- **Migration:** keine
-- **Nächste Schritte nach Freigabe:** `/frontend`, danach `/qa`
-
-## Implementation Notes (Frontend, 2026-11-23)
-
-**Gebaut, nicht committet:**
-
-- **Schriften:** Überschriften zentral in `globals.css` (PT Serif, H1 -2 %, sonst -1 %). `.a5-stack` und `.a5-page` behalten Merriweather und normalen Zeichenabstand, damit Seitenumbrüche gleich bleiben. `BrandName` setzt NARRAVIT in Überschriften in Merriweather.
-- **Buchansicht:** `BookView` legt einen Rücken neben das unveränderte `CoverRender`. Die Rückenfarbe wird aus der Coverfarbe berechnet und nirgends gespeichert.
-- **Startseite:** Foto mit dunkler Ebene, große Karte bei einem Projekt, „Ihre Bücher" bei mehreren. Ablaufdaten kommen in einer Abfrage. Schlägt sie fehl, zeigt die Karte neutral „Öffnen". „Zuletzt bearbeitet" zählt Kalendertage in deutscher Zeit (`project-card-status.ts`).
-- **Projektübersicht:** Cover-Karte, Kapitelliste mit „Erzähl-Impulse ansehen", `PrintOrderCard` außerhalb von `ReadOnlyScope`, Sprachnachricht und Projektzugang nebeneinander, Nutzerliste mit „Wer an diesem Buch beteiligt ist" und „Person einladen". Icon-Buttons sind jetzt 44 px groß, Hinweise dunkler und mindestens 16 px.
-- **Persönlicher Bereich:** eine Spalte ohne Foto, E-Mail fest ohne Support-Hinweis, nur noch der Rechnungshinweis, durchgehend „Konto". Passwort- und Lösch-Logik sind unverändert.
-
-**Abweichungen vom Entwurf:**
-
-- Der Satz „Ihr erstes gedrucktes Buch ist bereits bezahlt" steht nicht auf der Druck-Karte, weil das bis PROJ-16 nicht belegt ist.
-- Der Button heißt weiter „Name speichern" statt „Speichern". Die Autorenzeile steht so da, wie sie im Cover eingegeben wurde, ohne vorangestelltes „von".
+## Offene Punkte
+- BUG-4 (Low): Bestätigungsmeldungen sind nur 13 px groß, deshalb bleibt AC-6 offen. Von Jakob am 2026-11-23 zurückgestellt.
+- BUG-5 (Low): Der Fokusrahmen der Buchkarte ist teilweise verdeckt. Zurückgestellt.
+- BUG-6 (Low): Das aktive Navigationssymbol hat zu wenig Kontrast (rund 2,2:1). Zurückgestellt.
+- Hinweis für PROJ-24: Die Schrittnummern sind auf dem Handy 14 px groß und erreichen nur 2,19:1 bis 3,74:1.
+- Hinweis für PROJ-8: Im Lesemodus ist „Erzähl-Impulse ansehen“ gesperrt. Die Bibliothek sollte dort zum Ansehen offen bleiben.
 - Die Druck-Karte zählt ein Kapitel ohne Wörter als offen, auch wenn es nur Bilder enthält. Das wird mit PROJ-16 genauer.
-
-**Geprüft am 2026-11-23 (Production-Build gegen Stage):** Typprüfung, Lint ohne Fehler, Unit-Tests grün, E2E 170 + 50 + 14 bestanden. Alte Texte in den Tests wurden angepasst. Screens bei 1440, 768, 375 px und 200 % Zoom ohne horizontales Scrollen. Mehrere Projekte, Ablauf und Lesemodus liefen mit temporären Stage-Konten, die danach gelöscht wurden.
-
-**Hinweis für QA:** Der Lesemodus sperrt „Erzähl-Impulse ansehen" wie zuvor, weil der bisherige Dialog ein Kapitel anlegt. Das ändert sich erst mit der Bibliothek aus PROJ-8.
-
-**Nachträge von Jakob (2026-11-23):** Das Buch-Element auf der Startseite bekommt einen deutlichen Schatten. Der Abschnitt heißt „Weiteres Buchprojekt beginnen", der Button „Weiteren Projektzugang sichern". Die Nutzerliste heißt „Wer an diesem Buch beteiligt ist". Über dem Titel der großen Karte steht „Ihr Projekt".
-
-## QA Test Results
-
-**Tested:** 2026-11-23
-**App URL:** http://localhost:3000 (Production-Build gegen die Stage-Datenbank)
-**Tester:** QA Engineer (AI)
-**Browser:** nur Chromium. WebKit startet auf diesem Mac nicht, der Playwright-Firefox ist nicht installiert. **Safari und Firefox sind damit nicht geprüft.**
-
-### Acceptance Criteria Status
-
-| Bereich | Ergebnis | Anmerkung |
-|---|---|---|
-| A. Stil und Typografie (AC-1 bis 9, AC-38) | 9/10 | AC-6 bleibt offen, weil die Bestätigungsmeldungen 13 px groß sind (BUG-4). AC-7 und AC-8 sind nach dem Fix von BUG-2 erfüllt |
-| B. Startseite (AC-10 bis 17) | 8/8 | Weiß auf dem Foto erreicht an der hellsten Stelle mindestens 5,28:1 |
-| C. Projektübersicht (AC-18 bis 27) | 10/10 | Drag and Drop bleibt nach dem Neuladen erhalten, die Druck-Karte löst keinen Serveraufruf aus |
-| D. Persönlicher Bereich (AC-28 bis 34) | 7/7 | Google-Hinweis geprüft. Der echte Passwort-Versand wurde bewusst nicht ausgelöst |
-| E. Geräte (AC-35 bis 37) | 3/3 | AC-37 ist nach dem Fix von BUG-1 erfüllt |
-
-**Buchsatz:** Ein Kapitel mit 40 Absätzen auf 7 Seiten steht mit der neuen und der alten Überschriften-Regel an exakt denselben Positionen.
-
-### Edge Cases Status
-
-- [x] Kein Coverfoto
-- [x] Sehr langer Titel, auch ein einzelnes sehr langes Wort
-- [x] Keine Autorenzeile
-- [x] Viele Projekte (10 Karten)
-- [x] Projekt ohne Kapitel
-- [x] Aktive und abgelaufene Projekte gemischt
-- [x] Co-Autor sieht kein „Projekt löschen"
-- [x] Foto lädt nicht, Begrüßung bleibt lesbar
-- [x] Lange E-Mail-Adresse oder langer Name brechen um (BUG-3 behoben)
-- [x] Keine Projekte: Weiterleitung ins Onboarding, dort nur noch der Link „Zum persönlichen Bereich" (Wunsch von Jakob, 2026-11-23)
-
-### Security Audit Results
-
-- [x] Fremdes Projekt liefert 404
-- [x] Gespeichertes HTML in Titel und Autorenzeile wird nicht ausgeführt
-- [x] Der Umbau enthält keine neuen Server Actions, Schreibzugriffe, Migrationen, Pakete oder Env-Werte
-- [x] Die neue Ablauf-Abfrage läuft mit der Sitzung der Person und damit unter RLS
-- [x] Die gesperrten Druck-Buttons senden auch bei erzwungenem Klick nichts
-
-### Bugs Found
-
-#### BUG-1: Dialoge werden bei 200 % Zoom abgeschnitten
-- **Status:** Behoben. Alle Dialoge scrollen jetzt, wenn sie höher als der Bildschirm sind
-- **Severity:** High
-- **Steps to Reproduce:**
-  1. Browser auf 200 % stellen (entspricht 720 x 500 px)
-  2. „Erzähl-Impulse ansehen" öffnen oder auf der Startseite „Projekt löschen" bis Schritt 2 durchgehen
-  3. Expected: Alle Inhalte und Buttons sind erreichbar
-  4. Actual: „Impuls übernehmen" und „Endgültig löschen" liegen teilweise außerhalb des Bildschirms, die Überschrift ebenfalls. Die Seite dahinter ist gesperrt, scrollen geht nicht. Bei 320 px Breite ist die Überschrift nicht erreichbar
-- **Priority:** Fix before deployment
-
-#### BUG-2: Nachfolge-Auswahl beim Konto-Löschen ist zu klein und kontrastarm
-- **Status:** Behoben. Mindestens 16 px, 44 px Höhe, dunkle Schrift auf heller Markierung
-- **Severity:** Medium
-- **Steps to Reproduce:**
-  1. Als einzige Projektleitung eines gemeinsamen Projekts „Konto löschen" öffnen
-  2. Die Auswahl der Nachfolge aufklappen
-  3. Expected: mindestens 16 px, 44 px Höhe, 4,5:1 Kontrast
-  4. Actual: 14 px, 32 px Höhe, der markierte Eintrag hat nur 2,18:1
-- **Priority:** Fix before deployment
-
-#### BUG-3: Lange Namen und E-Mail-Adressen werden abgeschnitten
-- **Status:** Behoben. Das Namensfeld wächst mit, die E-Mail steht als feste Textzeile im Feld, die Nutzerliste bricht um
-- **Severity:** Medium
-- **Steps to Reproduce:**
-  1. Mit einer langen Adresse den Persönlichen Bereich oder die Nutzerliste am Handy öffnen
-  2. Expected: Der Text bricht um
-  3. Actual: Die Felder schneiden ihn ab, die Nutzerliste kürzt ihn mit „…". Auf dem Handy betrifft das schon Adressen mit rund 36 Zeichen
-- **Priority:** Fix before deployment
-
-#### BUG-4: Bestätigungsmeldungen sind nur 13 px groß
-- **Status:** Offen, von Jakob am 2026-11-23 vorerst zurückgestellt
-- **Severity:** Low
-- **Steps to Reproduce:** Im Persönlichen Bereich den Namen speichern. Die Meldung „Name gespeichert." ist 13 px groß, verlangt sind mindestens 16 px
-- **Priority:** Nice to have
-
-#### BUG-5: Fokusrahmen der Buchkarte ist teilweise verdeckt
-- **Status:** Offen, von Jakob am 2026-11-23 vorerst zurückgestellt
-- **Severity:** Low
-- **Steps to Reproduce:** Auf der Startseite mit der Tab-Taste zu einer Karte gehen. Der Rahmen ist nur um die untere Hälfte sichtbar, die Buchfläche liegt darüber
-- **Priority:** Nice to have
-
-#### BUG-6: Aktives Navigationssymbol hat zu wenig Kontrast
-- **Status:** Offen, von Jakob am 2026-11-23 vorerst zurückgestellt
-- **Severity:** Low
-- **Steps to Reproduce:** Das aktive Symbol in der Navigation ist weiß auf Salbei und erreicht rund 2,2:1. WCAG verlangt für Symbole 3:1. Der Entwurf zeigt es dunkel
-- **Priority:** Nice to have
-
-### Hinweise für andere Features
-
-- **PROJ-24 Onboarding:** Die Schrittnummern sind auf dem Handy 14 px groß und erreichen nur 2,19:1 bis 3,74:1. Das Onboarding gehört nicht zu den drei Seiten dieses Features.
-- **PROJ-8 Bibliothek:** Im Lesemodus ist „Erzähl-Impulse ansehen" gesperrt, weil der bisherige Dialog ein Kapitel anlegt. Die Bibliothek sollte dort zum Ansehen offen bleiben.
-
-### Automatisierte Tests
-
-- Nachtest nach den Fixes: alle 40 Dialog-Prüfungen in vier Größen ohne Befund, die drei Seiten in sieben Größen ohne Befund
-- Typprüfung und Lint ohne Fehler, Unit-Tests 765/765
-- E2E: 170 Standard, 50 Lesemodus, Papierkorb und Zugriffsregeln, 14 Aufbewahrung, 25 neu für PROJ-22 (`tests/PROJ-22-design-grundlage.spec.ts`, Start mit `E2E_DESIGN=1`)
-- Temporäre Konten und Projekte wurden nach jedem Lauf gelöscht. Das QA-Konto blieb erhalten, es wurden keine Mails ausgelöst
-
-### Summary
-
-- **Acceptance Criteria:** 37/38 passed (AC-6 offen wegen BUG-4)
-- **Bugs Found:** 6 total (0 critical, 1 high, 2 medium, 3 low). High und Medium sind behoben, die 3 Low-Bugs hat Jakob zurückgestellt
-- **Security:** Pass
-- **Production Ready:** YES für Stage. Vor dem Go-live fehlen die Prüfung in Safari und Firefox und die Lösung für die Druck-Karte (Umzugsliste, Abschnitt 9)
-- **Recommendation:** Committen und auf Stage prüfen
-
-## Deployment
-_To be added by /deploy_
+- Vor dem Go-live: Prüfung in Safari und Firefox, Lösung für die Druck-Karte (Umzugsliste, Abschnitt 9).

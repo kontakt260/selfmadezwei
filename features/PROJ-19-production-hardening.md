@@ -1,5 +1,7 @@
 # PROJ-19: Production-Hardening (Headers, Middleware-Caching, Env-Failsafe)
 
+> **Kurzfassung (PROJ-31).** Das vollständige Tech Design, Bau-Notizen, QA-Protokolle und der Deployment-Verlauf stehen unverändert im [Archiv](archive/PROJ-19-production-hardening.md).
+
 ## Status: Approved
 **Created:** 2026-05-16
 **Last Updated:** 2026-11-22 — Tech Design von Jakob freigegeben
@@ -9,13 +11,6 @@
 ## Dependencies
 - Requires: PROJ-2 (Auth + SSR) — die zu härtende Middleware und das Env-Var-Setup leben dort
 - Verwandt mit: PROJ-13 (Stabilität & Observability) — komplementär, aber separat scharf gestellt: PROJ-19 ist defensiv/sicherheitsorientiert, PROJ-13 reaktiv/observability-orientiert
-
-## Problem
-Drei Befunde aus dem Vibe-Security-Audit, die isoliert betrachtet jeweils Medium/Low sind, aber gemeinsam ein klares Production-Hardening-Paket bilden:
-
-1. **Fehlende Security-Headers** — `next.config.ts` enthält keinen `async headers()`-Block. Die Projekt-Regel [.claude/rules/security.md:27-31](../.claude/rules/security.md#L27) verlangt X-Frame-Options, X-Content-Type-Options, Referrer-Policy, HSTS — keiner ist gesetzt. **Konkret ausnutzbar:** Login-Seite per `<iframe>` einbettbar → Clickjacking. MIME-Sniffing kann bei vom User hochgeladenen Logo-/Cover-Bildern aus PROJ-1-Storage XSS-Vektoren öffnen.
-2. **Middleware-Cost-Amplifier** — [src/lib/supabase/middleware.ts:72-94](../src/lib/supabase/middleware.ts#L72-L94) triggert bei jedem authentifizierten Request auf einer nicht-öffentlichen Route eine `projects`-Query. Bei 20 Page-Loads/Session = 20 DB-Hits, nur für Routing-Entscheidung. Cost-/DoS-Vektor: 200 parallele Requests eines Wegwerf-Accounts → Supabase-Free-Tier-Connection-Limit (60) erschöpft.
-3. **`NEXT_PUBLIC_SITE_URL`-Fallback auf `localhost:3000`** — Drei Server Actions ([anmelden:67](../src/app/anmelden/actions.ts#L67), [registrieren:47](../src/app/registrieren/actions.ts#L47), [passwort-vergessen:28](../src/app/passwort-vergessen/actions.ts#L28)) fallen still auf `http://localhost:3000` zurück, wenn die Env-Var in Produktion vergessen wird → Auth-Mails enthalten ungültige Callback-Links, Nutzer können sich nicht einloggen. Silent Failure ohne Alarm.
 
 ## User Stories
 - Als Plattform-Betreiber möchte ich, dass die App nicht per `<iframe>` auf fremden Seiten einbettbar ist, damit Clickjacking-Phishing gegen mein Auth-Formular nicht möglich ist.
@@ -78,35 +73,8 @@ Drei Befunde aus dem Vibe-Security-Audit, die isoliert betrachtet jeweils Medium
 - **Reihenfolge der Umsetzung**: A → C → B (A und C sind trivial; B braucht etwas mehr Sorgfalt mit Webhook-Integration in PROJ-6)
 - **Nichts davon braucht eine Datenbank-Migration** → kein Supabase-Stage-Branch-Touch nötig
 
----
-<!-- Sections below are added by subsequent skills -->
-
-## Tech Design (Solution Architect)
-
-> **Stand 2026-11-22, von Jakob freigegeben (Abschnitte A bis H).** Abschnitt I hat Jakob am 2026-11-23 verworfen. Die Spec stammt vom Mai. Seitdem sind Turnstile, die Audio-Aufnahme im Browser und die Paywall pro Projekt dazugekommen. Das Design passt die Spec deshalb an, am stärksten bei Block B.
-
-### A) Aufbau
-
-```
-Build auf Vercel
-+-- Konfigurations-Prüfung (neu)
-|   +-- Pflichtwerte für Stage und Production
-|   +-- Zusatzregeln für die Kunden-Umgebung
-|   +-- Bei einem Fehler bricht der Build ab, die laufende Version bleibt online
-
-Jede Antwort der App
-+-- Sicherheits-Header (neu, zentral an einer Stelle)
-|   +-- Schutz vor Einbetten, MIME-Sniffing und unverschlüsseltem Zugriff
-|   +-- Browser-Rechte gesperrt (Kamera, Mikrofon, Standort)
-|   +-- Content-Security-Policy: kleiner Kern aktiv, der Rest im Beobachtungsmodus
-
-Mail-Links, Auth-Weiterleitungen, Stripe-Rückleitung
-+-- Eine zentrale Quelle für die Adresse der App (statt bisher mehrerer Stellen)
-```
-
-### B) Was gespeichert wird
-
-Nichts Neues: keine Tabelle, keine Migration, kein Cookie, keine neue Variable.
+## Technische Entscheidungen
+_Kurzform. Die vollständige Begründung steht im Archiv._
 
 ### C) Änderungen gegenüber der Spec vom Mai
 
@@ -124,149 +92,16 @@ Nichts Neues: keine Tabelle, keine Migration, kein Cookie, keine neue Variable.
 
 ### D) Warum der Cookie-Cache entfällt
 
-1. **Kaum Nutzen:** Die Abfrage dauert auf Stage im Schnitt 0,4 ms, höchstens 3 ms (4.597 gemessene Aufrufe). Die Prüfung der Anmeldung läuft bei jedem Seitenaufruf ohnehin weiter.
-2. **Schwächt die Paywall:** Die Datenbank kennt die Paywall beim Lesen nicht, diese Prüfung ist dort die zentrale Sperre. Ein Status pro Konto kann nicht abbilden, dass eines von mehreren Projekten abgelaufen ist. Abgelaufene oder entzogene Zugänge blieben bis zu 5 Minuten offen.
-3. **Die geplante Invalidierung funktioniert nicht:** Der Stripe-Webhook läuft von Server zu Server und kann kein Cookie im Browser löschen. Wer gerade verlängert hat, sähe bis zu 5 Minuten „Zugang abgelaufen".
+1. **Kaum Nutzen:** Die Abfrage dauert auf Stage im Schnitt 0,4 ms, höchstens 3 ms (4.597 gemessene Aufrufe).
+2. **Schwächt die Paywall:** Die Datenbank kennt die Paywall beim Lesen nicht, diese Prüfung ist dort die zentrale Sperre.
+3. **Die geplante Invalidierung funktioniert nicht:** Der Stripe-Webhook läuft von Server zu Server und kann kein Cookie im Browser löschen.
 4. **Neues Geheimnis:** Der Cache bräuchte einen weiteren Schlüssel in jeder Umgebung.
 
 Neu bewerten, falls die Abfrage in den Supabase-Statistiken oder bei echter Last auffällt.
 
-### E) Sicherheits-Header
+### Spätere Entscheidungen
+- **Identitätsprüfung vor dem Konto-Löschen:** Abschnitt I des Tech Designs hat Jakob am 2026-11-23 verworfen, sie wird nicht gebaut.
+- Kein Cookie-Cache, kein `SESSION_SECRET`, keine Migration, keine neuen Pakete.
 
-| Schutz | Wirkung |
-|---|---|
-| Einbetten verboten | Die App lässt sich nicht in fremde Seiten einbauen (Clickjacking). **Annahme:** Auch Webflow bettet sie nirgends per iframe ein |
-| Kein MIME-Sniffing | Hochgeladene Dateien werden nicht als Skript ausgeführt |
-| Referrer begrenzt | Fremde Seiten sehen nur die Domain, nie Pfade mit Einladungs- oder Aufnahme-Token |
-| HTTPS erzwingen | 2 Jahre, inklusive Subdomains von `app.narravit.de`. **Ohne `preload`**, weil sich das kaum rückgängig machen lässt |
-| Browser-Rechte | Kamera, Mikrofon und Standort sind gesperrt |
-| Technik-Hinweis entfernt | Die Antwort verrät nicht mehr, dass Next.js läuft |
-
-### F) Konfigurations-Prüfung
-
-| Regel | Stage | Kunden-Umgebung | Lokal |
-|---|---|---|---|
-| Pflichtwerte: Supabase, App-Adresse, Stripe, Resend, Cron, Turnstile | Build bricht ab | Build bricht ab | Warnung |
-| Adresse ist `https://app.narravit.de` | nicht geprüft | Pflicht | nicht geprüft |
-| Stripe-Schlüssel ist ein Live-Schlüssel | nicht geprüft | Pflicht | nicht geprüft |
-| Kein Turnstile-Testschlüssel | erlaubt | Build bricht ab | erlaubt |
-| Keine Test-Schalter (`EMAIL_TEST_RECIPIENT`, `RATE_LIMIT_DISABLED`) | erlaubt | Build bricht ab | erlaubt |
-| Rabattcode fehlt | Warnung | Warnung | still |
-
-**Folge für den Go-live:** In Production fehlen heute sieben Pflichtwerte (`CRON_SECRET`, `RESEND_API_KEY`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY` und vier Stripe-Werte). Bis sie gesetzt sind, scheitert jeder Build von `main`, die laufende Version bleibt online. Das ist gewollt: Die Variablen müssen vor dem Merge stehen. Die Reihenfolge kommt beim Bau in `docs/production/prod-umzug.md`.
-
-### G) Neue Abhängigkeiten
-
-Keine.
-
-### H) Reihenfolge der Umsetzung
-
-1. Sicherheits-Header
-2. Konfigurations-Prüfung und zentrale App-Adresse
-3. Automatische Tests, dabei CSP-Meldungen in den wichtigen Abläufen auswerten
-4. Auf Stage prüfen: Anmeldung mit Turnstile, Google/Facebook, Stripe-Checkout, Bilder
-5. Go-live-Liste ergänzen
-
-### I) Identitätsprüfung vor dem Konto-Löschen (entschieden: wird nicht gebaut)
-
-**Entscheidung Jakob, 2026-11-23:** Es bleibt bei der offenen Sitzung plus dem Wort `LÖSCHEN`. Ein Code per Mail wäre ein zusätzlicher Schritt und würde weitere Mails verursachen.
-
-**Bewusst akzeptiertes Risiko (PROJ-3 BUG-6):** Wer an ein entsperrtes, angemeldetes Gerät kommt, kann das Konto löschen. Projekte, in denen die Person allein ist, sind dann sofort endgültig weg.
-
-## Implementation Notes — Backend 2026-11-22
-
-**Gebaut (Abschnitte A bis H):**
-- Sicherheits-Header für alle Routen in `src/lib/config/security-headers.ts`, eingebunden in `next.config.ts`. Der Hinweis auf Next.js in den Antworten ist entfernt.
-- Content-Security-Policy: `frame-ancestors`, `base-uri` und `object-src` sind aktiv, der Rest läuft im Beobachtungsmodus und kennt Turnstile, Supabase und lokale Bildvorschauen.
-- Konfigurationsprüfung beim Build in `src/lib/config/build-config.ts`. Meldungen nennen nur Namen von Variablen, nie Werte.
-- Zentrale App-Adresse in `src/lib/site-url.ts`. Die stillen Ersatzwerte `localhost` in vier Server Actions und die Produktionsadresse in den Mails sind entfernt.
-
-**Kein Cookie-Cache, kein `SESSION_SECRET`, keine Migration, keine neue Variable, keine neuen Pakete.** Abschnitt I (Identitätsprüfung) wird nicht gebaut (Jakob, 2026-11-23).
-
-**Ergänzungen gegenüber dem Design:**
-- Als Kunden-Umgebung zählt zusätzlich `VERCEL_ENV=production`, damit auch ein Deployment ohne Git-Branch die strengen Regeln bekommt.
-- Eingeschränkte Stripe-Live-Schlüssel (`rk_live_`) gelten ebenfalls als Live-Schlüssel.
-- HTTPS wird auf allen Vercel-Deployments erzwungen, also auch auf Stage, und nie auf localhost.
-
-**Geprüft:**
-- Unit-Tests 690 von 690, Typprüfung, ESLint und Production-Build
-- E2E gegen einen echten Production-Build: 8 von 8 (Header, Einbett-Schutz, Turnstile, keine CSP-Meldung auf Anmeldung, Projekt, Editor, Cover und persönlichem Bereich)
-- E2E-Regression Chromium: 142 bestanden, 25 übersprungen, 0 fehlgeschlagen
-- Echte Builds brechen ab: Stage ohne Pflichtwerte und `main` mit Testwerten
-- Regeln gegen die echten Variablennamen in Vercel: Stage besteht, Production meldet genau die sieben fehlenden Werte
-- Website: Im Custom Code von Webflow steht kein iframe
-
-**Noch offen für `/qa`:** Ablauf auf `stage-app.narravit.de` (noch nicht deployed), Anmeldung mit Google und Facebook, Weiterleitung zum Stripe-Checkout, Bild-Upload unter der Beobachtung der CSP, Firefox und Safari. Embed-Elemente in Webflow ließen sich nicht prüfen.
-
-## QA Test Results
-
-**Getestet:** 2026-11-22
-**App:** echter Production-Build (`next build` und `next start`) auf `localhost:3000` gegen die Stage-Datenbank
-**Tester:** QA Engineer (AI)
-**Umfang:** Abschnitte A bis H des Tech Designs. Abschnitt I (Identitätsprüfung) wird nicht gebaut (Jakob, 2026-11-23).
-
-### Acceptance Criteria Status
-
-- [x] AC-1: Einbetten verboten (`X-Frame-Options: DENY`, `frame-ancestors 'none'`), im Browser mit fremder Seite geprüft
-- [x] AC-2: `X-Content-Type-Options: nosniff`
-- [x] AC-3: Referrer begrenzt, eine fremde Seite sieht von `/einladung/<token>` nur die Domain
-- [x] AC-4: Kamera, Mikrofon und Standort gesperrt
-- [x] AC-5: Header gelten für Seiten, 404, Middleware-Weiterleitung, Auth-Callback, API und statische Dateien
-- [x] AC-6: Technik-Hinweis `X-Powered-By` entfernt
-- [x] AC-7: CSP-Kern ist aktiv, eingeschleuste Basis-Adresse und Plugins werden blockiert
-- [x] AC-8: Beobachtungsmodus meldet in den wichtigen Abläufen nichts: Anmeldung mit Turnstile, Start von Google und Facebook, Weiterleitung zu Stripe, Projekt, Editor, Cover, persönlicher Bereich, Bild-Upload
-- [x] AC-9: HTTPS wird nur auf Vercel und ohne `preload` erzwungen (Regel per Unit-Test, auf localhost im Browser geprüft, auf Vercel noch offen)
-- [x] AC-10: Build bricht auf Stage ohne Pflichtwerte ab
-- [x] AC-11: Build von `main` bricht bei falscher Adresse, Stripe-Testschlüssel, Turnstile-Testschlüssel und Test-Schaltern ab
-- [x] AC-12: Lokal gibt es nur eine Warnung, Meldungen enthalten nie Werte
-- [x] AC-13: Regeln gegen die echten Variablennamen in Vercel: Stage besteht, Production meldet genau die sieben fehlenden Werte
-- [x] AC-14: Eine zentrale Quelle für die App-Adresse
-- [x] AC-15: Kein Cookie-Cache, kein `SESSION_SECRET`, keine Migration
-
-### Security Audit Results
-
-- [x] Clickjacking: Die App lädt nicht in einem fremden Frame
-- [x] Token-Schutz: Einladungs-Token gelangen nicht über den Referrer nach außen
-- [x] Injection: `<base>` und `<object>` werden vom aktiven CSP-Kern blockiert
-- [x] Client-Bundle: keine Secret-Werte, keine Namen geheimer Variablen, keine Stripe-, Webhook- oder Resend-Schlüssel (34 Dateien). Lokal ist nur der Service-Role-Key als Wert vorhanden, die übrigen wurden über ihre Namen und Muster geprüft
-- [x] Konfigurationsprüfung gibt keine Werte aus
-
-### Bugs Found
-
-#### BUG-1: Lokaler Production-Build stürzt ohne App-Adresse ab
-- **Severity:** Low
-- **Schritte:** `.env.local` ohne `NEXT_PUBLIC_SITE_URL`, `npm run build`, `npm run start`, „Passwort vergessen" absenden.
-- **Erwartet:** Lokal gilt `http://localhost:3000`. **Tatsächlich:** Die Action wirft `NEXT_PUBLIC_SITE_URL fehlt`. Der Build warnt lokal nur. Auf Stage und Production kann das nicht passieren, weil der Build dort abbricht.
-- **Status:** Behoben am 2026-11-22. Lokal gilt jetzt auch im Production-Build `http://localhost:3000`, auf Vercel bleibt der Ersatzwert gesperrt. Die Regression lief danach ohne gesetzte Adresse grün.
-
-#### BUG-2: Gelöschte Kapitel lassen ihre Bilder im Speicher zurück
-- **Severity:** Medium
-- **Beschreibung:** `deleteChapterAction` entfernt nur den Datensatz. Im QA-Projekt lagen 30 verwaiste Bilder (rund 107 MB). Das betrifft auch persönliche Fotos und bestand schon vor PROJ-19.
-- **Priorität:** Vor dem Go-live, gehört zu **PROJ-26** (endgültiges Löschen aus dem Papierkorb entfernt auch die Dateien).
-
-### Automatische Tests
-
-- Unit-Tests: 691 von 691
-- PROJ-19 E2E auf dem Production-Build: 15 von 15
-- Komplette E2E-Regression Chromium auf dem Production-Build: 148 bestanden, 25 übersprungen, 0 fehlgeschlagen. Der Test AC-14 aus PROJ-3 blieb bewusst außen vor, weil er eine echte Reset-Mail auslöst
-
-### Prüfung auf Stage (2026-11-22, Version `391f93d`)
-
-- Deployment fehlerfrei, die Konfigurationsprüfung hat auf Stage bestanden
-- Alle Header stimmen mit der Soll-Liste überein: Seite `/anmelden`, JavaScript-Datei, Datei aus `public/` und echte 404-Antwort. HSTS enthält `includeSubDomains`, aber kein `preload`, `X-Powered-By` fehlt
-- Unbekannte Pfade leiten nicht angemeldet zu `/anmelden` weiter und tragen dort ebenfalls alle Header
-- Turnstile lädt unter der CSP. Die einzigen Meldungen im Beobachtungsmodus betreffen `vercel.live`, die Vercel-Werkzeugleiste auf Preview-Deployments. Sie gehört nicht in die Regel
-- Gemessen im Browser nach Vercel-Anmeldung, weil `curl` an der Deployment-Protection endet. Die Seite wurde nur ohne App-Anmeldung aufgerufen
-
-**Nicht geprüft:** Seiten hinter der App-Anmeldung auf Stage, vollständige Anmeldung bei Google und Facebook, echte Stripe-Session, Firefox und Safari, Embed-Elemente in Webflow.
-
-### Summary
-
-- **Acceptance Criteria:** 15 von 15 bestanden
-- **Bugs:** 1 offen (BUG-2, Medium, wird mit PROJ-26 gelöst), BUG-1 ist behoben
-- **Security:** bestanden
-- **Production Ready:** JA, die Header sind auf Stage bestätigt
-- **Empfehlung:** Vor dem Merge auf `main` die sieben fehlenden Production-Werte setzen (`docs/production/prod-umzug.md`, Abschnitt 1, Schritt 5)
-
-## Deployment
-_To be added by /deploy_
+## Offene Punkte
+- Nicht geprüft: Seiten hinter der App-Anmeldung auf Stage, vollständige Anmeldung bei Google und Facebook, echte Stripe-Session, Firefox und Safari, Embed-Elemente in Webflow.

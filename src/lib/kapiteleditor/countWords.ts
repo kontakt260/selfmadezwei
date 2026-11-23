@@ -14,20 +14,6 @@ export function countWordsFromBody(body: unknown): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-export function countPageBreaksFromBody(body: unknown): number {
-  if (!body || typeof body !== "object") return 0;
-  return countByType(body as TipTapNode, "pageBreak");
-}
-
-function countByType(node: TipTapNode, type: string): number {
-  if (!node) return 0;
-  let count = node.type === type ? 1 : 0;
-  if (Array.isArray(node.content)) {
-    for (const c of node.content) count += countByType(c, type);
-  }
-  return count;
-}
-
 // Ohne Rekursion: Der Server zählt auch Inhalte, die von außen kommen. Sehr tief
 // verschachteltes JSON darf das Speichern nicht zum Absturz bringen.
 function extractText(root: TipTapNode): string {

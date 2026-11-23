@@ -10,9 +10,11 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --project=chromium",
     "test:e2e:ui": "playwright test --ui",
-    "test:all": "vitest run && playwright test",
+    "test:quick": "node scripts/run-tests.mjs quick",
+    "test:full": "node scripts/run-tests.mjs full",
+    "test:all": "node scripts/run-tests.mjs full",
     "email": "email dev --dir src/emails/preview --port 3001"
   },
   "dependencies": {
@@ -50,7 +52,6 @@
     "@tiptap/extension-paragraph": "^3.23.4",
     "@tiptap/extension-placeholder": "^3.23.4",
     "@tiptap/extension-text-align": "^3.23.4",
-    "@tiptap/extension-underline": "^3.23.4",
     "@tiptap/react": "^3.23.4",
     "@tiptap/starter-kit": "^3.23.4",
     "class-variance-authority": "^0.7.1",

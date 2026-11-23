@@ -1,8 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
+import { createTestAccount, readEnvLocal, signIn, STAGE_HOST } from "./helpers/stage";
 
 // PROJ-28 — automatischer Löschlauf gegen die echte Stage-Datenbank.
 //
@@ -16,7 +15,6 @@ import path from "node:path";
 // sie ab, bevor etwas verschoben wird. Das QA-Konto wird nicht angefasst.
 
 const ENABLED = process.env.E2E_RETENTION === "1";
-const STAGE_HOST = "kdjhxqitfxnsavhiafdn.supabase.co";
 const TEST_EMAIL_PREFIX = "e2e-loeschlauf-";
 const RUN_ID = crypto.randomBytes(4).toString("hex");
 const SESSION_PREFIX = `cs_e2e_loeschlauf_${RUN_ID}_`;
@@ -36,27 +34,11 @@ let page: Page;
 const accounts: Account[] = [];
 const projectIds = new Set<string>();
 
-function readEnvLocal(): Record<string, string> {
-  const values: Record<string, string> = {};
-  const content = fs.readFileSync(path.join(process.cwd(), ".env.local"), "utf8");
-  for (const line of content.split(/\r?\n/)) {
-    const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (match) values[match[1]] = match[2].trim().replace(/^['"]|['"]$/g, "");
-  }
-  return values;
-}
-
 async function createAccount(label: string): Promise<Account> {
-  const email = `${TEST_EMAIL_PREFIX}${label}-${RUN_ID}@example.test`;
-  const password = `${crypto.randomBytes(18).toString("base64url")}aA1!`;
-  const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { full_name: `Test ${label}` },
+  const account = await createTestAccount(admin, {
+    email: `${TEST_EMAIL_PREFIX}${label}-${RUN_ID}@example.test`,
+    name: `Test ${label}`,
   });
-  if (error || !data.user) throw new Error(`createUser failed: ${error?.message}`);
-  const account = { id: data.user.id, email, password };
   accounts.push(account);
   return account;
 }
@@ -175,25 +157,6 @@ async function payRenewalLikeWebhook(projectId: string, sessionId: string): Prom
   const restore = await admin.rpc("retention_restore_paid", { p_project_id: projectId });
   if (restore.error) throw new Error(restore.error.message);
   return restore.data as { status: string };
-}
-
-async function signIn(target: Page, account: Account): Promise<void> {
-  await target.goto("/anmelden");
-  await target.locator('input[name="email"]').fill(account.email);
-  await target.locator('input[name="password"]').fill(account.password);
-  await expect
-    .poll(
-      () =>
-        target.evaluate(
-          () =>
-            (document.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement | null)
-              ?.value.length ?? 0,
-        ),
-      { timeout: 20_000 },
-    )
-    .toBeGreaterThan(0);
-  await target.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await target.waitForURL((url) => !url.pathname.includes("/anmelden"), { timeout: 45_000 });
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

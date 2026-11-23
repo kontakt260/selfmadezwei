@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { waitForEditorReady, waitForSaved } from "./helpers/editor-audit";
 import { waitForPage } from "./helpers/page-ready";
+import { createTestAccount, readEnvLocal, signIn, STAGE_HOST } from "./helpers/stage";
 
 // PROJ-28 — Lesemodus abgelaufener Projekte im echten Browser gegen Stage.
 //
@@ -16,7 +17,6 @@ import { waitForPage } from "./helpers/page-ready";
 // Das QA-Konto wird nicht angefasst, es werden keine Mails ausgelöst.
 
 const ENABLED = process.env.E2E_READ_ONLY === "1";
-const STAGE_HOST = "kdjhxqitfxnsavhiafdn.supabase.co";
 const TEST_EMAIL_PREFIX = "e2e-lesemodus-";
 const SCREENSHOT_DIR = process.env.E2E_SCREENSHOT_DIR;
 const RUN_ID = crypto.randomBytes(4).toString("hex");
@@ -46,27 +46,11 @@ const accounts: Account[] = [];
 const projectIds = new Set<string>();
 const uploaded: string[] = [];
 
-function readEnvLocal(): Record<string, string> {
-  const values: Record<string, string> = {};
-  const content = fs.readFileSync(path.join(process.cwd(), ".env.local"), "utf8");
-  for (const line of content.split(/\r?\n/)) {
-    const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (match) values[match[1]] = match[2].trim().replace(/^['"]|['"]$/g, "");
-  }
-  return values;
-}
-
 async function createAccount(label: string): Promise<Account> {
-  const email = `${TEST_EMAIL_PREFIX}${label}-${RUN_ID}@example.test`;
-  const password = `${crypto.randomBytes(18).toString("base64url")}aA1!`;
-  const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { full_name: `Test ${label}` },
+  const account = await createTestAccount(admin, {
+    email: `${TEST_EMAIL_PREFIX}${label}-${RUN_ID}@example.test`,
+    name: `Test ${label}`,
   });
-  if (error || !data.user) throw new Error(`createUser failed: ${error?.message}`);
-  const account = { id: data.user.id, email, password };
   accounts.push(account);
   return account;
 }
@@ -144,25 +128,6 @@ const setExpiry = async (projectId: string, offsetDays: number) => {
     .eq("project_id", projectId);
   expect(error).toBeNull();
 };
-
-async function signIn(page: Page, account: Account): Promise<void> {
-  await page.goto("/anmelden");
-  await page.locator('input[name="email"]').fill(account.email);
-  await page.locator('input[name="password"]').fill(account.password);
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () =>
-            (document.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement | null)
-              ?.value.length ?? 0,
-        ),
-      { timeout: 20_000 },
-    )
-    .toBeGreaterThan(0);
-  await page.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.includes("/anmelden"), { timeout: 45_000 });
-}
 
 /** Zählt Server-Actions, also jeden Schreibversuch der Oberfläche. */
 function watchActions(page: Page) {

@@ -1,5 +1,7 @@
 # PROJ-3: Persönlicher Bereich + Konto
 
+> **Kurzfassung (PROJ-31).** Das vollständige Tech Design, Bau-Notizen, QA-Protokolle und der Deployment-Verlauf stehen unverändert im [Archiv](archive/PROJ-3-persoenlicher-bereich-konto.md).
+
 ## Status: Approved
 
 > Der Bereich **Account löschen** wurde neu gebaut (Refine 2026-11-22), die QA ist bestanden, der Code ist noch nicht deployed. Alle anderen Sektionen bleiben unverändert wie deployed.
@@ -98,41 +100,6 @@
 - Portal-Zugang läuft ab, während der Nutzer die Seite geöffnet hat → nächster Seitenaufruf / Route-Wechsel triggert Middleware-Redirect zu `/zugang-abgelaufen`; kein sofortiger Kick auf der aktuellen Seite nötig
 - Nutzer hat mehrere Browser-Tabs offen und löscht Account in einem Tab → andere Tabs zeigen beim nächsten API-Call einen Auth-Fehler und leiten zu `/anmelden` weiter
 
-## Implementation Notes — Refine 2026-05-21 (Path 2: Implementation Reality)
-
-**Was wurde geändert:**
-
-1. **„Mein Zugang"-Sektion entfernt.** Die Anzeige des Portal-Ablaufdatums lebt ab PROJ-6 in der Projektübersicht (Stat-Card „NARRAVIT-Projektzugang endet in …"). Im persönlichen Bereich war es redundant.
-2. **E-Mail-Selbstbedienungs-Änderung zurückgenommen.** Commit `942f97a` („Editable email in persönlicher Bereich + Apple OAuth reactivation") wurde durch `02cf7d8` revertiert. Begründung des Users: E-Mail-Wechsel hat zu viele Edge-Cases (gleichzeitige Pending-Confirmation, OAuth-Migrations-Konflikt, Verifikations-Recovery) — bis ein sauberer Flow steht, läuft das über Support. Apple-OAuth wurde im gleichen Revert deaktiviert, da Apple-Developer-Konfiguration noch nicht steht; Facebook bleibt aktiv (Google + Facebook = produktive OAuth-Provider).
-3. **„Mitglied seit"-Feld nicht implementiert.** Der Datenpunkt ist nicht produkt-kritisch — wenn ein User wissen will, wann er gekauft hat, steht's auf den Stripe-Rechnungen.
-4. **Delete-Trigger-Button-Label vereinfacht** auf „Account löschen" (das ausführliche „unwiderruflich" steht im Sektions-Disclaimer-Text + im Dialog-Body). Der finale Bestätigungs-Button im Dialog heißt weiterhin „Account endgültig löschen".
-
-**Test-Updates (Refine-Run 2026-05-21):**
-
-- `tests/PROJ-3-persoenlicher-bereich.spec.ts`:
-  - AC-5 umformuliert: E-Mail-Feld muss `readOnly` haben und den Support-Hinweis zeigen.
-  - AC-8 (Validierung „gleiche E-Mail") gelöscht — kein Edit-Flow mehr.
-  - AC-15/16/17/18 Button-Locator: `getByRole("button", { name: "Account löschen", exact: true })` statt Regex `/unwiderruflich löschen/`.
-- `tests/PROJ-2-auth-ssr.spec.ts`:
-  - /anmelden + /registrieren: Apple-Button-Assertions ersetzt durch Facebook (`Mit Facebook anmelden/registrieren`).
-  - Facebook-`count(0)`-Negativ-Check entfernt.
-  - Onboarding-Wizard-Describe: `test.use({ storageState: "tests/.auth/user.json" })` ergänzt — `/onboarding` ist seit PROJ-6 auth-only.
-
-**Nicht-Ziele dieses Refines:**
-
-- Kein E-Mail-Self-Service-Edit (separates Folge-Ticket sobald Recovery-Flow steht).
-- Kein Apple-OAuth (separates Ticket sobald Developer-Konfiguration steht).
-- Keine Wiedereinführung der „Mein Zugang"-Sektion — Quelle bleibt Projektübersicht.
-
-**E2E-Suite nach Refine (`npx playwright test --retries=1`):**
-
-- **71 passed, 0 failed, 1 skipped** (optionaler PROJ-6 Stage-Smoke).
-- 2 flaky (passten beim 2. Versuch): PROJ-2 Onboarding Path A + PROJ-4 AC-Ch-3 — beide
-  durch denselben bekannten Turbopack-Dev-Server-Modul-Lade-Fehler unter Last
-  (`__webpack_modules__[moduleId] is not a function`). Pre-existing, nicht von dieser
-  Refine verursacht. Folge-Ticket: in CI auf stabilen Build-Modus statt Turbopack-Dev
-  umstellen (PROJ-13 Stabilität & Observability).
-
 ## Refine 2026-11-22: Konto-Löschen
 
 **Anlass:** Die Prüfung von Code und Stage-Schema hat gezeigt, dass eine Kontolöschung ganze Projekte anderer vernichten kann. `projects.owner_id` steht auf `ON DELETE CASCADE`, die bisherige Prüfung zählt aber nur Mitglieder mit der Rolle Projektleiter. Betroffen sind Eigentümer mit zweiter Projektleitung, Eigentümer, die das Projekt verlassen haben oder entfernt wurden, und angemeldete Käufer eines Geschenks ohne eigenen Zugang. Der Trigger zum letzten Projektleiter schützt nicht, weil zuerst das Projekt gelöscht wird.
@@ -161,57 +128,20 @@
 - UX: Toast-Feedback nach Name-Save und nach Passwort-Reset-Trigger (shadcn/ui `Sonner`)
 
 ---
-<!-- Sections below are added by subsequent skills -->
 
-## Tech Design (Solution Architect)
+## Nachtrag 2026-10-14 — Passwort für Google-/Facebook-Konten
 
-> **Stand 2026-11-22, von Jakob freigegeben, einschließlich der zwei Datenbank-Änderungen.** Gilt für den Bereich „Account löschen" aus dem Refine vom selben Tag. Papierkorb (PROJ-26) und AGB-Zustimmung (PROJ-27) bekommen eigene Designs.
+- Abschnitt „Sicherheit" zeigt den Button jetzt auch für Konten, die per Google oder Facebook angelegt wurden (früher nur Hinweis „Passwort-Verwaltung erfolgt dort").
+- Drei Zustände:
+  - E-Mail-Konto: unverändert „Passwort zurücksetzen".
+  - Google-/Facebook-Konto ohne Passwort: „Sie melden sich über Google an. Wenn Sie sich zusätzlich mit einer E-Mail-Adresse und einem Passwort anmelden möchten, können Sie hier ein Passwort festlegen." — Button „Passwort festlegen".
+  - Google-/Facebook-Konto mit Passwort: Hinweis, dass zusätzlich ein Passwort festgelegt ist — Button „Passwort ändern".
+- Ob ein Passwort existiert, liefert Supabase nicht mit dem Nutzer-Objekt. Das Reset-Formular setzt deshalb beim Speichern den Marker `has_password` in den Nutzer-Metadaten; ausgewertet wird er in `src/lib/auth/has-password.ts` (mit Unit-Test). Der Marker steuert nur die Beschriftung, keine Berechtigung.
+- Bewusst **ohne** Datenbank-Änderung: Eine Hilfsfunktion in der Datenbank wäre genauer gewesen, die Supabase-Anbindung durfte am 2026-10-14 aber keine Migration anwenden („You do not have permission").
+- Nicht im Browser mit einem Google-Konto geprüft (QA-Konto ist ein E-Mail-Konto); Typprüfung, Unit-Tests und der E2E-Test für E-Mail-Konten (AC-13) sind grün.
 
-### A) Aufbau
-
-```
-Persönlicher Bereich
-+-- Sektion „Account löschen" (Text ohne Export-Hinweis)
-    +-- Lösch-Dialog (bestehender AlertDialog)
-        +-- Übersicht, beim Öffnen frisch vom Server geladen
-        |   +-- Wird gelöscht (Account und Einzelprojekte)
-        |   +-- Bleibt bestehen
-        |   +-- Hinweis auf verschenkte Bücher (ohne Titel)
-        +-- Nachfolge-Auswahl je Projekt (bestehendes Select)
-        +-- Bestätigung mit LÖSCHEN
-        +-- Lade- und Fehlerzustand
-
-Nutzerübersicht im Projekt
-+-- Dialog „Projekt verlassen"
-    +-- Nachfolge-Auswahl, falls man die einzige Projektleitung ist
-
-Seite „Zugang abgelaufen"
-+-- Link „Zum persönlichen Bereich"
-
-Im Hintergrund
-+-- Löschablauf auf dem Server (ein Schritt: alles oder nichts)
-+-- Mail „Sie leiten jetzt dieses Projekt"
-+-- Aufräumen der Dateien, Wiederholung im bestehenden täglichen Cron
-```
-
-### B) Was gespeichert wird
-
-| Daten | Änderung |
-|---|---|
-| Eigentümer eines Projekts | Hängt nicht mehr am Konto. Wird ein Konto gelöscht, bleibt das Projekt bestehen |
-| Mitschreibende je Kapitel (neu) | Kapitel, Person und Zeitpunkt des ersten Beitrags. Nur für den Support, Mitglieder können es weder sehen noch ändern. Der Eintrag verschwindet mit dem Konto |
-| Aufräum-Liste für Dateien (neu) | Nur die Projekt-ID und der Stand der Versuche, keine personenbezogenen Daten |
-| Mail-Warteschlange | Kennt zusätzlich die neue Nachfolge-Mail |
-
-### C) Ablauf beim Löschen
-
-1. **Prüfen:** Der Server lädt den aktuellen Stand und prüft die gewählte Nachfolge. Bei einem Fehler passiert nichts.
-2. **Ein Datenbankschritt, alles oder nichts:** Nachfolge setzen, Eigentum übergeben, Einzelprojekte löschen, eingelöste Käufe bereinigen, Einladungen an die Person entfernen, Dateien zum Aufräumen vormerken.
-3. **Konto löschen:** Profil und Mitgliedschaften verschwinden dabei automatisch in einem Schritt.
-4. **Nacharbeiten:** Dateien löschen, offene Mails bereinigen, die Nachfolge informieren. Scheitert etwas davon, holt es der tägliche Cron nach.
-5. **Abschluss:** Abmelden und Weiterleitung zu `/anmelden`.
-
-Scheitert Schritt 3, bleibt das Konto bestehen und die Löschung lässt sich wiederholen. Bereits gelöschte Einzelprojekte bleiben gelöscht, weil die Person das bestätigt hat.
+## Technische Entscheidungen
+_Kurzform. Die vollständige Begründung steht im Archiv._
 
 ### D) Entscheidungen
 
@@ -228,251 +158,13 @@ Scheitert Schritt 3, bleibt das Konto bestehen und die Löschung lässt sich wie
 | Dateien über eine Aufräum-Liste | Der Speicher gehört nicht zur Datenbank-Transaktion. So geht keine Datei verloren, die eigentlich gelöscht werden muss. PROJ-26 nutzt denselben Baustein |
 | Bestehende RLS-Regeln bleiben unverändert | Der Löschablauf läuft nur auf dem Server. Die neuen Tabellen sind für Browser-Zugriffe komplett gesperrt |
 
-### E) Datenbank-Änderungen (von Jakob freigegeben, Jakob spielt sie ein)
+### Spätere Entscheidungen
+- **„Mein Zugang“** ist aus dem persönlichen Bereich entfernt. Das Ablaufdatum steht in der Projektübersicht.
+- **E-Mail-Änderung** läuft über den Support, bis ein sauberer Ablauf steht (zu viele Sonderfälle bei Bestätigung und OAuth). Kein Self-Service.
+- **Apple-Anmeldung** bleibt deaktiviert, bis die Developer-Konfiguration steht. Google und Facebook sind aktiv.
+- **„Mitglied seit“** wird nicht gebaut. Das Kaufdatum steht auf den Stripe-Rechnungen.
 
-1. **Schutz-Änderung:** Das Projekt hängt nicht mehr am Konto. Sie funktioniert auch mit dem heutigen Code und schließt die gefährliche Lücke sofort, deshalb kommt sie zuerst.
-2. **Bau-Änderung:** Mitschreibende je Kapitel, Aufräum-Liste, serverseitiger Löschablauf und die neue Mail-Art. Muss vor dem Code-Deploy eingespielt werden.
-
-### F) Neue Abhängigkeiten
-
-Keine neuen Pakete, keine neue Umgebungsvariable.
-
-### G) Reihenfolge der Umsetzung
-
-1. Schutz-Änderung einspielen und prüfen
-2. Bau-Änderung und Löschablauf auf dem Server, mit automatischen Tests für alle Fälle aus der Spec
-3. Lösch-Dialog, Nachfolge beim Verlassen, Link auf „Zugang abgelaufen"
-4. Nachfolge-Mail im bestehenden Mail-Design
-5. Auf Stage prüfen, Go-live-Liste ergänzen
-
-## Implementation Notes — Backend 2026-11-22
-
-**Stand:** Code und Unit-Tests sind fertig, nichts ist committet oder deployed.
-- [x] Schutz-Migration `20261122130000_proj3_project_survives_account_delete.sql`, auf Stage eingespielt und geprüft.
-- [x] Bau-Migration `20261122140000_proj3_account_deletion.sql` auf Stage eingespielt, Tabellen, Trigger und Rechte dort geprüft. Der neue Code läuft nur lokal gegen Stage, deployed ist er nicht. E2E mit dem QA-Konto: 7 von 7 (Dialog, Bestätigung, Abbrechen, Letzte-Leitung-Sperre), ohne eine echte Löschung. Lokal mit PGlite (echtes Postgres) zusammen mit allen 24 Migrationen eingespielt, 51 von 51 Datenbank-Szenarien bestanden: alle Löschfälle, Verlassen, Mitschreibende, Rechte. Nicht abgedeckt, weil PGlite nur eine Verbindung hat: gleichzeitige Löschungen, und die Supabase-Funktion `auth.admin.deleteUser` selbst.
-- [x] Löschablauf, Übersicht im Dialog, Nachfolge beim Löschen und Verlassen, Aufräumen der Dateien im täglichen Cron, Nachfolge-Mail, Link auf „Zugang abgelaufen".
-
-**Abweichungen und Ergänzungen:**
-- Der Dialog heißt weiter „Account wirklich löschen?", passend zu Abschnitt und Button.
-- Die Löschung prüft die Eingabe „LÖSCHEN" jetzt auch auf dem Server.
-- Die Datenbank bricht ab, wenn ein Projekt gelöscht würde, das die Person im Dialog nicht gesehen hat.
-- Hat eine Person als einzige Mitwirkende ein noch nicht angenommenes Geschenk im Projekt, wird die beschenkte Person mit der Annahme Projektleitung.
-- Der E2E-Test AC-18 klickte die echte Löschung an und hätte das QA-Konto auf Stage gelöscht. Er prüft jetzt nur noch den Dialog und darf den Button nie klicken.
-- Die Nachfolge-Mail nutzt das bestehende Mail-Layout, ein Frame in der Figma-Datei fehlt noch.
-
-## QA Test Results
-
-**Datum:** 2026-05-17
-**Tester:** QA Engineer (Claude)
-**Umgebung:** Stage (kdjhxqitfxnsavhiafdn), Chromium Desktop + Mobile Safari (iPhone 13)
-**Testnutzer:** qa-test@narravit.de / QA-Test-2026! (stage, portal_access_expires_at = 2027-05-17)
-
-> **Scope-Anpassung:** "Mitglied seit"-FieldCard und "Mein Zugang"-Sektion wurden vom Entwickler bewusst aus der Implementierung entfernt. Entsprechende AC-Punkte aus der Spec wurden gestrichen; E2E-Tests angepasst.
-
-### Ergebnis-Übersicht
-
-| ID | Acceptance Criterion | Ergebnis |
-|----|---------------------|----------|
-| AC-1 | /persoenlicher-bereich lädt für eingeloggten Nutzer mit aktivem Zugang | ✅ PASS |
-| AC-2 | Banner-Bild und Seitenüberschrift mit Untertitel sichtbar | ✅ PASS |
-| AC-3 | Alle 4 Sektionen in korrekter Reihenfolge vorhanden | ✅ PASS |
-| AC-4 | Name-Feld zeigt aktuellen Wert und ist editierbar | ✅ PASS |
-| AC-5 | E-Mail-Feld zeigt aktuelle E-Mail und ist editierbar | ✅ PASS |
-| AC-7 | Name speichern — zu kurzer Name zeigt Validierungsfehler | ✅ PASS |
-| AC-8 | E-Mail ändern — gleiche E-Mail zeigt Validierungsfehler | ✅ PASS |
-| AC-11 | Rechnungen-Sektion zeigt Platzhalter 'Noch keine Rechnungen vorhanden' | ✅ PASS |
-| AC-12 | Rechnungstabelle hat korrekte Spaltenheader | ✅ PASS |
-| AC-13 | E-Mail-Nutzer sieht 'Passwort zurücksetzen'-Button | ✅ PASS |
-| AC-14 | Passwort-zurücksetzen zeigt Bestätigungshinweis nach Klick | ✅ PASS |
-| AC-15 | Löschen-Button öffnet AlertDialog | ✅ PASS |
-| AC-16 | Löschen-Button im Dialog ist deaktiviert bis 'LÖSCHEN' eingetippt | ✅ PASS |
-| AC-17 | Abbrechen schließt Dialog und setzt Eingabe zurück | ✅ PASS |
-| AC-18 | Sole-Owner-Check — Nutzer mit eigenem Projekt sieht Fehlermeldung beim Löschen | ✅ PASS |
-| AC-19 | Unauthentifizierter Nutzer wird zu /anmelden umgeleitet | ✅ PASS |
-| AC-20 | Seite lädt auf 375px ohne Layout-Bruch | ✅ PASS |
-
-**Gesamt: 17/17 bestanden**
-
-### Bugs
-
-#### BUG-1 — Medium: Nach Sole-Owner-Fehler bleibt Löschen-Button aktiviert (UX)
-- **Betrifft:** AC-18 (Test besteht, aber UX-Problem dokumentiert)
-- **Beschreibung:** Nach dem Sole-Owner-Fehler bleibt `isConfirmed` `true` (Eingabe "LÖSCHEN" nicht zurückgesetzt). Der Löschen-Button bleibt enabled, obwohl die Aktion nicht erfolgreich war.
-- **Sicherheit:** Unkritisch — server-seitiger Check blockiert jeden weiteren Versuch zuverlässig.
-- **Schritte:** Dialog öffnen → "LÖSCHEN" eingeben → klicken → Sole-Owner-Fehler sichtbar → Button sollte disabled sein, ist es aber nicht.
-- **Workaround:** keiner nötig; Löschen bleibt server-seitig geblockt.
-
-### Security Audit
-
-| Prüfpunkt | Ergebnis |
-|-----------|----------|
-| Unauthentifizierter Zugriff → Redirect | ✅ OK (AC-19) |
-| Server Actions mit auth.uid() — kein Client-Write | ✅ OK |
-| OAuth-Provider-Erkennung serverseitig | ✅ OK |
-| Sole-Owner-Check vor Account-Delete | ✅ OK (server-seitig) |
-| Keine Secrets im Client-Bundle | ✅ OK |
-| XSS via Nameninput | ✅ OK — React escaped, Server Action validiert |
-| Passwort-Reset sendet Link, kein Passwort im Response | ✅ OK |
-
-### E2E Test Suite
-
-Datei: `tests/PROJ-3-persoenlicher-bereich.spec.ts`
-Ausgeführt: `npm run test:e2e -- --project=chromium --grep "PROJ-3"`
-Ergebnis: **17/17 bestanden** in 16.1s
-
-Test-Infrastruktur:
-- `tests/global-setup.ts` — einmaliger Login; speichert Session in `tests/.auth/user.json`
-- `playwright.config.ts` — `globalSetup` + kein globales `storageState` (opt-in per Datei)
-- `vitest.config.ts` — `include` auf `src/**/*.test.*` eingeschränkt (verhindert Playwright-Konflikte)
-
-### Produktionsreife-Entscheidung
-
-**✅ BEREIT** — Keine Critical oder High Bugs. BUG-1 (Medium, UX-only) blockiert nicht das Deployment.
-
-## Nachtrag 2026-10-14 — Passwort für Google-/Facebook-Konten
-
-- Abschnitt „Sicherheit" zeigt den Button jetzt auch für Konten, die per Google oder Facebook angelegt wurden (früher nur Hinweis „Passwort-Verwaltung erfolgt dort").
-- Drei Zustände:
-  - E-Mail-Konto: unverändert „Passwort zurücksetzen".
-  - Google-/Facebook-Konto ohne Passwort: „Sie melden sich über Google an. Wenn Sie sich zusätzlich mit einer E-Mail-Adresse und einem Passwort anmelden möchten, können Sie hier ein Passwort festlegen." — Button „Passwort festlegen".
-  - Google-/Facebook-Konto mit Passwort: Hinweis, dass zusätzlich ein Passwort festgelegt ist — Button „Passwort ändern".
-- Ob ein Passwort existiert, liefert Supabase nicht mit dem Nutzer-Objekt. Das Reset-Formular setzt deshalb beim Speichern den Marker `has_password` in den Nutzer-Metadaten; ausgewertet wird er in `src/lib/auth/has-password.ts` (mit Unit-Test). Der Marker steuert nur die Beschriftung, keine Berechtigung.
-- Bewusst **ohne** Datenbank-Änderung: Eine Hilfsfunktion in der Datenbank wäre genauer gewesen, die Supabase-Anbindung durfte am 2026-10-14 aber keine Migration anwenden („You do not have permission").
-- Nicht im Browser mit einem Google-Konto geprüft (QA-Konto ist ein E-Mail-Konto); Typprüfung, Unit-Tests und der E2E-Test für E-Mail-Konten (AC-13) sind grün.
-
-## QA Test Results — Konto-Löschen (2026-11-22)
-
-**Getestet:** 2026-11-22
-**App:** lokaler Dev-Server (`localhost:3000`) gegen die Stage-Datenbank
-**Tester:** QA Engineer (AI)
-**Testkonten:** je Lauf zwei temporäre Konten, danach restlos entfernt und auf Stage nachgeprüft. Das QA-Konto blieb unberührt.
-
-### Acceptance Criteria Status
-
-- [x] AC-D1: Button öffnet den Dialog
-- [x] AC-D2: Löschen erst nach Eingabe von `LÖSCHEN`, auch auf dem Server geprüft
-- [x] AC-D3: Löschen ist immer möglich, keine Rolle blockiert es
-- [x] AC-D4: Ein Konto löscht nie ein Projekt, in dem andere mitwirken, auch nicht mit manipuliertem Formular
-- [x] AC-D5: Einzelprojekte werden mit Kapiteln und Dateien aus allen vier Speichern gelöscht
-- [x] AC-D6: Gemeinsame Projekte bleiben, das Eigentum geht über
-- [x] AC-D7: Nachfolge wird gesetzt und die Mail ausgelöst (Zustellung nicht geprüft, lokal fehlt der Resend-Schlüssel)
-- [x] AC-D8: Dieselbe Nachfolge-Auswahl funktioniert beim Verlassen eines Projekts
-- [x] AC-D9: Offene Geschenk-Einladung bleibt gültig, die beschenkte Person wird Projektleitung
-- [x] AC-D10: Profil, Anmeldung, Mitgliedschaften, normale Einladungen und Daten eingelöster Käufe werden entfernt
-- [x] AC-D11: Zahlungen bleiben ohne Personenbezug, offene Käufe bleiben bestehen
-- [x] AC-D12: Mitschreibende werden über die echte Session erfasst und verschwinden mit dem Konto
-- [x] AC-D13: Bei jeder fehlgeschlagenen Prüfung wird nichts gelöscht
-- [x] AC-D14: Nach der Löschung ist die Session beendet und keine Anmeldung mehr möglich
-- [ ] AC-D15: Dialogtexte sind lesbar. **BUG-2:** Auf Smartphone und Tablet verdeckt die Kopfzeile Überschrift und Warnung
-- [x] AC-D16: Von „Zugang abgelaufen" führt ein Link zum persönlichen Bereich, das Löschen bleibt erreichbar
-
-Die drei Kriterien unter „Sonderfälle über den Support" sind ein Arbeitsablauf und keine App-Funktion. Sie stehen in `docs/production/prod-umzug.md`, Abschnitt 8.
-
-### Edge Cases Status
-
-- [x] Nachfolge verlässt das Projekt, während gelöscht wird (5 parallele Durchläufe): kein Datenverlust
-- [x] Doppelter Löschversuch: Nachfolge und Mail genau einmal
-- [x] Zwei Projektleitungen verlassen gleichzeitig (5 Durchläufe): eine bleibt immer
-- [x] Echtes `deleteUser` bei der letzten Projektleitung wird von der Datenbank abgelehnt, nichts ändert sich
-- [x] Gescheiterter Versuch lässt sich wiederholen
-- [x] Offene normale Einladung, abgelaufenes Geschenk und Geschenk an die eigene Adresse
-- [ ] Zwei Projektleitungen lösen im selben Moment ein echtes `deleteUser` aus: nur einzeln geprüft (Datenbank-Sperre und paralleler Vorbereitungsschritt)
-- [ ] Erzählende Person ohne Konto: Regel folgt mit PROJ-12
-
-### Security Audit Results
-
-- [x] Angemeldete und anonyme Nutzer erreichen keine der fünf neuen Funktionen und keine der beiden neuen Tabellen (gegen die echte Stage-API geprüft)
-- [x] Manipulierte Formulare: fehlende Bestätigung, nicht bestätigtes Projekt, fremde Nachfolge, zusätzliches fremdes Projekt
-- [x] XSS: Projekttitel mit HTML wird im Dialog nur als Text angezeigt
-- [x] Die Person kommt immer aus der geprüften Session, nie aus dem Formular
-- [x] **BUG-6:** Keine erneute Identitätsprüfung vor der unwiderruflichen Löschung (bewusst akzeptiert, Jakob 2026-11-23)
-- [ ] **BUG-7:** Co-Autoren dürfen laut RLS-Regel das Feld `owner_id` ändern
-
-### Bugs Found
-
-#### BUG-2: Kopfzeile verdeckt Überschrift und Warnung im Lösch-Dialog
-- **Severity:** High
-- **Schritte:** Auf Smartphone (375 px) oder Tablet (768 px) mit mehreren Projekten den Lösch-Dialog öffnen und ganz nach oben scrollen.
-- **Erwartet:** Überschrift und Warnung sind sichtbar. **Tatsächlich:** Die Kopfzeile (`z-[60]`) liegt über dem Dialog (`z-50`), die Überschrift ist nicht erreichbar.
-- **Priorität:** Vor dem Deployment beheben. Der E2E-Test ist mit `test.fail` markiert.
-
-#### BUG-3: Alte Fehlermeldung bleibt beim erneuten Öffnen stehen
-- **Severity:** Low
-- **Schritte:** Fehler im Dialog auslösen, „Abbrechen", Dialog erneut öffnen. Die alte Meldung ist weiter sichtbar.
-- **Priorität:** Vor dem Deployment beheben. Der E2E-Test ist mit `test.fail` markiert.
-
-#### BUG-4: Projekte mit nie angenommenem Geschenk bleiben für immer gespeichert
-- **Severity:** Medium
-- **Schritte:** Käufer mit eigenem Zugang schreibt Kapitel und löscht sein Konto, die beschenkte Person nimmt nie an.
-- **Erwartet:** Die Inhalte werden nach einer festen Frist gelöscht. **Tatsächlich:** Die Einladung wird 30 Tage nach Ablauf entfernt, das Projekt bleibt ohne Mitglieder und ohne Eigentümer dauerhaft liegen. Kein Job räumt es auf.
-- **Priorität:** Vor dem Go-live, zusammen mit der offenen Aufbewahrungsregel von 90 Tagen.
-
-#### BUG-5: Text im Lösch-Dialog hat zu wenig Kontrast
-- **Severity:** Medium
-- **Gemessen:** 3,46:1, gefordert sind mindestens 4,5:1 (WCAG AA). Das ist für die ältere Zielgruppe relevant. Vermutliche Ursache: `text-muted-foreground` der `AlertDialogDescription` setzt sich gegen `text-[#535252]` durch.
-- **Priorität:** Vor dem Deployment beheben.
-
-#### BUG-6: Keine erneute Identitätsprüfung vor der Löschung
-- **Severity:** Medium
-- **Beschreibung:** Eine offene Sitzung und das Wort `LÖSCHEN` reichen. Wer an ein entsperrtes Gerät kommt, kann Konto und Einzelprojekte unwiderruflich löschen. Bestand schon vor diesem Refine.
-- **Priorität:** Produktentscheidung. Für Google- und Facebook-Konten bräuchte es einen Code per Mail statt eines Passworts.
-- **Entscheidung Jakob, 2026-11-23:** Es bleibt bei `LÖSCHEN`, das Risiko ist bewusst akzeptiert.
-
-#### BUG-7: Co-Autoren können das Feld `owner_id` ändern
-- **Severity:** Low
-- **Beschreibung:** Die RLS-Regel `projects: update as member` gilt für die ganze Zeile. Das Feld verleiht keine Rechte und führt nach der Schutz-Migration nicht mehr zum Löschen. Aus der Regel abgeleitet, nicht ausgeführt.
-- **Priorität:** Bei der nächsten RLS-Änderung mit erledigen.
-
-#### BUG-8: Projektlisten sind auf dem Smartphone zentriert
-- **Severity:** Low
-- **Beschreibung:** Die Aufzählungspunkte stehen links, der Text in der Mitte.
-- **Priorität:** Zusammen mit BUG-2 beheben.
-
-Der frühere BUG-1 (Button nach dem Sole-Owner-Fehler) ist überholt, weil es diese Sperre nicht mehr gibt. Dass auch das normale Löschen eines Projekts seine Dateien nicht entfernt, wird mit PROJ-26 gelöst.
-
-### Automatische Tests
-
-- Unit-Tests: 649 von 649 bestanden
-- Datenbank mit PGlite: 51 von 51 Szenarien bestanden
-- Echte Löschung gegen Stage (`tests/PROJ-3-konto-loeschen.spec.ts`, nur mit `E2E_ACCOUNT_DELETION=1`): 21 von 21, davon 3 als bekannte Fehler markiert
-- E2E-Regression Chromium: 134 bestanden, 23 übersprungen, 0 fehlgeschlagen
-
-**Nicht geprüft:** Firefox und Safari (auf diesem Mac nicht lauffähig, Smartphone und Tablet nur als Chromium-Ansicht), die tatsächliche Zustellung der Nachfolge-Mail und der Ablauf auf `stage-app.narravit.de`, weil der Code noch nicht deployed ist.
-
-### Summary
-
-- **Acceptance Criteria:** 15 von 16 bestanden
-- **Bugs:** 7 offen (0 Critical, 1 High, 3 Medium, 3 Low)
-- **Security:** Kernschutz bestanden, 2 Hinweise offen (BUG-6, BUG-7)
-- **Production Ready:** NEIN
-- **Empfehlung:** Erst BUG-2 beheben, sinnvollerweise zusammen mit BUG-3, BUG-5 und BUG-8, dann erneut `/qa`
-
-### Nachbesserung 2026-11-22
-
-Jakob: alle Bugs beheben und sinnvoll auf Projekte verteilen.
-
-| Bug | Stand |
-|---|---|
-| BUG-2 Kopfzeile | Behoben: Alle Lösch-Dialoge und die Mitglieder-Dialoge liegen über der Kopfzeile. Im Test auf 375 und 768 px bestätigt |
-| BUG-3 Alte Fehlermeldung | Behoben und getestet |
-| BUG-4 Nie angenommene Geschenke | Verschoben nach **PROJ-28**. Entscheidung Jakob: Projekte laufen mit dem Projektzugang aus |
-| BUG-5 Kontrast | Behoben und per Test auf mindestens 4,5:1 abgesichert |
-| BUG-6 Identitätsprüfung | Bewusst nicht umgesetzt (Jakob, 2026-11-23), es bleibt bei `LÖSCHEN` |
-| BUG-7 Eigentümer-Feld | Behoben: Migration `20261122150000_proj3_protect_project_owner.sql` ist auf Stage aktiv und gegen die echte API getestet |
-| BUG-8 Zentrierte Listen | Behoben und getestet |
-
-**Textänderungen von Jakob:** Der Satz zu gemeinsamen Kapiteln ist entfernt. „Wird gelöscht" nennt jetzt zuerst den Account, danach die Projekte. Die Nachfolge-Auswahl erscheint nur für die einzige Projektleitung eines Projekts mit weiteren Mitgliedern.
-
-**Tests nach der Nachbesserung:** Unit 649 von 649, Datenbank mit PGlite 53 von 53, echte Löschung gegen Stage 23 von 23, E2E-Regression Chromium 134 bestanden, 25 übersprungen (davon 23 die abgesicherte Löschsuite), 0 fehlgeschlagen. Typprüfung und Production-Build sind grün, ESLint meldet 0 Fehler. Nach dem Lauf waren auf Stage keine Testdaten mehr vorhanden, das QA-Konto ist unberührt.
-
-**Ergebnis:** 16 von 16 Kriterien bestanden, keine offenen Critical- oder High-Bugs in PROJ-3. **Status: Approved.**
-
-**Weiterhin nicht geprüft:** die tatsächliche Zustellung der Nachfolge-Mail, Firefox und Safari, der Ablauf auf `stage-app.narravit.de` (Code noch nicht deployed) und zwei wirklich zeitgleiche `deleteUser`-Aufrufe. Vor dem Go-live offen bleiben PROJ-26, PROJ-27, PROJ-28 und die Identitätsprüfung in PROJ-19.
-
-## Deployment
-
-**Deployed:** 2026-05-17
-**Branch:** stage → Vercel Preview
-**Commits:** `e36fd38` (feat), `eca4809` (QA tests), `0269986` (UI polish + banner)
-**Build:** ✅ `next build` passed (TypeScript clean, all 13 routes generated)
-**Pre-flight:** 17/17 Playwright E2E tests green on stage
+## Offene Punkte
+- Regel für eine erzählende Person ohne Konto beim Konto-Löschen folgt mit PROJ-12.
+- Entscheidung Jakob (2026-11-23, BUG-6): Vor dem Löschen gibt es keine erneute Identitätsprüfung. Es bleibt bei der Eingabe von `LÖSCHEN`, das Risiko ist bewusst akzeptiert.
+- Nicht geprüft: Zustellung der Nachfolge-Mail, Firefox und Safari, zwei wirklich zeitgleiche `deleteUser`-Aufrufe.

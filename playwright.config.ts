@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
+import { testServerEnv } from './tests/helpers/server-env.mjs'
 
 export default defineConfig({
   testDir: './tests',
@@ -12,7 +13,7 @@ export default defineConfig({
   reporter: 'html',
   globalSetup: './tests/global-setup.ts',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3000',
     trace: 'on-first-retry',
   },
   projects: [
@@ -23,22 +24,6 @@ export default defineConfig({
     command: 'npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
-    env: {
-      // Dummy-Werte für PROJ-6 Webhook-Tests, damit die Route ihre
-      // 3-Linien-Verteidigung (Sig → Idempotenz → Service-Role) lokal
-      // durchläuft, ohne dass echte Stripe/Supabase-Calls passieren.
-      // Echte Stripe-Roundtrips werden manuell gegen Stage getestet.
-      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ?? 'sk_test_e2e_dummy',
-      STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET ?? 'whsec_e2e_dummy',
-      STRIPE_PRICE_ID_INITIAL: process.env.STRIPE_PRICE_ID_INITIAL ?? 'price_e2e_initial',
-      STRIPE_PRICE_ID_RENEWAL: process.env.STRIPE_PRICE_ID_RENEWAL ?? 'price_e2e_renewal',
-      // PROJ-17: Alle Suites laufen von derselben IP und würden sich gegenseitig
-      // ins Limit bringen. Die Limits selbst prüft die eigene Suite mit
-      // `E2E_RATE_LIMIT=1 npx playwright test tests/PROJ-17-rate-limiting.spec.ts`.
-      RATE_LIMIT_DISABLED: process.env.E2E_RATE_LIMIT === '1' ? 'false' : 'true',
-      // Öffentlicher Testschlüssel von Cloudflare, die Prüfung besteht immer.
-      // Stage-Supabase nutzt den passenden Test-Secret-Key.
-      NEXT_PUBLIC_TURNSTILE_SITE_KEY: '1x00000000000000000000AA',
-    },
+    env: testServerEnv({ rateLimit: process.env.E2E_RATE_LIMIT === '1' }),
   },
 })

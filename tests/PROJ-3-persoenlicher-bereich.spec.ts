@@ -86,6 +86,8 @@ test.describe("PROJ-3 — Sicherheit", () => {
   });
 
   test("AC-14: Passwort-zurücksetzen zeigt Bestätigungshinweis nach Klick", async ({ page }) => {
+    // PROJ-31: Der Klick verschickt eine echte Mail an das QA-Konto.
+    test.skip(process.env.E2E_REAL_MAIL !== "1", "Nur mit E2E_REAL_MAIL=1");
     await page.goto("/persoenlicher-bereich");
     await waitForPage(page);
     await page.getByRole("button", { name: "Passwort zurücksetzen" }).click();

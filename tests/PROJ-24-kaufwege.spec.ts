@@ -1,9 +1,8 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
 import Stripe from "stripe";
+import { accessToken, createTestAccount, readEnvLocal, signIn, STAGE_HOST } from "./helpers/stage";
 
 // PROJ-24 — Kontaktdaten auf allen Kaufwegen, gegen Stage und den lokalen Webhook.
 //
@@ -16,7 +15,6 @@ import Stripe from "stripe";
 // Lokal gibt es keinen Mail-Schlüssel, deshalb geht auch keine Mail hinaus.
 
 const ENABLED = process.env.E2E_PURCHASE === "1";
-const STAGE_HOST = "kdjhxqitfxnsavhiafdn.supabase.co";
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "whsec_e2e_dummy";
 const TEST_EMAIL_PREFIX = "e2e-kaufwege-";
 const RUN_ID = crypto.randomBytes(4).toString("hex");
@@ -33,27 +31,11 @@ const accounts: Account[] = [];
 const sessions: string[] = [];
 const drafts: string[] = [];
 
-function readEnvLocal(): Record<string, string> {
-  const values: Record<string, string> = {};
-  const content = fs.readFileSync(path.join(process.cwd(), ".env.local"), "utf8");
-  for (const line of content.split(/\r?\n/)) {
-    const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (match) values[match[1]] = match[2].trim().replace(/^['"]|['"]$/g, "");
-  }
-  return values;
-}
-
 async function createAccount(label: string): Promise<Account> {
-  const email = `${TEST_EMAIL_PREFIX}${label}-${RUN_ID}@example.test`;
-  const password = `${crypto.randomBytes(18).toString("base64url")}aA1!`;
-  const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { full_name: `Test ${label}` },
+  const account = await createTestAccount(admin, {
+    email: `${TEST_EMAIL_PREFIX}${label}-${RUN_ID}@example.test`,
+    name: `Test ${label}`,
   });
-  if (error || !data.user) throw new Error(`createUser failed: ${error?.message}`);
-  const account = { id: data.user.id, email, password };
   accounts.push(account);
   return account;
 }
@@ -149,37 +131,6 @@ async function draftOf(id: string) {
     .eq("id", id)
     .maybeSingle();
   return data;
-}
-
-async function signIn(page: Page, account: Account, target = "/anmelden"): Promise<void> {
-  await page.goto(target);
-  await page.locator('input[name="email"]').fill(account.email);
-  await page.locator('input[name="password"]').fill(account.password);
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () =>
-            (document.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement | null)
-              ?.value.length ?? 0,
-        ),
-      { timeout: 20_000 },
-    )
-    .toBeGreaterThan(0);
-  await page.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.includes("/anmelden"), { timeout: 45_000 });
-}
-
-function accessToken(cookies: Array<{ name: string; value: string }>): string {
-  const parts = cookies
-    .filter((cookie) => /^sb-.+-auth-token(\.\d+)?$/.test(cookie.name))
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
-    .map((cookie) => cookie.value)
-    .join("");
-  const raw = parts.startsWith("base64-")
-    ? Buffer.from(parts.slice("base64-".length), "base64url").toString("utf8")
-    : decodeURIComponent(parts);
-  return (JSON.parse(raw) as { access_token: string }).access_token;
 }
 
 test.describe("PROJ-24 — Kontaktdaten auf allen Kaufwegen (nur Stage)", () => {

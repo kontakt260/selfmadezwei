@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { waitForPage } from "./helpers/page-ready";
+import { accessToken, createTestAccount, readEnvLocal, restRequest, signIn, STAGE_HOST } from "./helpers/stage";
 
 // PROJ-3 — echte Kontolöschung gegen die Stage-Datenbank.
 //
@@ -16,7 +17,6 @@ import { waitForPage } from "./helpers/page-ready";
 // entfernt, auch wenn ein Test scheitert.
 
 const ENABLED = process.env.E2E_ACCOUNT_DELETION === "1";
-const STAGE_HOST = "kdjhxqitfxnsavhiafdn.supabase.co";
 const TEST_EMAIL_PREFIX = "e2e-konto-";
 const SCREENSHOT_DIR = process.env.E2E_SCREENSHOT_DIR;
 
@@ -54,27 +54,11 @@ const paymentIds: string[] = [];
 const projectIds = new Set<string>();
 const uploaded: Array<{ bucket: string; path: string }> = [];
 
-function readEnvLocal(): Record<string, string> {
-  const values: Record<string, string> = {};
-  const content = fs.readFileSync(path.join(process.cwd(), ".env.local"), "utf8");
-  for (const line of content.split(/\r?\n/)) {
-    const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (match) values[match[1]] = match[2].trim().replace(/^['"]|['"]$/g, "");
-  }
-  return values;
-}
-
 async function createAccount(label: string, name: string): Promise<Account> {
-  const email = `${TEST_EMAIL_PREFIX}${label}-${RUN_ID}@example.test`;
-  const password = `${crypto.randomBytes(18).toString("base64url")}aA1!`;
-  const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { full_name: name },
+  return createTestAccount(admin, {
+    email: `${TEST_EMAIL_PREFIX}${label}-${RUN_ID}@example.test`,
+    name: name,
   });
-  if (error || !data.user) throw new Error(`createUser failed: ${error?.message}`);
-  return { id: data.user.id, email, password, name };
 }
 
 let memberClock = 0;
@@ -167,48 +151,8 @@ const leave = (projectId: string, account: Account, successor: Account | null = 
     p_successor_user_id: successor?.id ?? null,
   });
 
-async function signIn(page: Page, account: Account): Promise<void> {
-  await page.goto("/anmelden");
-  await page.locator('input[name="email"]').fill(account.email);
-  await page.locator('input[name="password"]').fill(account.password);
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () =>
-            (document.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement | null)
-              ?.value.length ?? 0,
-        ),
-      { timeout: 20_000 },
-    )
-    .toBeGreaterThan(0);
-  await page.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.includes("/anmelden"), { timeout: 45_000 });
-}
-
-function accessToken(cookies: Array<{ name: string; value: string }>): string {
-  const parts = cookies
-    .filter((cookie) => /^sb-.+-auth-token(\.\d+)?$/.test(cookie.name))
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
-    .map((cookie) => cookie.value)
-    .join("");
-  const raw = parts.startsWith("base64-")
-    ? Buffer.from(parts.slice("base64-".length), "base64url").toString("utf8")
-    : decodeURIComponent(parts);
-  return (JSON.parse(raw) as { access_token: string }).access_token;
-}
-
 function rest(pathname: string, init: RequestInit, token?: string): Promise<Response> {
-  return fetch(`${supabaseUrl}/rest/v1/${pathname}`, {
-    ...init,
-    headers: {
-      apikey: anonKey,
-      Authorization: `Bearer ${token ?? anonKey}`,
-      "Content-Type": "application/json",
-      Prefer: "return=minimal",
-      ...(init.headers ?? {}),
-    },
-  });
+  return restRequest({ supabaseUrl, anonKey, prefer: "return=minimal" }, pathname, init, token);
 }
 
 async function openDeleteDialog(page: Page, account: Account) {

@@ -1,4 +1,6 @@
 import { expect, type Browser, type Page } from "@playwright/test";
+import { createClient } from "@supabase/supabase-js";
+import { assertStage, readEnvLocal } from "./stage";
 
 // Gemeinsame Konstanten + Helfer für das QA-Testprojekt in der Stage-DB.
 // Alle E2E-Suites teilen sich dieses eine Projekt — wer daran etwas
@@ -32,34 +34,16 @@ export async function restoreQaProjectTitle(browser: Browser) {
   }
 }
 
-// Löscht Kapitel des QA-Projekts über die Projektübersicht — alle, oder nur
-// die mit dem angegebenen Titel.
-//
-// Wartet pro Kapitel auf die Antwort der Lösch-Anfrage. Ohne dieses Warten
-// verschwindet die Zeile zwar sofort aus der Liste, aber ein direkt danach
-// geschlossener Browser-Kontext bricht die Anfrage ab — das Kapitel bleibt
-// in der Datenbank und verfälscht nachfolgende Suites (z. B. die
-// Seitenzahl-Erwartung in PROJ-7).
-export async function deleteQaChapters(page: Page, title?: string): Promise<void> {
-  const name = title ? `Kapitel „${title}" löschen` : /Kapitel „.*" löschen/;
-  for (let guard = 0; guard < 30; guard++) {
-    await page.goto(`/projektuebersicht/${QA_PROJECT_ID}`);
-    await page.waitForLoadState("networkidle");
-    // PROJ-30: Hinter der Ladeansicht erscheint der Inhalt erst kurz nach `load`.
-    await page.locator("main h1").first().waitFor();
-    const trigger = page.getByRole("button", { name });
-    if ((await trigger.count()) === 0) return;
-    await trigger.first().click();
-    const confirm = page.getByRole("button", { name: /Endgültig löschen/ });
-    await expect(confirm).toBeEnabled({ timeout: 10_000 }); // 3-s-Countdown
-    const deleted = page.waitForResponse(
-      (response) =>
-        response.request().method() === "POST" &&
-        response.request().headers()["next-action"] !== undefined,
-      { timeout: 15_000 },
-    );
-    await confirm.click();
-    await deleted;
-  }
-  throw new Error("QA-Kapitel ließen sich nicht löschen.");
+// Löscht Kapitel des QA-Projekts direkt in der Datenbank, alle oder nur die mit
+// dem angegebenen Titel. PROJ-31: Das ist reines Aufräumen zwischen den Suites.
+// Der Löschdialog mit seinem Countdown hat eigene Tests (PROJ-4, PROJ-26).
+export async function deleteQaChapters(_page: Page, title?: string): Promise<void> {
+  const env = readEnvLocal();
+  assertStage(env);
+  const admin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const query = admin.from("chapters").delete().eq("project_id", QA_PROJECT_ID);
+  const { error } = await (title ? query.eq("title", title) : query);
+  if (error) throw new Error(`QA-Kapitel ließen sich nicht löschen: ${error.message}`);
 }

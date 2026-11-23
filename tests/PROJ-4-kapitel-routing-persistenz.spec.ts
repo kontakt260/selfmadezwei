@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { QA_PROJECT_TITLE, restoreQaProjectTitle } from "./helpers/qa-project";
+import { QA_PROJECT_TITLE, restoreQaProjectTitle, deleteQaChapters } from "./helpers/qa-project";
 import { waitForPage } from "./helpers/page-ready";
 
 // All tests run as the QA test user (qa-test@narravit.de), role: projektleiter.
@@ -18,24 +18,7 @@ test.beforeAll(async ({ browser }) => {
   await restoreQaProjectTitle(browser);
   const ctx = await browser.newContext({ storageState: "tests/.auth/user.json" });
   const p = await ctx.newPage();
-  await p.goto(PROJECT_URL);
-  await p.waitForLoadState("networkidle");
-  // PROJ-30: Hinter der Ladeansicht erscheint der Inhalt erst kurz nach `load`.
-  await p.locator("main h1").first().waitFor();
-  const deleteButtons = p.getByRole("button", { name: /Kapitel „.*" löschen/ });
-  let count = await deleteButtons.count();
-  console.log(`Starting PROJ-4 cleanup: found ${count} leftover chapters.`);
-  let deletedCount = 0;
-  while (count > 0) {
-    await deleteButtons.first().click();
-    await p.waitForTimeout(3500);
-    await p.getByRole("button", { name: /Endgültig löschen/ }).click();
-    await p.waitForTimeout(1000);
-    deletedCount++;
-    console.log(`Deleted chapter #${deletedCount}`);
-    count = await deleteButtons.count();
-  }
-  console.log(`PROJ-4 cleanup finished. Deleted ${deletedCount} chapters.`);
+  await deleteQaChapters(p);
   await ctx.close();
 });
 

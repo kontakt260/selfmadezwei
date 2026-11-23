@@ -1,5 +1,7 @@
 # PROJ-26: Papierkorb (serverseitig, 14 Tage)
 
+> **Kurzfassung (PROJ-31).** Das vollständige Tech Design, Bau-Notizen, QA-Protokolle und der Deployment-Verlauf stehen unverändert im [Archiv](archive/PROJ-26-papierkorb.md).
+
 ## Status: Approved
 **Created:** 2026-11-22
 **Last Updated:** 2026-11-22
@@ -115,203 +117,21 @@
 - **Datenschutzerklärung (Pflicht):** Sie muss nennen, dass gelöschte Inhalte bis zu 14 Tage gespeichert bleiben (Art. 13 Abs. 2 lit. a DSGVO).
 - **Lösch-Dialoge (Risiko, von Jakob so entschieden):** Sie sagen „unwiderruflich" und „Eine Wiederherstellung ist nicht möglich", obwohl der Support 14 Tage lang wiederherstellen kann. Das widerspricht der Datenschutzerklärung und kann gegen das Transparenzgebot verstoßen (Art. 5 Abs. 1 lit. a DSGVO). Bei der anwaltlichen Prüfung gezielt vorlegen. Eine wahre Formulierung ohne Hinweis auf den Papierkorb wäre: „Sie können das Kapitel danach nicht selbst wiederherstellen."
 
----
-<!-- Sections below are added by subsequent skills -->
-
-## Tech Design (Solution Architect)
-
-> Von Jakob am 2026-11-22 freigegeben, inklusive der neuen Sperrregel für Bilder. Die Kernlogik wurde mit 53 Prüfungen in einer lokalen Testdatenbank auf den echten Migrationen getestet. Auf Stage ist noch nichts eingespielt.
-
-### A) Ablauf
-
-```
-Kunde klickt „Endgültig löschen" (Dialoge unverändert)
-|
-+-- Kapitel
-|   +-- Datenbank legt eine vollständige Kopie in die geschützte Ablage
-|   +-- Kapitel verschwindet für alle, Seitenzahlen rechnen sich neu
-|   +-- Bilder bleiben liegen, sind aber sofort gesperrt
-|
-+-- Projekt (nur Projektleitung)
-    +-- Datenbank bricht die echte Löschung ab
-    +-- Mitgliederliste wandert in die geschützte Ablage
-    +-- Ohne Mitgliedschaft hat niemand mehr Zugriff auf
-        Projekt, Kapitel, Cover, Bilder und Zugangsdaten
-
-Täglicher Cron (läuft schon)
-+-- Löscht fällige Inhalte endgültig
-+-- Entfernt ihre Dateien, wiederholt Fehlversuche
-
-Support (Supabase SQL-Editor, Schritt-für-Schritt-Anleitung)
-+-- Fall suchen, ohne Kapiteltext zu sehen
-+-- Kapitel oder Projekt wiederherstellen
-+-- Auf Wunsch sofort endgültig löschen
-```
-
-### B) Datenmodell
-
-**Papierkorb für Kapitel:** Kapitel-ID, Projekt, Titel, vollständige Kopie des Kapitels, Mitschreibende, Löschzeitpunkt, löschende Person, Fälligkeit der endgültigen Löschung.
-
-**Papierkorb für Projekte:** Projekt, Löschzeitpunkt, löschende Person, Fälligkeit. Das Projekt selbst bleibt mit allen Inhalten an seinem Platz.
-
-**Mitglieder gelöschter Projekte:** Person und Rolle zum Zeitpunkt der Löschung. Löscht jemand das Konto, verschwindet der Eintrag automatisch.
-
-**Aufräumliste für Dateien:** Die Liste aus PROJ-3 lernt zusätzlich einzelne Kapitel.
-
-Kunden haben auf alle diese Daten keinerlei Zugriff, weder lesend noch schreibend. Nur der Server und der Support kommen daran.
+## Technische Entscheidungen
+_Kurzform. Die vollständige Begründung steht im Archiv._
 
 ### C) Technische Entscheidungen
 
-1. **Die Datenbank fängt das Löschen ab, nicht die App.** So landet auch eine Löschung, die unsere Buttons umgeht, etwa über die Browser-Konsole, sicher im Papierkorb. Die Lösch-Dialoge und Lösch-Aktionen bleiben fast unverändert.
-2. **Ein gelöschtes Projekt verliert seine Mitglieder, statt kopiert zu werden.** Alle Zugriffsregeln hängen an der Mitgliedschaft. Damit ist das ganze Projekt in einem Schritt gesperrt, und beim Wiederherstellen fehlt nichts.
-3. **Bilder werden gesperrt, nicht verschoben.** Das weicht vom ersten Vorschlag ab. Verschieben liefe in mehreren Schritten und könnte auf halbem Weg scheitern. Die Sperre greift im selben Moment wie die Löschung, und beim Wiederherstellen ist alles sofort wieder da. Das normale Entfernen eines Bildes im Editor bleibt dadurch wie heute.
-4. **Nur Kunden-Logins landen im Papierkorb.** Löschungen durch den Server sind echt. Das braucht das Konto-Löschen, die endgültige Löschung und das Aufräumen nach gescheiterten Käufen.
+1. **Die Datenbank fängt das Löschen ab, nicht die App.** So landet auch eine Löschung, die unsere Buttons umgeht, etwa über die Browser-Konsole, sicher im Papierkorb.
+2. **Ein gelöschtes Projekt verliert seine Mitglieder, statt kopiert zu werden.** Alle Zugriffsregeln hängen an der Mitgliedschaft.
+3. **Bilder werden gesperrt, nicht verschoben.** Das weicht vom ersten Vorschlag ab.
+4. **Nur Kunden-Logins landen im Papierkorb.** Löschungen durch den Server sind echt.
 5. **Keine Admin-Oberfläche.** Der Support nutzt vorbereitete, geschützte Datenbank-Funktionen und eine Anleitung in `docs/production/support-papierkorb.md`.
 
-### D) Änderungen an Zugriffsregeln (von Jakob freigegeben)
-
-- **Neu:** eine zusätzliche Sperrregel für Bilder von Kapiteln im Papierkorb
-- **Neu:** drei Tabellen ohne jeden Kundenzugriff
-- **Keine bestehende RLS-Regel wird umgeschrieben oder gelockert**
-
-### E) Lücken, die dieses Feature mit schließt
-
-| Lücke | Folge ohne Fix |
-|---|---|
-| Konto-Löschen hält ein gelöschtes gemeinsames Projekt für ein Einzelprojekt (im Test bestätigt) | Das Projekt wäre sofort endgültig weg, auch für die anderen Mitglieder |
-| Autosave meldet Erfolg, wenn das Kapitel inzwischen gelöscht wurde (besteht schon heute) | Eine Person schreibt weiter und verliert ihren Text unbemerkt |
-| Einladungen fügen Mitglieder über den Server hinzu | Eine alte Einladung könnte ein gelöschtes Projekt wieder öffnen |
-| Mitglieder können ein Kapitel in ein anderes eigenes Projekt verschieben (besteht schon heute) | Texte könnten am Papierkorb vorbei aus einem Projekt verschwinden |
-| Ein neues Kapitel könnte die ID eines gelöschten Kapitels bekommen | Die Wiederherstellung würde scheitern |
-| Schutz der letzten Projektleitung blockiert das Sperren eines Projekts | Projekte ließen sich nicht in den Papierkorb legen |
-| Wartende Mails und späte Verlängerungszahlungen | Mails zu gelöschten Projekten. Die Zahlung bleibt gebucht, der Support bekommt einen Hinweis |
-
-### F) Grenzen
-
-- Der Papierkorb schützt vor dem **Löschen**. Überschreibt ein Mitglied den Text eines Kapitels oder entfernt ein einzelnes Bild, hilft er nicht. Das gehört zu PROJ-15 (Versionen).
-- Bereits geöffnete Bildlinks funktionieren bis zu einer Stunde weiter.
-- Die endgültige Löschung läuft einmal täglich, also nach 14 Tagen bis spätestens rund 15 Tagen.
-
-### G) Abhängigkeiten und Einspielen
-
-- **Neue Pakete:** keine
-- **Neue Env-Variablen:** keine
-- **Migration:** eine, von Jakob im SQL-Editor, reines ASCII. Auf Stage und später in Production **vor** dem Code-Deploy.
-- **Tests:** Datenbank-Szenarien, Unit-Tests für das Aufräumen, E2E für Löschen, Autosave und Einladungen
-
-## Implementation Notes (Backend, 2026-11-22)
-
-**Datenbank:** Migration `20261122160000_proj26_trash.sql` mit den Papierkorb-Tabellen, dem Abfangen von Kunden-Löschungen, der Sperrregel für Bilder, den Support-Funktionen und dem täglichen Löschlauf. Angepasst sind der Schutz der letzten Projektleitung, die Einladungs-Prüfung und der Konto-Lösch-Ablauf. Hilfsfunktionen liegen im Schema `private`, das die API nicht erreicht.
-
-**App:**
-- Autosave meldet einen Fehler, wenn das Kapitel inzwischen gelöscht wurde
-- Täglicher Cron löscht fällige Inhalte und entfernt ihre Dateien
-- Wartende Einladungs-, Verlängerungs-Info- und Projektleitungs-Mails zu gelöschten Projekten entfallen, Zahlungsbestätigungen gehen weiter raus
-- Zahlung für ein gelöschtes Projekt bleibt gebucht, der Support bekommt eine interne Mail
-
-**Support:** Anleitung in `docs/production/support-papierkorb.md`.
-
-**Abweichung vom Design:** Keine. Die Lösch-Dialoge und Lösch-Aktionen sind unverändert.
-
-**Geprüft:** 77 Datenbank-Szenarien lokal, die 53 Szenarien aus PROJ-3 weiterhin grün, 714 Unit-Tests, Typecheck, ESLint und Production-Build. Migration auf Stage eingespielt, Tabellen, Rechte, Trigger und Sperrregel dort kontrolliert. E2E-Regression auf dem Production-Build gegen Stage: 148 bestanden, 25 übersprungen, 0 fehlgeschlagen (ohne Mail-Test AC-14). Dabei landeten 10 echt gelöschte Test-Kapitel vollständig im Papierkorb.
-
-**Nachtrag nach der QA:** Migration `20261122170000_proj26_trash_people.sql` hält Mitglieder und Mitschreibende gelöschter Kapitel in einer eigenen Tabelle fest. Die Support-Suche zeigt zusätzlich `contributor_emails`. Der Webhook bucht Zahlungen auch dann, wenn Projekt oder Konto nicht mehr existieren. Die Kapitelliste übernimmt nach fremden Änderungen den Stand vom Server.
-
-## QA Test Results
-
-**Getestet:** 2026-11-22
-**Umgebung:** lokaler Production-Build gegen Stage-Datenbank und echten Stage-Dateispeicher, Chromium
-**Tester:** QA Engineer (AI)
-**Suite:** `E2E_TRASH=1 npx playwright test tests/PROJ-26-papierkorb.spec.ts --project=chromium`. Sie nutzt nur eigene Wegwerf-Konten und räumt danach auf.
-
-### Acceptance Criteria
-
-| Bereich | Kriterien | Ergebnis |
-|---|---|---|
-| A. Löschen | AC-1 bis AC-6 | bestanden |
-| B. Unsichtbar für Kunden | AC-7 bis AC-13 | bestanden |
-| C. Support | AC-14 bis AC-20 | bestanden, AC-16 nach Fix von BUG-1 |
-| D. Endgültiges Löschen | AC-21 bis AC-24 | bestanden |
-| E. Konto-Löschen | AC-25 bis AC-28 | bestanden, AC-28 nach Fix von BUG-2 |
-
-**Ergebnis: 28 von 28 bestanden.**
-
-### Edge Cases
-
-- [x] Zwei Personen im selben Kapitel: Autosave zeigt „Fehler beim Speichern" und holt das Kapitel nicht zurück
-- [x] Kapitel doppelt gelöscht: ein Eintrag, die erste Löschung zählt
-- [x] Letztes Projekt gelöscht: Person landet im Onboarding
-- [x] Offene Einladung zu gelöschtem Projekt: ungültig, nach Wiederherstellung wieder gültig
-- [x] Letzte Projektleitung löscht ihr Konto: Wiederherstellen verlangt eine neue Leitung
-- [x] Kapitel im gelöschten Projekt: lässt sich erst nach dem Projekt wiederherstellen
-- [x] Zugang: Das Ablaufdatum bleibt beim Wiederherstellen gleich
-- [x] Zahlung für ein Projekt im Papierkorb: bleibt gebucht, Support-Hinweis (Unit-Test)
-- [x] Reihenfolge in einem veralteten Tab: verständliche Meldung, die Liste lädt neu (BUG-5)
-- [x] Zahlung für ein bereits endgültig gelöschtes Projekt: wird gebucht, Support soll erstatten (BUG-3, Unit-Test)
-- [x] Person wird vor dem Löschen entfernt: bleibt als Mitschreibende erkennbar
-
-### Sicherheit (Red Team)
-
-- [x] Kunden und anonyme Aufrufe erreichen weder Papierkorb-Tabellen noch Support-Funktionen noch das Schema `private`
-- [x] GraphQL zeigt den Papierkorb nicht, Löschen darüber geht nicht am Papierkorb vorbei
-- [x] Gesperrte Bilder: Auflisten, Laden, Link erzeugen, Hochladen, Überschreiben, Löschen, Kopieren und Verschieben scheitern im echten Speicher
-- [x] Gelöschte Kapitel-ID lässt sich nicht übernehmen, Kapitel lassen sich nicht in andere Projekte verschieben, auch nicht per Upsert
-- [x] Nach dem Löschen eines Projekts kommt niemand wieder hinein, auch nicht über Einladungen
-- [x] Gleichzeitige Zugriffe: Einladung gegen Löschen, doppeltes Löschen, Autosave gegen Löschen, Wiederherstellen gegen endgültiges Löschen, Projekt-Löschen gegen Konto-Löschen
-- [x] Supabase-Advisors: keine neue Warnung, nur der erwartete Hinweis auf Tabellen ohne Policies
-- [x] Client-Bundle enthält das Wort „Papierkorb" nicht
-
-### Bugs
-
-#### BUG-1: Support erkennt eine später entfernte Person nicht als Mitglied
-- **Severity:** Medium
-- **Schritte:** Projektleitung löscht das Kapitel einer mitschreibenden Person und entfernt sie danach aus dem Projekt. Die Person schreibt dem Support.
-- **Erwartet (AC-16):** `trash_find` nennt sie als Mitglied zum Zeitpunkt der Löschung. **Tatsächlich:** Bei Kapiteln zeigt die Suche nur die heutigen Mitglieder. Laut Anleitung müsste der Support die Anfrage ablehnen, obwohl das genau der Streitfall ist.
-- **Status:** Behoben am 2026-11-22. Kapitel merken sich die Mitglieder beim Löschen, die Suche nennt zusätzlich alle Mitschreibenden. Auf Stage geprüft.
-
-#### BUG-2: Nutzer-ID bleibt nach dem Konto-Löschen im Papierkorb
-- **Severity:** Low
-- **Beschreibung:** Die Liste der Mitschreibenden in `trash_chapters` behält die ID eines gelöschten Kontos bis zu 14 Tage. Name und E-Mail sind weg.
-- **Status:** Behoben am 2026-11-22. Die Einträge verschwinden jetzt mit dem Konto. Auf Stage geprüft.
-
-#### BUG-3: Zahlung für ein endgültig gelöschtes Projekt wird nicht gebucht
-- **Severity:** Low
-- **Beschreibung:** Der Webhook scheitert dann am Datenbank-Verweis auf das Projekt, antwortet mit Fehler, und der Support bekommt keinen Hinweis. Das Geld ist bei Stripe eingegangen. Nur möglich, wenn während eines offenen Checkouts das Projekt sofort endgültig gelöscht wird. Aus Code und Datenbank abgeleitet, nicht mit einer echten Zahlung ausgelöst.
-- **Status:** Behoben am 2026-11-22. Die Zahlung wird gebucht, und der Support bekommt die Bitte um Erstattung. Existiert nur das Konto nicht mehr, bekommt das Projekt die Zeit trotzdem. Per Unit-Test geprüft, nicht mit einer echten Zahlung.
-
-#### BUG-4: Umbenennen eines gelöschten Kapitels meldet Erfolg
-- **Severity:** Low
-- **Beschreibung:** In einem veralteten Tab läuft das Umbenennen ohne Fehlermeldung ins Leere.
-- **Status:** Behoben am 2026-11-22, im echten Browser geprüft.
-
-#### BUG-5: Reihenfolge in einem veralteten Tab zeigt „Sicherheitsfehler"
-- **Severity:** Low
-- **Beschreibung:** Hat jemand anderes ein Kapitel gelöscht, scheitert das Sortieren mit „Sicherheitsfehler: Ungültige Kapitel-IDs.", und die Liste bleibt bis zum Neuladen veraltet.
-- **Status:** Behoben am 2026-11-22, im echten Browser geprüft.
-
-### Automatische Tests
-
-- Unit-Tests: 719 von 719
-- PROJ-26 gegen Stage: 29 von 29
-- Komplette E2E-Regression inklusive echter Konto-Löschung: 171 bestanden, 30 übersprungen, 0 fehlgeschlagen. Übersprungen ist unter anderem die PROJ-26-Suite, die separat lief. Der Mail-Test AC-14 aus PROJ-3 blieb außen vor
-- Lokale Datenbank-Szenarien: 89 für PROJ-26, 53 für PROJ-3
-- Supabase-Advisors nach beiden Migrationen: keine neue Warnung
-
-**Nicht geprüft:** Firefox und Safari, Handy und Tablet (die Oberfläche ist unverändert), der echte Cron-Aufruf (er könnte echte Erinnerungen verschicken, deshalb liefen Löschlauf und Datei-Aufräumen direkt), die Zustellung der Support-Mail, eine echte Stripe-Zahlung.
-
-### Nebenbefunde außerhalb von PROJ-26
-
-- Auf Stage liegen 15 Dateien aus dem Mai ohne zugehöriges Projekt. Sie bleiben unangetastet, bis Jakob das Aufräumen freigibt.
-- Auf Stage läuft kein automatischer Cron. Jeder E2E-Lauf lässt deshalb rund 10 Test-Kapitel im Papierkorb liegen.
-- Laut RLS prüfen die Datenbankregeln den Ablauf des Projektzugangs nicht, nur die Server Actions. Ein Mitglied eines abgelaufenen Projekts könnte also direkt über die API weiterschreiben. Nicht ausprobiert, gehört zu PROJ-6.
-
-### Summary
-
-- **Acceptance Criteria:** 28 von 28 bestanden
-- **Bugs:** 5 gefunden, alle behoben
-- **Security:** bestanden
-- **Production Ready:** JA, nach Push auf Stage und einem kurzen Blick auf das Deployment
-- **Empfehlung:** Auf `stage` pushen. Vor Production beide Migrationen vor dem Code einspielen
-
-## Deployment
-_To be added by /deploy_
+## Offene Punkte
+- Nicht geprüft: Firefox und Safari, Handy und Tablet, der echte Cron-Aufruf, die Zustellung der Support-Mail, eine echte Stripe-Zahlung.
+- Auf Stage liegen 15 Dateien aus dem Mai ohne zugehöriges Projekt. Sie bleiben, bis Jakob das Aufräumen freigibt.
+- Vor Production beide Migrationen vor dem Code einspielen.
+- Der Papierkorb schützt nur vor dem Löschen, nicht vor überschriebenem Text oder einzelnen entfernten Bildern (PROJ-15).
+- Geöffnete Bildlinks funktionieren bis zu einer Stunde weiter. Die endgültige Löschung läuft täglich, also nach 14 bis rund 15 Tagen.
+- Auf Stage läuft kein automatischer Cron. E2E-Läufe lassen deshalb Test-Kapitel im Papierkorb liegen.

@@ -1,9 +1,8 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
 import { waitForPage } from "./helpers/page-ready";
+import { accessToken, createTestAccount, readEnvLocal, signIn, STAGE_HOST, storageFileExists } from "./helpers/stage";
 
 // PROJ-28 — QA gegen die echte Stage-Datenbank: Wege am Lesemodus vorbei und
 // der Zustand von Personen, deren letztes Projekt automatisch entfernt wurde.
@@ -14,7 +13,6 @@ import { waitForPage } from "./helpers/page-ready";
 // keine Mails ausgelöst. Ist ein fremdes Projekt fällig, bricht die Suite ab.
 
 const ENABLED = process.env.E2E_RETENTION === "1";
-const STAGE_HOST = "kdjhxqitfxnsavhiafdn.supabase.co";
 const TEST_EMAIL_PREFIX = "e2e-loeschlauf-qa-";
 const RUN_ID = crypto.randomBytes(4).toString("hex");
 const SESSION_PREFIX = `cs_e2e_loeschlauf_qa_${RUN_ID}_`;
@@ -50,28 +48,11 @@ let pageN: Page;
 const accounts: Account[] = [];
 const projects: Project[] = [];
 
-function readEnvLocal(): Record<string, string> {
-  const values: Record<string, string> = {};
-  const content = fs.readFileSync(path.join(process.cwd(), ".env.local"), "utf8");
-  for (const line of content.split(/\r?\n/)) {
-    const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (match) values[match[1]] = match[2].trim().replace(/^['"]|['"]$/g, "");
-  }
-  return values;
-}
-
 async function createAccount(label: string): Promise<Account> {
-  const email = `${TEST_EMAIL_PREFIX}${label}-${RUN_ID}@example.test`;
-  const password = `${crypto.randomBytes(18).toString("base64url")}aA1!`;
-  const name = `Test ${label}`;
-  const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { full_name: name },
+  const account = await createTestAccount(admin, {
+    email: `${TEST_EMAIL_PREFIX}${label}-${RUN_ID}@example.test`,
+    name: `Test ${label}`,
   });
-  if (error || !data.user) throw new Error(`createUser failed: ${error?.message}`);
-  const account = { id: data.user.id, email, password, name };
   accounts.push(account);
   return account;
 }
@@ -144,37 +125,10 @@ async function createProject(
   return project;
 }
 
-async function signIn(context: BrowserContext, account: Account): Promise<Page> {
+async function signInNewPage(context: BrowserContext, account: Account): Promise<Page> {
   const page = await context.newPage();
-  await page.goto("/anmelden");
-  await page.locator('input[name="email"]').fill(account.email);
-  await page.locator('input[name="password"]').fill(account.password);
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () =>
-            (document.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement | null)
-              ?.value.length ?? 0,
-        ),
-      { timeout: 20_000 },
-    )
-    .toBeGreaterThan(0);
-  await page.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.includes("/anmelden"), { timeout: 45_000 });
+  await signIn(page, account);
   return page;
-}
-
-function accessToken(cookies: Array<{ name: string; value: string }>): string {
-  const parts = cookies
-    .filter((cookie) => /^sb-.+-auth-token(\.\d+)?$/.test(cookie.name))
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
-    .map((cookie) => cookie.value)
-    .join("");
-  const raw = parts.startsWith("base64-")
-    ? Buffer.from(parts.slice("base64-".length), "base64").toString("utf8")
-    : decodeURIComponent(parts);
-  return (JSON.parse(raw) as { access_token: string }).access_token;
 }
 
 const asUser = (token: string): SupabaseClient =>
@@ -183,12 +137,8 @@ const asUser = (token: string): SupabaseClient =>
     global: { headers: { Authorization: `Bearer ${token}` } },
   });
 
-async function fileExists(bucket: string, file: string): Promise<boolean> {
-  const folder = file.slice(0, file.lastIndexOf("/"));
-  const name = file.slice(file.lastIndexOf("/") + 1);
-  const { data, error } = await admin.storage.from(bucket).list(folder, { limit: 100 });
-  if (error) throw new Error(error.message);
-  return (data ?? []).some((entry) => entry.name === name);
+function fileExists(bucket: string, file: string): Promise<boolean> {
+  return storageFileExists(admin, bucket, file);
 }
 
 async function chapterIntact(id: string): Promise<boolean> {
@@ -235,7 +185,7 @@ test.describe("PROJ-28 — QA (nur Stage)", () => {
     const open = async (account: Account) => {
       const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
       contexts.push(context);
-      const page = await signIn(context, account);
+      const page = await signInNewPage(context, account);
       return { page, token: accessToken(await context.cookies()) };
     };
     const lead = await open(L);

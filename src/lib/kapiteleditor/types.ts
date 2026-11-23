@@ -29,18 +29,6 @@ export function imagesPerPage(layout: ImageLayout): number {
   return layout === "2-spaltig" ? 4 : 2;
 }
 
-// Anzahl Bilder, die auf den ersten Chunk passen — kann von perPage abweichen
-// wenn z. B. der Erste-Seite-Header bereits Platz wegnimmt.
-export function imageOverflowPages(
-  section: ImageSectionData,
-  firstChunkSize?: number,
-): number {
-  const per = imagesPerPage(section.layout);
-  const first = firstChunkSize ?? per;
-  if (section.images.length <= first) return 0;
-  return 1 + Math.max(0, Math.ceil((section.images.length - first) / per) - 1);
-}
-
 export type SaveState = "idle" | "saving" | "saved" | "error";
 
 export type ChapterDraft = {

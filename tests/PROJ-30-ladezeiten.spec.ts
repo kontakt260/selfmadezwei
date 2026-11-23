@@ -2,14 +2,15 @@ import { test, expect, type Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { readEnvLocal, signIn, STAGE_HOST } from "./helpers/stage";
 
 // PROJ-30 — Lade- und Fehlerverhalten mit einem temporären Konto auf Stage.
 //
 //   E2E_LOADING=1 npx playwright test tests/PROJ-30-ladezeiten.spec.ts --project=chromium --workers=1
 
 const ENABLED = process.env.E2E_LOADING === "1";
-const STAGE_HOST = "kdjhxqitfxnsavhiafdn.supabase.co";
 const RUN_ID = crypto.randomBytes(4).toString("hex");
 const EMAIL = `e2e-proj30-${RUN_ID}@example.test`;
 const PASSWORD = `${crypto.randomBytes(18).toString("base64url")}aA1!`;
@@ -20,18 +21,9 @@ let userId = "";
 let projectId = "";
 let shortChapter = "";
 let longChapter = "";
+const SESSION_FILE = path.join(os.tmpdir(), `e2e-proj30-${RUN_ID}.json`);
 
 test.use({ storageState: { cookies: [], origins: [] } });
-
-function readEnvLocal(): Record<string, string> {
-  const values: Record<string, string> = {};
-  const content = fs.readFileSync(path.join(process.cwd(), ".env.local"), "utf8");
-  for (const line of content.split(/\r?\n/)) {
-    const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (match) values[match[1]] = match[2].trim().replace(/^['"]|['"]$/g, "");
-  }
-  return values;
-}
 
 const doc = (paragraphs: string[]) => ({
   type: "doc",
@@ -39,25 +31,6 @@ const doc = (paragraphs: string[]) => ({
 });
 
 const LONG_PARAGRAPH = "Damals gingen wir jeden Morgen gemeinsam den langen Weg durch das Dorf zur Schule. ".repeat(6);
-
-async function signIn(page: Page) {
-  await page.goto("/anmelden");
-  await page.locator('input[name="email"]').fill(EMAIL);
-  await page.locator('input[name="password"]').fill(PASSWORD);
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () =>
-            (document.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement | null)
-              ?.value.length ?? 0,
-        ),
-      { timeout: 20_000 },
-    )
-    .toBeGreaterThan(0);
-  await page.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.includes("/anmelden"), { timeout: 45_000 });
-}
 
 async function chapterRow(id: string) {
   const { data, error } = await admin
@@ -139,8 +112,10 @@ async function delayNavigations(page: Page, ms: number) {
 test.describe("PROJ-30 — Ladezeiten", () => {
   test.skip(!ENABLED, "Nur mit E2E_LOADING=1, legt temporäre Daten auf Stage an.");
   test.describe.configure({ mode: "serial" });
+  // PROJ-31: Einmal anmelden und die Sitzung für alle Tests wiederverwenden.
+  test.use({ storageState: SESSION_FILE });
 
-  test.beforeAll(async () => {
+  test.beforeAll(async ({ browser }) => {
     const env = readEnvLocal();
     const url = env.NEXT_PUBLIC_SUPABASE_URL;
     if (new URL(url).host !== STAGE_HOST) throw new Error("Diese Suite läuft nur gegen Stage.");
@@ -189,9 +164,15 @@ test.describe("PROJ-30 — Ladezeiten", () => {
     if (chapterError || !chapters) throw new Error(chapterError?.message ?? "keine Kapitel");
     shortChapter = chapters.find((c) => c.title === "Kurzes Kapitel")!.id as string;
     longChapter = chapters.find((c) => c.title === "Langes Kapitel")!.id as string;
+
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    await signIn(await context.newPage(), { email: EMAIL, password: PASSWORD });
+    await context.storageState({ path: SESSION_FILE });
+    await context.close();
   });
 
   test.afterAll(async () => {
+    fs.rmSync(SESSION_FILE, { force: true });
     if (!admin) return;
     if (projectId) {
       await admin.from("mail_log").delete().eq("project_id", projectId);
@@ -200,10 +181,6 @@ test.describe("PROJ-30 — Ladezeiten", () => {
       await admin.from("projects").delete().eq("id", projectId);
     }
     if (userId) await admin.auth.admin.deleteUser(userId);
-  });
-
-  test.beforeEach(async ({ page }) => {
-    await signIn(page);
   });
 
   test("AC-26: Bloßes Öffnen schreibt keinen Text zurück", async ({ page }) => {

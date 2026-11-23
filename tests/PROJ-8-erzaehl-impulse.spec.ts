@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { waitForPage } from "./helpers/page-ready";
+import { deleteQaChapters } from "./helpers/qa-project";
 
 // PROJ-8 — Erzähl-Impulse Browser-Smoke gegen Stage-DB.
 //
@@ -18,23 +19,7 @@ test.use({ storageState: "tests/.auth/user.json" });
 const QA_PROJECT_ID = "cccccccc-0099-0099-0099-000000000099";
 const QA_PROJECT_URL = `/projektuebersicht/${QA_PROJECT_ID}`;
 
-async function wipeAllChaptersInQaProject(p: import("@playwright/test").Page) {
-  await p.goto(QA_PROJECT_URL);
-  await p.waitForLoadState("networkidle");
-  // PROJ-30: Hinter der Ladeansicht erscheint der Inhalt erst kurz nach `load`.
-  await p.locator("main h1").first().waitFor();
-  const anyDelete = p.getByRole("button", { name: /Kapitel „.*" löschen/ });
-  let count = await anyDelete.count();
-  while (count > 0) {
-    await anyDelete.first().click();
-    await p.waitForTimeout(3_500);
-    const confirm = p.getByRole("button", { name: /Endgültig löschen/ });
-    if (!(await confirm.isVisible().catch(() => false))) break;
-    await confirm.click();
-    await p.waitForLoadState("networkidle");
-    count = await anyDelete.count();
-  }
-}
+const wipeAllChaptersInQaProject = (p: import("@playwright/test").Page) => deleteQaChapters(p);
 
 test.beforeAll(async ({ browser }) => {
   test.setTimeout(120_000);

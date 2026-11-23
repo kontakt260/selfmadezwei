@@ -1,5 +1,7 @@
 # PROJ-18: Debug-Telemetrie-Cleanup
 
+> **Kurzfassung (PROJ-31).** Das vollständige Tech Design, Bau-Notizen, QA-Protokolle und der Deployment-Verlauf stehen unverändert im [Archiv](archive/PROJ-18-debug-telemetrie-cleanup.md).
+
 ## Status: Approved
 **Created:** 2026-05-16
 **Last Updated:** 2026-05-16
@@ -9,37 +11,6 @@
 ## Dependencies
 - Keine — reine Bereinigung von vorhandenem Code
 - Empfohlen vor: jedem produktiven Build (auch Stage)
-
-## Problem
-Sieben hart kodierte Debug-Logger-`fetch`-Calls sind über das Repo verteilt. Sie zeigen alle auf einen lokalen Loopback-Endpoint mit fester UUID:
-
-```ts
-fetch("http://127.0.0.1:7800/ingest/fd631e72-4665-4122-b32e-2df0088c7344", { ... }).catch(() => {});
-```
-
-Stellen:
-
-| Datei | Zeile | Kontext |
-|-------|-------|---------|
-| [next.config.ts](../next.config.ts) | 5 | Läuft zur **Build-Zeit** auf Vercel-Build-Maschinen |
-| [src/app/layout.tsx](../src/app/layout.tsx) | 7 | Läuft auf dem Server bei jedem Request |
-| [src/app/onboarding/page.tsx](../src/app/onboarding/page.tsx) | 7, 16, 26 | Server Component — jeder Onboarding-Aufruf |
-| [src/app/onboarding/OnboardingWizard.tsx](../src/app/onboarding/OnboardingWizard.tsx) | 69, 74 | `"use client"` — landet im Browser-Bundle, läuft bei **jedem User** |
-
-### Konkrete Auswirkungen
-
-**Client-Bundle (OnboardingWizard.tsx):**
-- Jeder Endnutzer schickt bei jedem Render `POST http://127.0.0.1:7800/...` mit internem State (`stepIndex`, `currentStep`, `userPresent`-Flag, Projektanzahl)
-- Browser-DevTools-Konsole zeigt Endnutzern dauerhaft Network-Fehler → unprofessioneller Eindruck
-- Hartkodierte UUID `fd631e72-4665-4122-b32e-2df0088c7344` ist im JS-Bundle indizierbar (Source-Map-Leak, GitHub-Code-Search)
-- Theoretisches Risiko: nutzt der User zufällig lokal einen Service auf Port 7800 (eigene Dev-Tools, Tests), bekommt dieser Service unbeabsichtigt Daten
-
-**Server-Side (next.config.ts, layout.tsx, page.tsx):**
-- Production-Server (Vercel) führt Loopback-Fetches bei jedem Render aus → Fehlversuch + Latenz
-- `next.config.ts:5` läuft zur Build-Zeit → kann Build verzögern oder bei Sandboxed-Build-Environments mit blockiertem Loopback zu Timeouts führen
-- Strukturierte Logs (Vercel Functions Logs / Sentry) füllen sich mit Fetch-Errors
-
-**Strategisch:** Echtes Logging gehört in eine ordentliche Telemetrie-Lösung (Sentry → PROJ-13). Diese Debug-Sonden sind weder das eine noch das andere und sollten ersatzlos verschwinden.
 
 ## User Stories
 - Als Endnutzer möchte ich keine fremden Network-Requests aus meinem Browser an Localhost-Ports sehen, damit das Produkt vertrauenswürdig wirkt und meine Daten transparent fließen.
@@ -88,47 +59,5 @@ Stellen:
 - Aufwand minimal (geschätzt < 30 Minuten)
 - Verzögert echte Production-Vorbereitung jeden Tag, an dem es offen ist
 
----
-<!-- Sections below are added by subsequent skills -->
-
-## Tech Design (Solution Architect)
-_Nicht erforderlich — reines Cleanup-Ticket; direkt nach `/frontend` oder im Rahmen von `/refine`-Sweeps ausführbar_
-
-## QA Test Results
-
-**QA-Datum:** 2026-05-17
-**Tester:** Claude (QA-Skill)
-**Ergebnis:** APPROVED — keine Bugs gefunden
-
-### Acceptance Criteria Check
-
-| # | Kriterium | Status |
-|---|-----------|--------|
-| 1 | `grep -rn "127.0.0.1:7800" src/ next.config.ts` → 0 Treffer | ✅ PASS |
-| 2 | `grep -rn "ingest/fd631e72" src/ next.config.ts` → 0 Treffer | ✅ PASS |
-| 3 | `grep -rn "#region agent log" src/ next.config.ts` → 0 Treffer | ✅ PASS |
-| 4 | TypeScript-Check (`tsc --noEmit`) ohne Fehler | ✅ PASS |
-| 5 | Bestehende E2E-Tests unverändert grün (44/44) | ✅ PASS |
-| 6 | Entfernte Blöcke: 7 total (next.config.ts ×1, layout.tsx ×1, onboarding/page.tsx ×3, OnboardingWizard.tsx ×2) | ✅ PASS |
-| 7 | Ungenutzter `useEffect`-Import in OnboardingWizard.tsx mit-entfernt | ✅ PASS |
-
-### E2E-Regressionssuite
-
-- **Chromium:** 22/22 ✅
-- **Mobile Safari:** 22/22 ✅ (WebKit-Binary bei dieser QA-Runde installiert: `npx playwright install webkit`)
-- **Gesamt:** 44/44 — alle PROJ-2-Tests grün
-
-### Bugs gefunden
-
+## Offene Punkte
 Keine.
-
-### Security-Audit
-
-Die zu entfernenden Calls waren selbst das Security-Finding (BUG-12 aus PROJ-2-Re-QA). Nach Cleanup kein weiteres Finding.
-
-### Production-Ready
-
-**JA** — alle Acceptance Criteria erfüllt, keine Bugs, E2E-Suite grün.
-
-## Deployment
-_To be added by /deploy_
