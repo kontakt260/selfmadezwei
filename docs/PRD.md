@@ -52,12 +52,12 @@ und Technik-Angst als größte Hürden. Brauchen emotionalen Einstieg, Struktur
 ## Constraints
 - Solo-Entwicklung; Build-Reihenfolge strikt nach Abhängigkeiten
 - Stack fix: Next.js 16, Supabase, TipTap, Tailwind v3 + shadcn/ui, Stripe, Resend, Vercel; SMS- und Transkriptions-Anbieter noch nicht gewählt
-- Frontend: 1:1-Migration aus alter App (kein Redesign); Design-System aus `projektuebersicht-palette.ts` + shadcn/ui
+- Frontend: 1:1-Migration aus alter App (kein Redesign, Ausnahme ist die freigegebene Design-Überarbeitung aus PROJ-22); Design-System aus `projektuebersicht-palette.ts` + shadcn/ui
 - A5-Hochformat fest; Phone erhält keinen Kapitel-Editor
 - Einmalkauf-Modell (kein Abo); LLMs nur serverseitig
 - Audio-Erzählen: Aufforderung per Mail/SMS mit persönlichem Aufnahme-Link (Browser, kein Login); Audio → Transkript → per LLM ausformulierter Kapiteltext in Ich-Form (nah am Wortlaut, keine Kürzung); Audio + Roh-Transkript bleiben gespeichert
 - Aufnahme-Links müssen ohne Login sicher sein: zufälliges Geheimnis (≥ 256 Bit), für Dritte nicht rekonstruierbar, nur als Hash gespeichert, an genau ein Kapitel gebunden, nur Einreichen (kein Lesezugriff), verfällt nach Nutzung/Ablauf
-- Erzähl-Aufforderungen werden **ausschließlich automatisch** verschickt — wöchentlich an genau eine erzählende Person pro Projekt, per Mail und/oder SMS laut Onboarding (kein manuelles „Aufforderung senden" durch den Projektleiter); zusätzlich kann im Portal jederzeit direkt zu einem Kapitel erzählt werden, **solange es noch leer ist**
+- Erzähl-Aufforderungen werden **ausschließlich automatisch** verschickt — im eingestellten Rhythmus (Vorgabe wöchentlich, in der Projektübersicht änderbar) an genau eine erzählende Person pro Projekt, per Mail und/oder SMS laut Onboarding (kein manuelles „Aufforderung senden" durch den Projektleiter); zusätzlich kann im Portal jederzeit direkt zu einem Kapitel erzählt werden, **solange es noch leer ist**
 - Erzählen ist im Portal-Zugang enthalten — kein Zeit-Kontingent, kein Nachkauf-Produkt
 - Buchweite Seitenzahl: Live-Anzeige im Editor (persistierte Seiten-Offsets + Berechnungs-Job)
 - PoD-Anbieter noch nicht gewählt (Phase 10 blockiert bis Entscheidung)

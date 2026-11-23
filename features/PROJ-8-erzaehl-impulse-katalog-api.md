@@ -2,7 +2,7 @@
 
 ## Status: Deployed
 **Created:** 2026-05-21
-**Last Updated:** 2026-05-21 — Deployed to stage-app.narravit.de
+**Last Updated:** 2026-11-23 — Erweiterung Impuls-Bibliothek geplant (Basis deployed to stage-app.narravit.de am 2026-05-21)
 
 ## Dependencies
 - Requires **PROJ-1** (Supabase-Datenmodell & RLS) — `impulse_catalog` existiert (id, title, sort_order, created_at) und wird in PROJ-8 erweitert um `leading_questions` (Array, mind. 1 Eintrag) und `category`
@@ -260,10 +260,50 @@ Keine Project-Membership-Prüfung beim Lesen — der Katalog ist global gemeinsa
 ### H) Offene Punkte für Folge-Tickets (out of scope für PROJ-8)
 
 - **Admin-UI im Portal** für nicht-technische Pflege durch das narravit-Team — eigenes PROJ-X falls jemals nötig.
-- **Kategorie-Filter** im Modal (Dropdown, Tabs) — kann an existierende Modal-UI angeflanscht werden, sobald > ~30 Impulse / > ~6 Kategorien gepflegt sind.
+- **Kategorie-Filter:** kommt mit der Impuls-Bibliothek, siehe Erweiterung 2026-11-23.
 - **Mehrsprachigkeit** des Katalogs (DE/EN) — derzeit nur Deutsch; bei späterer Internationalisierung eine `language`-Spalte oder eine pro-Sprache-Reihe ergänzen.
 - **Per-Frage-Metadaten** (z. B. „eher Einstiegsfrage", „eher Vertiefung") — falls die Rotation später kontextsensitiv werden soll.
 - **Telemetrie**: welche Impulse werden gewählt, welche ignoriert — könnte Pflege priorisieren.
+
+## Erweiterung 2026-11-23: Impuls-Bibliothek (geplant, noch nicht gebaut)
+
+> Wunsch von Jakob nach der Recherche bei Storyworth. Der Abschnitt beschreibt das Ziel, Umsetzung erst nach `/refine PROJ-8`.
+
+**Ziel:** Statt eines zufälligen Impulses im Dialog gibt es in der Kapitelübersicht eine Bibliothek mit vielen Erzähl-Impulsen als einzelne Karten, die sich gut filtern lassen.
+
+**Stand heute:** 15 Impulse in 9 Kategorien (Beruf, Beziehungen, Bildung, Erfahrungen, Familie, Heimat, Kindheit, Lebensphasen, Werte). Für eine echte Bibliothek braucht es deutlich mehr Inhalte.
+
+### Anforderungen
+
+- [ ] Der Button „Erzähl-Impuls" in der Kapitelübersicht öffnet die Bibliothek.
+- [ ] Jeder Impuls ist eine eckige Karte mit Titel, Kategorie und einer Beispielfrage.
+- [ ] Ein Dropdown filtert nach Thema. Die Auswahl „Alle Themen" ist die Vorgabe.
+- [ ] Ein zweiter Filter blendet Impulse aus, die schon im Buch sind.
+- [ ] Impulse, die schon im Buch sind, bleiben erkennbar und lassen sich nicht doppelt hinzufügen.
+- [ ] Ein Klick zeigt alle Leitfragen, ein Button legt daraus ein Kapitel an.
+- [ ] Die Funktion „Zufälliger Impuls" bleibt als Einstieg für alle, die nicht suchen möchten.
+- [ ] Große Schrift, hoher Kontrast und klare Bedienung für Menschen über 60, auf Tablet und Desktop, auf dem Handy einspaltig.
+- [ ] Im Lesemodus (PROJ-28) kann man stöbern, aber nichts hinzufügen.
+- [ ] Die Leitfragen bleiben in der Du-Form, alle anderen Texte in der Sie-Form.
+
+### Illustrationen (Wunsch Jakob, 2026-11-23)
+
+Die Karten sollen später leichte, handgemalt wirkende Illustrationen bekommen, zum Beispiel Haus, Drachen, Brille oder Briefumschlag. Sie müssen wirklich gut aussehen und werden nicht nebenbei erzeugt.
+
+Vorgeschlagener Ablauf:
+
+1. Einen festen Stil festlegen und an 3 bis 5 Motiven testen, bis Jakob ihn freigibt.
+2. Zuerst ein Motiv pro Thema erstellen (9 Stück), erst danach eventuell eines pro Impuls.
+3. Alle Bilder mit derselben Stilvorlage, freigestellt und in einheitlicher Größe erzeugen.
+4. Nutzungsrechte des Bildwerkzeugs für kommerzielle Nutzung vorher prüfen.
+
+Wegen Inhalten, Illustrationen und Oberfläche wird die Bibliothek vermutlich ein eigenes Projekt. Das wird beim `/refine` entschieden.
+
+### Offen für `/refine`
+
+1. Wie viele Impulse soll die Bibliothek zum Start haben, und wer schreibt sie? Vorschlag: etwa 100, von Claude entworfen und von Jakob freigegeben.
+2. Reichen die 9 Kategorien, oder kommt ein zweiter Filter nach Lebensphase dazu?
+3. Der automatische Versand aus PROJ-12 nutzt dieselbe Bibliothek als Quelle.
 
 ## Implementation Notes — Phase Frontend (2026-05-21)
 

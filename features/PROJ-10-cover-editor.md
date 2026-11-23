@@ -339,13 +339,25 @@ Beim Entfernen des Fotos:
 ### J) Offene Punkte für Folge-Tickets (out of scope für PROJ-10)
 
 - **Storage-Cleanup-Job**: alte Cover-Fotos, die durch Replace entstanden sind, sammeln sich im Bucket. Ein Cron-Job könnte verwaiste Foto-Objekte (kein passender DB-Eintrag mehr) entfernen. Eigenes Ticket.
-- **Rückseite + Buchrücken**: explizit out of scope.
+- **Rückseite + Buchrücken**: in PROJ-10 out of scope. Der Buchrücken ist für PROJ-20 geplant, siehe Abschnitt K.
 - **Freie Farb-/Schrift-Wahl**: explizit out of scope; Code-Kataloge sind fix.
 - **Klappentext-Editor**: würde mit Rückseite kommen — eigenes Ticket.
 - **Admin-UI für Theme-/Farb-Pflege**: nur sinnvoll, wenn Nicht-Entwickler den Katalog pflegen sollen. Aktuell unnötig.
 - **Pixel-perfekter Print-Export**: PROJ-16 (Print-on-Demand-Adapter) konsumiert die in PROJ-10 standardisierten Cover-Daten und übersetzt sie in PDF/X oder vom PoD-Anbieter geforderte Formate.
 - **Cover-Versionshistorie**: Undo/Redo bzw. Liste vergangener Stände. Eigenes Ticket bei Bedarf.
 - **Multiple Fotos / Foto-Anordnung**: aktuell genau 1 Foto im oberen Drittel. Wenn später mehrere Fotos erwünscht sind, eigenes Ticket.
+
+### K) Geplant für PROJ-20: Buchrücken (Jakob, 2026-11-23)
+
+Wunsch nach der Recherche bei Storyworth: Der Cover-Editor zeigt das Buch künftig **mit Buchrücken** und füllt ihn automatisch.
+
+- [ ] Die Vorschau zeigt Vorderseite und Buchrücken zusammen, damit das Cover wie ein echtes Buch wirkt.
+- [ ] Titel und Autorenzeile erscheinen automatisch auf dem Buchrücken, in Farbe und Stil des Covers.
+- [ ] Die Rückenbreite richtet sich nach der Seitenzahl des Buchs (PROJ-7).
+- [ ] Ist der Rücken für den Text zu schmal, wird der Text sinnvoll gekürzt oder ausgeblendet.
+- [ ] Die Daten fließen später in das Druck-PDF für den Umschlag (PROJ-16).
+
+**Abhängigkeit:** Die genaue Rückenbreite pro Seitenzahl und der Beschnitt kommen von der Druckerei (voraussichtlich CPI). Bis dahin kann die Vorschau mit einem Näherungswert arbeiten, das Druck-PDF nicht. Umsetzung in PROJ-20.
 
 ## Implementation Notes (Frontend) — 2026-05-22
 

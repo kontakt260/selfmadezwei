@@ -17,7 +17,7 @@ Unterstützt durch Leitfragen, Erzähl-Impulse, Lektorat und Print-on-Demand. K�
 
 ## Frontend-Übernahme (verbindlich)
 
-Das **gesamte bestehende Frontend** der alten App soll **1:1 übernommen** werden — Look, Layout, Komponentenstruktur, deutsche Bezeichner. Angepasst werden nur:
+Das **gesamte bestehende Frontend** der alten App soll **1:1 übernommen** werden — Look, Layout, Komponentenstruktur, deutsche Bezeichner. **Ausnahme:** die von Jakob freigegebene Design-Überarbeitung aus [PROJ-22](features/PROJ-22-design-grundlage.md). Angepasst werden sonst nur:
 - **Styling-Layer:** Roh-Tailwind v4 → **Tailwind v3 + shadcn/ui** (vorinstallierte UI-Primitives unter `src/components/ui/` wiederverwenden, niemals neu bauen).
 - **Datenzugriff:** Mock-Daten (`lib/mock-*.ts`) → **Supabase** Server Actions/Routes mit RLS.
 - **Routing/Validierung:** Projekt/Kapitel-IDs künftig **in der URL + serverseitig geprüft**, nicht nur sessionStorage.
@@ -66,7 +66,7 @@ Quelle: `/Users/jakobtrierweiler/Desktop/GitHub/selfmade/my-app/`
 
 - **A5-Hochformat** im Editor; **Phone:** kein produktiver Kapitel-Editor (Hinweis + Link); **Tablet & Desktop:** voll.
 - **Einmalkauf + Verlängerung**, **kein Abo**. Initial-Portalzugang typ. 1 Jahr.
-- **Audio-Erzählen statt Vapi** (Entscheidung 2026-10-13): Aufnahme über persönlichen Link aus Mail/SMS (Browser, kein Login); Ergebnis ist ein per LLM ausformulierter Kapiteltext in Ich-Form, Audio + Roh-Transkript bleiben gespeichert. Aufforderungs-Links kommen **nur automatisch** (wöchentlich, eine erzählende Person pro Projekt, Mail und/oder SMS; kein manueller Versand); im Portal kann zusätzlich jederzeit zu einem **noch leeren** Kapitel erzählt werden. **Kein Zeit-Kontingent, kein Minuten-Nachkauf** — Erzählen ist im Portal-Zugang enthalten.
+- **Audio-Erzählen statt Vapi** (Entscheidung 2026-10-13): Aufnahme über persönlichen Link aus Mail/SMS (Browser, kein Login); Ergebnis ist ein per LLM ausformulierter Kapiteltext in Ich-Form, Audio + Roh-Transkript bleiben gespeichert. Aufforderungs-Links kommen **nur automatisch** (Rhythmus in der Projektübersicht einstellbar, Vorgabe wöchentlich; eine erzählende Person pro Projekt, Mail und/oder SMS; kein manueller Versand); im Portal kann zusätzlich jederzeit zu einem **noch leeren** Kapitel erzählt werden. **Kein Zeit-Kontingent, kein Minuten-Nachkauf** — Erzählen ist im Portal-Zugang enthalten.
 - **Aufnahme-Links ohne Login müssen sicher sein:** ≥ 256 Bit Zufall, nicht aus IDs ableitbar, nur als Hash in der DB, an genau ein Kapitel gebunden, nur Einreichen (kein Lesezugriff), verfallen nach Nutzung/Ablauf; alle Prüfungen serverseitig. Details: [features/PROJ-12-audio-erzaehlpipeline.md](features/PROJ-12-audio-erzaehlpipeline.md).
 - **Onboarding-Erzählweise (Geschenk):** „Nur per Sprachnachricht erzählen" (beschenkte Person ohne Konto, Käufer ist Projektleiter) vs. „Auch am Computer schreiben" (zusätzlich Portal-Einladung). Erzählen ist die Basis, der Computer die Ergänzung.
 - **Handgeschriebenes ist Master:** Audio füllt nur leere Kapitel und überschreibt/ergänzt nie vorhandenen Text. Kein Pausieren und keine Abmelde-Funktion für Erzähl-Aufforderungen.

@@ -2,7 +2,7 @@
 
 ## Status: Architected
 **Created:** 2026-05-25
-**Last Updated:** 2026-10-13
+**Last Updated:** 2026-11-23
 
 > **Neufassung 2026-10-13.** Ersetzt die frühere „Vapi-Pipeline" (Telefon-Assistent) vollständig. Die alte Spec liegt nur noch zur Referenz unter [archive/PROJ-12-vapi-pipeline.md](archive/PROJ-12-vapi-pipeline.md) und wird **nicht** umgesetzt. Das frühere Tech-Design ist damit hinfällig — `/architecture` muss neu laufen.
 
@@ -13,6 +13,8 @@
 > - **Rhythmus einstellbar:** In der Projektübersicht lässt sich die Frequenz der Erzähl-Impulse einstellen, z. B. „alle 7 Tage" / „alle 14 Tage", eventuell mit einem kleinen Kalender für den nächsten Termin (Idee, Ausgestaltung offen).
 > - **Von Hand auslösen:** Der Projektleiter kann in der Projektübersicht jederzeit eine Erzähl-Aufforderung sofort auslösen.
 > - **Achtung, Widerspruch zu festen Entscheidungen:** Beides ändert bisher gesetzte Punkte — „wöchentlich" und „kein manueller Versand" (CLAUDE.md „Feste Produktentscheidungen", PRD-Constraints, hier das Kriterium „Es gibt keinen Button zum manuellen Versenden einer Aufforderung"). Wenn Jakob das beim `/refine` bestätigt, dort und in CLAUDE.md/PRD nachziehen. Zu klären: Missbrauchs- und Kostenschutz beim Auslösen von Hand (SMS-Kosten, z. B. höchstens eine Aufforderung pro Tag), und ob es dann auch nur für noch leere Kapitel gilt.
+
+> **Neue Wünsche 2026-11-23 (Jakob).** Einschalten, Kanal, Rhythmus, zwei Wege in jeder Aufforderung und die Regeln zwischen Erzählen und Tippen stehen im Abschnitt „Erweiterung 2026-11-23". Bei Widersprüchen zu älteren Kriterien hat dieser Abschnitt Vorrang. Vor dem Bau läuft `/refine PROJ-12` mit den dort genannten offenen Entscheidungen.
 
 ## Kurzbeschreibung
 Die erzählende Person bekommt automatisch einmal pro Woche per Mail und/oder SMS eine Erzähl-Aufforderung zu einem Kapitel. Über einen persönlichen, nicht erratbaren Link öffnet sie eine Aufnahmeseite im Browser (ohne Login) und erzählt ihre Geschichte als Monolog. NARRAVIT verschriftlicht die Aufnahme und formuliert daraus intern einen flüssigen Kapiteltext in Ich-Form, der im Kapitel landet und im Editor weiterbearbeitet werden kann. Zusätzlich kann im Portal jederzeit direkt zu einem noch leeren Kapitel erzählt werden.
@@ -98,8 +100,8 @@ Neuer Ablauf (Schritte in Klammern nur bedingt):
 - [ ] Die Aufnahmeseite zeigt an Personendaten höchstens den Vornamen der erzählenden Person und den Kapitel-Titel.
 - [ ] Ein Link kann nicht mehr zum Einreichen genutzt werden, sobald: eine Aufnahme darüber eingereicht wurde, das Kapitel nicht mehr leer ist, 30 Tage vergangen sind, der Kontaktweg geändert wurde, der Portal-Zugang abgelaufen ist oder das Projekt/Kapitel gelöscht wurde.
 - [ ] Unbekannte, abgelaufene und widerrufene Links zeigen **dieselbe** neutrale Seite („Dieser Link ist nicht mehr gültig") — keine Unterscheidung, die Rückschlüsse zulässt. Einzige Ausnahmen sind die beiden freundlichen Hinweise unten („bereits geschrieben" / „bereits erzählt"); sie erscheinen nur bei einem echten, noch nicht abgelaufenen Link und verraten keine Inhalte.
-- [ ] **Kapitel inzwischen von Hand befüllt:** Öffnet die Person einen Link zu einem Kapitel, das zwischenzeitlich im Portal geschrieben wurde, sieht sie statt des Aufnahme-Knopfs einen klaren Hinweis, z. B. „Zu diesem Thema ist schon etwas geschrieben worden — hier musst du nichts mehr erzählen. Dein nächstes Thema kommt am [Wochentag]." Eine Aufnahme ist nicht möglich, damit nicht doppelt erzählt wird. Mit der nächsten regulären Aufforderung geht es mit dem nächsten leeren Kapitel weiter.
-- [ ] **Bereits über diesen Link erzählt:** Hinweis „Danke — deine Geschichte zu diesem Thema ist schon angekommen."
+- [ ] **Kapitel inzwischen von Hand befüllt:** Öffnet die Person einen Link zu einem Kapitel, das zwischenzeitlich im Portal geschrieben wurde, sieht sie statt des Aufnahme-Knopfs einen klaren Hinweis, z. B. „Zu diesem Thema ist schon etwas geschrieben worden — hier müssen Sie nichts mehr erzählen. Ihr nächstes Thema kommt am [Wochentag]." Eine Aufnahme ist nicht möglich, damit nicht doppelt erzählt wird. Mit der nächsten regulären Aufforderung geht es mit dem nächsten leeren Kapitel weiter.
+- [ ] **Bereits über diesen Link erzählt:** Hinweis „Danke, Ihre Geschichte zu diesem Thema ist schon angekommen."
 - [ ] Die Prüfung „Kapitel noch leer?" erfolgt auch **beim Absenden** erneut: Wurde das Kapitel während der Aufnahme von Hand befüllt, wird die Aufnahme trotzdem angenommen (nichts geht verloren), aber nicht ins Kapitel geschrieben (siehe Verarbeitung).
 - [ ] Aufrufe und Uploads sind pro IP und pro Link begrenzt (Rate-Limit); auffällige Fehlversuchs-Muster werden gemeldet.
 - [ ] Das Geheimnis taucht nicht in Server-Logs, Fehler-Tracking oder Analyse-Tools auf; die Aufnahmeseite sendet es nicht an Dritte (kein Referrer, keine externen Skripte, nicht in Suchmaschinen indexierbar).
@@ -115,7 +117,7 @@ Neuer Ablauf (Schritte in Klammern nur bedingt):
 - [ ] Nach dem Beenden: Anhören, **Neu aufnehmen** oder **Absenden**. Erst „Absenden" reicht ein.
 - [ ] Upload mit Fortschrittsanzeige; bei Verbindungsabbruch bleibt die Aufnahme auf dem Gerät erhalten und kann erneut gesendet werden, solange die Seite offen ist.
 - [ ] Maximale Länge pro Aufnahme: **60 Minuten** (technische Grenze, kein Kontingent). Ab 55 Minuten Hinweis; bei 60 Minuten stoppt die Aufnahme und kann abgesendet werden.
-- [ ] Nach dem Absenden: klare Bestätigung („Danke, [Vorname] — deine Geschichte ist angekommen."). Der Link ist danach verbraucht.
+- [ ] Nach dem Absenden: klare Bestätigung („Danke, [Vorname]. Ihre Geschichte ist angekommen."). Der Link ist danach verbraucht.
 - [ ] Unterstützt der Browser keine Aufnahme, erscheint ein Hinweis mit der Bitte, den Link in einem aktuellen Browser zu öffnen.
 
 ### Erzählen im Portal (eingeloggt)
@@ -174,6 +176,53 @@ Neuer Ablauf (Schritte in Klammern nur bedingt):
 - **PROJ-2 / PROJ-3:** Onboarding-Texte und -Schritte (diese Spec ist maßgeblich); Zahlungstyp-Anzeige „Vapi-Sprechzeit" im persönlichen Bereich nur noch als Altbestand.
 - **PROJ-4:** Platzhalter „Code für das Telefonieren" und „Telefonzeit übrig".
 - **PROJ-19:** `Permissions-Policy` für Mikrofon.
+
+## Erweiterung 2026-11-23: Steuerung der Erzähl-Aufforderungen
+
+### Von Jakob festgelegt
+
+- Die Aufforderungen lassen sich **einschalten**, beim Kauf für sich selbst genauso wie bei einem Geschenk.
+- Die Nachricht kommt per **SMS oder Mail**.
+- Der **Rhythmus** wird in der Projektübersicht eingestellt. Das ersetzt das feste „einmal pro Woche", die Vorgabe bleibt wöchentlich.
+- Jede Aufforderung bietet **zwei Wege**, in dieser Reihenfolge: zuerst **per Audio erzählen** (Handy, Tablet oder Laptop), danach **im Kapitel-Editor tippen**.
+- Welche Wege angeboten werden, soll einstellbar sein.
+- **Erst erzählt, dann getippt geht. Erst getippt, dann erzählt geht nicht**, weil sich die Inhalte sonst kaum zusammenführen lassen.
+
+### Welche Wege wer bekommt (Vorschlag)
+
+| Erzählweise | Mail | SMS |
+|---|---|---|
+| Nur per Sprachnachricht, ohne Konto | Erzählen | Erzählen |
+| Auch am Computer schreiben | Erzählen, danach Schreiben | Erzählen |
+| Für mich selbst | Erzählen, danach Schreiben | Erzählen |
+
+Der Schreib-Link führt über die normale Anmeldung in den Editor und braucht deshalb ein Konto. Auf dem Handy erscheint dort wie bisher der Hinweis, am Tablet oder Computer weiterzuschreiben. Die SMS bekommt nur den Erzähl-Link, weil zwei lange Links die Nachricht unübersichtlich und teurer machen.
+
+### Was die Links je nach Kapitel tun
+
+| Zustand des Kapitels | Link „Erzählen" | Link „Schreiben" |
+|---|---|---|
+| Leer | Aufnahme starten | Editor öffnen |
+| Aufnahme wird verarbeitet | Hinweis: Geschichte ist angekommen | Hinweis, Editor für dieses Kapitel gesperrt, bis der Text da ist |
+| Per Audio entstanden | Hinweis: schon erzählt | Editor mit dem Text, weiter tippen möglich |
+| Von Hand geschrieben | Hinweis: schon geschrieben, keine Aufnahme | Editor öffnen |
+
+Die Sperre während der Verarbeitung ist neu. Mit zwei Links in derselben Mail wird dieser Fall häufig, und ohne Sperre würde die fertige Erzählung nicht mehr ins Kapitel kommen.
+
+### Was in den Aufforderungen steht (Vorschlag)
+
+1. Zuerst das **nächste leere Kapitel in Buch-Reihenfolge**, egal ob eigenes Kapitel oder Erzähl-Impuls.
+2. Gibt es keines mehr, kommt der nächste unbenutzte Impuls aus der Bibliothek (PROJ-8).
+3. Eigene Kapitel haben keine Leitfragen. Dort steht eine allgemeine Einladung, zum Titel zu erzählen.
+
+### Offene Entscheidungen für `/refine PROJ-12`
+
+1. **Ausschalten:** Darf die Projektleitung die Aufforderungen auch wieder ausschalten? Empfehlung: ja. Das ändert die bisherige Regel „kein Pausieren" und entschärft zugleich die rechtliche Frage zur fehlenden Abmeldung.
+2. **Abmeldung der erzählenden Person:** Braucht sie selbst eine Möglichkeit, keine Nachrichten mehr zu bekommen? Anwaltlich klären, besonders bei SMS an Dritte.
+3. **Inhalte:** Gelten auch eigene Kapitel als Thema? Empfehlung: ja, wie oben beschrieben.
+4. **Rhythmus:** Welche Stufen? Empfehlung: wöchentlich und alle 2 Wochen.
+5. **Standard beim Kauf:** Empfehlung: bei „Nur per Sprachnachricht" immer an, sonst Auswahl im Onboarding.
+6. **Von Hand auslösen:** Der Wunsch vom 2026-11-19 ist noch offen und bleibt bis zur Entscheidung ausgeschlossen.
 
 ---
 
