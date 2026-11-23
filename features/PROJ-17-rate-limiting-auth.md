@@ -4,7 +4,7 @@
 
 ## Status: Approved
 **Created:** 2026-05-16
-**Last Updated:** 2026-11-22 (QA bestanden, Handtest auf Stage bestätigt; BUG-10 und die Korrektur von BUG-5 lokal geprüft, noch nicht auf Stage)
+**Last Updated:** 2026-11-22 (QA bestanden, Handtest auf Stage bestätigt; BUG-10 und die Korrektur von BUG-5 seit `a4684dc` auf Stage, von Jakob bestätigt)
 **Priority:** P0 (Security-Blocker für Public-Launch)
 **Trigger:** Vibe-Security-Audit 2026-05-16 — High-Finding #1
 
