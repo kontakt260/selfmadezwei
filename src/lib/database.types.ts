@@ -408,6 +408,50 @@ export type Database = {
         }
         Relationships: []
       }
+      narration_settings: {
+        Row: {
+          channel: string
+          created_at: string
+          email: string | null
+          narrator_name: string
+          phone: string | null
+          project_id: string
+          rhythm_weeks: number
+          updated_at: string
+          weekday: number
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          email?: string | null
+          narrator_name: string
+          phone?: string | null
+          project_id: string
+          rhythm_weeks?: number
+          updated_at?: string
+          weekday?: number
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          email?: string | null
+          narrator_name?: string
+          phone?: string | null
+          project_id?: string
+          rhythm_weeks?: number
+          updated_at?: string
+          weekday?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "narration_settings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount_cents: number
@@ -707,6 +751,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      purchase_narration_drafts: {
+        Row: {
+          channel: string | null
+          created_at: string
+          email: string | null
+          gift_recipient_email: string | null
+          id: string
+          narrator_name: string | null
+          phone: string | null
+          status: string
+          status_changed_at: string
+          uses_checkout_email: boolean
+        }
+        Insert: {
+          channel?: string | null
+          created_at?: string
+          email?: string | null
+          gift_recipient_email?: string | null
+          id?: string
+          narrator_name?: string | null
+          phone?: string | null
+          status?: string
+          status_changed_at?: string
+          uses_checkout_email?: boolean
+        }
+        Update: {
+          channel?: string | null
+          created_at?: string
+          email?: string | null
+          gift_recipient_email?: string | null
+          id?: string
+          narrator_name?: string | null
+          phone?: string | null
+          status?: string
+          status_changed_at?: string
+          uses_checkout_email?: boolean
+        }
+        Relationships: []
       }
       voice_sessions: {
         Row: {

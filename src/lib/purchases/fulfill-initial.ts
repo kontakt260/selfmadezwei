@@ -4,6 +4,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { PRODUCTS } from "@/lib/stripe/server";
 import { addTwelveMonths } from "./access-period";
+import {
+  applyNarrationDraft,
+  readGiftRecipientEmail,
+  removeNarrationDraft,
+} from "./narration-draft";
 
 // Erfüllung eines bezahlten Erstkaufs (PROJ-6): Projekt, Zugang,
 // Mitgliedschaft, ggf. Einladung, Zahlungs-Eintrag.
@@ -43,6 +48,8 @@ export type InitialPurchaseInput = {
   currency: string | null | undefined;
   /** Angaben aus dem Kauf-Assistenten (Stripe-Metadata). */
   meta: Record<string, string | undefined>;
+  /** E-Mail aus dem Stripe-Checkout, für Erzähl-Impulse beim Kauf ohne Konto. */
+  buyerEmail?: string | null;
 };
 
 export type InitialPurchaseResult = {
@@ -62,15 +69,13 @@ export async function fulfillInitialPurchase(
   const { userId, meta } = input;
   const isGift = meta.is_gift === "1";
   const giftMode = meta.gift_mode as "phone-only" | "phone-plus-computer" | undefined;
-  const recipientEmail = meta.gift_recipient_email?.trim() || null;
+  const isComputerGift = isGift && giftMode === "phone-plus-computer";
+  const recipientEmail = isComputerGift ? await readGiftRecipientEmail(supabase, meta) : null;
   const recipientRole = (meta.gift_recipient_role as MemberRole | undefined) ?? "co_author";
   const buyerRetainsAccess = meta.buyer_retains_access === "1";
 
   // Ohne Konto gibt es niemanden, der das Projekt sonst verwalten könnte.
-  if (
-    userId === null &&
-    !(isGift && giftMode === "phone-plus-computer" && !buyerRetainsAccess && recipientEmail)
-  ) {
+  if (userId === null && !(isComputerGift && !buyerRetainsAccess && recipientEmail)) {
     throw new Error("purchase without account is only possible for a gift without own access");
   }
 
@@ -106,7 +111,12 @@ export async function fulfillInitialPurchase(
     let inviteRecipient = false;
     let inviteRole: MemberRole = "co_author";
 
-    if (isGift && giftMode === "phone-plus-computer") {
+    // Ist die Adresse nicht mehr da (Frist abgelaufen), behält der Käufer das
+    // Projekt und kann selbst einladen. Sonst hätte niemand Zugriff darauf.
+    if (isComputerGift && !recipientEmail) {
+      console.warn(`[purchases] no gift email for session ${input.stripeSessionId}`);
+    }
+    if (isComputerGift && recipientEmail) {
       inviteRecipient = true;
       if (buyerRetainsAccess) {
         inviteRole = recipientRole;
@@ -139,7 +149,14 @@ export async function fulfillInitialPurchase(
       invitation = { token, email: recipientEmail, role: inviteRole };
     }
 
-    // 4. payments-Eintrag (idempotenz-tragend via UNIQUE stripe_session_id).
+    // 4. PROJ-24: Erzähl-Einstellungen. Ein Fehler hier verhindert keinen Kauf.
+    await applyNarrationDraft(supabase, {
+      draftId: meta.narration_draft,
+      projectId,
+      buyerEmail: input.buyerEmail ?? null,
+    });
+
+    // 5. payments-Eintrag (idempotenz-tragend via UNIQUE stripe_session_id).
     const { error: payErr } = await supabase.from("payments").insert({
       project_id: projectId,
       user_id: userId,
@@ -150,6 +167,9 @@ export async function fulfillInitialPurchase(
       status: "completed",
     });
     if (payErr) throw new Error(payErr.message);
+
+    // Erst jetzt, sonst fände ein wiederholter Webhook die Daten nicht mehr.
+    await removeNarrationDraft(supabase, meta.narration_draft);
 
     return { projectId, expiresAt, buyerIsMember, invitation };
   } catch (err) {

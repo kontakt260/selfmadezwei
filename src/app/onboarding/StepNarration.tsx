@@ -5,9 +5,11 @@ import { Label } from "@/components/ui/label";
 import {
   channelUsesEmail,
   channelUsesSms,
+  EMAIL_MAX_LENGTH,
   narrationIsActive,
   narrationIsRequired,
   narrationUsesCheckoutEmail,
+  PHONE_MAX_LENGTH,
   type FieldErrors,
   type NarrationChannel,
   type WizardState,
@@ -107,6 +109,7 @@ export function StepNarration({ state, errors, isGuest, onChange }: Props) {
                   id="narrationEmail"
                   type="email"
                   inputMode="email"
+                  maxLength={EMAIL_MAX_LENGTH}
                   autoComplete={isGift ? "off" : "email"}
                   value={state.narrationEmail}
                   onChange={(event) => onChange("narrationEmail", event.target.value)}
@@ -128,6 +131,7 @@ export function StepNarration({ state, errors, isGuest, onChange }: Props) {
                 id="narrationPhone"
                 type="tel"
                 inputMode="tel"
+                maxLength={PHONE_MAX_LENGTH}
                 autoComplete={isGift ? "off" : "tel"}
                 placeholder="+49 171 1234567"
                 value={state.narrationPhone}

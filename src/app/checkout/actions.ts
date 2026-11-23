@@ -18,6 +18,15 @@ import {
   getRequestIp,
   hitRateLimits,
 } from "@/lib/rate-limit";
+import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
+import {
+  buildNarrationDraft,
+  createNarrationDraft,
+  narrationInputSchema,
+  removeNarrationDraft,
+  type NarrationDraftValues,
+  type NarrationInput,
+} from "@/lib/purchases/narration-draft";
 
 // Stripe-Checkout-Initiator (PROJ-6 Backend).
 //
@@ -54,6 +63,8 @@ export type InitialMetadata = {
   giftMode?: "phone-only" | "phone-plus-computer";
   giftRecipientRole?: "projektleiter" | "co_author";
   buyerRetainsAccess?: boolean;
+  /** PROJ-24: Angaben aus dem Schritt „Erzähl-Impulse". */
+  narration?: NarrationInput;
 };
 
 export type StartCheckoutInput =
@@ -75,6 +86,7 @@ const initialMetadataSchema = z.object({
   giftMode: z.enum(["phone-only", "phone-plus-computer"]).optional(),
   giftRecipientRole: z.enum(["projektleiter", "co_author"]).optional(),
   buyerRetainsAccess: z.boolean().optional(),
+  narration: narrationInputSchema.optional(),
 });
 
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -101,6 +113,8 @@ export async function startCheckoutAction(
   }
 
   // Eingabe-Validierung pro Produkt-Typ.
+  let narrationValues: NarrationDraftValues | null = null;
+  let giftRecipientEmail: string | null = null;
   if (input.productType === "initial") {
     const parsed = initialMetadataSchema.safeParse(input.metadata);
     if (!parsed.success) {
@@ -121,8 +135,21 @@ export async function startCheckoutAction(
         if (!EMAIL_PATTERN.test(recipientEmail)) {
           return { ok: false, error: "Bitte eine gültige E-Mail-Adresse angeben." };
         }
+        giftRecipientEmail = recipientEmail;
       }
     }
+    const narration = buildNarrationDraft({
+      narration: parsed.data.narration,
+      fullName: parsed.data.fullName,
+      isGift: parsed.data.isGift,
+      giftMode: parsed.data.giftMode,
+      giftRecipientName: parsed.data.giftRecipientName,
+      isGuest: !user,
+    });
+    if (!narration.ok) {
+      return { ok: false, error: "Bitte prüfen Sie die Angaben zu den Erzähl-Impulsen." };
+    }
+    narrationValues = narration.draft;
   } else {
     // Verlängern kann nur, wer angemeldet und Mitglied des Projekts ist.
     if (!user) return { ok: false, error: "Nicht eingeloggt." };
@@ -207,7 +234,6 @@ export async function startCheckoutAction(
     metadata.is_gift = input.metadata.isGift ? "1" : "0";
     if (input.metadata.isGift) {
       metadata.gift_recipient_name = input.metadata.giftRecipientName ?? "";
-      metadata.gift_recipient_email = input.metadata.giftRecipientEmail ?? "";
       metadata.gift_mode = input.metadata.giftMode ?? "phone-only";
       metadata.gift_recipient_role = input.metadata.giftRecipientRole ?? "co_author";
       metadata.buyer_retains_access = input.metadata.buyerRetainsAccess ? "1" : "0";
@@ -215,6 +241,32 @@ export async function startCheckoutAction(
   } else {
     metadata.project_id = input.projectId;
   }
+
+  // PROJ-24: Kontaktdaten bleiben bei uns, Stripe bekommt nur die Kennung.
+  let narrationClient: ReturnType<typeof createServiceRoleClient> | null = null;
+  let narrationDraftId: string | null = null;
+  if (narrationValues || giftRecipientEmail) {
+    try {
+      narrationClient = createServiceRoleClient();
+      narrationDraftId = await createNarrationDraft(
+        narrationClient,
+        narrationValues,
+        giftRecipientEmail,
+      );
+    } catch (err) {
+      console.error(
+        `[checkout] purchase draft failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+  // Ohne gespeicherte Adresse wäre bezahlt, aber niemand eingeladen.
+  if (giftRecipientEmail && !narrationDraftId) {
+    return { ok: false, error: CHECKOUT_FAILED_MESSAGE };
+  }
+  if (narrationDraftId) metadata.narration_draft = narrationDraftId;
+  const discardNarrationDraft = async () => {
+    if (narrationClient) await removeNarrationDraft(narrationClient, narrationDraftId);
+  };
 
   try {
     const session = await stripe.checkout.sessions.create({
@@ -235,6 +287,7 @@ export async function startCheckoutAction(
     });
     if (!session.url) {
       console.error("[checkout] Stripe returned no checkout URL");
+      await discardNarrationDraft();
       return { ok: false, error: CHECKOUT_FAILED_MESSAGE };
     }
     if (claimToken) {
@@ -260,6 +313,7 @@ export async function startCheckoutAction(
     console.error(
       `[checkout] session failed: ${err instanceof Error ? err.message : String(err)}`,
     );
+    await discardNarrationDraft();
     return { ok: false, error: CHECKOUT_FAILED_MESSAGE };
   }
 }

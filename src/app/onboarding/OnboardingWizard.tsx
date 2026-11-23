@@ -25,6 +25,11 @@ import {
   buildSteps,
   changeForWhom,
   changeNarrationEmail,
+  EMAIL_MAX_LENGTH,
+  NAME_MAX_LENGTH,
+  channelUsesEmail,
+  channelUsesSms,
+  narrationIsActive,
   validateStep,
   type FieldErrors,
   type FieldKey,
@@ -251,6 +256,12 @@ function WizardForm({
           giftMode: isGift ? (state.giftMode ?? undefined) : undefined,
           giftRecipientRole: state.giftRecipientRole,
           buyerRetainsAccess: withComputer ? state.buyerWantsAccess : true,
+          narration: {
+            enabled: narrationIsActive(state),
+            channel: state.narrationChannel,
+            email: channelUsesEmail(state.narrationChannel) ? state.narrationEmail : undefined,
+            phone: channelUsesSms(state.narrationChannel) ? state.narrationPhone : undefined,
+          },
         },
       });
       if (!res.ok) {
@@ -425,6 +436,7 @@ function StepName({
         <Input
           id="fullName"
           type="text"
+          maxLength={NAME_MAX_LENGTH}
           value={fullName}
           onChange={(event) => onChange(event.target.value)}
           autoComplete="name"
@@ -502,6 +514,7 @@ function StepGiftDetails({
         <Input
           id="recipientName"
           type="text"
+          maxLength={NAME_MAX_LENGTH}
           value={recipientName}
           onChange={(event) => onChangeName(event.target.value)}
           aria-invalid={!!nameError}
@@ -572,6 +585,7 @@ function StepGiftComputer({
         <Input
           id="recipientEmail"
           type="email"
+          maxLength={EMAIL_MAX_LENGTH}
           value={email}
           onChange={(event) => onChangeEmail(event.target.value)}
           aria-invalid={!!emailError}

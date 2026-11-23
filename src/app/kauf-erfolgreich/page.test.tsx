@@ -112,4 +112,18 @@ describe("/kauf-erfolgreich — Geschenk ohne eigenen Zugang", () => {
     expect(text).not.toContain("Sobald sie");
     expect(screen.queryByRole("link")).toBeNull();
   });
+
+  it("nennt die beschenkte Person, wenn die Adresse nicht mehr zu finden ist", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    state.user = null;
+    state.session = paidSession({
+      gift_direct: "1",
+      is_gift: "1",
+      gift_mode: "phone-plus-computer",
+      narration_draft: "11111111-1111-4111-8111-111111111111",
+      buyer_retains_access: "0",
+    });
+    const { container } = await show();
+    expect(container.textContent).toContain("Geschenk unterwegs an die beschenkte Person");
+  });
 });

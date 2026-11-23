@@ -22,7 +22,7 @@ export function DirectGiftScreen({
           Wir haben das Geschenk verschickt.
         </p>
         <p className="w-full break-words border border-[#96B897]/40 bg-[#96B897]/10 p-4 text-base text-[#3E3831]">
-          Geschenk unterwegs an <span className="font-semibold">{recipientEmail}</span>
+          Geschenk unterwegs an <span className="font-semibold">{recipientEmail || "die beschenkte Person"}</span>
         </p>
         <p className="text-base leading-7 text-[#535252]">
           Für Sie ist nichts weiter zu tun, ein Konto brauchen Sie nicht.

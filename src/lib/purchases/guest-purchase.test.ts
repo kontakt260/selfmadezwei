@@ -90,6 +90,40 @@ describe("isGuestSession", () => {
   });
 });
 
+describe("Erzähl-Impulse beim Kauf ohne Konto (PROJ-24)", () => {
+  it("hält die Daten bis zum Einlösen und nutzt die Adresse aus der Zahlung", async () => {
+    db.purchase_narration_drafts = [
+      {
+        id: "draft-1",
+        status: "open",
+        narrator_name: "Karla Käufer",
+        channel: "email",
+        email: null,
+        phone: null,
+        uses_checkout_email: true,
+      },
+    ];
+    db.narration_settings = [];
+    const session = guestSession({}, { narration_draft: "draft-1" });
+    await expect(recordGuestPurchase(client(), session, "hash")).resolves.toBe("created");
+    expect(db.purchase_narration_drafts[0]).toMatchObject({ status: "paid" });
+    expect(JSON.stringify(db.purchase_claims[0].metadata)).not.toContain("@");
+
+    const outcome = await claimGuestPurchases(client(), {
+      user: buyer,
+      cookie: null,
+      retrieveSession: noStripe,
+    });
+    expect(outcome.claimed).toHaveLength(1);
+    expect(db.narration_settings[0]).toMatchObject({
+      project_id: outcome.claimed[0].projectId,
+      channel: "email",
+      email: "kaeufer@example.com",
+    });
+    expect(db.purchase_narration_drafts).toHaveLength(0);
+  });
+});
+
 describe("Geschenk ohne eigenen Zugang und ohne Konto", () => {
   const meta = {
     product_type: "initial",
@@ -106,6 +140,11 @@ describe("Geschenk ohne eigenen Zugang und ohne Konto", () => {
     expect(isDirectGiftSession({ metadata: { ...meta, gift_mode: "phone-only" } })).toBe(false);
     expect(isDirectGiftSession({ metadata: { ...meta, user_id: "u1" } })).toBe(false);
     expect(isDirectGiftSession({ metadata: { ...meta, gift_recipient_email: " " } })).toBe(false);
+    expect(
+      isDirectGiftSession({
+        metadata: { ...meta, gift_recipient_email: undefined, narration_draft: "d1" } as never,
+      }),
+    ).toBe(true);
     expect(isDirectGiftSession({ metadata: { ...meta, gift_direct: undefined } as never })).toBe(false);
   });
 

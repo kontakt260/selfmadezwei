@@ -13,6 +13,7 @@ import {
 } from "@/lib/projects/storage-cleanup";
 import { moveExpiredProjectsToTrash, type RetentionResult } from "@/lib/projects/retention";
 import { purgeDueTrash, type TrashPurgeResult } from "@/lib/projects/trash";
+import { purgeExpiredNarrationDrafts } from "@/lib/purchases/narration-draft";
 
 // PROJ-11 — Reminder-Cron.
 //
@@ -38,8 +39,8 @@ import { purgeDueTrash, type TrashPurgeResult } from "@/lib/projects/trash";
 //      (PROJ-28).
 //
 // Antwort: JSON mit `processed`, `sent`, `skipped`, `mailRetries`,
-// `retention`, `trashPurge`, `storageCleanup` und `chapterStorageCleanup`
-// für Monitoring.
+// `retention`, `trashPurge`, `storageCleanup`, `chapterStorageCleanup` und
+// `narrationDrafts` für Monitoring.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -159,6 +160,17 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = createServiceRoleClient();
+
+  // PROJ-24: Kontaktdaten aus nicht abgeschlossenen Käufen entfernen.
+  let narrationDrafts = { removed: 0 };
+  try {
+    narrationDrafts = await purgeExpiredNarrationDrafts(supabase);
+  } catch (err) {
+    console.error(
+      `[cron/reminders] narration draft cleanup failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
   const now = Date.now();
   const windows = buildWindows(now);
   const siteUrl = getSiteUrl();
@@ -253,5 +265,6 @@ export async function GET(req: NextRequest) {
     trashPurge,
     storageCleanup,
     chapterStorageCleanup,
+    narrationDrafts,
   });
 }

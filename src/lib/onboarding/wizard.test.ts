@@ -132,6 +132,17 @@ describe("Wegwechsel", () => {
     expect(next.narrationPhone).toBe("");
   });
 
+  it("behält nach Geschenk, eigenem Kauf und neuem Geschenk nicht die alte Einladungsadresse", () => {
+    const oma = changeNarrationEmail(
+      state({ forWhom: "gift", giftMode: "phone-plus-computer", giftRecipientName: "Oma" }),
+      "oma@example.test",
+    );
+    const self = changeForWhom(oma, "self", logged);
+    expect(self.giftRecipientEmail).toBe("");
+    const opa = changeNarrationEmail(changeForWhom(self, "gift", logged), "opa@example.test");
+    expect(opa.giftRecipientEmail).toBe("opa@example.test");
+  });
+
   it("behält die Daten, wenn derselbe Weg erneut gewählt wird", () => {
     const current = { ...phoneGift, narrationEmail: "oma@example.test" };
     expect(changeForWhom(current, "gift", logged)).toBe(current);
@@ -139,6 +150,35 @@ describe("Wegwechsel", () => {
 
   it("hält die Impulse bei „Nur per Sprachnachricht“ immer aktiv", () => {
     expect(narrationIsActive({ ...phoneGift, narrationEnabled: false })).toBe(true);
+  });
+});
+
+describe("validateStep: Längen", () => {
+  it("nennt beim eigenen Namen direkt die Grenze", () => {
+    expect(validateStep("name", state({ fullName: "a".repeat(120) }), guest)).toEqual({});
+    expect(validateStep("name", state({ fullName: "a".repeat(121) }), guest).fullName).toContain(
+      "höchstens 120 Zeichen",
+    );
+  });
+
+  it("nennt beim Namen der beschenkten Person direkt die Grenze", () => {
+    const errors = validateStep(
+      "gift-details",
+      state({ giftMode: "phone-only", giftRecipientName: "a".repeat(121) }),
+      guest,
+    );
+    expect(errors.giftRecipientName).toContain("höchstens 120 Zeichen");
+  });
+
+  it("lehnt eine zu lange E-Mail-Adresse ab", () => {
+    const email = `${"a".repeat(250)}@example.test`;
+    expect(
+      validateStep(
+        "gift-computer",
+        state({ forWhom: "gift", giftMode: "phone-plus-computer", giftRecipientEmail: email }),
+        guest,
+      ).giftRecipientEmail,
+    ).toBeTruthy();
   });
 });
 

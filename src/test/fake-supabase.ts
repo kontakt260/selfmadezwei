@@ -1,7 +1,7 @@
 // Kleiner In-Memory-Ersatz für den Supabase-Client in Unit-Tests.
 //
 // Unterstützt genau die Aufrufketten, die serverseitiger Code im Projekt
-// benutzt: select/insert/update/delete mit eq/is-Filtern, order, limit,
+// benutzt: select/insert/update/delete mit eq/is/lt-Filtern, order, limit,
 // single/maybeSingle. Eindeutigkeit lässt sich pro Tabelle angeben — ein
 // Verstoß liefert wie Postgres den Fehlercode 23505.
 
@@ -43,6 +43,10 @@ class Query implements PromiseLike<Result> {
   }
   is(column: string, value: null) {
     this.filters.push({ column, test: (v) => (v ?? null) === value });
+    return this;
+  }
+  lt(column: string, value: string) {
+    this.filters.push({ column, test: (v) => typeof v === "string" && v < value });
     return this;
   }
   order(column: string, opts?: { ascending?: boolean }) {

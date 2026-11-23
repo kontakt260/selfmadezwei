@@ -15,6 +15,7 @@ import {
   type ClaimCookie,
 } from "./claim-token";
 import { fulfillInitialPurchase, PROJECT_DEFAULT_TITLE } from "./fulfill-initial";
+import { markNarrationDraft } from "./narration-draft";
 
 // Käufe ohne Konto (PROJ-6, Checkout vor Login/Registrierung, 2026-11-16).
 //
@@ -58,7 +59,8 @@ export function isDirectGiftSession(session: Pick<Stripe.Checkout.Session, "meta
     meta.is_gift === "1" &&
     meta.gift_mode === "phone-plus-computer" &&
     meta.buyer_retains_access !== "1" &&
-    !!meta.gift_recipient_email?.trim()
+    // Die Adresse liegt in der Kauf-Vorbereitung, ältere Käufe tragen sie noch hier.
+    !!(meta.narration_draft || meta.gift_recipient_email?.trim())
   );
 }
 
@@ -97,7 +99,11 @@ export async function recordGuestPurchase(
     amount_cents: session.amount_total ?? PRODUCTS.initial.amountCents,
     currency: (session.currency ?? PRODUCTS.initial.currency).toLowerCase(),
   });
-  if (!error) return "created";
+  if (!error) {
+    // PROJ-24: Das Konto kann später kommen, die Kontaktdaten müssen warten.
+    await markNarrationDraft(supabase, meta.narration_draft, "paid");
+    return "created";
+  }
   // 23505 = unique_violation → der Kauf ist schon erfasst.
   if (error.code === "23505") return "duplicate";
   throw new Error(error.message);
@@ -258,6 +264,7 @@ export async function claimGuestPurchases(
         amountCents: row.amount_cents,
         currency: row.currency,
         meta,
+        buyerEmail: row.buyer_email ?? user.email,
       });
     } catch (err) {
       // Erfüllung gescheitert → Sperre lösen, damit ein erneuter Versuch

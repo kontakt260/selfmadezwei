@@ -1,6 +1,6 @@
 # PROJ-24: Onboarding optimieren
 
-## Status: In Progress
+## Status: In Review
 **Created:** 2026-11-23
 **Last Updated:** 2026-11-23
 **Freigabe:** Von Jakob am 2026-11-23 freigegeben.
@@ -56,48 +56,48 @@ So sieht Schritt 4 je nach Weg aus:
 
 ### A. Ablauf und Lesbarkeit
 
-- [ ] AC-1: Die Schritte erscheinen in der Reihenfolge der Tabelle, jeweils nur die zum gewählten Weg passenden.
-- [ ] AC-2: Die Schrittanzeige ist gut lesbar: Ziffern mindestens 16 px und mindestens 4,5:1 Kontrast, auch beim aktuellen Schritt.
-- [ ] AC-3: Alle Texte im Onboarding sind mindestens 16 px groß und erreichen mindestens 4,5:1 Kontrast. Alle Bedienelemente sind mindestens 44 px hoch.
-- [ ] AC-4: Schriften und Stil folgen PROJ-22. NARRAVIT steht im Schriftzug in Merriweather.
-- [ ] AC-5: Die Zusammenfassung nutzt einfache Begriffe, zum Beispiel „Für wen" statt „Geschenk?" und „Beschenkte Person" statt „Beschenkte:r".
-- [ ] AC-6: Fehlermeldungen stehen direkt beim betroffenen Feld, in der Sie-Form, und sagen, was zu tun ist.
-- [ ] AC-7: Das Onboarding funktioniert bei 1440, 768 und 375 px ohne seitliches Scrollen und bei 200 % Zoom.
-- [ ] AC-8: Der Link „Zum persönlichen Bereich" für Konten ohne Projekt und der Link „Anmelden" für Gäste bleiben erhalten.
+- [x] AC-1: Die Schritte erscheinen in der Reihenfolge der Tabelle, jeweils nur die zum gewählten Weg passenden.
+- [x] AC-2: Die Schrittanzeige ist gut lesbar: Ziffern mindestens 16 px und mindestens 4,5:1 Kontrast, auch beim aktuellen Schritt.
+- [x] AC-3: Alle Texte im Onboarding sind mindestens 16 px groß und erreichen mindestens 4,5:1 Kontrast. Alle Bedienelemente sind mindestens 44 px hoch.
+- [x] AC-4: Schriften und Stil folgen PROJ-22. NARRAVIT steht im Schriftzug in Merriweather.
+- [x] AC-5: Die Zusammenfassung nutzt einfache Begriffe, zum Beispiel „Für wen" statt „Geschenk?" und „Beschenkte Person" statt „Beschenkte:r".
+- [x] AC-6: Fehlermeldungen stehen direkt beim betroffenen Feld, in der Sie-Form, und sagen, was zu tun ist.
+- [x] AC-7: Das Onboarding funktioniert bei 1440, 768 und 375 px ohne seitliches Scrollen und bei 200 % Zoom.
+- [x] AC-8: Der Link „Zum persönlichen Bereich" für Konten ohne Projekt und der Link „Anmelden" für Gäste bleiben erhalten.
 
 ### B. Schritt „Erzähl-Impulse"
 
-- [ ] AC-9: Bei „Nur per Sprachnachricht erzählen" sind die Erzähl-Impulse fest eingeschaltet. Ohne gültigen Kontaktweg geht es nicht weiter.
-- [ ] AC-10: Bei „Auch am Computer schreiben" und „Für mich selbst" gibt es eine Ja-oder-Nein-Frage, Ja ist vorausgewählt.
-- [ ] AC-11: Bei Nein verschwinden die Kontaktfelder und man kommt ohne weitere Angaben zum nächsten Schritt. Die Karte sagt: „[Name] nutzt zunächst nur den gängigen Projektzugang." Beim eigenen Kauf: „Ich nutze zunächst nur den gängigen Projektzugang."
-- [ ] AC-28: Der Untertitel lautet: „[Name] bekommt eine tiefgehende Leitfrage und kann die Antwort einfach per Sprachnachricht erzählen oder im Portal festhalten." Beim eigenen Kauf in der Sie-Form. Bei „Nur per Sprachnachricht" entfällt das Portal.
-- [ ] AC-29: „Für wen ist das Geschenk?" hat keinen Untertitel. Die Karte „Nur per Sprachnachricht erzählen" ergänzt: „Das ist vor allem für Personen geeignet, denen der Umgang mit dem Computer schwerfällt."
-- [ ] AC-12: Bei Ja wählt man **E-Mail**, **SMS** oder **beides**. Es erscheinen nur die dazu passenden Felder.
-- [ ] AC-13: Die Handynummer steht in einem einzigen Feld mit dem Hinweis „Geben Sie die Nummer mit + und Ländervorwahl ein, zum Beispiel +49." Nummern aller Länder werden angenommen und einheitlich gespeichert, ungültige direkt am Feld abgelehnt.
-- [ ] AC-14: Bei „Für mich selbst" ist die eigene E-Mail-Adresse vorbefüllt. Gäste ohne Konto tragen keine Adresse ein, die Impulse gehen an die Adresse, mit der sie bezahlen. Der Schritt sagt das so.
-- [ ] AC-15: Der Schritt sagt in einem Satz, dass die Erzähl-Impulse jeden Sonntag kommen und der Rhythmus später in der Projektübersicht änderbar ist.
-- [ ] AC-16: Es gibt keine Einverständnis-Box. Information und Ablehnen kommen mit der ersten Nachricht (PROJ-12).
-- [ ] AC-17: Die Angaben werden erst nach erfolgreicher Zahlung dem Projekt zugeordnet. Kommt keine Zahlung zustande, werden sie automatisch gelöscht (Fristen im Tech Design).
-- [ ] AC-18: Durch PROJ-24 allein wird keine Nachricht verschickt. Der Versand kommt mit PROJ-12.
+- [x] AC-9: Bei „Nur per Sprachnachricht erzählen" sind die Erzähl-Impulse fest eingeschaltet. Ohne gültigen Kontaktweg geht es nicht weiter.
+- [x] AC-10: Bei „Auch am Computer schreiben" und „Für mich selbst" gibt es eine Ja-oder-Nein-Frage, Ja ist vorausgewählt.
+- [x] AC-11: Bei Nein verschwinden die Kontaktfelder und man kommt ohne weitere Angaben zum nächsten Schritt. Die Karte sagt: „[Name] nutzt zunächst nur den gängigen Projektzugang." Beim eigenen Kauf: „Ich nutze zunächst nur den gängigen Projektzugang."
+- [x] AC-28: Der Untertitel lautet: „[Name] bekommt eine tiefgehende Leitfrage und kann die Antwort einfach per Sprachnachricht erzählen oder im Portal festhalten." Beim eigenen Kauf in der Sie-Form. Bei „Nur per Sprachnachricht" entfällt das Portal.
+- [x] AC-29: „Für wen ist das Geschenk?" hat keinen Untertitel. Die Karte „Nur per Sprachnachricht erzählen" ergänzt: „Das ist vor allem für Personen geeignet, denen der Umgang mit dem Computer schwerfällt."
+- [x] AC-12: Bei Ja wählt man **E-Mail**, **SMS** oder **beides**. Es erscheinen nur die dazu passenden Felder.
+- [x] AC-13: Die Handynummer steht in einem einzigen Feld mit dem Hinweis „Geben Sie die Nummer mit + und Ländervorwahl ein, zum Beispiel +49." Nummern aller Länder werden angenommen und einheitlich gespeichert, ungültige direkt am Feld abgelehnt.
+- [x] AC-14: Bei „Für mich selbst" ist die eigene E-Mail-Adresse vorbefüllt. Gäste ohne Konto tragen keine Adresse ein, die Impulse gehen an die Adresse, mit der sie bezahlen. Der Schritt sagt das so.
+- [x] AC-15: Der Schritt sagt in einem Satz, dass die Erzähl-Impulse jeden Sonntag kommen und der Rhythmus später in der Projektübersicht änderbar ist.
+- [x] AC-16: Es gibt keine Einverständnis-Box. Information und Ablehnen kommen mit der ersten Nachricht (PROJ-12).
+- [x] AC-17: Die Angaben werden erst nach erfolgreicher Zahlung dem Projekt zugeordnet. Kommt keine Zahlung zustande, werden sie automatisch gelöscht (Fristen im Tech Design).
+- [x] AC-18: Durch PROJ-24 allein wird keine Nachricht verschickt. Der Versand kommt mit PROJ-12.
 
 ### C. Zugang einrichten
 
-- [ ] AC-19: Schalter „Eigener Zugang" und Rollenauswahl bleiben in Funktion und Regeln wie heute.
-- [ ] AC-20: Eine E-Mail aus Schritt 4 ist in Schritt 5 vorbefüllt und zieht spätere Korrekturen mit, bis dort bewusst eine andere Adresse steht.
+- [x] AC-19: Schalter „Eigener Zugang" und Rollenauswahl bleiben in Funktion und Regeln wie heute.
+- [x] AC-20: Eine E-Mail aus Schritt 4 ist in Schritt 5 vorbefüllt und zieht spätere Korrekturen mit, bis dort bewusst eine andere Adresse steht.
 
 ### D. Kaufschritt
 
-- [ ] AC-21: Die Zusammenfassung zeigt nur „Ihr Name", „Für wen", „Beschenkte Person" und „E-Mail für das Geschenk". Beim Kauf für sich selbst bleiben die ersten beiden.
-- [ ] AC-22: Das Buch steht im Preisfeld an erster Stelle. Der Preistext lautet: „Ihr erstes gedrucktes Hardcover-Buch, 12 Monate Projektzugang, Erzählen per Sprachnachricht und Editor."
-- [ ] AC-23: Die Karte „Buch in den Druck geben" aus PROJ-22 nennt passend dazu: „Ihr erstes gedrucktes Buch ist bereits bezahlt."
+- [x] AC-21: Die Zusammenfassung zeigt nur „Ihr Name", „Für wen", „Beschenkte Person" und „E-Mail für das Geschenk". Beim Kauf für sich selbst bleiben die ersten beiden.
+- [x] AC-22: Das Buch steht im Preisfeld an erster Stelle. Der Preistext lautet: „Ihr erstes gedrucktes Hardcover-Buch, 12 Monate Projektzugang, Erzählen per Sprachnachricht und Editor."
+- [x] AC-23: Die Karte „Buch in den Druck geben" aus PROJ-22 nennt passend dazu: „Ihr erstes gedrucktes Buch ist bereits bezahlt."
 
-- [ ] AC-27: Die letzte Seite zeigt ein Buch als Bild. Es ist ein Platzhalter und lässt sich später an einer Stelle gegen ein echtes Foto tauschen.
+- [x] AC-27: Die letzte Seite zeigt ein Buch als Bild. Es ist ein Platzhalter und lässt sich später an einer Stelle gegen ein echtes Foto tauschen.
 
 ### E. Abbruch und Neuladen
 
-- [ ] AC-24: Wer auf der Stripe-Seite zurückgeht, landet wieder bei „Bereit zum Start?" mit allen Angaben.
-- [ ] AC-25: Wer die Seite neu lädt, bleibt beim selben Schritt mit allen Angaben.
-- [ ] AC-26: Die Angaben bleiben nur in diesem Browser-Tab. Sie werden nach erfolgreicher Zahlung, beim Abmelden und beim Schließen des Tabs gelöscht.
+- [x] AC-24: Wer auf der Stripe-Seite zurückgeht, landet wieder bei „Bereit zum Start?" mit allen Angaben.
+- [x] AC-25: Wer die Seite neu lädt, bleibt beim selben Schritt mit allen Angaben.
+- [x] AC-26: Die Angaben bleiben nur in diesem Browser-Tab. Sie werden nach erfolgreicher Zahlung, beim Abmelden und beim Schließen des Tabs gelöscht.
 
 ## Edge Cases
 
@@ -197,7 +197,7 @@ Wer „Nein" wählt, bekommt keine Zeile. Das Projekt gilt dann als „nicht ein
 
 1. **Kontaktdaten gehen nicht über Stripe.** PROJ-12 sah das noch vor. Stripe speichert solche Angaben aber dauerhaft, auch bei abgebrochenen Käufen. Für Daten einer dritten Person ist das nicht sparsam genug.
 2. **Eine Stelle für alle Käufe.** Angemeldeter Kauf, Kauf ohne Konto und Geschenk ohne eigenen Zugang laufen schon heute über dieselbe Erfüllung. Dort werden auch die Erzähl-Einstellungen angelegt.
-3. **Kontaktdaten verhindern nie einen Kauf.** Fehlt die Kauf-Vorbereitung, entsteht das Buch trotzdem. Das Erzählen ist dann „nicht eingerichtet" und lässt sich mit PROJ-12 in der Projektübersicht nachtragen.
+3. **Erzähl-Kontakte verhindern nie einen Kauf.** Fehlt die Kauf-Vorbereitung, entsteht das Buch trotzdem. Das Erzählen ist dann „nicht eingerichtet" und lässt sich mit PROJ-12 in der Projektübersicht nachtragen. **Ausnahme seit BUG-3:** Lässt sich die Adresse für die Geschenk-Einladung nicht speichern, startet der Checkout gar nicht, damit niemand bezahlt, ohne dass die Einladung ankommen kann.
 4. **Vor der Zahlung wird niemand angeschrieben.** So lässt sich der offene Kaufweg nicht nutzen, um fremde Menschen mit Nachrichten zu belästigen.
 5. **Zugriff nur über den Server.** Beide Tabellen sind per RLS für Browser und angemeldete Nutzer komplett gesperrt. Lese- und Änderungsrechte für die Projektübersicht kommen erst mit PROJ-12. Diese RLS-Regeln hat Jakob am 2026-11-23 freigegeben.
 6. **Gleiche Prüfung im Browser und auf dem Server.** Handynummern werden international geprüft und einheitlich gespeichert, damit PROJ-12 sie direkt nutzen kann.
@@ -249,15 +249,128 @@ Geprüft werden alle sechs Kombinationen aus Weg und Erzähl-Impulsen, bezahlte 
 - **Lesbarkeit:** Schrittanzeige, Texte, Felder und Buttons, Fehlermeldungen direkt am Feld, keine Glaseffekte mehr.
 - **Kaufschritt und Druck-Karte:** kurze Zusammenfassung, Buchbild als Platzhalter (`PURCHASE_BOOK` in `OnboardingWizard.tsx`), Preistext mit dem Buch zuerst, Hinweis auf das bereits bezahlte Buch.
 
-**Noch nicht gebaut (`/backend`):** Die Angaben aus dem Schritt „Erzähl-Impulse" gehen beim Kauf noch nicht an den Server. Ein Testkauf auf Stage speichert sie also noch nicht.
 
 **Ergänzungen beim Bau:**
 
 - Eine Nummer ohne + wird als deutsche Nummer gelesen, zum Beispiel 0171 1234567.
 - Der Zwischenspeicher verfällt zusätzlich nach 24 Stunden, auch wenn der Tab offen bleibt.
 
-## QA Test Results
-_To be added by /qa_
+## Implementation Notes (Backend, 2026-11-23)
 
-## Deployment
-_To be added by /deploy_
+**Gebaut, nicht committet:**
+
+- **Migration `20261123120000_proj24_narration.sql`:** Tabellen `narration_settings` und `purchase_narration_drafts`, beide per RLS ohne Policies und ohne Rechte für `anon` und `authenticated`.
+- **Checkout:** Der Server prüft die Angaben selbst, legt die Kauf-Vorbereitung an und gibt Stripe nur deren Kennung. Scheitert Stripe, wird sie wieder gelöscht.
+- **Erfüllung:** Alle drei Kaufwege übertragen die Daten in `fulfillInitialPurchase` ans Projekt. Gelöscht wird die Vorbereitung erst nach dem Zahlungseintrag, damit ein wiederholter Webhook sie noch findet.
+- **Verzögerte Zahlung und Kauf ohne Konto:** Die Vorbereitung bekommt dann den Zustand `payment_pending` oder `paid` und damit die längere Frist.
+- **Cron:** Der tägliche Lauf löscht offene Einträge nach 2, laufende Zahlungen nach 21 und bezahlte, nicht eingelöste Käufe nach 90 Tagen.
+- **Fehlerverhalten:** Probleme mit den Kontaktdaten verhindern nie einen Kauf. Das Projekt gilt dann als „nicht eingerichtet". In den Logs stehen keine Kontaktdaten.
+
+**Geprüft am 2026-11-23:** Die Migration ist auf Stage eingespielt. Dort hat nur die Service-Role Zugriff, `anon` und `authenticated` haben keine Rechte, RLS ist aktiv. Unit-Tests 826/826, E2E 283 bestanden. Ein echter Testkauf über Stripe steht noch aus und gehört in `/qa`.
+
+**Nach der QA geändert (BUG-3):** Auch die E-Mail für die Portal-Einladung beim Weg „Auch am Computer" liegt jetzt in der Kauf-Vorbereitung (Migration `20261123130000_proj24_gift_email_draft.sql`), Stripe kennt nur die Kennung. Ältere Käufe mit der Adresse in den Metadaten funktionieren weiter. Ist die Adresse nach Ablauf der Frist nicht mehr da, behält der Käufer das Projekt und lädt selbst ein.
+
+## QA Test Results
+
+**Tested:** 2026-11-23
+**App URL:** http://localhost:3000 (Production-Build gegen die Stage-Datenbank)
+**Tester:** QA Engineer (AI)
+**Browser:** nur Chromium. WebKit startet auf diesem Mac nicht, der Playwright-Firefox ist nicht installiert.
+**Nicht geprüft:** ein echter Kauf über die Stripe-Seite. Zahlungen wurden als signierte Webhook-Events gegen den lokalen Server simuliert. Der echte Testkauf braucht den Code auf Stage.
+
+### Acceptance Criteria Status
+
+| Bereich | Ergebnis | Anmerkung |
+|---|---|---|
+| A. Ablauf und Lesbarkeit (AC-1 bis 8) | 8/8 | AC-6 nach BUG-2 bestanden. Lesbarkeit in fünf Größen ohne Befund |
+| B. Schritt „Erzähl-Impulse" (AC-9 bis 18, 28, 29) | 12/12 | Nummern aus mehreren Ländern, auch mit 00 und (0), werden korrekt gespeichert |
+| C. Zugang einrichten (AC-19, 20) | 2/2 | AC-20 nach BUG-1 bestanden |
+| D. Kaufschritt (AC-21 bis 23, 27) | 4/4 | |
+| E. Abbruch und Neuladen (AC-24 bis 26) | 3/3 | AC-25 nach BUG-2 bestanden |
+
+### Kaufwege (gegen Stage, simulierte Zahlung)
+
+- [x] Angemeldeter Kauf: Einstellungen am Projekt, Vorbereitung gelöscht
+- [x] Wiederholter Webhook: nichts doppelt
+- [x] SEPA: Daten warten bis zum Zahlungseingang
+- [x] Geschenk ohne eigenen Zugang und ohne Konto
+- [x] Kauf ohne Konto: Daten warten bis zum Einlösen und nutzen die Adresse aus der Zahlung
+- [x] Fehlende oder kaputte Kennung: Der Kauf läuft trotzdem durch
+- [x] Scheitert Stripe beim Start, bleibt keine Vorbereitung zurück
+- [x] Geschenk ohne Erzähl-Impulse: Nur die Einladungsadresse wartet, die Einladung entsteht, danach ist die Adresse gelöscht
+
+### Edge Cases Status
+
+- [x] Weg gewechselt von „Auch am Computer" zu „Nur per Sprachnachricht"
+- [x] Von Geschenk zu „Für mich selbst" und zurück: Die alte Einladungsadresse wird gelöscht (BUG-1 behoben)
+- [x] Nur SMS beim Weg „Auch am Computer"
+- [x] Eigene Adresse beim Geschenk
+- [x] Beides gewählt, ein Feld leer oder ungültig
+- [x] Checkout schlägt fehl
+- [x] Gast meldet sich mitten im Ablauf an
+- [x] Abmelden löscht den Zwischenspeicher, ein fremder Entwurf wird nicht gezeigt
+- [x] Vorbelegter Weg über den Link der Website
+
+### Security Audit Results
+
+- [x] RLS: Gäste und angemeldete Nutzer können beide Tabellen weder lesen noch ändern
+- [x] Auf Stage hat nur die Service-Role Rechte, auch nach der zweiten Migration
+- [x] Telefonnummern, Erzähl-Adressen und die Einladungsadresse gehen nicht an Stripe (BUG-3 behoben). Der Name der beschenkten Person steht weiter in den Stripe-Metadaten
+- [x] In den Server-Logs stehen keine Kontaktdaten
+- [x] Gespeichertes HTML im Namen wird nicht ausgeführt
+- [x] Beschädigter Zwischenspeicher wird verworfen
+- [x] Es wurden keine Mails oder SMS ausgelöst, die Testdaten sind wieder gelöscht
+
+### Bugs Found
+
+#### BUG-1: Nach einem Wegwechsel steht die alte Adresse in der Geschenk-Einladung
+- **Severity:** High
+- **Steps to Reproduce:**
+  1. Geschenk „Auch am Computer" für Oma mit oma@… bis Schritt 5 durchgehen
+  2. Zurück zu „Für wen", „Für mich selbst" wählen und wieder „Als Geschenk"
+  3. Als Person Opa mit opa@… eintragen und weiter
+  4. Expected: Schritt 5 zeigt opa@…
+  5. Actual: Schritt 5 zeigt weiter oma@…. Bleibt das unbemerkt, geht die Einladung nach dem Kauf an die falsche Person
+- **Priority:** Fix before deployment
+- **Status:** Behoben am 2026-11-23
+
+#### BUG-2: Zu lange Namen führen in eine Sackgasse
+- **Severity:** Medium
+- **Steps to Reproduce:**
+  1. Einen Namen mit mehr als 120 Zeichen eintragen und bis zum Kauf gehen
+  2. Expected: Das Feld begrenzt die Länge oder sagt direkt, was zu tun ist
+  3. Actual: Erst auf der letzten Seite erscheint „Bitte prüfen Sie Ihre Angaben", ohne Hinweis auf das Feld. Ab 200 Zeichen gehen beim Neuladen alle Angaben verloren
+- **Priority:** Fix before deployment
+- **Status:** Behoben am 2026-11-23
+
+#### BUG-3: Die Adresse für die Einladung liegt weiter bei Stripe
+- **Severity:** Medium
+- **Steps to Reproduce:** Beim Weg „Auch am Computer" steht die E-Mail der beschenkten Person weiter in den Stripe-Metadaten und in `purchase_claims`, auch bei abgebrochenen Käufen. Das widerspricht der Entscheidung, Kontaktdaten Dritter nicht bei Stripe zu speichern
+- **Priority:** Fix before deployment
+- **Status:** Behoben am 2026-11-23
+
+#### BUG-4: Ein verspätetes Stripe-Event verkürzt die Aufbewahrung
+- **Severity:** Low
+- **Steps to Reproduce:** Kommt beim Kauf ohne Konto das Event „unbezahlt" nach dem Zahlungseingang an, springt die Vorbereitung von `paid` auf `payment_pending`. Die Frist sinkt von 90 auf 21 Tage, danach gingen die Kontaktdaten verloren
+- **Priority:** Fix before deployment
+- **Status:** Behoben am 2026-11-23
+
+#### BUG-5: Ein fehlender Server-Schlüssel stoppt den Kauf
+- **Severity:** Low
+- **Steps to Reproduce:** Laut Code wird der Datenbank-Client für die Kauf-Vorbereitung außerhalb der Fehlerbehandlung erzeugt. Fehlt `SUPABASE_SERVICE_ROLE_KEY`, bricht der Kaufstart ab, obwohl Kontaktdaten nie einen Kauf verhindern sollen. Nicht im Browser ausgelöst
+- **Priority:** Nice to have
+- **Status:** Behoben am 2026-11-23
+
+### Automatisierte Tests
+
+- Nachtest nach allen fünf Fixes: Unit-Tests 845/845, E2E 300 Testläufe bestanden (185 Hauptlauf, 42 Design und Onboarding, 50 Lesemodus, Zugriff und Papierkorb, 14 Aufbewahrung, 9 Kaufwege)
+- Migration `20261123130000_proj24_gift_email_draft.sql` ist auf Stage eingespielt und geprüft. Die Testdaten sind wieder entfernt
+- Die echte Cron-Route wurde nicht aufgerufen, die Löschfristen sind per Unit-Test abgesichert
+
+### Summary
+
+- **Acceptance Criteria:** 29/29 passed
+- **Bugs Found:** 5 total (0 critical, 1 high, 2 medium, 2 low), alle behoben
+- **Security:** Pass
+- **Production Ready:** Noch nicht. Es fehlen ein echter Stripe-Testkauf auf Stage und die Prüfung in Safari und Firefox. Live geht PROJ-24 außerdem nur zusammen mit PROJ-12
+- **Recommendation:** Auf Stage bringen, echten Stripe-Testkauf machen, danach Status Approved

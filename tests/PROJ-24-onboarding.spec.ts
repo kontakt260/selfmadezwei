@@ -177,6 +177,49 @@ test.describe("PROJ-24 — Onboarding als Gast", () => {
     await expect(page.locator("#narrationPhone")).toHaveCount(0);
   });
 
+  test("AC-20: Nach einem Wegwechsel steht die neue Adresse im Geschenk", async ({ page }) => {
+    await toNarration(page, "computer");
+    await page.locator("#narrationEmail").fill("oma@example.test");
+    await weiter(page);
+    await expect(page.locator("#recipientEmail")).toHaveValue("oma@example.test");
+    for (let step = 0; step < 4; step += 1) {
+      await page.getByRole("button", { name: "Zurück" }).click();
+    }
+    await page.getByRole("button", { name: /Für mich selbst/ }).click();
+    await page.getByRole("button", { name: /Als Geschenk/ }).click();
+    await weiter(page);
+    await weiter(page);
+    await page.getByLabel("Name der beschenkten Person").fill("Opa Karl");
+    await weiter(page);
+    await page.locator("#narrationEmail").fill("opa@example.test");
+    await weiter(page);
+    await expect(page.locator("#recipientEmail")).toHaveValue("opa@example.test");
+  });
+
+  test("AC-6, AC-25: Die Felder begrenzen die Länge", async ({ page }) => {
+    await toNarration(page, "computer");
+    await expect(page.locator("#narrationEmail")).toHaveAttribute("maxlength", "254");
+    await page.getByRole("button", { name: "Per SMS", exact: true }).click();
+    await expect(page.locator("#narrationPhone")).toHaveAttribute("maxlength", "40");
+    await page.getByRole("button", { name: "Zurück" }).click();
+    await expect(page.getByLabel("Name der beschenkten Person")).toHaveAttribute("maxlength", "120");
+    await page.getByRole("button", { name: "Zurück" }).click();
+    await expect(page.getByLabel("Vor- und Nachnamen")).toHaveAttribute("maxlength", "120");
+  });
+
+  test("AC-29: Geschenk-Schritt ohne Untertitel, mit Hinweis zur Sprachnachricht", async ({ page }) => {
+    await page.goto("/onboarding");
+    await page.getByRole("button", { name: /Als Geschenk/ }).click();
+    await weiter(page);
+    await page.getByLabel("Vor- und Nachnamen").fill("Max Mustermann");
+    await weiter(page);
+    await expect(page.getByRole("heading", { name: "Für wen ist das Geschenk?" })).toBeVisible();
+    await expect(page.getByText(/Erzählen Sie uns ein bisschen/)).toHaveCount(0);
+    await expect(
+      page.getByText(/Das ist vor allem für Personen geeignet, denen der Umgang mit dem Computer schwerfällt/),
+    ).toBeVisible();
+  });
+
   test("AC-2, AC-3, AC-7: Alle Schritte sind lesbar und laufen nicht über", async ({ page }) => {
     for (const [width, height] of [[1440, 900], [768, 1024], [375, 812], [720, 500]] as const) {
       await page.setViewportSize({ width, height });
@@ -201,6 +244,11 @@ test.describe("PROJ-24 — Onboarding angemeldet", () => {
   test("AC-14: Die eigene Adresse ist vorbefüllt", async ({ page }) => {
     await toNarration(page, "self");
     await expect(page.locator("#narrationEmail")).toHaveValue("qa-test@narravit.de");
+  });
+
+  test("AC-23: Die Druck-Karte nennt das bereits bezahlte Buch", async ({ page }) => {
+    await page.goto("/projektuebersicht/cccccccc-0099-0099-0099-000000000099");
+    await expect(page.getByText(/Ihr erstes gedrucktes Buch\s+ist bereits bezahlt/)).toBeVisible();
   });
 
   test("AC-26: Fremder Zwischenspeicher wird nicht gezeigt", async ({ page }) => {

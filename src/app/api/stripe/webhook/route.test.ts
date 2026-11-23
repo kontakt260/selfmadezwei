@@ -69,6 +69,13 @@ vi.mock("@/lib/email/send-deleted-project-alert", () => ({
     sendDeletedProjectAlertMock(input),
 }));
 
+const markNarrationDraftMock = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock("@/lib/purchases/narration-draft", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/purchases/narration-draft")>()),
+  markNarrationDraft: (_client: unknown, id: string, status: string) =>
+    (markNarrationDraftMock as unknown as (id: string, status: string) => Promise<void>)(id, status),
+}));
+
 // ─── Mock Supabase Service-Role-Client ───────────────────────────────
 //
 // Der Webhook ruft Insert/Upsert/Select-Methoden. Wir tracken alle
@@ -1007,6 +1014,24 @@ describe("Stripe webhook — Zahlungsstatus (BUG-G2, BUG-G3)", () => {
     expect(res.status).toBe(200);
     expect(fakeDb.projects).toHaveLength(1);
     expect(fakeDb.payments).toHaveLength(1);
+  });
+
+  it("keeps the narration draft alive while a delayed payment is pending (PROJ-24)", async () => {
+    markNarrationDraftMock.mockClear();
+    constructEventMock.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: makeSession({
+          id: "cs_sepa_draft",
+          payment_status: "unpaid",
+          metadata: { ...initialMeta, narration_draft: "draft-1" },
+        }),
+      },
+    });
+    const res = await callPost("body", "valid-sig");
+    expect(res.status).toBe(200);
+    expect(markNarrationDraftMock).toHaveBeenCalledWith("draft-1", "payment_pending");
+    expect(fakeDb.projects).toHaveLength(0);
   });
 
   it("ignores a failed delayed payment", async () => {

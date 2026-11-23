@@ -14,6 +14,7 @@ import {
   type PaidRestoreStatus,
 } from "@/lib/projects/trash";
 import { formatEur, formatGermanDate } from "@/lib/email/format";
+import { markNarrationDraft } from "@/lib/purchases/narration-draft";
 import { fulfillInitialPurchase, PROJECT_DEFAULT_TITLE } from "@/lib/purchases/fulfill-initial";
 import {
   isDirectGiftSession,
@@ -156,6 +157,14 @@ export async function POST(req: NextRequest) {
   const session = event.data.object;
   if (!isCheckoutPaid(session)) {
     // Geld noch nicht da: Die Erfüllung folgt mit async_payment_succeeded.
+    // PROJ-24: Bis dahin müssen die Kontaktdaten länger erhalten bleiben.
+    if (session.metadata?.narration_draft) {
+      await markNarrationDraft(
+        createServiceRoleClient(),
+        session.metadata.narration_draft,
+        "payment_pending",
+      );
+    }
     return NextResponse.json({ received: true, ignored: session.payment_status });
   }
 
@@ -274,6 +283,7 @@ async function handleInitial(
     amountCents: session.amount_total,
     currency: session.currency,
     meta,
+    buyerEmail: session.customer_details?.email ?? session.customer_email ?? null,
   });
 
   // PROJ-11: Einladung an die beschenkte Person + Kauf-Bestätigung an
@@ -342,6 +352,7 @@ async function handleDirectGift(
     amountCents: session.amount_total,
     currency: session.currency,
     meta,
+    buyerEmail: session.customer_details?.email ?? session.customer_email ?? null,
   });
 
   // Einladung an die beschenkte Person + Bestätigung an den Käufer (Mail 04).

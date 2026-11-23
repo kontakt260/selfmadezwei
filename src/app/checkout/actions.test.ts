@@ -35,6 +35,21 @@ vi.mock("@/lib/supabase/server", () => ({
   }),
 }));
 
+const draftInsertMock = vi.hoisted(() => vi.fn());
+const draftDeleteMock = vi.hoisted(() => vi.fn());
+const serviceRole = vi.hoisted(() => ({ missing: false }));
+vi.mock("@/lib/supabase/serviceRole", () => ({
+  createServiceRoleClient: () => {
+    if (serviceRole.missing) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not set");
+    return {
+      from: () => ({
+        insert: draftInsertMock,
+        delete: () => ({ eq: draftDeleteMock }),
+      }),
+    };
+  },
+}));
+
 const cookieSetMock = vi.fn();
 vi.mock("next/headers", () => ({
   cookies: async () => ({ set: cookieSetMock }),
@@ -62,6 +77,9 @@ beforeEach(() => {
     url: "https://checkout.stripe.test/c/pay/cs_test_a1B2c3D4e5F6",
   });
   cookieSetMock.mockReset();
+  serviceRole.missing = false;
+  draftInsertMock.mockReset().mockResolvedValue({ error: null });
+  draftDeleteMock.mockReset().mockResolvedValue({ error: null });
 });
 
 describe("startCheckoutAction — Rate-Limit (PROJ-17)", () => {
@@ -167,6 +185,7 @@ describe("startCheckoutAction — Kauf ohne Konto", () => {
         giftRecipientName: "Oma Erna",
         giftMode: "phone-only",
         buyerRetainsAccess: false,
+        narration: { enabled: true, channel: "email", email: "oma@example.com" },
       },
     });
     const { metadata } = createSessionMock.mock.calls[0][0];
@@ -275,5 +294,127 @@ describe("startCheckoutAction — angemeldet (unverändert)", () => {
       product_type: "renewal",
       project_id: "proj-1",
     });
+  });
+});
+
+describe("startCheckoutAction — Erzähl-Impulse (PROJ-24)", () => {
+  const phoneOnly: InitialMetadata = {
+    fullName: "Karla Käufer",
+    isGift: true,
+    giftRecipientName: "Oma Erna",
+    giftMode: "phone-only",
+    narration: {
+      enabled: true,
+      channel: "both",
+      email: "oma@example.com",
+      phone: "+49 171 1234567",
+    },
+  };
+
+  it("gibt Stripe nur die Kennung, nie die Kontaktdaten", async () => {
+    const res = await startCheckoutAction({ productType: "initial", metadata: phoneOnly });
+    expect(res.ok).toBe(true);
+    const params = createSessionMock.mock.calls[0][0];
+    const draft = draftInsertMock.mock.calls[0][0];
+    expect(params.metadata.narration_draft).toBe(draft.id);
+    expect(draft).toMatchObject({ email: "oma@example.com", phone: "+491711234567" });
+    const sentToStripe = JSON.stringify(params);
+    expect(sentToStripe).not.toContain("oma@example.com");
+    expect(sentToStripe).not.toContain("1711234567");
+  });
+
+  it("lehnt „Nur per Sprachnachricht“ ohne Kontakt ab", async () => {
+    const res = await startCheckoutAction({
+      productType: "initial",
+      metadata: { ...phoneOnly, narration: undefined },
+    });
+    expect(res).toEqual({
+      ok: false,
+      error: "Bitte prüfen Sie die Angaben zu den Erzähl-Impulsen.",
+    });
+    expect(createSessionMock).not.toHaveBeenCalled();
+    expect(draftInsertMock).not.toHaveBeenCalled();
+  });
+
+  it("lehnt eine ungültige Handynummer auf dem Server ab", async () => {
+    const res = await startCheckoutAction({
+      productType: "initial",
+      metadata: { ...phoneOnly, narration: { enabled: true, channel: "sms", phone: "030 1234567" } },
+    });
+    expect(res.ok).toBe(false);
+    expect(createSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("legt bei Nein keine Kauf-Vorbereitung an", async () => {
+    await startCheckoutAction({
+      productType: "initial",
+      metadata: { ...selfPurchase, narration: { enabled: false, channel: "email" } },
+    });
+    expect(draftInsertMock).not.toHaveBeenCalled();
+    expect(createSessionMock.mock.calls[0][0].metadata.narration_draft).toBeUndefined();
+  });
+
+  it("lässt den Kauf weiterlaufen, wenn die Vorbereitung nicht gespeichert werden kann", async () => {
+    draftInsertMock.mockResolvedValue({ error: { message: "kaputt" } });
+    const res = await startCheckoutAction({ productType: "initial", metadata: phoneOnly });
+    expect(res.ok).toBe(true);
+    expect(createSessionMock.mock.calls[0][0].metadata.narration_draft).toBeUndefined();
+  });
+
+  it("lässt den Kauf weiterlaufen, wenn der Server-Schlüssel fehlt", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    serviceRole.missing = true;
+    const res = await startCheckoutAction({ productType: "initial", metadata: phoneOnly });
+    expect(res.ok).toBe(true);
+    expect(createSessionMock.mock.calls[0][0].metadata.narration_draft).toBeUndefined();
+  });
+
+  const computerGift: InitialMetadata = {
+    fullName: "Karla Käufer",
+    isGift: true,
+    giftRecipientName: "Oma Erna",
+    giftRecipientEmail: "oma@example.com",
+    giftMode: "phone-plus-computer",
+    giftRecipientRole: "co_author",
+    buyerRetainsAccess: true,
+    narration: { enabled: false, channel: "email" },
+  };
+
+  it("gibt Stripe auch die Adresse für die Einladung nicht", async () => {
+    const res = await startCheckoutAction({ productType: "initial", metadata: computerGift });
+    expect(res.ok).toBe(true);
+    const params = createSessionMock.mock.calls[0][0];
+    const draft = draftInsertMock.mock.calls[0][0];
+    expect(draft).toMatchObject({
+      narrator_name: null,
+      channel: null,
+      gift_recipient_email: "oma@example.com",
+    });
+    expect(params.metadata.narration_draft).toBe(draft.id);
+    expect(params.metadata.gift_recipient_email).toBeUndefined();
+    expect(JSON.stringify(params)).not.toContain("oma@example.com");
+  });
+
+  it("startet kein Geschenk, wenn die Einladungsadresse nicht gespeichert werden kann", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    draftInsertMock.mockResolvedValue({ error: { message: "kaputt" } });
+    const res = await startCheckoutAction({ productType: "initial", metadata: computerGift });
+    expect(res.ok).toBe(false);
+    expect(createSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("startet kein Geschenk, wenn der Server-Schlüssel fehlt", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    serviceRole.missing = true;
+    const res = await startCheckoutAction({ productType: "initial", metadata: computerGift });
+    expect(res.ok).toBe(false);
+    expect(createSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("löscht die Vorbereitung, wenn Stripe scheitert", async () => {
+    createSessionMock.mockRejectedValue(new Error("stripe down"));
+    const res = await startCheckoutAction({ productType: "initial", metadata: phoneOnly });
+    expect(res.ok).toBe(false);
+    expect(draftDeleteMock).toHaveBeenCalledWith("id", draftInsertMock.mock.calls[0][0].id);
   });
 });

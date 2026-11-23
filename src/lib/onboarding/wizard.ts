@@ -85,6 +85,11 @@ export type WizardContext = {
 
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
+/** Dieselben Längen prüft der Server beim Kauf. */
+export const NAME_MAX_LENGTH = 120;
+export const EMAIL_MAX_LENGTH = 254;
+export const PHONE_MAX_LENGTH = 40;
+
 export const INITIAL_WIZARD_STATE: WizardState = {
   fullName: "",
   forWhom: null,
@@ -144,7 +149,8 @@ export function normalizeMobileNumber(raw: string): string | null {
 }
 
 export function isValidEmail(value: string): boolean {
-  return EMAIL_PATTERN.test(value.trim());
+  const email = value.trim();
+  return email.length <= EMAIL_MAX_LENGTH && EMAIL_PATTERN.test(email);
 }
 
 function narrationErrors(state: WizardState, context: WizardContext): FieldErrors {
@@ -173,13 +179,18 @@ export function validateStep(
     case "for-whom":
       return state.forWhom ? {} : { forWhom: "Bitte treffen Sie eine Auswahl." };
     case "name":
-      return state.fullName.trim().length < 2
-        ? { fullName: "Bitte geben Sie Ihren Namen an (mind. 2 Zeichen)." }
+      if (state.fullName.trim().length < 2) {
+        return { fullName: "Bitte geben Sie Ihren Namen an (mind. 2 Zeichen)." };
+      }
+      return state.fullName.length > NAME_MAX_LENGTH
+        ? { fullName: `Bitte kürzen Sie Ihren Namen auf höchstens ${NAME_MAX_LENGTH} Zeichen.` }
         : {};
     case "gift-details": {
       const errors: FieldErrors = {};
       if (state.giftRecipientName.trim().length < 2) {
         errors.giftRecipientName = "Bitte geben Sie den Namen der beschenkten Person an.";
+      } else if (state.giftRecipientName.length > NAME_MAX_LENGTH) {
+        errors.giftRecipientName = `Bitte kürzen Sie den Namen auf höchstens ${NAME_MAX_LENGTH} Zeichen.`;
       }
       if (!state.giftMode) errors.giftMode = "Bitte wählen Sie, wie erzählt werden soll.";
       return errors;
@@ -204,8 +215,9 @@ export function validateStep(
 }
 
 /**
- * Wechselt den Weg. Angaben zur beschenkten Person gehen dabei nicht in den
- * Kauf für sich selbst über, die eigene Adresse ist dort vorbefüllt.
+ * Wechselt den Weg. Kontaktangaben gehen dabei nicht auf den neuen Weg über,
+ * damit eine Einladung nie an eine frühere Adresse geht. Beim Kauf für sich
+ * selbst ist die eigene Adresse vorbefüllt.
  */
 export function changeForWhom(
   state: WizardState,
@@ -220,6 +232,7 @@ export function changeForWhom(
     narrationChannel: "email",
     narrationEmail: forWhom === "self" ? context.buyerEmail : "",
     narrationPhone: "",
+    giftRecipientEmail: "",
   };
 }
 

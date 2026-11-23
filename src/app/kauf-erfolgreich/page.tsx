@@ -5,6 +5,7 @@ import { isCheckoutPaid } from "@/lib/stripe/payment-status";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { isDirectGiftSession, isGuestSession } from "@/lib/purchases/guest-purchase";
+import { findGiftRecipientEmail } from "@/lib/purchases/narration-draft";
 import { BackdropScreen, type BackdropKey } from "@/components/BackdropScreen";
 import { BrandName } from "@/components/BrandName";
 import { ClearOnboardingDraft } from "@/app/onboarding/ClearOnboardingDraft";
@@ -55,6 +56,19 @@ type VerifiedSession = {
   buyerEmail: string;
 };
 
+// Die Adresse steht seit PROJ-24 nicht mehr bei Stripe. Fehlt sie, nennen die
+// Texte stattdessen „die beschenkte Person".
+async function lookupGiftRecipientEmail(
+  stripeSessionId: string,
+  meta: Record<string, string | undefined>,
+): Promise<string> {
+  try {
+    return await findGiftRecipientEmail(createServiceRoleClient(), { stripeSessionId, meta });
+  } catch {
+    return "";
+  }
+}
+
 async function verifyStripeSession(sessionId: string): Promise<VerifiedSession | null> {
   try {
     const stripe = getStripe();
@@ -73,7 +87,6 @@ async function verifyStripeSession(sessionId: string): Promise<VerifiedSession |
     };
     if (productType === "initial") {
       if (meta.is_gift === "1") {
-        const recipientEmail = meta.gift_recipient_email ?? "";
         const giftMode = meta.gift_mode;
         if (giftMode === "phone-only") {
           const recipientName = meta.gift_recipient_name?.trim() ?? "";
@@ -82,6 +95,7 @@ async function verifyStripeSession(sessionId: string): Promise<VerifiedSession |
         // gift_mode === "phone-plus-computer" — beide Sub-Modi auf
         // einer gemeinsamen Bestätigungsseite, die das Mail-Versenden
         // hervorhebt.
+        const recipientEmail = paid ? await lookupGiftRecipientEmail(session.id, meta) : "";
         return {
           ...base,
           variant: {
