@@ -19,7 +19,7 @@ test.describe("PROJ-3 — Seite & Layout", () => {
     await page.goto("/persoenlicher-bereich");
     await expect(page.locator('img[alt*="Banner"]')).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Persönlicher Bereich", level: 1 })).toBeVisible();
-    await expect(page.getByText("Ihre Angaben, Rechnungen und Ihr Konto an einem Ort.")).toBeVisible();
+    await expect(page.getByText("Ihre Daten, Rechnungen und Konto")).toBeVisible();
   });
 
   test("AC-3: Alle 4 Sektionen in korrekter Reihenfolge vorhanden", async ({ page }) => {

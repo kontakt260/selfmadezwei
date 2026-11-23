@@ -597,7 +597,7 @@ export function PersonalAreaClient({
               Persönlicher Bereich
             </h1>
             <p className="text-xl leading-normal text-[#4A453F] sm:text-[1.3125rem]">
-              Ihre Angaben, Rechnungen und Ihr Konto an einem Ort.
+              Ihre Daten, Rechnungen und Konto
             </p>
           </header>
 
