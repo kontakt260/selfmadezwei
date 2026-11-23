@@ -61,9 +61,16 @@
     font-family: var(--font-lato), ui-sans-serif, system-ui, sans-serif;
   }
 
+  /* PROJ-22: Überschriften der App wie auf der Website. Das Buch selbst
+   * (.a5-stack, .a5-page) behält weiter unten seine eigene Schrift. */
   h1, h2, h3, h4, h5, h6 {
     @apply text-foreground;
-    font-family: var(--font-merriweather), ui-serif, Georgia, "Times New Roman", serif;
+    font-family: var(--font-pt-serif), ui-serif, Georgia, "Times New Roman", serif;
+    letter-spacing: -0.01em;
+  }
+
+  h1 {
+    letter-spacing: -0.02em;
   }
 }
 
@@ -301,6 +308,14 @@
 
 .a5-page + .a5-page {
   margin-top: var(--a5-page-gap);
+}
+
+/* PROJ-22: Die App-Überschriften dürfen den Buchsatz nicht verändern, sonst
+ * verschieben sich Seitenumbrüche und das spätere Druck-PDF. */
+.a5-stack :is(h1, h2, h3, h4, h5, h6),
+.a5-page :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--font-merriweather), ui-serif, Georgia, "Times New Roman", serif;
+  letter-spacing: normal;
 }
 
 .a5-stack h1,

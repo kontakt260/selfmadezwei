@@ -12,7 +12,9 @@ import { getRetentionHoldUntil } from "@/lib/projects/trash";
 import { ProjectUsersSection } from "@/components/projektuebersicht/ProjectUsersSection";
 import type { MemberDisplay } from "@/components/projektuebersicht/ProjectUsersClient";
 import { CheckoutCancelToast } from "@/components/CheckoutCancelToast";
-import { CoverRender } from "@/components/cover/CoverRender";
+import { BookView } from "@/components/cover/BookView";
+import { PrintOrderCard } from "@/components/projektuebersicht/PrintOrderCard";
+import { Button } from "@/components/ui/button";
 import { DEFAULT_COLOR_ID } from "@/lib/cover-colors";
 import { DEFAULT_THEME_ID } from "@/lib/cover-themes";
 import type { CoverData, CoverRowRaw } from "@/lib/cover-types";
@@ -35,15 +37,6 @@ function IconArrowLeft() {
   );
 }
 
-function IconEye() {
-  return (
-    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" stroke="#96B897" strokeWidth={2} />
-      <circle cx={12} cy={12} r={3} stroke="#96B897" strokeWidth={2} />
-    </svg>
-  );
-}
-
 function IconPhoneHandset() {
   return (
     <svg width={24} height={24} viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -62,7 +55,7 @@ function IconPhoneHandset() {
 
 function SectionShell({ children }: { children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-5 bg-white p-5 sm:gap-6 sm:p-8">
+    <section className="flex flex-col gap-5 border border-[#E0DCD5] bg-white p-5 sm:gap-6 sm:p-8">
       {children}
     </section>
   );
@@ -198,7 +191,7 @@ export default async function ProjektuebersichtPage({
 
   const { data: rawChapters } = await supabase
     .from("chapters")
-    .select("id, title, chapter_origin, body, sort_order")
+    .select("id, title, chapter_origin, body, sort_order, page_count")
     .eq("project_id", project_id)
     .order("sort_order", { ascending: true });
 
@@ -208,6 +201,14 @@ export default async function ProjektuebersichtPage({
     source: c.chapter_origin === "catalog_impulse" ? "Erzähl-Impuls" : "Eigenes Kapitel",
     words: countWordsFromBody(c.body),
   }));
+  // PROJ-22: Kennzahlen für Cover-Karte und Druck-Karte.
+  const chapterCount = chapters.length;
+  const pageCount = (rawChapters ?? []).reduce((sum, c) => sum + c.page_count, 0);
+  const openChapterCount = chapters.filter((c) => c.words === 0).length;
+  const bookSummary =
+    chapterCount === 0
+      ? "Noch keine Kapitel"
+      : `${chapterCount} Kapitel, ${pageCount === 1 ? "1 Seite" : `${pageCount} Seiten`} im A5-Format`;
 
   // PROJ-8: Erzähl-Impuls-Katalog für das Shuffle-Modal. RLS erlaubt
   // SELECT für authenticated; jeder Nutzer sieht den vollständigen Katalog.
@@ -264,60 +265,39 @@ export default async function ProjektuebersichtPage({
         <CheckoutCancelToast />
       </Suspense>
       <main className="[font-family:var(--font-lato)] box-border min-h-full w-full min-w-0 flex-1 bg-[#FAF8F6] px-4 pb-20 pt-[calc(7.348rem+2rem)] sm:px-6 sm:pb-16 sm:pt-[calc(7.348rem+2.5rem)] md:px-8 md:pt-[calc(7.348rem+3rem)] xl:pl-[calc(11rem+2rem)] xl:pr-8 xl:pt-12">
-        <div className="mx-auto flex w-full max-w-[1213px] flex-col gap-8 sm:gap-10 md:gap-12">
+        <div className="mx-auto flex w-full max-w-[1213px] flex-col gap-6 sm:gap-8">
+          <Link
+            href="/"
+            className="inline-flex min-h-11 w-fit max-w-full flex-row items-center gap-2 text-base leading-6 text-[#3E3831] hover:underline sm:text-lg sm:leading-7"
+          >
+            <IconArrowLeft />
+            Zurück zur Startseite
+          </Link>
 
-          {/* Header */}
-          <header className="flex flex-col gap-2 sm:gap-3">
-            <Link
-              href="/"
-              className="inline-flex w-fit max-w-full flex-row items-center gap-2 text-base leading-6 text-black hover:underline sm:text-lg sm:leading-7"
-            >
-              <IconArrowLeft />
-              Zurück zur Startseite
-            </Link>
-            <h1 className="[font-family:var(--font-merriweather)] mt-1 text-3xl font-medium leading-10 text-[#3E3831] sm:mt-2 sm:text-4xl sm:leading-[1.2] md:text-5xl">
-              {project.title}
-            </h1>
-            <p className="text-lg leading-8 text-[#535252] sm:text-xl sm:leading-9">
-              {readOnly ? "Projekt ansehen und verwalten" : "Projekt bearbeiten und verwalten"}
-            </p>
-          </header>
-
-          {/* Cover + Code placeholder */}
-          <SectionShell>
-            <div className="flex flex-col gap-10 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-10">
-              <div className="flex min-w-0 flex-col gap-3 sm:gap-4">
-                <SectionHeader icon={<IconEye />} title={readOnly ? "Cover ansehen" : "Cover bearbeiten"} />
-                <Link
-                  href={`/projektuebersicht/${project_id}/cover-bearbeiten`}
-                  className="group flex flex-col items-stretch gap-4 bg-[#FAF8F6] p-5 transition-colors hover:bg-[#f5f3ee] sm:flex-row sm:items-center sm:gap-6 sm:p-7"
-                  aria-label="Cover-Editor öffnen"
-                >
-                  <div className="mx-auto w-full max-w-[180px] shrink-0 sm:mx-0 sm:w-44">
-                    <CoverRender data={coverData} size="overview" />
-                  </div>
-                  <div className="flex min-w-0 flex-1 flex-col gap-3">
-                    <p className="text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
-                      {readOnly
-                        ? "Die Vorderseite Ihres Buches auf dem letzten Stand."
-                        : "Gestalten Sie die Vorderseite Ihres Buches: Titel, Untertitel, Foto, Muster und Farbe."}
-                    </p>
-                    <span className="inline-flex h-12 w-fit items-center justify-center bg-[#D0BCA6] px-5 text-lg font-bold leading-6 text-[#0a0909] transition-colors group-hover:bg-[#c0ad98]">
-                      Cover öffnen
-                    </span>
-                  </div>
-                </Link>
-              </div>
-              <div className="flex min-w-0 flex-col gap-3 sm:gap-4">
-                <SectionHeader icon={<IconPhoneHandset />} title="Erzählen per Sprachnachricht" />
-                <div className="flex flex-col gap-4 bg-[#FAF8F6] p-5 sm:p-7">
-                  <p className="text-base leading-7 text-[#848484] sm:text-lg sm:leading-8">
-                    Das Erzählen per Sprachnachricht wird mit der Audio-Erzählpipeline aktiviert (PROJ-12).
-                  </p>
-                </div>
-              </div>
+          {/* Cover-Karte */}
+          <section className="flex flex-col border border-[#E0DCD5] bg-white lg:flex-row">
+            <div className="flex items-center justify-center bg-[#EFEAE3] px-6 py-10 sm:px-10 sm:py-14 lg:flex-1">
+              <BookView data={coverData} className="max-w-[392px]" />
             </div>
-          </SectionShell>
+            <div className="flex min-w-0 flex-col justify-center gap-6 p-6 sm:p-10 lg:flex-1 lg:p-14">
+              <div className="flex min-w-0 flex-col gap-2.5">
+                <h1 className="text-[clamp(2.375rem,3.6vw,3.375rem)] leading-[1.12] text-[#3E3831] [overflow-wrap:anywhere]">
+                  {project.title}
+                </h1>
+                {coverData.authorLine.trim() ? (
+                  <p className="text-xl leading-snug text-[#4A453F] [overflow-wrap:anywhere] sm:text-[1.375rem]">
+                    {coverData.authorLine}
+                  </p>
+                ) : null}
+              </div>
+              <p className="text-lg leading-relaxed text-[#4A453F] sm:text-xl">{bookSummary}</p>
+              <Button asChild className="h-[3.625rem] w-full px-8 text-xl font-bold sm:w-fit">
+                <Link href={`/projektuebersicht/${project_id}/cover-bearbeiten`}>
+                  {readOnly ? "Cover ansehen" : "Cover bearbeiten"}
+                </Link>
+              </Button>
+            </div>
+          </section>
 
           {/* Kapitel */}
           <SectionShell>
@@ -334,14 +314,32 @@ export default async function ProjektuebersichtPage({
             />
           </SectionShell>
 
-          {/* Stat-Karte mit Verlängerungs-Button (PROJ-6) */}
-          <PaywallStats
-            projectId={project_id}
-            portalExpiresAt={portalExpiresAt}
-            daysLeft={portalDaysLeft}
-            expiredOn={expiredOn}
-            deletesOn={deletesOn}
+          {/* PROJ-22: Platzhalter bis PROJ-16, bewusst ohne Lesemodus-Sperre */}
+          <PrintOrderCard
+            title={project.title}
+            chapterCount={chapterCount}
+            pageCount={pageCount}
+            openChapterCount={openChapterCount}
+            hasCover={coverRow !== null}
           />
+
+          <div className="grid grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-2">
+            <SectionShell>
+              <SectionHeader icon={<IconPhoneHandset />} title="Erzählen per Sprachnachricht" />
+              <p className="text-base leading-7 text-[#5F5A54] sm:text-lg sm:leading-8">
+                Das Erzählen per Sprachnachricht wird mit der Audio-Erzählpipeline aktiviert (PROJ-12).
+              </p>
+            </SectionShell>
+
+            {/* Stat-Karte mit Verlängerungs-Button (PROJ-6) */}
+            <PaywallStats
+              projectId={project_id}
+              portalExpiresAt={portalExpiresAt}
+              daysLeft={portalDaysLeft}
+              expiredOn={expiredOn}
+              deletesOn={deletesOn}
+            />
+          </div>
 
           {/* PROJ-9: Mitgliederverwaltung */}
           <ProjectUsersSection

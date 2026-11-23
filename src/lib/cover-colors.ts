@@ -84,3 +84,23 @@ export function getCoverColor(id: string | null | undefined): CoverColor {
   const found = COVER_COLORS.find((c) => c.id === id);
   return found ?? COVER_COLORS.find((c) => c.id === DEFAULT_COLOR_ID)!;
 }
+
+function darken(hex: string, factor: number): string {
+  const value = parseInt(hex.slice(1), 16);
+  const channels = [value >> 16, (value >> 8) & 255, value & 255];
+  return `#${channels
+    .map((channel) =>
+      Math.round(channel * factor)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
+
+/** PROJ-22: Buchrücken und seine Kante, etwas dunkler als die Vorderseite. */
+export function getSpineColors(color: CoverColor): { spine: string; edge: string } {
+  return {
+    spine: darken(color.surface, 0.89),
+    edge: darken(color.surface, 0.76),
+  };
+}

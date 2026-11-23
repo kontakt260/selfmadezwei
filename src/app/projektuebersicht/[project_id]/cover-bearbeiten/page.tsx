@@ -107,7 +107,7 @@ export default async function CoverBearbeitenPage({
               <IconArrowLeft />
               Zurück zur Projektübersicht
             </Link>
-            <h1 className="[font-family:var(--font-merriweather)] mt-1 text-3xl font-medium leading-10 text-[#3E3831] sm:mt-2 sm:text-4xl sm:leading-[1.2] md:text-5xl">
+            <h1 className="mt-1 text-3xl font-normal leading-10 text-[#3E3831] sm:mt-2 sm:text-4xl sm:leading-[1.2] md:text-5xl">
               {readOnly ? "Cover ansehen" : "Cover bearbeiten"}
             </h1>
             <p className="text-lg leading-8 text-[#535252] sm:text-xl sm:leading-9">

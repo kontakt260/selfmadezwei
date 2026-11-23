@@ -779,8 +779,8 @@ test.describe("PROJ-26 — Papierkorb (nur Stage)", () => {
   test("AC-26: Konto-Lösch-Dialog zeigt das gelöschte Projekt nicht", async () => {
     const keep = await createProject({ title: "Sichtbar", members: [[L, "projektleiter"]], chapters: 1 });
     await pageL.goto("/persoenlicher-bereich");
-    await expect(pageL.locator("#account-email")).toHaveValue(L.email);
-    await pageL.getByRole("button", { name: "Account löschen", exact: true }).click();
+    await expect(pageL.locator("#account-email")).toHaveText(L.email);
+    await pageL.getByRole("button", { name: "Konto löschen", exact: true }).click();
     const dialog = pageL.getByRole("alertdialog");
     await expect(dialog.getByText("Wird gelöscht")).toBeVisible({ timeout: 20_000 });
     await expect(dialog).toContainText(keep.title);
@@ -838,7 +838,7 @@ test.describe("PROJ-26 — Papierkorb (nur Stage)", () => {
       .toBe(1);
     await pageO.goto("/");
     await pageO.waitForURL(/\/onboarding/, { timeout: 15_000 });
-    await expect(pageO.locator("body")).toContainText("Konto");
+    await expect(pageO.getByRole("link", { name: "Zum persönlichen Bereich" })).toBeVisible();
   });
 
   // ─── D: Endgültiges Löschen ────────────────────────────────────────────────

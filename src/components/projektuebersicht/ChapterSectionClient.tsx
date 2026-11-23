@@ -25,12 +25,12 @@ const DELETE_CONFIRM_SECONDS = 3;
 function IconDrag({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
-      <circle cx={9} cy={6} r={1.4} fill="#B5B5B5" />
-      <circle cx={9} cy={12} r={1.4} fill="#B5B5B5" />
-      <circle cx={9} cy={18} r={1.4} fill="#B5B5B5" />
-      <circle cx={15} cy={6} r={1.4} fill="#B5B5B5" />
-      <circle cx={15} cy={12} r={1.4} fill="#B5B5B5" />
-      <circle cx={15} cy={18} r={1.4} fill="#B5B5B5" />
+      <circle cx={9} cy={6} r={1.4} fill="#77716A" />
+      <circle cx={9} cy={12} r={1.4} fill="#77716A" />
+      <circle cx={9} cy={18} r={1.4} fill="#77716A" />
+      <circle cx={15} cy={6} r={1.4} fill="#77716A" />
+      <circle cx={15} cy={12} r={1.4} fill="#77716A" />
+      <circle cx={15} cy={18} r={1.4} fill="#77716A" />
     </svg>
   );
 }
@@ -510,10 +510,10 @@ export function ChapterSectionClient({
   const modalShell = (content: React.ReactNode) =>
     typeof document !== "undefined"
       ? createPortal(
-          <div className="fixed inset-0 z-[300] flex items-center justify-center p-5 sm:p-8" role="presentation">
+          <div className="fixed inset-0 z-[300] flex overflow-y-auto p-5 sm:p-8" role="presentation">
             <button
               type="button"
-              className="absolute inset-0 cursor-pointer bg-black/45 transition-opacity"
+              className="fixed inset-0 cursor-pointer bg-black/45 transition-opacity"
               aria-label="Dialog schließen"
               onClick={() => {
                 if (impulseOpen) closeImpulseModal();
@@ -522,7 +522,7 @@ export function ChapterSectionClient({
                 else closeDeleteModal();
               }}
             />
-            <div className="[font-family:var(--font-lato)] relative z-10 w-full max-w-xl border border-[#e0dcd5] bg-[#FAF8F6] p-8 shadow-[0_16px_48px_rgba(0,0,0,0.18)] sm:max-w-2xl sm:p-10 [&_button]:cursor-pointer [&_button:disabled]:cursor-not-allowed">
+            <div className="[font-family:var(--font-lato)] relative z-10 m-auto w-full max-w-xl border border-[#e0dcd5] bg-[#FAF8F6] p-8 shadow-[0_16px_48px_rgba(0,0,0,0.18)] sm:max-w-2xl sm:p-10 [&_button]:cursor-pointer [&_button:disabled]:cursor-not-allowed">
               {content}
             </div>
           </div>,
@@ -592,7 +592,7 @@ export function ChapterSectionClient({
             maxLength={200}
             autoComplete="off"
             disabled={renamePending}
-            className="mt-3 w-full border border-[#e0dcd5] bg-white px-4 py-3.5 text-base text-[#3E3831] outline-none transition-colors placeholder:text-[#848484] focus:border-[#96B897] disabled:opacity-50 sm:text-lg"
+            className="mt-3 w-full border border-[#e0dcd5] bg-white px-4 py-3.5 text-base text-[#3E3831] outline-none transition-colors placeholder:text-[#6B655E] focus:border-[#96B897] disabled:opacity-50 sm:text-lg"
             placeholder="Kapitelname"
           />
           <div className="mt-8 flex flex-col-reverse gap-4 sm:flex-row sm:justify-end sm:gap-5">
@@ -634,7 +634,7 @@ export function ChapterSectionClient({
             maxLength={200}
             autoComplete="off"
             disabled={addPending}
-            className="mt-3 w-full border border-[#e0dcd5] bg-white px-4 py-3.5 text-base text-[#3E3831] outline-none transition-colors placeholder:text-[#848484] focus:border-[#96B897] disabled:opacity-50 sm:text-lg"
+            className="mt-3 w-full border border-[#e0dcd5] bg-white px-4 py-3.5 text-base text-[#3E3831] outline-none transition-colors placeholder:text-[#6B655E] focus:border-[#96B897] disabled:opacity-50 sm:text-lg"
             placeholder="z. B. Reisen und Begegnungen"
           />
           <div className="mt-8 flex flex-col-reverse gap-4 sm:flex-row sm:justify-end sm:gap-5">
@@ -660,7 +660,7 @@ export function ChapterSectionClient({
           </p>
           <div className="mt-8 border border-[#e0dcd5] bg-white px-5 py-6 sm:px-6 sm:py-8" aria-live="polite" aria-atomic="true">
             {currentImpulseCategory && (
-              <p className="[font-family:var(--font-lato)] text-xs font-semibold uppercase tracking-wide text-[#848484] sm:text-sm">
+              <p className="[font-family:var(--font-lato)] text-base font-semibold uppercase tracking-wide text-[#5F5A54]">
                 {currentImpulseCategory}
               </p>
             )}
@@ -728,15 +728,14 @@ export function ChapterSectionClient({
               onClick={openErzaehlImpulsModal}
               className="inline-flex h-12 w-full min-w-0 cursor-pointer items-center justify-center gap-2 bg-[#D0BCA6] px-4 text-base font-bold leading-6 text-[#0a0909] transition-colors hover:bg-[#c0ad98] sm:w-auto sm:text-lg"
             >
-              <IconPlus color="#0a0909" />
-              Erzähl-Impuls
+              Erzähl-Impulse ansehen
             </button>
           </>
         }
       />
       {chapters.length === 0 ? (
         <div className="flex flex-col items-center gap-5 py-12 text-center sm:py-14">
-          <p className="text-lg leading-8 text-[#848484] sm:text-xl sm:leading-9">
+          <p className="text-lg leading-8 text-[#5F5A54] sm:text-xl sm:leading-9">
             Noch keine Kapitel vorhanden.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -753,8 +752,7 @@ export function ChapterSectionClient({
               onClick={openErzaehlImpulsModal}
               className="inline-flex h-12 min-w-0 cursor-pointer items-center justify-center gap-2 bg-[#D0BCA6] px-5 text-base font-bold leading-6 text-[#0a0909] transition-colors hover:bg-[#c0ad98] sm:text-lg"
             >
-              <IconPlus color="#0a0909" />
-              Erzähl-Impuls
+              Erzähl-Impulse ansehen
             </button>
           </div>
         </div>
@@ -790,20 +788,20 @@ export function ChapterSectionClient({
                 }
               >
                 <span
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center text-[#B5B5B5] sm:h-7 sm:w-7 ${
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center text-[#77716A] sm:h-7 sm:w-7 ${
                     readOnly ? "opacity-40" : ""
                   }`}
                 >
                   <IconDrag className="h-full w-full" />
                 </span>
-                <span className="w-8 shrink-0 text-lg leading-7 text-[#B5B5B5] sm:w-9 sm:text-xl sm:leading-8">
+                <span className="w-8 shrink-0 text-lg leading-7 text-[#5F5A54] sm:w-9 sm:text-xl sm:leading-8">
                   {index + 1}.
                 </span>
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <h4 className="[font-family:var(--font-pt-serif)] line-clamp-2 text-xl leading-8 text-[#3E3831] sm:text-2xl sm:leading-9">
                     {chapter.title}
                   </h4>
-                  <p className="text-sm leading-6 text-[#848484] sm:text-base">
+                  <p className="text-base leading-6 text-[#5F5A54]">
                     {chapter.source} • {chapter.words} Wörter
                   </p>
                 </div>
@@ -814,20 +812,20 @@ export function ChapterSectionClient({
                   draggable={false}
                   onDragStart={(e) => e.stopPropagation()}
                   onClick={() => openEditModal(chapter)}
-                  className="relative z-20 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center bg-[#EAF0EA] text-[#3E3831] transition-colors hover:bg-[#dfe9df] hover:text-[#2d332d] sm:h-8 sm:w-8"
+                  className="relative z-20 flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center bg-[#EAF0EA] text-[#3E3831] transition-colors hover:bg-[#dfe9df] hover:text-[#2d332d]"
                   aria-label={`Kapitel „${chapter.title}" umbenennen`}
                 >
-                  <IconPencil className="pointer-events-none h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+                  <IconPencil className="pointer-events-none h-[18px] w-[18px] shrink-0" />
                 </button>
                 <button
                   type="button"
                   draggable={false}
                   onDragStart={(e) => e.stopPropagation()}
                   onClick={() => openDeleteModal(chapter)}
-                  className="relative z-20 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center bg-[#FEF2F2] text-[#DC2626] transition-colors hover:bg-[#FEE2E2] hover:text-[#991B1B] sm:h-8 sm:w-8"
+                  className="relative z-20 flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center bg-[#FEF2F2] text-[#C81E1E] transition-colors hover:bg-[#FEE2E2] hover:text-[#991B1B]"
                   aria-label={`Kapitel „${chapter.title}" löschen`}
                 >
-                  <IconTrash className="pointer-events-none h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+                  <IconTrash className="pointer-events-none h-[18px] w-[18px] shrink-0" />
                 </button>
                 {chapter.id.startsWith("optimistic-") ? (
                   // Optimistic-Phase: das Kapitel ist noch nicht in der DB,

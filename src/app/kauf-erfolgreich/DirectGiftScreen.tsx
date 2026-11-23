@@ -15,7 +15,7 @@ export function DirectGiftScreen({
     <BackdropScreen backdrop="geschenk">
       <div className="flex flex-col items-center gap-6 text-center">
         <SuccessIcon />
-        <h1 className="[font-family:var(--font-merriweather)] text-2xl font-medium text-[#3E3831] sm:text-3xl">
+        <h1 className="text-2xl font-normal text-[#3E3831] sm:text-3xl">
           Vielen Dank – Ihre Zahlung ist eingegangen und Ihr Geschenk ist unterwegs
         </h1>
         <p className="text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">

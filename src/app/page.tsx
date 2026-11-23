@@ -3,13 +3,16 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { BrandName } from "@/components/BrandName";
 import { Navbar } from "@/components/Navbar";
 import { CheckoutCancelToast } from "@/components/CheckoutCancelToast";
 import { ProjectCard, type ProjectCardData } from "@/components/ProjectCard";
+import { Button } from "@/components/ui/button";
 import { deleteProjectAction } from "@/app/projektuebersicht/[project_id]/actions";
 import { DEFAULT_COLOR_ID } from "@/lib/cover-colors";
 import { DEFAULT_THEME_ID } from "@/lib/cover-themes";
 import type { CoverData, CoverRowRaw } from "@/lib/cover-types";
+import { formatLastEdited, projectCardAccess } from "@/lib/projects/project-card-status";
 
 function IconPlus({ className }: { className?: string }) {
   return (
@@ -19,17 +22,18 @@ function IconPlus({ className }: { className?: string }) {
   );
 }
 
-function formatRelativeDate(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / 86_400_000);
-  if (diffDays === 0) return "Heute bearbeitet";
-  if (diffDays === 1) return "Gestern bearbeitet";
-  if (diffDays < 7) return `Vor ${diffDays} Tagen bearbeitet`;
-  if (diffDays < 14) return "Vor 1 Woche bearbeitet";
-  if (diffDays < 30) return `Vor ${Math.floor(diffDays / 7)} Wochen bearbeitet`;
-  if (diffDays < 60) return "Vor 1 Monat bearbeitet";
-  return `Vor ${Math.floor(diffDays / 30)} Monaten bearbeitet`;
+function BuyMoreLink() {
+  return (
+    <Button
+      asChild
+      className="h-auto min-h-[3.25rem] w-full shrink-0 whitespace-normal border-[#EFEBE5] bg-[#EFEBE5] px-5 py-2 text-lg font-bold leading-6 text-[#1F1C19] hover:border-[#E4DFD8] hover:bg-[#E4DFD8] sm:w-auto"
+    >
+      <Link href="/onboarding">
+        <IconPlus className="shrink-0" />
+        Weiteren Projektzugang kaufen
+      </Link>
+    </Button>
+  );
 }
 
 export default async function HomePage() {
@@ -58,6 +62,19 @@ export default async function HomePage() {
           .select("project_id, image_url, theme, metadata")
           .in("project_id", projectIds)
       : { data: [] as { project_id: string; image_url: string | null; theme: string | null; metadata: CoverRowRaw["metadata"] | null }[] };
+
+  // PROJ-22: Ablaufdaten aller Projekte in einer Abfrage. Schlägt sie fehl,
+  // zeigen die Karten neutral „Öffnen" und die Projektseite prüft selbst.
+  const { data: accessRows, error: accessError } =
+    projectIds.length > 0
+      ? await supabase
+          .from("project_access")
+          .select("project_id, expires_at")
+          .in("project_id", projectIds)
+      : { data: [] as { project_id: string; expires_at: string | null }[], error: null };
+  const expiresAtByProject = new Map(
+    (accessRows ?? []).map((row) => [row.project_id, row.expires_at]),
+  );
 
   const coverMap = new Map<string, CoverRowRaw>();
   for (const r of coverRows ?? []) {
@@ -108,11 +125,12 @@ export default async function HomePage() {
       return {
         id: p.id,
         title: p.title,
-        formattedUpdatedAt: formatRelativeDate(lastEdited),
+        formattedUpdatedAt: formatLastEdited(lastEdited),
         lastEditedAt: lastEdited,
         chapterCount: chapters.length,
         userRole: m.role as "projektleiter" | "co_author",
         coverData,
+        access: projectCardAccess(expiresAtByProject.get(p.id), accessError !== null),
       };
     })
     // Sort by effective last-edited (Projekt + Kapitel kombiniert), nicht
@@ -120,74 +138,94 @@ export default async function HomePage() {
     // wenn nur Kapitel-Inhalt geändert wurde.
     .sort((a, b) => (b.lastEditedAt > a.lastEditedAt ? 1 : -1));
 
+  const singleProject = projects.length === 1;
+
   return (
     <>
       <Suspense fallback={null}>
         <CheckoutCancelToast />
       </Suspense>
       <Navbar />
-      <main className="[font-family:var(--font-lato)] box-border min-h-full w-full min-w-0 flex-1 bg-[#FAF8F6] px-4 pb-16 pt-[calc(7.348rem+2rem)] sm:px-6 sm:pt-[calc(7.348rem+2.5rem)] md:px-8 md:pt-[calc(7.348rem+3rem)] xl:pl-[calc(11rem+2rem)] xl:pr-8 xl:pt-12">
-        <div className="mx-auto flex w-full max-w-[1213px] flex-col gap-8 sm:gap-10 md:gap-12">
-          <div className="relative h-[min(31.5vh,285px)] w-full min-h-[105px] overflow-hidden sm:min-h-[135px]">
+      <main className="[font-family:var(--font-lato)] box-border min-h-full w-full min-w-0 flex-1 bg-[#FAF8F6] pt-[7.348rem] xl:pl-[11rem] xl:pt-0">
+        <section
+          className={`relative isolate flex items-center justify-center overflow-hidden bg-[#4A453F] px-4 text-center sm:px-6 ${
+            singleProject
+              ? "min-h-[320px] pb-[6.5rem] pt-10 md:min-h-[360px]"
+              : "min-h-[260px] py-10 md:min-h-[300px]"
+          }`}
+        >
+          <div className="absolute -inset-6 -z-20">
             <Image
-              src="/images/start-hero.png"
-              alt="Nahaufnahme: Hände mit Stift über einem geöffneten, türkisfarbenen Notizbuch."
+              src="/images/onboarding-background-book.png"
+              alt=""
               fill
-              className="object-cover blur-[2px]"
-              sizes="(max-width: 768px) 100vw, 1213px"
+              className="object-cover blur-[7px] [object-position:center_42%]"
+              sizes="(min-width: 1280px) calc(100vw - 11rem), 100vw"
               priority
             />
           </div>
-
-          <header className="flex w-full flex-col items-center gap-2 text-center">
-            <h1 className="[font-family:var(--font-merriweather)] w-full text-3xl font-medium leading-10 text-[#3E3831] sm:text-4xl sm:leading-[1.2] md:text-5xl">
-              Willkommen zurück bei NARRAVIT
+          <div className="absolute inset-0 -z-10 bg-[#2B2722]/60" />
+          <div className="flex max-w-5xl flex-col items-center gap-3.5">
+            <h1 className="text-[clamp(2.25rem,4.4vw,3.75rem)] leading-[1.12] text-white">
+              Willkommen zurück bei <BrandName />
             </h1>
-            <p className="mx-auto max-w-3xl text-lg leading-8 text-[#535252] sm:text-xl sm:leading-9">
+            <p className="max-w-3xl text-xl leading-normal text-white sm:text-[1.375rem]">
               Schön, dass Sie sich die Zeit nehmen, um weitere Geschichten festzuhalten.
             </p>
-          </header>
+          </div>
+        </section>
 
-          <section className="flex flex-col gap-6 sm:gap-8">
-            <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-              <h2 className="[font-family:var(--font-pt-serif)] text-2xl leading-8 text-[#3E3831] sm:text-3xl sm:leading-10">
-                {projects.length === 1 ? "Ihr Projekt" : "Ihre Projekte"}
-              </h2>
-              <Link
-                href="/onboarding"
-                className="inline-flex h-12 w-full shrink-0 items-center justify-center gap-3 bg-[rgba(10,9,9,0.05)] px-5 text-lg font-bold leading-6 text-black transition-colors hover:bg-[rgba(10,9,9,0.08)] sm:w-auto sm:min-w-[300px] sm:justify-start sm:pl-6"
-              >
-                <IconPlus className="shrink-0 text-black" />
-                Weiteren Projektzugang kaufen
-              </Link>
-            </div>
+        <div
+          className={`relative mx-auto flex w-full flex-col gap-6 px-4 pb-16 sm:px-6 md:px-8 ${
+            singleProject ? "-mt-[4.25rem] max-w-[1144px] sm:gap-7" : "max-w-[1312px] pt-10"
+          }`}
+        >
+          {singleProject ? (
+            <>
+              <ProjectCard
+                project={projects[0]!}
+                deleteProjectAction={deleteProjectAction}
+                featured
+              />
+              <section className="flex flex-col gap-4 border border-[#E0DCD5] bg-white p-6 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+                <div className="flex min-w-0 flex-col gap-1">
+                  <h2 className="text-[1.625rem] leading-tight text-[#3E3831]">
+                    Ein weiteres Buch beginnen
+                  </h2>
+                  <p className="text-lg leading-normal text-[#5F5A54]">
+                    Zum Beispiel als Geschenk für einen Menschen, dessen Geschichte bleiben soll.
+                  </p>
+                </div>
+                <BuyMoreLink />
+              </section>
+            </>
+          ) : (
+            <>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="text-[2rem] leading-[1.2] text-[#3E3831] sm:text-4xl">
+                  Ihre Bücher
+                </h2>
+                <BuyMoreLink />
+              </div>
 
-            {projects.length === 0 ? (
-              <div className="flex flex-col items-center gap-5 bg-white px-6 py-12 text-center sm:px-8 sm:py-14">
-                <p className="max-w-2xl text-lg leading-8 text-[#848484] sm:text-xl sm:leading-9">
-                  Sie haben noch kein Projekt. Kaufen Sie Ihren ersten Projektzugang, um loszulegen.
-                </p>
-                <Link
-                  href="/onboarding"
-                  className="inline-flex h-12 items-center justify-center bg-[#D0BCA6] px-6 text-lg font-bold text-[#0a0909] transition-colors hover:bg-[#c0ad98]"
-                >
-                  Jetzt starten
-                </Link>
-              </div>
-            ) : (
-              <div
-                className={
-                  projects.length === 1
-                    ? "mx-auto grid w-full max-w-[1200px] grid-cols-[minmax(0,min(100%,36rem))] justify-center gap-5 sm:gap-6 md:-translate-x-8 md:gap-6 xl:-translate-x-10 xl:gap-6"
-                    : "mx-auto grid w-full max-w-[1200px] grid-cols-[minmax(0,min(100%,32rem))] justify-center gap-5 sm:gap-6 md:grid-cols-[repeat(auto-fit,minmax(22rem,24rem))] md:gap-6 xl:grid-cols-[repeat(auto-fit,minmax(22rem,24rem))] xl:gap-6"
-                }
-              >
-                {projects.map((p) => (
-                  <ProjectCard key={p.id} project={p} deleteProjectAction={deleteProjectAction} />
-                ))}
-              </div>
-            )}
-          </section>
+              {projects.length === 0 ? (
+                <div className="flex flex-col items-center gap-5 border border-[#E0DCD5] bg-white px-6 py-12 text-center sm:px-8 sm:py-14">
+                  <p className="max-w-2xl text-lg leading-8 text-[#5F5A54] sm:text-xl sm:leading-9">
+                    Sie haben noch kein Projekt. Kaufen Sie Ihren ersten Projektzugang, um loszulegen.
+                  </p>
+                  <Button asChild className="h-12 px-6 text-lg font-bold">
+                    <Link href="/onboarding">Jetzt starten</Link>
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,20rem),1fr))] gap-6">
+                  {projects.map((p) => (
+                    <ProjectCard key={p.id} project={p} deleteProjectAction={deleteProjectAction} />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
       </main>
     </>

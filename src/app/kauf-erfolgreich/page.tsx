@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 import { isDirectGiftSession, isGuestSession } from "@/lib/purchases/guest-purchase";
 import { BackdropScreen, type BackdropKey } from "@/components/BackdropScreen";
+import { BrandName } from "@/components/BrandName";
 import { DirectGiftScreen } from "./DirectGiftScreen";
 import { SuccessIcon } from "./SuccessIcon";
 
@@ -131,7 +132,7 @@ export default async function KaufErfolgreichPage({
   if (paymentPending) {
     return (
       <SuccessScreen backdrop="kauf" icon={false}>
-        <h1 className="[font-family:var(--font-merriweather)] text-2xl font-medium text-[#3E3831] sm:text-3xl">
+        <h1 className="text-2xl font-normal text-[#3E3831] sm:text-3xl">
           Ihre Zahlung wird bearbeitet
         </h1>
         <p className="text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
@@ -233,7 +234,7 @@ function GuestAccountContent({
 
   return (
     <>
-      <h1 className="[font-family:var(--font-merriweather)] text-2xl font-medium text-[#3E3831] sm:text-3xl">
+      <h1 className="text-2xl font-normal text-[#3E3831] sm:text-3xl">
         Vielen Dank — Ihre Zahlung ist eingegangen
       </h1>
       <p className="text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
@@ -285,8 +286,8 @@ function GuestAccountContent({
 function InitialSelfContent() {
   return (
     <>
-      <h1 className="[font-family:var(--font-merriweather)] text-2xl font-medium text-[#3E3831] sm:text-3xl">
-        Willkommen bei NARRAVIT!
+      <h1 className="text-2xl font-normal text-[#3E3831] sm:text-3xl">
+        Willkommen bei <BrandName />!
       </h1>
       <p className="text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
         Ihr Zugang ist aktiv – Wir wünschen Ihnen viel Freude mit Ihrem
@@ -309,7 +310,7 @@ function InitialGiftPhoneOnlyContent({
 }) {
   return (
     <>
-      <h1 className="[font-family:var(--font-merriweather)] text-2xl font-medium text-[#3E3831] sm:text-3xl">
+      <h1 className="text-2xl font-normal text-[#3E3831] sm:text-3xl">
         Geschenk aktiviert
       </h1>
       <p className="text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
@@ -345,7 +346,7 @@ function InitialGiftPhoneComputerContent({
 }) {
   return (
     <>
-      <h1 className="[font-family:var(--font-merriweather)] text-2xl font-medium text-[#3E3831] sm:text-3xl">
+      <h1 className="text-2xl font-normal text-[#3E3831] sm:text-3xl">
         Geschenk verschickt
       </h1>
       <p className="text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
@@ -389,7 +390,7 @@ function InitialGiftPhoneComputerContent({
 function RenewalContent({ projectId }: { projectId: string }) {
   return (
     <>
-      <h1 className="[font-family:var(--font-merriweather)] text-2xl font-medium text-[#3E3831] sm:text-3xl">
+      <h1 className="text-2xl font-normal text-[#3E3831] sm:text-3xl">
         Kauf erfolgreich
       </h1>
       <p className="text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">

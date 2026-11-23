@@ -43,13 +43,13 @@ export default async function OnboardingPage({
 
   // PROJ-28: Wer kein Projekt (mehr) hat, muss sein Konto trotzdem finden und
   // löschen können, auch wenn das letzte Projekt automatisch entfernt wurde.
-  let showAccountDeleteLink = false;
+  let showPersonalAreaLink = false;
   if (user) {
     const { count, error } = await supabase
       .from("project_members")
       .select("project_id", { count: "exact", head: true })
       .eq("user_id", user.id);
-    showAccountDeleteLink = !error && (count ?? 0) === 0;
+    showPersonalAreaLink = !error && (count ?? 0) === 0;
   }
 
   return (
@@ -63,7 +63,7 @@ export default async function OnboardingPage({
         isGuest={!user}
         initialForWhom={initialForWhom}
         backUrl={user ? "/" : "https://www.narravit.de"}
-        showAccountDeleteLink={showAccountDeleteLink}
+        showPersonalAreaLink={showPersonalAreaLink}
       />
     </>
   );

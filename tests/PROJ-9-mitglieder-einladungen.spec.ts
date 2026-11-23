@@ -4,7 +4,7 @@ import { test, expect } from "@playwright/test";
 //
 // Diese E2E-Suite verifiziert:
 //   - Mitgliederliste rendert mit dem eigenen Member-Eintrag.
-//   - PL sieht „Nutzer hinzufügen"-Button + Verwaltungs-Controls.
+//   - PL sieht „Person einladen"-Button + Verwaltungs-Controls.
 //   - Last-PL-Disable greift (Trash + Toggle + Projekt-verlassen).
 //   - AddUser-Modal Step 1 → Step 2 mit Link-Anzeige.
 //   - /einladung/[token]-Page mit ungültigem Token → klare Fehlermeldung.
@@ -20,21 +20,21 @@ const QA_PROJECT_URL = `/projektuebersicht/${QA_PROJECT_ID}`;
 // ─── Mitgliederliste — Anzeige + PL-Controls ───────────────────────────────
 
 test.describe("PROJ-9 — Mitgliederliste", () => {
-  test("AC-List-1: Nutzerübersicht-Sektion sichtbar mit eigenem Eintrag", async ({
+  test("AC-List-1: Wer an diesem Buch mitschreibt-Sektion sichtbar mit eigenem Eintrag", async ({
     page,
   }) => {
     await page.goto(QA_PROJECT_URL);
     await expect(
-      page.getByRole("heading", { name: "Nutzerübersicht" }),
+      page.getByRole("heading", { name: "Wer an diesem Buch mitschreibt" }),
     ).toBeVisible();
     await expect(page.getByText("qa-test@narravit.de").first()).toBeVisible();
     await expect(page.getByText("(Sie)")).toBeVisible();
   });
 
-  test("AC-List-2: PL sieht 'Nutzer hinzufügen'-Button", async ({ page }) => {
+  test("AC-List-2: PL sieht 'Person einladen'-Button", async ({ page }) => {
     await page.goto(QA_PROJECT_URL);
     await expect(
-      page.getByRole("button", { name: /Nutzer hinzufügen/ }),
+      page.getByRole("button", { name: /Person einladen/ }),
     ).toBeVisible();
   });
 
@@ -67,7 +67,7 @@ test.describe("PROJ-9 — AddUser-Modal", () => {
     page,
   }) => {
     await page.goto(QA_PROJECT_URL);
-    await page.getByRole("button", { name: /Nutzer hinzufügen/ }).click();
+    await page.getByRole("button", { name: /Person einladen/ }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await expect(page.getByLabel("E-Mail-Adresse")).toBeVisible();
     await expect(page.getByLabel("Rolle")).toBeVisible();
@@ -78,7 +78,7 @@ test.describe("PROJ-9 — AddUser-Modal", () => {
     page,
   }) => {
     await page.goto(QA_PROJECT_URL);
-    await page.getByRole("button", { name: /Nutzer hinzufügen/ }).click();
+    await page.getByRole("button", { name: /Person einladen/ }).click();
     await page.getByLabel("E-Mail-Adresse").fill("proj9-e2e@example.com");
     // Rolle bleibt Default „Co-Autor"
     await page.getByRole("button", { name: /Einladen/ }).click();

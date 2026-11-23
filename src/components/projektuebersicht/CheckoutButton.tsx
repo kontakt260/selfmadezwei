@@ -56,7 +56,7 @@ export function CheckoutButton({
       </button>
       {error && (
         <p
-          className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+          className="border border-destructive/40 bg-destructive/10 px-3 py-2 text-base text-destructive"
           role="alert"
         >
           {error}

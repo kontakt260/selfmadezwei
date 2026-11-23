@@ -123,7 +123,7 @@ async function createImpulseChapterAndOpenEditor(
   page: import("@playwright/test").Page,
 ) {
   await page.goto(QA_PROJECT_URL);
-  const editLinks = page.getByRole("link", { name: "Bearbeiten" });
+  const editLinks = page.getByRole("link", { name: "Bearbeiten", exact: true });
   const linksBefore = await editLinks.count();
   await page.getByRole("button", { name: /Erzähl-Impuls/ }).first().click();
   await page.getByRole("button", { name: /Impuls übernehmen/ }).click();

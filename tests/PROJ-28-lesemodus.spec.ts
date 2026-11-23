@@ -262,15 +262,15 @@ test.describe("PROJ-28 — Lesemodus (nur Stage)", () => {
   });
 
   test("AC-6, AC-7: Verändernde Buttons sind grau, Verlassen und Entfernen aktiv", async () => {
-    for (const name of ["Eigenes Kapitel", "Erzähl-Impuls"]) {
+    for (const name of ["Eigenes Kapitel", "Erzähl-Impulse ansehen"]) {
       await expect(pageL.getByRole("button", { name }).first()).toBeDisabled();
     }
     for (const label of ["umbenennen", "löschen"]) {
       await expect(pageL.getByRole("button", { name: `Kapitel „Kapitel 1" ${label}` })).toBeDisabled();
     }
-    await expect(pageL.getByRole("button", { name: "Nutzer hinzufügen" })).toBeDisabled();
+    await expect(pageL.getByRole("button", { name: "Person einladen" })).toBeDisabled();
     await expect(pageL.getByRole("link", { name: "Ansehen" }).first()).toBeVisible();
-    await expect(pageL.getByRole("link", { name: "Bearbeiten" })).toHaveCount(0);
+    await expect(pageL.getByRole("link", { name: "Bearbeiten", exact: true })).toHaveCount(0);
     await expect(pageL.getByRole("button", { name: /Mitglied „.*" entfernen/ }).nth(1)).toBeEnabled();
     await expect(pageL.getByRole("button", { name: "Projekt verlassen" })).toBeEnabled();
 
@@ -381,7 +381,7 @@ test.describe("PROJ-28 — Lesemodus (nur Stage)", () => {
     await pageL.goto(`/projektuebersicht/${active.id}`);
     await expect(pageL.getByText(EXPIRED_LABEL)).toHaveCount(0);
     await expect(pageL.getByRole("button", { name: "Eigenes Kapitel" }).first()).toBeEnabled();
-    await expect(pageL.getByRole("link", { name: "Bearbeiten" }).first()).toBeVisible();
+    await expect(pageL.getByRole("link", { name: "Bearbeiten", exact: true }).first()).toBeVisible();
 
     await pageL.goto(`/projektuebersicht/${active.id}/kapiteleditor/${active.chapters[0]}`);
     await waitForEditorReady(pageL);
@@ -441,7 +441,7 @@ test.describe("PROJ-28 — Lesemodus (nur Stage)", () => {
     await setExpiry(expired.id, -1);
 
     await pageC.goto("/persoenlicher-bereich");
-    await expect(pageC.locator("#account-email")).toHaveValue(C.email);
+    await expect(pageC.locator("#account-email")).toHaveText(C.email);
 
     await pageC.goto(`/projektuebersicht/${expired.id}`);
     await pageC.getByRole("button", { name: "Projekt verlassen" }).click();

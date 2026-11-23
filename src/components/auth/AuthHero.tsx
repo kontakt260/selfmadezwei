@@ -41,7 +41,7 @@ export function AuthHero() {
           className="mb-10 h-32 w-32 object-contain xl:h-40 xl:w-40"
           aria-hidden
         />
-        <p className="mb-6 [font-family:var(--font-merriweather)] text-5xl leading-tight text-[#3E3831] xl:text-6xl">
+        <p className="mb-6 [font-family:var(--font-pt-serif)] text-5xl tracking-[-0.02em] leading-tight text-[#3E3831] xl:text-6xl">
           Weil jedes Leben{" "}
           <span className="text-[#708ca4]">ein Buch wert ist.</span>
         </p>

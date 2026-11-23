@@ -36,10 +36,12 @@ test.beforeAll(async ({ browser }) => {
   await ctx.close();
 });
 
-// Kartentitel auf der Home-Seite. Seit PROJ-10 zeigt die Karte den Titel
-// zusätzlich im Mini-Cover (h2) — getByText wäre mehrdeutig.
+// Kartentitel auf der Home-Seite. Die Karte zeigt den Titel zusätzlich auf dem
+// Cover (role="img") und auf dem Buchrücken, gemeint ist die Überschrift daneben.
 function projectCardTitle(page: Page) {
-  return page.getByRole("heading", { name: QA_PROJECT_TITLE, level: 3 });
+  return page.locator('main article :is(h2, h3):not([role="img"] *)', {
+    hasText: QA_PROJECT_TITLE,
+  });
 }
 
 // NOTE: Chapter modals use role="presentation" (accessibility BUG-3, Medium).
@@ -67,7 +69,7 @@ test.describe("PROJ-4 — Home-Seite (/)", () => {
   test("AC-Home-3: Löschen-Button für projektleiter sichtbar", async ({ page }) => {
     await page.goto("/");
     await expect(projectCardTitle(page)).toBeVisible();
-    const card = page.locator("a", { hasText: "Öffnen" }).first();
+    const card = page.getByRole("link", { name: /^Projekt „.*" öffnen$/ }).first();
     await expect(card).toBeVisible();
     const deleteBtn = page.getByRole("button", { name: /löschen/i }).first();
     await expect(deleteBtn).toBeVisible();
@@ -97,12 +99,12 @@ test.describe("PROJ-4 — Projektübersicht", () => {
     await expect(backLink).toHaveAttribute("href", "/");
   });
 
-  test("AC-PÜ-3: Sektionen Cover-Karte, Sprachnachricht-Platzhalter, Nutzerübersicht sichtbar", async ({ page }) => {
+  test("AC-PÜ-3: Sektionen Cover-Karte, Sprachnachricht-Platzhalter, Wer an diesem Buch mitschreibt sichtbar", async ({ page }) => {
     await page.goto(PROJECT_URL);
-    await expect(page.getByRole("heading", { name: "Cover bearbeiten" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Cover bearbeiten" })).toBeVisible();
     // PROJ-10 ersetzt den alten Cover-Editor-Placeholder durch die echte
     // Karte mit Vorschau + Link auf /cover-bearbeiten.
-    const coverLink = page.getByRole("link", { name: /Cover-Editor öffnen/ });
+    const coverLink = page.getByRole("link", { name: /Cover bearbeiten/ });
     await expect(coverLink).toBeVisible();
     await expect(coverLink).toHaveAttribute(
       "href",
@@ -112,8 +114,8 @@ test.describe("PROJ-4 — Projektübersicht", () => {
       page.getByRole("heading", { name: "Erzählen per Sprachnachricht" }),
     ).toBeVisible();
     // PROJ-9 ersetzt den alten „Projektmitglieder"-Placeholder durch die
-    // echte „Nutzerübersicht"-Sektion mit Mitglieder-Liste.
-    await expect(page.getByRole("heading", { name: "Nutzerübersicht" })).toBeVisible();
+    // echte „Wer an diesem Buch mitschreibt"-Sektion mit Mitglieder-Liste.
+    await expect(page.getByRole("heading", { name: "Wer an diesem Buch mitschreibt" })).toBeVisible();
   });
 
   test("AC-PÜ-4: Stat-Karten Platzhalter sichtbar", async ({ page }) => {
@@ -177,7 +179,7 @@ test.describe("PROJ-4 — Kapitel CRUD", () => {
 
   test("AC-Ch-4: Kapiteleditor-Seite zeigt PROJ-5 Platzhalter und Zurück-Link", async ({ page }) => {
     await page.goto(PROJECT_URL);
-    await page.getByRole("link", { name: "Bearbeiten" }).first().click();
+    await page.getByRole("link", { name: "Bearbeiten", exact: true }).first().click();
     await page.waitForURL(/kapiteleditor/);
     await expect(page.getByPlaceholder("Kapitel-Titel")).toBeVisible();
     const backLink = page.getByRole("link", { name: /Zurück zur Projektübersicht/ });
@@ -187,7 +189,7 @@ test.describe("PROJ-4 — Kapitel CRUD", () => {
   test("AC-Ch-5: Zurück von Editor → Kapitel in der Liste sichtbar", async ({ page }) => {
     await page.goto(PROJECT_URL);
     await expect(page.getByText("QA-Testkapitel").first()).toBeVisible();
-    await expect(page.getByRole("link", { name: "Bearbeiten" }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "Bearbeiten", exact: true }).first()).toBeVisible();
     await expect(page.getByText("Noch keine Kapitel vorhanden.")).not.toBeVisible();
   });
 
@@ -252,7 +254,7 @@ test.describe("PROJ-4 — Kapitel CRUD", () => {
 
   test("AC-Ch-10: Kapitel löschen — Countdown-Dialog, Button disabled für 3s, dann aktiv", async ({ page }) => {
     await page.goto(PROJECT_URL);
-    const chaptersBeforeCount = await page.getByRole("link", { name: "Bearbeiten" }).count();
+    const chaptersBeforeCount = await page.getByRole("link", { name: "Bearbeiten", exact: true }).count();
     const deleteButtons = page.getByRole("button", { name: /Kapitel „.*" löschen/ });
     await deleteButtons.last().click();
 
@@ -267,7 +269,7 @@ test.describe("PROJ-4 — Kapitel CRUD", () => {
     await deleteButton.click();
 
     await expect(deleteButton).not.toBeVisible({ timeout: 8_000 });
-    const chaptersAfterCount = await page.getByRole("link", { name: "Bearbeiten" }).count();
+    const chaptersAfterCount = await page.getByRole("link", { name: "Bearbeiten", exact: true }).count();
     expect(chaptersAfterCount).toBe(chaptersBeforeCount - 1);
   });
 
@@ -326,7 +328,7 @@ test.describe("PROJ-4 — Sicherheit", () => {
 test.describe("PROJ-4 — Responsive & Navigation", () => {
   test("AC-Nav-1: Kapiteleditor-Route zeigt Kapiteltitel im Header", async ({ page }) => {
     await page.goto(PROJECT_URL);
-    const editLink = page.getByRole("link", { name: "Bearbeiten" }).first();
+    const editLink = page.getByRole("link", { name: "Bearbeiten", exact: true }).first();
     const hasChapters = await editLink.isVisible().catch(() => false);
     if (hasChapters) {
       await editLink.click();

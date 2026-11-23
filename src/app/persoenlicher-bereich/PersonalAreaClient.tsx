@@ -1,12 +1,13 @@
 "use client";
 
 import { useActionState, useCallback, useEffect, useState } from "react";
-import Image from "next/image";
 import { toast } from "sonner";
 import { Navbar } from "@/components/Navbar";
 import { TURNSTILE_ENABLED, TurnstileField } from "@/components/auth/TurnstileField";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -25,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { AccountDeletionOverview } from "@/lib/account/account-deletion";
+import { cn } from "@/lib/utils";
 import {
   updateNameAction,
   resetPasswordAction,
@@ -35,18 +37,12 @@ import {
   type DeleteAccountState,
 } from "./actions";
 
-// ─── Design tokens (matching old app exactly) ────────────────────────────────
-
-const narravitMuted = "#848484";
-const narravitBorder = "#e0dcd5";
-const narravitGreen = "#96B897";
-
-// ─── Shared input class (mirrors old app accountInputRowClass) ───────────────
-
-const inputClass = `[font-family:var(--font-lato)] box-border h-12 w-full shrink-0 border px-3 py-0 text-lg leading-[2.875rem] outline-none transition-colors sm:text-xl`;
-const editableInputClass = `${inputClass} border-[${narravitBorder}] bg-white placeholder:text-[${narravitMuted}] focus:border-[${narravitGreen}]`;
-
 // ─── Sub-components ──────────────────────────────────────────────────────────
+
+// Name und E-Mail dürfen umbrechen, damit lange Angaben vollständig lesbar bleiben.
+const fieldTextClass =
+  "min-h-[3.375rem] w-full rounded-none border px-3.5 py-3 text-lg leading-7 [overflow-wrap:anywhere] sm:text-[1.1875rem] md:text-[1.1875rem]";
+const bodyTextClass = "text-lg leading-normal text-[#4A453F] sm:text-[1.1875rem]";
 
 function SectionShell({
   children,
@@ -57,7 +53,7 @@ function SectionShell({
 }) {
   return (
     <section
-      className={`flex w-full flex-col gap-5 bg-white px-5 py-6 sm:gap-6 sm:px-8 sm:py-8 ${className}`}
+      className={`flex w-full flex-col gap-5 border border-[#E0DCD5] bg-white p-5 sm:p-8 ${className}`}
     >
       {children}
     </section>
@@ -65,49 +61,7 @@ function SectionShell({
 }
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <h2
-      className="[font-family:var(--font-pt-serif)] text-2xl leading-8 text-[#3E3831] sm:text-3xl sm:leading-10"
-    >
-      {children}
-    </h2>
-  );
-}
-
-function FieldCard({
-  label,
-  hint,
-  children,
-  pinContentToBottom = false,
-}: {
-  label: string;
-  hint: string;
-  children: React.ReactNode;
-  pinContentToBottom?: boolean;
-}) {
-  return (
-    <div
-      className="flex h-full min-w-0 flex-col gap-1 bg-[#FAF8F6] p-4 sm:p-5"
-    >
-      <div className="shrink-0">
-        <span className="[font-family:var(--font-lato)] text-base leading-6 text-[#848484]">
-          {label}
-        </span>
-        <p className="[font-family:var(--font-lato)] mt-1 min-h-[3.75rem] text-sm leading-relaxed text-[#848484]/90 sm:min-h-[4.5rem] xl:min-h-[6rem]">
-          {hint}
-        </p>
-      </div>
-      <div
-        className={
-          pinContentToBottom
-            ? "mt-auto flex w-full min-w-0 flex-col gap-2"
-            : "flex w-full min-w-0 flex-col gap-2"
-        }
-      >
-        {children}
-      </div>
-    </div>
-  );
+  return <h2 className="text-[1.75rem] leading-tight text-[#3E3831] sm:text-3xl">{children}</h2>;
 }
 
 function SandButton({
@@ -124,18 +78,18 @@ function SandButton({
   className?: string;
 }) {
   return (
-    <button
+    <Button
       type={type}
       disabled={disabled}
       onClick={onClick}
-      className={`[font-family:var(--font-lato)] h-12 w-full shrink-0 bg-[#D0BCA6] px-6 text-lg font-bold leading-6 text-[#0a0909] transition-colors hover:bg-[#c0ad98] disabled:opacity-50 sm:w-auto sm:min-w-[186px] ${className}`}
+      className={cn("h-[3.375rem] w-full shrink-0 px-6 text-lg font-bold sm:w-auto", className)}
     >
       {children}
-    </button>
+    </Button>
   );
 }
 
-// ─── Account-Übersicht ───────────────────────────────────────────────────────
+// ─── Ihre Angaben ────────────────────────────────────────────────────────────
 
 function AccountSection({
   fullName,
@@ -161,114 +115,83 @@ function AccountSection({
   }, [nameState.fullName, nameState.success]);
 
   return (
-    <SectionShell>
-      <div className="flex flex-row flex-wrap items-center gap-3">
-        <Image
-          src="/nav/account.png"
-          alt=""
-          width={28}
-          height={28}
-          className="h-6 w-6 shrink-0 object-contain opacity-60 sm:h-7 sm:w-7"
-          aria-hidden
-          unoptimized
-        />
-        <SectionHeading>Account Übersicht</SectionHeading>
-      </div>
-      <p className="max-w-3xl text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
-        Diese Angaben nutzen wir für Anzeigen in der App, E-Mail-Versand und Ihre
-        Mitgliedschaft. Passen Sie Ihren Namen bei Bedarf an.
-      </p>
+    <SectionShell className="gap-6">
+      <SectionHeading>Ihre Angaben</SectionHeading>
 
-      <div className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 xl:grid-cols-3">
-        {/* Name */}
-        <FieldCard
-          label="Name"
-          hint="So erscheint Ihr Name z. B. in Begrüßungen, Projektlisten und von uns adressierten E-Mails."
-          pinContentToBottom
-        >
-          <form action={nameFormAction} className="flex flex-col gap-2">
-            <input
+      <form action={nameFormAction} className="flex flex-col gap-2">
+        <Label htmlFor="account-name" className="text-lg font-bold text-[#3E3831]">
+          Name
+        </Label>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+          {/* Die unsichtbare Kopie gibt dem Feld die Höhe des umbrochenen Namens. */}
+          <div className="grid min-w-0 flex-1">
+            <div
+              aria-hidden
+              className={`${fieldTextClass} invisible col-start-1 row-start-1 whitespace-pre-wrap border-transparent`}
+            >
+              {nameValue || " "}
+            </div>
+            <Textarea
               id="account-name"
               name="name"
-              type="text"
+              rows={1}
               autoComplete="name"
               value={nameValue}
-              onChange={(event) => setNameValue(event.target.value)}
-              className={`${editableInputClass} text-[#3E3831]`}
-              aria-describedby="account-name-hint"
+              onChange={(event) => setNameValue(event.target.value.replace(/\s*\n\s*/g, " "))}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }}
+              className={`${fieldTextClass} col-start-1 row-start-1 resize-none overflow-hidden border-[#8E877E] bg-white text-[#26231F]`}
             />
-            <p
-              id="account-name-hint"
-              className="min-h-[5rem] text-sm leading-6 text-[#848484] sm:min-h-[5.5rem] xl:min-h-[6.5rem]"
-            >
-              Tipp: Verwenden Sie den Namen, mit dem Sie angesprochen werden
-              möchten.
-            </p>
-            {nameState.error && (
-              <p className="text-base text-destructive">{nameState.error}</p>
-            )}
-            <SandButton type="submit" disabled={namePending}>
-              {namePending ? "Wird gespeichert …" : "Name speichern"}
-            </SandButton>
-          </form>
-        </FieldCard>
-
-        {/* E-Mail (read-only) */}
-        <FieldCard
-          label="E-Mail"
-          hint="Um Ihre E-Mail-Adresse zu ändern, wenden Sie sich bitte an den Support."
-        >
-          <input
-            id="account-email"
-            name="email"
-            type="email"
-            readOnly
-            tabIndex={-1}
-            value={email}
-            className={`${editableInputClass} cursor-default select-none text-[#848484]`}
-          />
-          <p className="min-h-[5rem] text-sm leading-6 text-[#848484] sm:min-h-[5.5rem] xl:min-h-[6.5rem]">
-            Ihre Anmelde-E-Mail — für Änderungen wenden Sie sich an den Support.
+          </div>
+          <SandButton type="submit" disabled={namePending}>
+            {namePending ? "Wird gespeichert …" : "Name speichern"}
+          </SandButton>
+        </div>
+        {nameState.error && (
+          <p role="alert" className="text-base text-destructive">
+            {nameState.error}
           </p>
-        </FieldCard>
+        )}
+      </form>
 
-      </div>
+      <dl className="flex flex-col gap-2">
+        <dt className="text-lg font-bold leading-none text-[#3E3831]">E-Mail</dt>
+        <dd
+          id="account-email"
+          className={`${fieldTextClass} border-[#D5D0C9] bg-[#F8F7F5] text-[#4A453F]`}
+        >
+          {email}
+        </dd>
+      </dl>
     </SectionShell>
   );
 }
 
-// ─── Rechnungen (Placeholder) ────────────────────────────────────────────────
+// ─── Rechnungen ──────────────────────────────────────────────────────────────
 
 function InvoiceSection() {
   return (
-    <SectionShell>
-      <div className="flex flex-col gap-2">
-        <SectionHeading>Rechnungen</SectionHeading>
-        <p className="max-w-3xl text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
-          Hier finden Sie alle bisherigen Belege und Zahlungsnachweise — ideal
-          für die Buchhaltung oder wenn Sie eine Übersicht über Ihre Ausgaben bei
-          uns brauchen.
-        </p>
-      </div>
-
-      {/* Placeholder table */}
-      <div className="border border-[#e0dcd5]">
-        <div className="grid grid-cols-4 border-b border-[#e0dcd5] bg-[#FAF8F6] px-4 py-2">
-          {["Datum", "Betrag", "Typ", "Rechnung"].map((h) => (
-            <span key={h} className="text-sm font-bold uppercase tracking-wide text-[#848484]">
-              {h}
-            </span>
-          ))}
-        </div>
-        <div className="px-4 py-6 text-center text-base text-[#848484] sm:text-lg">
-          Noch keine Rechnungen vorhanden.
-        </div>
-      </div>
+    <SectionShell className="gap-2">
+      <SectionHeading>Rechnungen</SectionHeading>
+      <p className={bodyTextClass}>
+        Ihre Rechnung erhalten Sie nach jedem Kauf per E-Mail. Falls Sie sie nicht mehr
+        finden, schreiben Sie uns an{" "}
+        <a
+          href="mailto:kontakt@narravit.de"
+          className="break-words text-[#3E3831] underline underline-offset-4 hover:text-[#0A0909]"
+        >
+          kontakt@narravit.de
+        </a>
+        .
+      </p>
     </SectionShell>
   );
 }
 
-// ─── Sicherheit ──────────────────────────────────────────────────────────────
+// ─── Passwort ───────────────────────────────────────────────────────────────
 
 function SecuritySection({
   authProvider,
@@ -296,15 +219,15 @@ function SecuritySection({
   return (
     <SectionShell>
       <div className="flex flex-col gap-2">
-        <SectionHeading>Sicherheit</SectionHeading>
+        <SectionHeading>Passwort</SectionHeading>
         {isEmailProvider ? (
           <>
-            <p className="[font-family:var(--font-lato)] max-w-4xl text-lg font-semibold leading-8 text-[#3E3831] sm:text-xl sm:leading-9">
+            <p className={bodyTextClass}>
               Mit dem Klick auf „Passwort zurücksetzen&quot; erhalten Sie eine E-Mail
               von uns mit einem sicheren Link, über den Sie ein neues Passwort
               vergeben können.
             </p>
-            <p className="max-w-3xl text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
+            <p className={bodyTextClass}>
               Wir empfehlen ein starkes, einzigartiges Passwort und regelmäßige
               Aktualisierung, besonders wenn Sie sich auf einem gemeinsam
               genutzten Gerät angemeldet haben.
@@ -313,20 +236,20 @@ function SecuritySection({
         ) : (
           <>
             {hasPassword ? (
-              <p className="[font-family:var(--font-lato)] max-w-4xl text-lg font-semibold leading-8 text-[#3E3831] sm:text-xl sm:leading-9">
+              <p className={bodyTextClass}>
                 Sie melden sich über {providerLabel} an und haben zusätzlich
                 ein Passwort festgelegt. Mit dem Klick auf „Passwort ändern&quot;
                 erhalten Sie eine E-Mail von uns mit einem sicheren Link, über
                 den Sie ein neues Passwort vergeben können.
               </p>
             ) : (
-              <p className="[font-family:var(--font-lato)] max-w-4xl text-lg font-semibold leading-8 text-[#3E3831] sm:text-xl sm:leading-9">
+              <p className={bodyTextClass}>
                 Sie melden sich über {providerLabel} an. Wenn Sie sich
                 zusätzlich mit einer E-Mail-Adresse und einem Passwort
                 anmelden möchten, können Sie hier ein Passwort festlegen.
               </p>
             )}
-            <p className="max-w-3xl text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
+            <p className={bodyTextClass}>
               {hasPassword
                 ? `Die Anmeldung über ${providerLabel} funktioniert weiterhin wie gewohnt.`
                 : `Sie erhalten dazu eine E-Mail mit einem sicheren Link. Die Anmeldung über ${providerLabel} funktioniert danach weiterhin wie gewohnt.`}
@@ -338,12 +261,12 @@ function SecuritySection({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-1 max-w-xl">
           {state.success ? (
-            <p className="text-base leading-7 text-[#96B897]">
+            <p className="text-base font-bold leading-7 text-[#2B452F] sm:text-lg">
               Wir haben Ihnen einen Link zum Zurücksetzen geschickt. Bitte prüfen Sie
               auch Ihren Spam-Ordner.
             </p>
           ) : (
-            <p className="text-base leading-7 text-[#848484]">
+            <p className="text-base leading-7 text-[#5F5A54] sm:text-lg">
               Sie bleiben während des Vorgangs angemeldet; nach erfolgreicher
               Änderung sollten Sie sich neu anmelden.
             </p>
@@ -354,7 +277,11 @@ function SecuritySection({
         </div>
         <form action={formAction} className="relative flex flex-col gap-2">
           <TurnstileField onReadyChange={setCaptchaReady} resetSignal={state} />
-          <SandButton type="submit" disabled={pending || !!state.success || !captchaReady}>
+          <SandButton
+            type="submit"
+            disabled={pending || !!state.success || !captchaReady}
+            className="border-[#EFEBE5] bg-[#EFEBE5] text-[#1F1C19] hover:border-[#E4DFD8] hover:bg-[#E4DFD8]"
+          >
             {pending
               ? "Wird gesendet …"
               : isEmailProvider
@@ -369,7 +296,7 @@ function SecuritySection({
   );
 }
 
-// ─── Account löschen ─────────────────────────────────────────────────────────
+// ─── Konto löschen ───────────────────────────────────────────────────────────
 
 function candidateName(candidate: { fullName: string; email: string }): string {
   return candidate.fullName.trim() || candidate.email || "Projektmitglied";
@@ -439,23 +366,18 @@ function DeleteAccountSection() {
   return (
     <SectionShell>
       <div className="flex flex-col gap-2">
-        <SectionHeading>Account löschen</SectionHeading>
-        <p className="[font-family:var(--font-lato)] max-w-3xl text-lg font-semibold leading-8 text-[#D00018] sm:text-xl sm:leading-9">
-          Achtung: Das Löschen ist unwiderruflich. Sie verlieren den Zugang zu
-          Ihrem Account und zu allen Ihren Projekten.
+        <SectionHeading>Konto löschen</SectionHeading>
+        <p className={bodyTextClass}>
+          <strong className="text-[#9C1C1C]">Das Löschen ist unwiderruflich.</strong> Sie
+          verlieren den Zugang zu Ihrem Konto und zu allen Ihren Projekten.
         </p>
-        <p className="max-w-3xl text-base leading-7 text-[#535252] sm:text-lg sm:leading-8">
+        <p className={bodyTextClass}>
           Projekte, in denen nur Sie mitwirken, werden mitgelöscht. Gemeinsame
           Projekte bleiben für die anderen Mitglieder bestehen.
         </p>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <p className="max-w-xl text-base leading-7 text-[#848484] sm:text-lg sm:leading-8">
-          Nutzen Sie diese Option nur, wenn Sie sicher sind. Bei Unsicherheiten
-          wenden Sie sich vorher an den Support.
-        </p>
-
+      <div className="flex">
         <AlertDialog
           open={open}
           onOpenChange={(o) => {
@@ -471,9 +393,9 @@ function DeleteAccountSection() {
           <AlertDialogTrigger asChild>
             <button
               type="button"
-              className="[font-family:var(--font-lato)] h-12 w-full shrink-0 whitespace-nowrap bg-[#53444B] px-4 text-center text-lg font-bold leading-6 text-white transition-colors hover:bg-[#45383e] sm:w-auto sm:px-6"
+              className="[font-family:var(--font-lato)] h-[3.375rem] w-full shrink-0 whitespace-nowrap bg-[#4A4240] px-6 text-center text-lg font-bold leading-6 text-white transition-colors hover:bg-[#3A3331] sm:w-auto"
             >
-              Account löschen
+              Konto löschen
             </button>
           </AlertDialogTrigger>
 
@@ -486,7 +408,7 @@ function DeleteAccountSection() {
           >
             <AlertDialogHeader className="text-left">
               <AlertDialogTitle className="text-2xl font-normal leading-8 text-[#3E3831] sm:text-3xl sm:leading-10">
-                Account wirklich löschen?
+                Konto wirklich löschen?
               </AlertDialogTitle>
               <AlertDialogDescription
                 asChild
@@ -519,7 +441,7 @@ function DeleteAccountSection() {
                       <div className="flex flex-col gap-1">
                         <p className="font-bold text-[#3E3831]">Wird gelöscht</p>
                         <ul className="list-disc pl-5">
-                          <li className="break-words">Ihr Account: {accountLabel}</li>
+                          <li className="break-words">Ihr Konto: {accountLabel}</li>
                           {overview.delete.map((project) => (
                             <li key={project.projectId} className="break-words">
                               Projekt „{project.title}“
@@ -581,13 +503,17 @@ function DeleteAccountSection() {
                             >
                               <SelectTrigger
                                 aria-labelledby={labelId}
-                                className="h-12 text-base sm:text-lg"
+                                className="h-auto min-h-12 py-2 text-left text-base sm:text-lg [&>span]:line-clamp-none [&>span]:[overflow-wrap:anywhere]"
                               >
                                 <SelectValue placeholder="Person auswählen" />
                               </SelectTrigger>
-                              <SelectContent className="z-[310]">
+                              <SelectContent className="z-[310] max-w-[calc(100vw-2rem)]">
                                 {project.candidates.map((candidate) => (
-                                  <SelectItem key={candidate.userId} value={candidate.userId}>
+                                  <SelectItem
+                                    key={candidate.userId}
+                                    value={candidate.userId}
+                                    className="min-h-11 py-2 pr-3 text-base leading-6 [overflow-wrap:anywhere] focus:bg-[#EFEBE5] focus:text-[#1F1C19] sm:text-lg"
+                                  >
                                     {candidateName(candidate)}
                                   </SelectItem>
                                 ))}
@@ -602,7 +528,7 @@ function DeleteAccountSection() {
                   {dialogError && <p className="text-base text-destructive">{dialogError}</p>}
 
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="delete-confirm" className="text-sm font-bold text-[#3E3831] sm:text-base">
+                    <Label htmlFor="delete-confirm" className="text-base font-bold text-[#3E3831]">
                       Tippen Sie <strong>LÖSCHEN</strong> zur Bestätigung:
                     </Label>
                     <Input
@@ -633,7 +559,7 @@ function DeleteAccountSection() {
                   disabled={!canDelete}
                   className="[font-family:var(--font-lato)] h-12 w-full bg-[#53444B] px-5 text-base font-bold text-white transition-colors hover:bg-[#45383e] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:text-lg"
                 >
-                  {pending ? "Wird gelöscht …" : "Account endgültig löschen"}
+                  {pending ? "Wird gelöscht …" : "Konto endgültig löschen"}
                 </button>
               </form>
             </AlertDialogFooter>
@@ -665,38 +591,20 @@ export function PersonalAreaClient({
       <main
         className="[font-family:var(--font-lato)] box-border min-h-full w-full min-w-0 flex-1 bg-[#FAF8F6] px-4 pb-16 pt-[calc(7.348rem+2rem)] sm:px-6 sm:pt-[calc(7.348rem+2.5rem)] md:px-8 md:pt-[calc(7.348rem+3rem)] xl:pl-[calc(11rem+2rem)] xl:pr-8 xl:pt-12"
       >
-        <div className="mx-auto flex w-full max-w-[1213px] flex-col gap-8 sm:gap-10 md:gap-12">
-          {/* Banner */}
-          <div className="relative h-[min(31.5vh,285px)] w-full min-h-[105px] overflow-hidden sm:min-h-[135px]">
-            <Image
-              src="/images/persoenlicher-bereich-banner.png"
-              alt="Person mit Laptop auf einem Ledersofa — stimmungsvolles Bannerbild."
-              fill
-              className="object-cover blur-[2px]"
-              sizes="(max-width: 768px) 100vw, 1213px"
-              priority
-            />
-          </div>
-
-          {/* Header */}
-          <header className="flex w-full flex-col items-center gap-2 text-center">
-            <h1 className="[font-family:var(--font-merriweather)] w-full text-3xl font-medium leading-10 text-[#3E3831] sm:text-4xl sm:leading-[1.2] md:text-5xl">
+        <div className="mx-auto flex w-full max-w-[880px] flex-col gap-6">
+          <header className="flex flex-col gap-2.5 pb-3">
+            <h1 className="text-[clamp(2.375rem,3.6vw,3.375rem)] leading-[1.12] text-[#3E3831]">
               Persönlicher Bereich
             </h1>
-            <p className="mx-auto max-w-3xl text-lg leading-8 text-[#535252] sm:text-xl sm:leading-9">
-              Hier verwalten Sie die wichtigsten Angaben zu Ihrem NARRAVIT-Konto,
-              Ihre Abrechnung und sicherheitsrelevante Aktionen — alles an einem
-              Ort, übersichtlich gegliedert.
+            <p className="text-xl leading-normal text-[#4A453F] sm:text-[1.3125rem]">
+              Ihre Angaben, Rechnungen und Ihr Konto an einem Ort.
             </p>
           </header>
 
-          {/* Sections */}
-          <div className="flex flex-col gap-6 sm:gap-8">
-            <AccountSection fullName={fullName} email={email} />
-            <InvoiceSection />
-            <SecuritySection authProvider={authProvider} hasPassword={hasPassword} />
-            <DeleteAccountSection />
-          </div>
+          <AccountSection fullName={fullName} email={email} />
+          <InvoiceSection />
+          <SecuritySection authProvider={authProvider} hasPassword={hasPassword} />
+          <DeleteAccountSection />
         </div>
       </main>
     </>

@@ -46,7 +46,7 @@ export function RegistrierenClient({
   return (
     <AuthLayout>
       <div className="mb-8 text-center md:mb-10">
-        <h1 className="[font-family:var(--font-merriweather)] mb-4 text-[2.75rem] font-normal leading-[1.15] tracking-[-0.03rem] text-[#3E3831] sm:text-5xl sm:leading-[1.18] xl:whitespace-nowrap">
+        <h1 className="mb-4 text-[2.75rem] font-normal leading-[1.15] tracking-[-0.03rem] text-[#3E3831] sm:text-5xl sm:leading-[1.18] xl:whitespace-nowrap">
           Konto erstellen
         </h1>
         <p className="text-[#535252]">

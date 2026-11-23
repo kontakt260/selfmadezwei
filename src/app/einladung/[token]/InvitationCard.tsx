@@ -9,7 +9,7 @@ export function InvitationCard({ children }: { children: ReactNode }) {
 
 export function InvitationHeading({ children }: { children: ReactNode }) {
   return (
-    <h1 className="text-center [font-family:var(--font-merriweather)] text-2xl text-[#3E3831] sm:text-3xl">
+    <h1 className="text-center text-2xl text-[#3E3831] sm:text-3xl">
       {children}
     </h1>
   );

@@ -109,9 +109,9 @@ export type AccountDeletionOverviewState = {
 };
 
 const DELETE_NOT_CONFIGURED =
-  "Account-Löschung ist serverseitig nicht konfiguriert. Bitte wenden Sie sich an den Support.";
+  "Die Konto-Löschung ist serverseitig nicht konfiguriert. Bitte wenden Sie sich an den Support.";
 const DELETE_FAILED =
-  "Account konnte nicht gelöscht werden. Bitte versuchen Sie es erneut oder wenden Sie sich an den Support.";
+  "Das Konto konnte nicht gelöscht werden. Bitte versuchen Sie es erneut oder wenden Sie sich an den Support.";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const uuidSchema = z.string().regex(UUID_RE);

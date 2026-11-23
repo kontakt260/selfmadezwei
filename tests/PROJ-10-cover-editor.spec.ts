@@ -34,9 +34,9 @@ test.describe("PROJ-10 — Cover-Karte in Projektübersicht", () => {
   }) => {
     await page.goto(QA_PROJECT_URL);
     await expect(
-      page.getByRole("heading", { name: "Cover bearbeiten" }),
+      page.getByRole("link", { name: "Cover bearbeiten" }),
     ).toBeVisible();
-    const editLink = page.getByRole("link", { name: /Cover-Editor öffnen/ });
+    const editLink = page.getByRole("link", { name: /Cover bearbeiten/ });
     await expect(editLink).toBeVisible();
     await expect(editLink).toHaveAttribute(
       "href",

@@ -47,11 +47,11 @@ beforeEach(() => {
 });
 
 describe("ProjectUsersClient — Sichtbarkeit nach Rolle", () => {
-  it("PL sieht 'Nutzer hinzufügen'-Button", () => {
+  it("PL sieht 'Person einladen'-Button", () => {
     render(
       <ProjectUsersClient projectId={PROJECT_ID} members={[SOLO_PL]} myRole="projektleiter" />,
     );
-    expect(screen.getByRole("button", { name: /Nutzer hinzufügen/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Person einladen/ })).toBeInTheDocument();
   });
 
   it("Co-Autor sieht KEINE Verwaltungs-Buttons (Add, Trash)", () => {
@@ -62,7 +62,7 @@ describe("ProjectUsersClient — Sichtbarkeit nach Rolle", () => {
         myRole="co_author"
       />,
     );
-    expect(screen.queryByRole("button", { name: /Nutzer hinzufügen/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Person einladen/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /entfernen/i })).not.toBeInTheDocument();
   });
 });
@@ -136,7 +136,7 @@ describe("ProjectUsersClient — AddUserModal Step-Switch", () => {
     render(
       <ProjectUsersClient projectId={PROJECT_ID} members={TEAM} myRole="projektleiter" />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /Nutzer hinzufügen/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Person einladen/ }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByLabelText("E-Mail-Adresse")).toBeInTheDocument();
     expect(screen.getByLabelText("Rolle")).toBeInTheDocument();
@@ -146,7 +146,7 @@ describe("ProjectUsersClient — AddUserModal Step-Switch", () => {
     render(
       <ProjectUsersClient projectId={PROJECT_ID} members={TEAM} myRole="projektleiter" />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /Nutzer hinzufügen/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Person einladen/ }));
     const submit = screen.getByRole("button", { name: /Einladen/ });
     expect(submit).toBeDisabled();
 

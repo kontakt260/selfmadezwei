@@ -10,7 +10,7 @@ export function PhoneNotice({ projectId }: { projectId: string }) {
           <Smartphone className="h-7 w-7" />
         </div>
         <div className="flex flex-col gap-2">
-          <h1 className="[font-family:var(--font-merriweather)] text-2xl font-medium leading-8 text-[#3E3831]">
+          <h1 className="text-2xl font-normal leading-8 text-[#3E3831]">
             Editor auf dem Smartphone nicht verfügbar
           </h1>
           <p className="text-base leading-7 text-[#535252]">

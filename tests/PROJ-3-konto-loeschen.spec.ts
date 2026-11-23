@@ -212,8 +212,8 @@ function rest(pathname: string, init: RequestInit, token?: string): Promise<Resp
 
 async function openDeleteDialog(page: Page, account: Account) {
   await page.goto("/persoenlicher-bereich");
-  await expect(page.locator("#account-email")).toHaveValue(account.email);
-  await page.getByRole("button", { name: "Account löschen", exact: true }).click();
+  await expect(page.locator("#account-email")).toHaveText(account.email);
+  await page.getByRole("button", { name: "Konto löschen", exact: true }).click();
   const dialog = page.getByRole("alertdialog");
   await expect(dialog.getByText("Wird gelöscht")).toBeVisible({ timeout: 20_000 });
   return dialog;
@@ -223,7 +223,7 @@ async function openDeleteDialog(page: Page, account: Account) {
 async function assertDisposable(page: Page, account: Account): Promise<void> {
   expect(account.email.startsWith(TEST_EMAIL_PREFIX)).toBe(true);
   expect(account.email).toContain(RUN_ID);
-  await expect(page.locator("#account-email")).toHaveValue(account.email);
+  await expect(page.locator("#account-email")).toHaveText(account.email);
 }
 
 const setHidden = (page: Page, name: string, value: string) =>
@@ -575,7 +575,7 @@ test.describe("PROJ-3 — echte Kontolöschung (nur Stage)", () => {
     await expect(dialog.getByText(`${TAG} Gemeinsam`).first()).toBeVisible();
     await expect(dialog.getByText("Bleibt bestehen")).toBeVisible();
     await expect(dialog.getByRole("listitem").first()).toHaveText(
-      `Ihr Account: ${A.name} (${A.email})`,
+      `Ihr Konto: ${A.name} (${A.email})`,
     );
     await expect(dialog.getByText(/Möchten Sie eigene Texte entfernen lassen/)).toBeVisible();
     await expect(dialog.getByText(/Gemeinsame Projekte bleiben/)).toHaveCount(0);
@@ -583,7 +583,7 @@ test.describe("PROJ-3 — echte Kontolöschung (nur Stage)", () => {
     await expect(dialog.getByRole("combobox").first()).toContainText("Bob Testkonto");
     await expect(dialog.getByText(/Exportieren|Kopie/)).toHaveCount(0);
 
-    const submit = dialog.getByRole("button", { name: "Account endgültig löschen" });
+    const submit = dialog.getByRole("button", { name: "Konto endgültig löschen" });
     await expect(submit).toBeDisabled();
     await pageA.locator("#delete-confirm").fill("LÖSCHEN");
     await expect(submit).toBeEnabled();
@@ -620,7 +620,7 @@ test.describe("PROJ-3 — echte Kontolöschung (nur Stage)", () => {
       expect(box!.y + box!.height).toBeLessThanOrEqual(height);
       expect(await pageA.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
 
-      const submit = dialog.getByRole("button", { name: "Account endgültig löschen" });
+      const submit = dialog.getByRole("button", { name: "Konto endgültig löschen" });
       await submit.scrollIntoViewIfNeeded();
       await expect(submit).toBeInViewport();
       await shot(pageA, `dialog-${label}`);
@@ -641,7 +641,7 @@ test.describe("PROJ-3 — echte Kontolöschung (nur Stage)", () => {
       await dialog.evaluate((element) => {
         element.scrollTop = 0;
       });
-      const heading = dialog.getByRole("heading", { name: "Account wirklich löschen?" });
+      const heading = dialog.getByRole("heading", { name: "Konto wirklich löschen?" });
       // Nicht über elementFromPoint: Der offene Dialog setzt `pointer-events:
       // none` auf den Body, die Kopfzeile würde dabei übersprungen.
       const covered = await heading.evaluate((element) => {
@@ -686,11 +686,11 @@ test.describe("PROJ-3 — echte Kontolöschung (nur Stage)", () => {
     const dialog = await openDeleteDialog(pageA, A);
     await pageA.locator("#delete-confirm").fill("LÖSCHEN");
     await setHidden(pageA, "confirmation", "egal");
-    await dialog.getByRole("button", { name: "Account endgültig löschen" }).click();
+    await dialog.getByRole("button", { name: "Konto endgültig löschen" }).click();
     await expect(dialog.getByText("Bitte bestätigen Sie die Löschung erneut.")).toBeVisible();
     await dialog.getByRole("button", { name: "Abbrechen" }).click();
 
-    await pageA.getByRole("button", { name: "Account löschen", exact: true }).click();
+    await pageA.getByRole("button", { name: "Konto löschen", exact: true }).click();
     const reopened = pageA.getByRole("alertdialog");
     await expect(reopened.getByText("Wird gelöscht")).toBeVisible({ timeout: 20_000 });
     const stale = await reopened.getByText("Bitte bestätigen Sie die Löschung erneut.").count();
@@ -704,7 +704,7 @@ test.describe("PROJ-3 — echte Kontolöschung (nur Stage)", () => {
     const dialog = await openDeleteDialog(pageA, A);
     await pageA.locator("#delete-confirm").fill("LÖSCHEN");
     await setHidden(pageA, "confirmation", "egal");
-    await dialog.getByRole("button", { name: "Account endgültig löschen" }).click();
+    await dialog.getByRole("button", { name: "Konto endgültig löschen" }).click();
 
     await expect(dialog.getByText("Bitte bestätigen Sie die Löschung erneut.")).toBeVisible();
     expect(await accountExists(A)).toBe(true);
@@ -715,7 +715,7 @@ test.describe("PROJ-3 — echte Kontolöschung (nur Stage)", () => {
     const dialog = await openDeleteDialog(pageA, A);
     await pageA.locator("#delete-confirm").fill("LÖSCHEN");
     await setHidden(pageA, "confirmedDelete", "[]");
-    await dialog.getByRole("button", { name: "Account endgültig löschen" }).click();
+    await dialog.getByRole("button", { name: "Konto endgültig löschen" }).click();
 
     await expect(dialog.getByText(/hat sich etwas geändert/)).toBeVisible();
     expect(await accountExists(A)).toBe(true);
@@ -730,7 +730,7 @@ test.describe("PROJ-3 — echte Kontolöschung (nur Stage)", () => {
       "successors",
       JSON.stringify({ [sharedProject]: crypto.randomUUID(), [leaveTestProject]: B.id }),
     );
-    await dialog.getByRole("button", { name: "Account endgültig löschen" }).click();
+    await dialog.getByRole("button", { name: "Konto endgültig löschen" }).click();
 
     await expect(dialog.getByText(/hat sich etwas geändert/)).toBeVisible();
     expect(await accountExists(A)).toBe(true);
@@ -768,8 +768,8 @@ test.describe("PROJ-3 — echte Kontolöschung (nur Stage)", () => {
       await expect(pageB).not.toHaveURL(/\/zugang-abgelaufen/);
       await pageB.goto("/persoenlicher-bereich");
       await expect(pageB).toHaveURL(/\/persoenlicher-bereich/);
-      await expect(pageB.locator("#account-email")).toHaveValue(B.email);
-      await pageB.getByRole("button", { name: "Account löschen", exact: true }).click();
+      await expect(pageB.locator("#account-email")).toHaveText(B.email);
+      await pageB.getByRole("button", { name: "Konto löschen", exact: true }).click();
       await expect(pageB.getByRole("alertdialog").getByText("Wird gelöscht")).toBeVisible({
         timeout: 20_000,
       });
@@ -794,7 +794,7 @@ test.describe("PROJ-3 — echte Kontolöschung (nur Stage)", () => {
     await setHidden(pageA, "confirmedDelete", JSON.stringify([soloProject, sharedProject]));
 
     await assertDisposable(pageA, A);
-    await dialog.getByRole("button", { name: "Account endgültig löschen" }).click();
+    await dialog.getByRole("button", { name: "Konto endgültig löschen" }).click();
     await pageA.waitForURL(/\/anmelden/, { timeout: 30_000 });
 
     expect(await accountExists(A)).toBe(false);
@@ -898,7 +898,7 @@ test.describe("PROJ-3 — echte Kontolöschung (nur Stage)", () => {
     await pageB.locator("#delete-confirm").fill("LÖSCHEN");
 
     await assertDisposable(pageB, B);
-    await dialog.getByRole("button", { name: "Account endgültig löschen" }).click();
+    await dialog.getByRole("button", { name: "Konto endgültig löschen" }).click();
     await pageB.waitForURL(/\/anmelden/, { timeout: 30_000 });
 
     expect(await accountExists(B)).toBe(false);

@@ -5,8 +5,10 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CoverRender } from "@/components/cover/CoverRender";
+import { BookView } from "@/components/cover/BookView";
+import { Button } from "@/components/ui/button";
 import type { CoverData } from "@/lib/cover-types";
+import type { ProjectCardAccess } from "@/lib/projects/project-card-status";
 
 export type ProjectCardData = {
   id: string;
@@ -18,21 +20,9 @@ export type ProjectCardData = {
   // werden vom Server-Lader synthetisiert, wenn keine project_covers-
   // Row existiert.
   coverData: CoverData;
+  // PROJ-22: bestimmt Statuszeile und Button der Karte.
+  access: ProjectCardAccess;
 };
-
-function IconTrash({ className }: { className?: string }) {
-  return (
-    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
-      <path
-        d="M3 6h18M8 6V4h8v2M10 11v6M14 11v6M19 6l-1 14H6L5 6"
-        stroke="currentColor"
-        strokeWidth={1.67}
-        strokeLinecap="square"
-        strokeLinejoin="miter"
-      />
-    </svg>
-  );
-}
 
 function makeRandomSuffix(length = 8): string {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -51,9 +41,17 @@ function makeRandomSuffix(length = 8): string {
 type Props = {
   project: ProjectCardData;
   deleteProjectAction: (projectId: string) => Promise<{ error?: string }>;
+  /** PROJ-22: große Karte, wenn die Person genau ein Projekt hat. */
+  featured?: boolean;
 };
 
-export function ProjectCard({ project, deleteProjectAction }: Props) {
+function primaryActionLabel(project: ProjectCardData): string {
+  if (project.access.state === "expired") return "Ansehen";
+  if (project.access.state === "unknown") return "Öffnen";
+  return project.chapterCount === 0 ? "Loslegen" : "Weiterschreiben";
+}
+
+export function ProjectCard({ project, deleteProjectAction, featured = false }: Props) {
   const href = `/projektuebersicht/${project.id}`;
   const router = useRouter();
   const [deletePending, startDeleteTransition] = useTransition();
@@ -138,15 +136,23 @@ export function ProjectCard({ project, deleteProjectAction }: Props) {
   const canConfirm = inputValue.trim() === expectedPhrase && expectedPhrase.length > 0;
 
   const chapterLabel =
-    project.chapterCount === 1 ? "1 Kapitel" : `${project.chapterCount} Kapitel`;
+    project.chapterCount === 0
+      ? "Noch keine Kapitel"
+      : project.chapterCount === 1
+        ? "1 Kapitel"
+        : `${project.chapterCount} Kapitel`;
+  const canDelete = project.userRole === "projektleiter";
+  const roleLabel = canDelete ? "Sie leiten dieses Buch" : "Sie schreiben mit";
+  const expired = project.access.state === "expired";
+  const Heading = featured ? "h2" : "h3";
 
   const modal =
     modalOpen && typeof document !== "undefined"
       ? createPortal(
-          <div className="fixed inset-0 z-[300] flex items-center justify-center p-5 sm:p-8" role="presentation">
+          <div className="fixed inset-0 z-[300] flex overflow-y-auto p-5 sm:p-8" role="presentation">
             <button
               type="button"
-              className="absolute inset-0 cursor-pointer bg-black/45 transition-opacity"
+              className="fixed inset-0 cursor-pointer bg-black/45 transition-opacity"
               aria-label="Dialog schließen"
               onClick={closeModal}
               disabled={deletePending}
@@ -156,9 +162,9 @@ export function ProjectCard({ project, deleteProjectAction }: Props) {
               aria-modal="true"
               aria-labelledby={deleteStep === 1 ? step1TitleId : step2TitleId}
               aria-describedby={deleteStep === 1 ? step1DescId : step2DescId}
-              className="[font-family:var(--font-lato)] relative z-10 w-full max-w-xl border border-[#e0dcd5] bg-[#FAF8F6] p-8 shadow-[0_16px_48px_rgba(0,0,0,0.18)] sm:max-w-2xl sm:p-10 [&_button]:cursor-pointer [&_button:disabled]:cursor-not-allowed"
+              className="[font-family:var(--font-lato)] relative z-10 m-auto w-full max-w-xl border border-[#e0dcd5] bg-[#FAF8F6] p-8 shadow-[0_16px_48px_rgba(0,0,0,0.18)] sm:max-w-2xl sm:p-10 [&_button]:cursor-pointer [&_button:disabled]:cursor-not-allowed"
             >
-              <p className="text-sm font-medium leading-5 text-[#848484] sm:text-base">
+              <p className="text-base font-medium leading-6 text-[#5F5A54]">
                 Schritt {deleteStep} von 2
               </p>
               {deleteStep === 1 ? (
@@ -211,7 +217,7 @@ export function ProjectCard({ project, deleteProjectAction }: Props) {
                     </p>
                   </div>
                   <div className="mt-8 border border-[#e0dcd5] bg-white px-5 py-4">
-                    <p className="text-sm font-medium uppercase tracking-wide text-[#848484] sm:text-base">
+                    <p className="text-base font-medium uppercase tracking-wide text-[#5F5A54]">
                       Eingabe erforderlich
                     </p>
                     <p className="mt-3 break-all font-mono text-lg font-semibold tracking-wide text-[#3E3831] sm:text-xl" aria-live="polite">
@@ -237,7 +243,7 @@ export function ProjectCard({ project, deleteProjectAction }: Props) {
                       }
                     }}
                     disabled={deletePending}
-                    className="mt-3 w-full border border-[#e0dcd5] bg-white px-4 py-3.5 font-mono text-base text-[#3E3831] outline-none transition-colors placeholder:text-[#848484] focus:border-[#96B897] disabled:opacity-50 sm:text-lg"
+                    className="mt-3 w-full border border-[#e0dcd5] bg-white px-4 py-3.5 font-mono text-base text-[#3E3831] outline-none transition-colors placeholder:text-[#6B655E] focus:border-[#96B897] disabled:opacity-50 sm:text-lg"
                     placeholder={expectedPhrase}
                   />
                   <div className="mt-8 flex flex-col-reverse gap-4 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-5">
@@ -277,52 +283,91 @@ export function ProjectCard({ project, deleteProjectAction }: Props) {
   return (
     <>
       {modal}
-      <article className="relative flex min-w-0 flex-col bg-white p-5 shadow-none transition-[box-shadow,transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-[#fcfcfb] hover:shadow-[0_10px_28px_rgba(0,0,0,0.09)] sm:p-8">
+      <article
+        className={`relative flex min-w-0 border border-[#E0DCD5] bg-white transition-colors hover:border-[#BDB5AA] ${
+          featured ? "flex-col md:flex-row" : "flex-col"
+        }`}
+      >
         <Link
           href={href}
-          className="absolute inset-0 z-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#96B897]/50"
+          className="absolute inset-0 z-0 outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-[#3E3831]"
           aria-label={`Projekt „${project.title}" öffnen`}
         />
-        <div className="relative z-10 flex min-h-0 flex-col pointer-events-none">
-          <div className="flex flex-row items-start justify-between gap-3 sm:gap-4">
-            <div className="flex min-w-0 flex-1 flex-row items-center gap-4">
-              <div className="w-14 shrink-0 sm:w-16">
-                <CoverRender data={project.coverData} size="card" />
-              </div>
-              <div className="flex min-w-0 flex-col">
-                <h3 className="[font-family:var(--font-pt-serif)] [overflow-wrap:anywhere] text-xl leading-8 text-[#3E3831] sm:text-2xl sm:leading-9">
-                  {project.title}
-                </h3>
-                <p className="mt-1 text-base leading-6 text-[#848484]">
-                  {project.formattedUpdatedAt}
-                </p>
-              </div>
-            </div>
-            {project.userRole === "projektleiter" && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  openDeleteModal();
-                }}
-                className="pointer-events-auto relative z-20 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center bg-[#FEF2F2] text-[#DC2626] transition-colors hover:bg-[#FEE2E2] hover:text-[#991B1B]"
-                aria-label={`Projekt „${project.title}" löschen`}
-              >
-                <IconTrash className="pointer-events-none shrink-0" />
-              </button>
+        <div
+          className={`pointer-events-none relative z-10 flex items-center justify-center bg-[#EFEAE3] ${
+            featured ? "px-6 py-10 md:flex-1 md:px-8 md:py-11" : "px-6 py-8"
+          }`}
+        >
+          <BookView
+            data={project.coverData}
+            className={featured ? "max-w-[300px]" : "max-w-[222px]"}
+          />
+        </div>
+        <div
+          className={`pointer-events-none relative z-10 flex min-w-0 flex-1 flex-col ${
+            featured ? "justify-center gap-5 p-6 sm:p-8 md:p-12" : "gap-3.5 p-6"
+          }`}
+        >
+          <div className="flex min-w-0 flex-col gap-1">
+            <p className="text-lg leading-7 text-[#5F5A54]">
+              {featured ? "Ihr Buch" : roleLabel}
+            </p>
+            <Heading
+              className={`[overflow-wrap:anywhere] text-[#3E3831] ${
+                featured
+                  ? "text-[2rem] leading-[1.15] sm:text-[2.625rem]"
+                  : "text-[1.75rem] leading-[1.22]"
+              }`}
+            >
+              {project.title}
+            </Heading>
+          </div>
+          <div
+            className={`flex flex-col gap-0.5 leading-normal text-[#4A453F] ${
+              featured ? "text-xl" : "text-[1.1875rem]"
+            }`}
+          >
+            <p>{chapterLabel}</p>
+            {project.access.state === "expired" ? (
+              <p className="font-bold text-[#8A3B12]">
+                Abgelaufen am {project.access.expiredOn}
+              </p>
+            ) : (
+              <p>{project.formattedUpdatedAt}</p>
             )}
           </div>
-          <div className="mt-6 flex flex-row flex-wrap items-center justify-between gap-3 border-t border-transparent pt-4 sm:mt-8 sm:pt-4">
-            <p className="text-base leading-6 text-[#848484] sm:text-lg">{chapterLabel}</p>
-            <Link
-              href={href}
-              tabIndex={-1}
-              className="pointer-events-auto relative z-20 inline-flex min-h-12 min-w-[6rem] items-center justify-center bg-[#D0BCA6] px-5 py-2 text-lg font-bold leading-6 text-[#0a0909] transition-colors hover:bg-[#c0ad98]"
-            >
-              Öffnen
+          <Button
+            asChild
+            className={`pointer-events-auto relative z-20 h-14 w-full px-5 text-[1.1875rem] font-bold ${
+              featured ? "" : "mt-auto"
+            } ${
+              expired
+                ? "border-[#EFEBE5] bg-[#EFEBE5] text-[#1F1C19] hover:border-[#E4DFD8] hover:bg-[#E4DFD8]"
+                : ""
+            }`}
+          >
+            <Link href={href} tabIndex={-1}>
+              {primaryActionLabel(project)}
             </Link>
-          </div>
+          </Button>
+          {(canDelete || !featured) && (
+            <div className="flex min-h-11 items-center">
+              {canDelete && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openDeleteModal();
+                  }}
+                  className="pointer-events-auto relative z-20 min-h-11 cursor-pointer text-[1.0625rem] text-[#5F5A54] underline underline-offset-4 transition-colors hover:text-[#3E3831]"
+                  aria-label={`Projekt „${project.title}" löschen`}
+                >
+                  Projekt löschen
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </article>
     </>

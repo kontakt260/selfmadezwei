@@ -41,14 +41,14 @@ export function OnboardingWizard({
   buyerEmail,
   initialForWhom,
   backUrl = "https://www.narravit.de",
-  showAccountDeleteLink = false,
+  showPersonalAreaLink = false,
   isGuest = false,
 }: {
   defaultFullName: string;
   buyerEmail: string;
   initialForWhom?: ForWhom | null;
   backUrl?: string;
-  showAccountDeleteLink?: boolean;
+  showPersonalAreaLink?: boolean;
   /**
    * Nicht angemeldet (Kauf ohne Konto, 2026-11-16): Der Checkout läuft
    * zuerst, das Konto wird direkt danach angelegt.
@@ -272,12 +272,11 @@ export function OnboardingWizard({
             </p>
           )}
 
-          {showAccountDeleteLink && (
-            <p className="mt-8 border-t border-[#e0dcd5] pt-6 text-center text-sm text-[#848484]">
-              Sie möchten stattdessen Ihr NARRAVIT-Konto endgültig löschen?{" "}
+          {showPersonalAreaLink && (
+            <p className="mt-8 border-t border-[#e0dcd5] pt-4 text-center text-base">
               <a
                 href="/persoenlicher-bereich"
-                className="text-[#3E3831] underline underline-offset-4 hover:no-underline"
+                className="inline-flex min-h-11 items-center text-[#3E3831] underline underline-offset-4 hover:no-underline"
               >
                 Zum persönlichen Bereich
               </a>

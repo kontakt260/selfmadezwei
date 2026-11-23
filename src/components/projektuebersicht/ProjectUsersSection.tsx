@@ -18,7 +18,7 @@ type Props = {
 
 export function ProjectUsersSection({ projectId, members, myRole, readOnly = false }: Props) {
   return (
-    <section className="flex flex-col gap-5 bg-white p-5 sm:gap-6 sm:p-8">
+    <section className="flex flex-col gap-5 border border-[#E0DCD5] bg-white p-5 sm:gap-6 sm:p-8">
       <ProjectUsersClient
         projectId={projectId}
         members={members}

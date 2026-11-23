@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandName } from "@/components/BrandName";
 import { CONTENT_RETENTION_DAYS } from "@/lib/projects/project-access";
 import { CheckoutButton } from "./CheckoutButton";
 
@@ -29,7 +30,7 @@ type Props = {
 
 export function PaywallStats({ projectId, portalExpiresAt, daysLeft, expiredOn, deletesOn }: Props) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:gap-6">
+    <div className="grid h-full grid-cols-1">
       <PortalAccessStat
         projectId={projectId}
         expiresAt={portalExpiresAt}
@@ -58,7 +59,11 @@ function PortalAccessStat({
   return (
     <StatCard
       icon={<IconCalendar />}
-      label={expired ? "NARRAVIT-Projektzugang" : "NARRAVIT-Projektzugang endet in"}
+      label={
+        <>
+          <BrandName />-Projektzugang{expired ? "" : " endet in"}
+        </>
+      }
       value={
         expired
           ? `Abgelaufen am ${expiredOn}`
@@ -103,26 +108,26 @@ function StatCard({
   action,
 }: {
   icon: React.ReactNode;
-  label: string;
+  label: React.ReactNode;
   value: string;
   hint: string;
   action: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-3 bg-white p-5 sm:p-8">
+    <div className="flex h-full flex-col gap-3 border border-[#E0DCD5] bg-white p-5 sm:p-8">
       <div className="flex flex-row items-center gap-2 sm:gap-3">
         <span className="shrink-0 [&>svg]:h-6 [&>svg]:w-6 sm:[&>svg]:h-7 sm:[&>svg]:w-7">
           {icon}
         </span>
-        <h3 className="[font-family:var(--font-pt-serif)] min-w-0 text-xl leading-8 text-[#3E3831] sm:text-2xl sm:leading-9">
+        <h2 className="min-w-0 text-2xl leading-8 text-[#3E3831] sm:text-3xl sm:leading-10">
           {label}
-        </h3>
+        </h2>
       </div>
       <p className="text-3xl leading-9 text-[#3E3831] sm:text-4xl sm:leading-10">
         {value}
       </p>
-      <p className="text-sm leading-6 text-[#848484] sm:text-base">{hint}</p>
-      <div className="mt-2">{action}</div>
+      <p className="text-base leading-7 text-[#5F5A54] sm:text-lg sm:leading-8">{hint}</p>
+      <div className="mt-auto pt-2">{action}</div>
     </div>
   );
 }

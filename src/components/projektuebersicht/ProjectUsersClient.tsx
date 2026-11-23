@@ -166,7 +166,7 @@ export function ProjectUsersClient({ projectId, members, myRole, readOnly = fals
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="[font-family:var(--font-pt-serif)] text-2xl leading-8 text-[#3E3831] sm:text-3xl sm:leading-10">
-          Nutzerübersicht
+          Wer an diesem Buch mitschreibt
         </h2>
         {isPL && (
           <button
@@ -176,7 +176,7 @@ export function ProjectUsersClient({ projectId, members, myRole, readOnly = fals
             title={readOnly ? "Der Projektzugang ist abgelaufen." : undefined}
             className="inline-flex h-12 items-center justify-center gap-2 bg-[#D0BCA6] px-5 text-base font-bold text-[#0a0909] transition-colors hover:bg-[#c0ad98] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#D0BCA6] sm:text-lg"
           >
-            <PlusIcon /> Nutzer hinzufügen
+            <PlusIcon /> Person einladen
           </button>
         )}
       </div>
@@ -203,24 +203,24 @@ export function ProjectUsersClient({ projectId, members, myRole, readOnly = fals
                 </span>
                 <div className="flex min-w-0 flex-1 flex-col">
                   <p
-                    className="truncate text-base font-semibold text-[#3E3831] sm:text-lg"
+                    className="text-base font-semibold text-[#3E3831] [overflow-wrap:anywhere] sm:text-lg"
                     title={name}
                   >
                     {name}
                     {m.isMe && (
-                      <span className="ml-2 text-sm font-normal text-[#848484]">
+                      <span className="ml-2 text-base font-normal text-[#5F5A54]">
                         (Sie)
                       </span>
                     )}
                   </p>
-                  <p className="truncate text-sm text-[#848484] sm:text-base" title={m.email}>
+                  <p className="text-base text-[#5F5A54] [overflow-wrap:anywhere]" title={m.email}>
                     {m.email}
                   </p>
                 </div>
               </div>
 
               <div className="flex flex-row items-center gap-2 sm:gap-3">
-                <span className="text-sm text-[#535252] sm:text-base">
+                <span className="text-base text-[#4A453F]">
                   {ROLE_LABEL[m.role]}
                 </span>
                 {isPL && (
@@ -237,7 +237,7 @@ export function ProjectUsersClient({ projectId, members, myRole, readOnly = fals
                             : "Mitglied entfernen"
                       }
                       aria-label={`Mitglied „${name}" entfernen`}
-                      className="flex h-10 w-10 shrink-0 items-center justify-center border border-[#e0dcd5] bg-white text-[#3E3831] transition-colors hover:bg-[#f5f3f0] disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center border border-[#e0dcd5] bg-white text-[#3E3831] transition-colors hover:bg-[#f5f3f0] disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <TrashIcon />
                     </button>
@@ -272,14 +272,14 @@ export function ProjectUsersClient({ projectId, members, myRole, readOnly = fals
           {addStep === "input" ? (
             <>
               <h3 id="add-user-title" className="[font-family:var(--font-pt-serif)] text-2xl text-[#3E3831] sm:text-3xl">
-                Nutzer einladen
+                Person einladen
               </h3>
               <p className="text-base leading-7 text-[#535252] sm:text-lg">
                 Tragen Sie die E-Mail-Adresse der Person ein und wählen Sie ihre Rolle.
                 Wir verschicken die Einladung automatisch per Mail.
               </p>
               <label className="flex flex-col gap-2">
-                <span className="text-sm font-bold text-[#3E3831]">E-Mail-Adresse</span>
+                <span className="text-base font-bold text-[#3E3831]">E-Mail-Adresse</span>
                 <input
                   type="email"
                   value={addEmail}
@@ -290,7 +290,7 @@ export function ProjectUsersClient({ projectId, members, myRole, readOnly = fals
                 />
               </label>
               <label className="flex flex-col gap-2">
-                <span className="text-sm font-bold text-[#3E3831]">Rolle</span>
+                <span className="text-base font-bold text-[#3E3831]">Rolle</span>
                 <select
                   value={addRole}
                   onChange={(e) =>
@@ -362,7 +362,7 @@ export function ProjectUsersClient({ projectId, members, myRole, readOnly = fals
           <p className="text-base leading-7 text-[#535252] sm:text-lg">
             Möchten Sie{" "}
             <span className="font-semibold">{displayName(confirmRemove)}</span>{" "}
-            wirklich aus dem Projekt entfernen? Der Nutzer verliert den
+            wirklich aus dem Projekt entfernen? Die Person verliert den
             Zugriff auf dieses Projekt.
           </p>
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-4">
@@ -419,7 +419,7 @@ export function ProjectUsersClient({ projectId, members, myRole, readOnly = fals
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-sm leading-6 text-[#848484] sm:text-base">
+              <p className="text-base leading-6 text-[#5F5A54]">
                 Die Person wird sofort Projektleitung und per E-Mail informiert.
               </p>
             </div>
@@ -468,11 +468,11 @@ function ModalShell({
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
-      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 px-4 py-8"
+      className="fixed inset-0 z-[300] flex overflow-y-auto bg-black/40 px-4 py-8"
       onClick={onClose}
     >
       <div
-        className="flex w-full max-w-xl flex-col gap-5 bg-white p-6 sm:gap-6 sm:p-8"
+        className="m-auto flex w-full max-w-xl flex-col gap-5 bg-white p-6 sm:gap-6 sm:p-8"
         onClick={(e) => e.stopPropagation()}
       >
         {children}
