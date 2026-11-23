@@ -83,7 +83,7 @@ Drei Befunde aus dem Vibe-Security-Audit, die isoliert betrachtet jeweils Medium
 
 ## Tech Design (Solution Architect)
 
-> **Stand 2026-11-22, von Jakob freigegeben (Abschnitte A bis H).** Abschnitt I ist davon ausgenommen und wird vor dem Bau separat entworfen und freigegeben. Die Spec stammt vom Mai. Seitdem sind Turnstile, die Audio-Aufnahme im Browser und die Paywall pro Projekt dazugekommen. Das Design passt die Spec deshalb an, am stärksten bei Block B.
+> **Stand 2026-11-22, von Jakob freigegeben (Abschnitte A bis H).** Abschnitt I hat Jakob am 2026-11-23 verworfen. Die Spec stammt vom Mai. Seitdem sind Turnstile, die Audio-Aufnahme im Browser und die Paywall pro Projekt dazugekommen. Das Design passt die Spec deshalb an, am stärksten bei Block B.
 
 ### A) Aufbau
 
@@ -167,9 +167,11 @@ Keine.
 4. Auf Stage prüfen: Anmeldung mit Turnstile, Google/Facebook, Stripe-Checkout, Bilder
 5. Go-live-Liste ergänzen
 
-### I) Ergänzung aus PROJ-3 BUG-6 (noch zu entwerfen und freizugeben)
+### I) Identitätsprüfung vor dem Konto-Löschen (entschieden: wird nicht gebaut)
 
-Vor dem unwiderruflichen Löschen eines Kontos reicht heute eine offene Sitzung. Geplant ist eine erneute Identitätsprüfung, Vorschlag: ein Code per Mail, weil Google- und Facebook-Konten kein Passwort haben. Das ändert den Auth-Ablauf und braucht Jakobs ausdrückliche Freigabe.
+**Entscheidung Jakob, 2026-11-23:** Es bleibt bei der offenen Sitzung plus dem Wort `LÖSCHEN`. Ein Code per Mail wäre ein zusätzlicher Schritt und würde weitere Mails verursachen.
+
+**Bewusst akzeptiertes Risiko (PROJ-3 BUG-6):** Wer an ein entsperrtes, angemeldetes Gerät kommt, kann das Konto löschen. Projekte, in denen die Person allein ist, sind dann sofort endgültig weg.
 
 ## Implementation Notes — Backend 2026-11-22
 
@@ -179,7 +181,7 @@ Vor dem unwiderruflichen Löschen eines Kontos reicht heute eine offene Sitzung.
 - Konfigurationsprüfung beim Build in `src/lib/config/build-config.ts`. Meldungen nennen nur Namen von Variablen, nie Werte.
 - Zentrale App-Adresse in `src/lib/site-url.ts`. Die stillen Ersatzwerte `localhost` in vier Server Actions und die Produktionsadresse in den Mails sind entfernt.
 
-**Kein Cookie-Cache, kein `SESSION_SECRET`, keine Migration, keine neue Variable, keine neuen Pakete.** Abschnitt I (Identitätsprüfung) ist nicht gebaut.
+**Kein Cookie-Cache, kein `SESSION_SECRET`, keine Migration, keine neue Variable, keine neuen Pakete.** Abschnitt I (Identitätsprüfung) wird nicht gebaut (Jakob, 2026-11-23).
 
 **Ergänzungen gegenüber dem Design:**
 - Als Kunden-Umgebung zählt zusätzlich `VERCEL_ENV=production`, damit auch ein Deployment ohne Git-Branch die strengen Regeln bekommt.
@@ -201,7 +203,7 @@ Vor dem unwiderruflichen Löschen eines Kontos reicht heute eine offene Sitzung.
 **Getestet:** 2026-11-22
 **App:** echter Production-Build (`next build` und `next start`) auf `localhost:3000` gegen die Stage-Datenbank
 **Tester:** QA Engineer (AI)
-**Umfang:** Abschnitte A bis H des Tech Designs. Abschnitt I (Identitätsprüfung) ist nicht gebaut.
+**Umfang:** Abschnitte A bis H des Tech Designs. Abschnitt I (Identitätsprüfung) wird nicht gebaut (Jakob, 2026-11-23).
 
 ### Acceptance Criteria Status
 

@@ -385,7 +385,7 @@ Die drei Kriterien unter „Sonderfälle über den Support" sind ein Arbeitsabla
 - [x] Manipulierte Formulare: fehlende Bestätigung, nicht bestätigtes Projekt, fremde Nachfolge, zusätzliches fremdes Projekt
 - [x] XSS: Projekttitel mit HTML wird im Dialog nur als Text angezeigt
 - [x] Die Person kommt immer aus der geprüften Session, nie aus dem Formular
-- [ ] **BUG-6:** Keine erneute Identitätsprüfung vor der unwiderruflichen Löschung
+- [x] **BUG-6:** Keine erneute Identitätsprüfung vor der unwiderruflichen Löschung (bewusst akzeptiert, Jakob 2026-11-23)
 - [ ] **BUG-7:** Co-Autoren dürfen laut RLS-Regel das Feld `owner_id` ändern
 
 ### Bugs Found
@@ -416,6 +416,7 @@ Die drei Kriterien unter „Sonderfälle über den Support" sind ein Arbeitsabla
 - **Severity:** Medium
 - **Beschreibung:** Eine offene Sitzung und das Wort `LÖSCHEN` reichen. Wer an ein entsperrtes Gerät kommt, kann Konto und Einzelprojekte unwiderruflich löschen. Bestand schon vor diesem Refine.
 - **Priorität:** Produktentscheidung. Für Google- und Facebook-Konten bräuchte es einen Code per Mail statt eines Passworts.
+- **Entscheidung Jakob, 2026-11-23:** Es bleibt bei `LÖSCHEN`, das Risiko ist bewusst akzeptiert.
 
 #### BUG-7: Co-Autoren können das Feld `owner_id` ändern
 - **Severity:** Low
@@ -456,7 +457,7 @@ Jakob: alle Bugs beheben und sinnvoll auf Projekte verteilen.
 | BUG-3 Alte Fehlermeldung | Behoben und getestet |
 | BUG-4 Nie angenommene Geschenke | Verschoben nach **PROJ-28**. Entscheidung Jakob: Projekte laufen mit dem Projektzugang aus |
 | BUG-5 Kontrast | Behoben und per Test auf mindestens 4,5:1 abgesichert |
-| BUG-6 Identitätsprüfung | Verschoben nach **PROJ-19**, Abschnitt I |
+| BUG-6 Identitätsprüfung | Bewusst nicht umgesetzt (Jakob, 2026-11-23), es bleibt bei `LÖSCHEN` |
 | BUG-7 Eigentümer-Feld | Behoben: Migration `20261122150000_proj3_protect_project_owner.sql` ist auf Stage aktiv und gegen die echte API getestet |
 | BUG-8 Zentrierte Listen | Behoben und getestet |
 
