@@ -1,15 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { createPageLayoutClock, MAX_LAYOUT_ROUNDS, type PageLayoutSteps } from "./pageLayoutClock";
+import { createPageLayoutClock, type PageLayoutSteps } from "./pageLayoutClock";
 
 function setup(overrides: Partial<PageLayoutSteps> = {}) {
   const queue: Array<() => void> = [];
   const log: string[] = [];
   const steps: PageLayoutSteps = {
     isVisible: () => true,
-    images: () => log.push("images"),
-    text: () => log.push("text"),
-    imageSignature: () => "gleich",
-    textSignature: () => "gleich",
+    layout: () => log.push("layout"),
     ...overrides,
   };
   const cancel = vi.fn((frame: number) => {
@@ -28,67 +25,7 @@ describe("Seiten-Takt", () => {
     clock.request();
     expect(queue).toHaveLength(1);
     flush();
-    expect(log).toEqual(["images", "text"]);
-  });
-
-  it("rechnet beim normalen Tippen jede Berechnung nur einmal", () => {
-    const { clock, flush, log } = setup();
-    clock.request();
-    flush();
-    expect(log).toEqual(["images", "text"]);
-  });
-
-  it("rechnet die Bilder nach, wenn sich der Text geändert hat, und hört dann auf", () => {
-    let text = "alt";
-    const { clock, flush, log } = setup({
-      text: () => {
-        log.push("text");
-        text = "neu";
-      },
-      textSignature: () => text,
-    });
-    clock.request();
-    flush();
-    expect(log).toEqual(["images", "text", "images"]);
-  });
-
-  it("wiederholt, solange Text und Bilder sich gegenseitig ändern", () => {
-    let text = 0;
-    let images = 0;
-    const { clock, flush, log } = setup({
-      images: () => {
-        log.push("images");
-        if (images < 2) images += 1;
-      },
-      text: () => {
-        log.push("text");
-        if (text < 2) text += 1;
-      },
-      imageSignature: () => String(images),
-      textSignature: () => String(text),
-    });
-    clock.request();
-    flush();
-    expect(log).toEqual(["images", "text", "images", "text", "images"]);
-  });
-
-  it("begrenzt die Runden, auch wenn zwei Zustände sich abwechseln", () => {
-    let flip = 0;
-    const { clock, flush, log } = setup({
-      images: () => {
-        log.push("images");
-        flip += 1;
-      },
-      text: () => {
-        log.push("text");
-        flip += 1;
-      },
-      imageSignature: () => String(flip),
-      textSignature: () => String(flip),
-    });
-    clock.request();
-    flush();
-    expect(log.filter((step) => step === "text")).toHaveLength(MAX_LAYOUT_ROUNDS);
+    expect(log).toEqual(["layout"]);
   });
 
   it("rechnet nicht, solange der Editor unsichtbar ist", () => {

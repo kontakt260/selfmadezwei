@@ -264,6 +264,36 @@ export type Database = {
         }
         Relationships: []
       }
+      storage_image_cleanup_queue: {
+        Row: {
+          attempts: number
+          chapter_id: string
+          created_at: string
+          delete_after: string
+          last_error: string | null
+          project_id: string
+          storage_path: string
+        }
+        Insert: {
+          attempts?: number
+          chapter_id: string
+          created_at?: string
+          delete_after?: string
+          last_error?: string | null
+          project_id: string
+          storage_path: string
+        }
+        Update: {
+          attempts?: number
+          chapter_id?: string
+          created_at?: string
+          delete_after?: string
+          last_error?: string | null
+          project_id?: string
+          storage_path?: string
+        }
+        Relationships: []
+      }
       trash_chapter_people: {
         Row: {
           chapter_id: string

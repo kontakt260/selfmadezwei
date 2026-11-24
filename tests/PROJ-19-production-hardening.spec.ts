@@ -213,7 +213,7 @@ test.describe("PROJ-19 — CSP in den wichtigen Abläufen", () => {
       await page.waitForURL(/kapiteleditor/, { timeout: 15_000 });
       await waitForEditorReady(page);
 
-      await page.getByRole("button", { name: "Bild hinzufügen" }).first().click();
+      await page.getByRole("button", { name: "Bildabschnitt einfügen" }).click();
       await page.locator('input[type="file"]').setInputFiles(image);
       await page.getByRole("button", { name: "Übernehmen" }).click();
       await expect(page.locator('img[src*="chapter-heroes"]').first()).toBeVisible({

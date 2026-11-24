@@ -1,6 +1,11 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import {
+  allImages,
+  isInChapterFolder,
+  parseImageSections,
+} from "@/lib/kapiteleditor/image-sections";
 import { createServiceRoleClient } from "@/lib/supabase/serviceRole";
 
 // PROJ-3 — entfernt die Dateien gelöschter Projekte aus dem Speicher.
@@ -22,6 +27,8 @@ const REMOVE_BATCH_SIZE = 100;
 const MAX_FOLDER_DEPTH = 3;
 const MAX_ROWS_PER_RUN = 25;
 const MAX_CHAPTER_ROWS_PER_RUN = 100;
+const MAX_IMAGE_ROWS_PER_RUN = 300;
+const IMAGE_BATCH_SIZE = 25;
 const CHAPTER_BUCKET = "chapter-heroes";
 
 type ServiceClient = SupabaseClient<Database>;
@@ -212,6 +219,127 @@ export async function processChapterStorageCleanup(): Promise<StorageCleanupResu
         console.error(
           `[storage-cleanup] update of chapter ${row.chapter_id} failed: ${updateError.message}`,
         );
+      }
+    }
+  }
+
+  return result;
+}
+
+function inBatches<T>(items: T[]): T[][] {
+  const batches: T[][] = [];
+  for (let start = 0; start < items.length; start += IMAGE_BATCH_SIZE) {
+    batches.push(items.slice(start, start + IMAGE_BATCH_SIZE));
+  }
+  return batches;
+}
+
+/** Alle Dateien, die ein gespeichertes oder wiederherstellbares Kapitel verwendet. */
+async function loadUsedImagePaths(
+  supabase: ServiceClient,
+  chapterIds: string[],
+): Promise<Set<string>> {
+  const used = new Set<string>();
+  for (const ids of inBatches(chapterIds)) {
+    const [live, trashed] = await Promise.all([
+      supabase.from("chapters").select("image_sections").in("id", ids).limit(ids.length),
+      supabase
+        .from("trash_chapters")
+        .select("image_sections:snapshot->image_sections")
+        .in("chapter_id", ids)
+        .limit(ids.length),
+    ]);
+    if (live.error) throw new Error(live.error.message);
+    if (trashed.error) throw new Error(trashed.error.message);
+    for (const row of [...(live.data ?? []), ...(trashed.data ?? [])]) {
+      for (const image of allImages(parseImageSections(row.image_sections))) {
+        used.add(image.storage_path);
+      }
+    }
+  }
+  return used;
+}
+
+/**
+ * PROJ-34 — löscht entfernte Fotos, sobald ihre 14 Tage um sind. Vorher wird
+ * noch einmal geprüft, dass weder das Kapitel noch sein Papierkorb-Eintrag die
+ * Datei verwendet. Kann das nicht geprüft werden, wird nichts gelöscht.
+ */
+export async function processImageStorageCleanup(): Promise<StorageCleanupResult> {
+  const result: StorageCleanupResult = { processed: 0, cleaned: 0, failed: 0 };
+  const supabase = createServiceRoleClient();
+
+  const { data: rows, error } = await supabase
+    .from("storage_image_cleanup_queue")
+    .select("storage_path, chapter_id, project_id, attempts")
+    .lte("delete_after", new Date().toISOString())
+    .order("attempts", { ascending: true })
+    .order("delete_after", { ascending: true })
+    .limit(MAX_IMAGE_ROWS_PER_RUN);
+  if (error) {
+    console.error(`[storage-cleanup] image queue read failed: ${error.message}`);
+    return result;
+  }
+  if (!rows || rows.length === 0) return result;
+
+  let used: Set<string>;
+  try {
+    used = await loadUsedImagePaths(supabase, [...new Set(rows.map((row) => row.chapter_id))]);
+  } catch (err) {
+    console.error(
+      `[storage-cleanup] image check failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return result;
+  }
+
+  result.processed = rows.length;
+  const keptPaths: string[] = [];
+  const due: typeof rows = [];
+  for (const row of rows) {
+    if (used.has(row.storage_path)) {
+      keptPaths.push(row.storage_path);
+    } else if (!isInChapterFolder(row.storage_path, row.project_id, row.chapter_id)) {
+      console.error(`[storage-cleanup] image outside chapter ${row.chapter_id} skipped`);
+      keptPaths.push(row.storage_path);
+    } else {
+      due.push(row);
+    }
+  }
+
+  // Die Datei bleibt, nur der Eintrag verschwindet.
+  for (const paths of inBatches(keptPaths)) {
+    const { error: clearError } = await supabase
+      .from("storage_image_cleanup_queue")
+      .delete()
+      .in("storage_path", paths);
+    if (clearError) {
+      console.error(`[storage-cleanup] image queue clear failed: ${clearError.message}`);
+    }
+  }
+
+  for (const batch of inBatches(due)) {
+    const paths = batch.map((row) => row.storage_path);
+    try {
+      const { error: removeError } = await supabase.storage.from(CHAPTER_BUCKET).remove(paths);
+      if (removeError) throw new Error(removeError.message);
+      const { error: clearError } = await supabase
+        .from("storage_image_cleanup_queue")
+        .delete()
+        .in("storage_path", paths);
+      if (clearError) throw new Error(clearError.message);
+      result.cleaned += batch.length;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      result.failed += batch.length;
+      console.error(`[storage-cleanup] image batch failed: ${message}`);
+      for (const row of batch) {
+        const { error: updateError } = await supabase
+          .from("storage_image_cleanup_queue")
+          .update({ attempts: row.attempts + 1, last_error: message.slice(0, 500) })
+          .eq("storage_path", row.storage_path);
+        if (updateError) {
+          console.error(`[storage-cleanup] image queue update failed: ${updateError.message}`);
+        }
       }
     }
   }

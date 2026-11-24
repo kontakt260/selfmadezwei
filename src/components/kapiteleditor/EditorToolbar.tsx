@@ -2,13 +2,14 @@
 
 import { useRef } from "react";
 import type React from "react";
-import type { Editor } from "@tiptap/react";
+import { useEditorState, type Editor } from "@tiptap/react";
 import {
   AlignCenter,
   AlignJustify,
   AlignLeft,
   AlignRight,
   Bold,
+  ImagePlus,
   Italic,
   List,
   ListOrdered,
@@ -32,7 +33,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ReadOnlyScope } from "@/components/ReadOnlyScope";
+import { MAX_IMAGES_PER_CHAPTER } from "@/lib/kapiteleditor/image-sections";
 import { cn } from "@/lib/utils";
+import { canInsertImageSection } from "./tiptap/imageSectionRules";
 
 // Verhindert, dass der Browser beim Klick auf ein Toolbar-Element den Fokus
 // vom Editor weg auf den Button zieht — sonst landen nachfolgende Tasten-
@@ -42,12 +45,52 @@ import { cn } from "@/lib/utils";
 // nachträglich wieder auf den Button zieht.
 const keepEditorFocus = (e: React.MouseEvent) => e.preventDefault();
 
+// PROJ-34: Eigene Komponente, weil der Zustand von der Cursorposition abhängt.
+function ImageSectionTool({
+  editor,
+  photoLimitReached,
+  onInsert,
+}: {
+  editor: Editor;
+  photoLimitReached: boolean;
+  onInsert: () => void;
+}) {
+  const nextToSection = useEditorState({
+    editor,
+    selector: ({ editor: current }) => !canInsertImageSection(current.state),
+  });
+  const reason = photoLimitReached
+    ? `Dieses Kapitel enthält bereits ${MAX_IMAGES_PER_CHAPTER} Fotos.`
+    : nextToSection
+      ? "Zwei Bildabschnitte brauchen mindestens eine Textzeile dazwischen. Bitte wählen Sie eine andere Stelle."
+      : null;
+  return (
+    <Button
+      type="button"
+      size="icon"
+      variant="ghost"
+      className="h-8 w-8"
+      onMouseDown={keepEditorFocus}
+      onClick={onInsert}
+      disabled={reason !== null}
+      title={reason ?? "Bildabschnitt einfügen"}
+      aria-label={reason ? `Bildabschnitt einfügen — ${reason}` : "Bildabschnitt einfügen"}
+    >
+      <ImagePlus className="h-4 w-4" />
+    </Button>
+  );
+}
+
 export function EditorToolbar({
   editor,
   readOnly = false,
+  photoLimitReached = false,
+  onInsertImageSection,
 }: {
   editor: Editor | null;
   readOnly?: boolean;
+  photoLimitReached?: boolean;
+  onInsertImageSection?: () => void;
 }) {
   const lineHeightMenu = useRef({ openedWithPointer: false, closedWithEscape: false });
 
@@ -273,6 +316,13 @@ export function EditorToolbar({
         <ScrollText className="h-4 w-4" />
         Seitenumbruch
       </Button>
+      {onInsertImageSection && (
+        <ImageSectionTool
+          editor={editor}
+          photoLimitReached={photoLimitReached}
+          onInsert={onInsertImageSection}
+        />
+      )}
 
       <Sep />
 

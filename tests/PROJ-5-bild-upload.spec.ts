@@ -52,7 +52,7 @@ test.afterAll(async () => {
 
 test("AC-Img-1: ein großes Foto (~5 MB) lässt sich hochladen und bleibt nach dem Neuladen", async () => {
   test.setTimeout(90_000);
-  await page.getByRole("button", { name: "Bild hinzufügen" }).first().click();
+  await page.getByRole("button", { name: "Bildabschnitt einfügen" }).click();
   await page.locator('input[type="file"]').setInputFiles(bigImage);
   await page.getByRole("button", { name: "Übernehmen" }).click();
 

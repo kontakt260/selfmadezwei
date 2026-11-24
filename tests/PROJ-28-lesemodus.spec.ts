@@ -288,7 +288,9 @@ test.describe("PROJ-28 — Lesemodus (nur Stage)", () => {
     }
     expect(new Set(toolbar.filter((control) => !control.pressed).map((control) => control.color)).size).toBe(1);
     await expect(pageL.getByRole("button", { name: "Bild löschen" })).toHaveCount(0);
-    await expect(pageL.getByRole("button", { name: "Bild hinzufügen" }).first()).toBeDisabled();
+    // PROJ-34: Im Lesemodus lässt sich kein Bildabschnitt einfügen.
+    await expect(pageL.getByRole("button", { name: /Bildabschnitt einfügen/ })).toBeDisabled();
+    await expect(pageL.getByRole("button", { name: "Bild hinzufügen" })).toHaveCount(0);
 
     const title = pageL.getByLabel("Kapitel-Titel");
     await expect(title).toHaveJSProperty("readOnly", true);
@@ -361,7 +363,8 @@ test.describe("PROJ-28 — Lesemodus (nur Stage)", () => {
     await waitForPage(pageL);
     await waitForEditorReady(pageL);
     const editor = pageL.locator(".ProseMirror").first();
-    await editor.click();
+    // PROJ-34: Das Foto am Anfang steht jetzt im Text. Geschrieben wird im Absatz.
+    await editor.locator("p").first().click();
     await pageL.keyboard.type(" vorher");
     await waitForSaved(pageL);
 
@@ -395,7 +398,7 @@ test.describe("PROJ-28 — Lesemodus (nur Stage)", () => {
     await waitForEditorReady(pageC);
     const editor = pageC.locator(".ProseMirror").first();
     await expect(editor).toContainText("Erinnerung Nummer 1");
-    await editor.click();
+    await editor.locator("p").first().click();
     await pageC.keyboard.type(" wieder offen");
     await waitForSaved(pageC);
     await expect

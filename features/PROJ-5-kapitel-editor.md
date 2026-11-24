@@ -184,3 +184,4 @@ Bilder können emotional sehr persönlich sein (Familienfotos, Erinnerungen). Pr
 - Halbvolle Bildreihen beim Wechsel zwischen 1- und 2-spaltig prüfen (Vorschlag: Das letzte Bild bleibt links allein).
 - `color_page_count` ist eine Schätzung, die genaue Druckberechnung kommt mit PROJ-16.
 - Bei UI-Zoom ungleich 100 % kann eine Zeile rundungsbedingt bis etwa 1 px vom Inhaltsbereich abweichen.
+- **Behoben in PROJ-34 (2026-11-24):** Zeilenabstand, Einzug und Ausrichtung gingen beim Speichern verloren, weil Next.js die Attribut-Objekte von ProseMirror nicht an den Server überträgt. Vorher gespeicherte Kapitel haben diese Angaben nicht mehr.

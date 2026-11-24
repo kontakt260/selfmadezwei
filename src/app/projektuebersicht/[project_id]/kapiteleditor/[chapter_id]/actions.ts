@@ -4,12 +4,28 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { countWordsFromBody } from "@/lib/kapiteleditor/countWords";
 import { projectWriteBlockedError } from "@/lib/projects/project-access";
+import {
+  MAX_IMAGES_PER_CHAPTER,
+  MAX_IMAGES_PER_SECTION,
+  allImages,
+  checkImageSections,
+  getImageSection,
+  imageLimitError,
+  imageSectionsForSave,
+  isImageSectionId,
+  isInProjectFolder,
+  parseImageSections,
+  withImageSection,
+} from "@/lib/kapiteleditor/image-sections";
 import type { ImageSections, ChapterImage } from "@/lib/kapiteleditor/types";
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/i;
 const uuidSchema = z.string().regex(UUID_RE, "Ungültige ID.");
 
 const layoutSchema = z.enum(["1-spaltig", "2-spaltig"]);
+const imageFormatSchema = z.enum(["quer", "hoch"]);
+// PROJ-34: `start`, `end` oder die ID eines Abschnitts im Text.
+const sectionIdSchema = z.string().refine(isImageSectionId, "Ungültiger Bildabschnitt.");
 
 const chapterImageSchema: z.ZodType<ChapterImage> = z.object({
   id: z.string().min(1).max(120),
@@ -17,16 +33,24 @@ const chapterImageSchema: z.ZodType<ChapterImage> = z.object({
   // signed_url ist server-erzeugt; wir verwerfen den Client-Wert beim Speichern.
   signed_url: z.string().max(2000).optional().default(""),
   alt: z.string().max(500).default(""),
+  format: imageFormatSchema.optional(),
 });
 
 const imageSectionSchema = z.object({
   layout: layoutSchema,
-  images: z.array(chapterImageSchema).max(60),
+  images: z
+    .array(chapterImageSchema)
+    .max(
+      MAX_IMAGES_PER_SECTION,
+      `Ein Bildabschnitt kann höchstens ${MAX_IMAGES_PER_SECTION} Fotos enthalten.`,
+    ),
 });
 
 const imageSectionsSchema = z.object({
   start: imageSectionSchema,
   end: imageSectionSchema,
+  inline: z.record(uuidSchema, imageSectionSchema).optional(),
+  placed: z.literal(true).optional(),
 });
 
 const autosaveSchema = z.object({
@@ -57,7 +81,7 @@ const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
 const prepareUploadSchema = z.object({
   projectId: uuidSchema,
   chapterId: uuidSchema,
-  section: z.enum(["start", "end"]),
+  section: sectionIdSchema,
   contentType: z.string().max(100),
   size: z.number().int().min(1).max(MAX_FILE_BYTES, "Datei zu groß. Maximum 10 MB."),
 });
@@ -65,16 +89,23 @@ const prepareUploadSchema = z.object({
 const commitUploadSchema = z.object({
   projectId: uuidSchema,
   chapterId: uuidSchema,
-  section: z.enum(["start", "end"]),
+  section: sectionIdSchema,
   imageId: uuidSchema,
   storagePath: z.string().max(200),
+  format: imageFormatSchema.optional(),
 });
 
 const deleteSchema = z.object({
   projectId: uuidSchema,
   chapterId: uuidSchema,
-  section: z.enum(["start", "end"]),
+  section: sectionIdSchema,
   imageId: z.string().min(1).max(120),
+});
+
+const imageLinksSchema = z.object({
+  projectId: uuidSchema,
+  chapterId: uuidSchema,
+  paths: z.array(z.string().min(1).max(500)).min(1).max(MAX_IMAGES_PER_CHAPTER),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -103,27 +134,32 @@ export async function chapterAutosaveAction(input: {
   const accessError = await projectWriteBlockedError(supabase, projectId);
   if (accessError) return { error: accessError };
 
-  // Strip signed_url before persisting (server-erzeugt zur Laufzeit).
-  const stripped: ImageSections = {
-    start: {
-      layout: imageSections.start.layout,
-      images: imageSections.start.images.map((i) => ({
-        id: i.id,
-        storage_path: i.storage_path,
-        signed_url: "",
-        alt: i.alt ?? "",
-      })),
-    },
-    end: {
-      layout: imageSections.end.layout,
-      images: imageSections.end.images.map((i) => ({
-        id: i.id,
-        storage_path: i.storage_path,
-        signed_url: "",
-        alt: i.alt ?? "",
-      })),
-    },
-  };
+  // Ohne Bildlinks (server-erzeugt zur Laufzeit) und ohne entfernte Abschnitte.
+  // Der Editor behält entfernte Abschnitte für „Rückgängig" im Speicher, sie
+  // zählen deshalb nicht zu den Grenzen.
+  const stripped = imageSectionsForSave(imageSections, body);
+
+  // PROJ-34: Grenzen, Dateipfade und Abschnitte im Text prüft immer der Server.
+  const imageCheck = checkImageSections({ projectId, chapterId, sections: stripped, body });
+  if (!imageCheck.ok) return { error: imageCheck.error };
+  if (imageCheck.foreignPaths.length > 0) {
+    // Ein Pfad außerhalb des Kapitelordners ist nur erlaubt, wenn das Kapitel
+    // ihn schon gespeichert hat. So bleiben alte Kapitel speicherbar, neue
+    // fremde Pfade kommen aber nicht hinein.
+    const { data: stored, error: storedError } = await supabase
+      .from("chapters")
+      .select("image_sections")
+      .eq("id", chapterId)
+      .eq("project_id", projectId)
+      .maybeSingle();
+    if (storedError || !stored) return { error: "Speichern fehlgeschlagen." };
+    const known = new Set(
+      allImages(parseImageSections(stored.image_sections)).map((image) => image.storage_path),
+    );
+    if (imageCheck.foreignPaths.some((path) => !known.has(path))) {
+      return { error: "Ungültiger Speicherpfad." };
+    }
+  }
 
   // RLS sorgt für Membership-Check; .eq("project_id") für Defense-in-depth.
   // PROJ-7: page_count nur ins UPDATE-Set aufnehmen, wenn der Client einen
@@ -258,23 +294,33 @@ async function requireMemberAndChapter(projectId: string, chapterId: string) {
     .single();
   if (loadErr || !chapter) return { error: "Kapitel nicht gefunden." } as const;
 
-  return { supabase, sections: chapter.image_sections as unknown as ImageSections } as const;
+  return { supabase, sections: parseImageSections(chapter.image_sections) } as const;
+}
+
+function limitAfterAdding(sections: ImageSections, sectionId: string): string | null {
+  return imageLimitError(
+    (getImageSection(sections, sectionId)?.images.length ?? 0) + 1,
+    allImages(sections).length + 1,
+  );
 }
 
 export async function chapterImageUploadPrepareAction(input: {
   projectId: string;
   chapterId: string;
-  section: "start" | "end";
+  section: string;
   contentType: string;
   size: number;
 }): Promise<{ upload?: { imageId: string; storagePath: string; token: string }; error?: string }> {
   const parsed = prepareUploadSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
-  const { projectId, chapterId, contentType } = parsed.data;
+  const { projectId, chapterId, section, contentType } = parsed.data;
   if (!ALLOWED_MIME.has(contentType)) return { error: "Nur JPEG, PNG oder WebP erlaubt." };
 
   const ctx = await requireMemberAndChapter(projectId, chapterId);
   if ("error" in ctx) return { error: ctx.error };
+
+  const limit = limitAfterAdding(ctx.sections, section);
+  if (limit) return { error: limit };
 
   // Datei-Endung aus dem MIME-Type ableiten (sicher: nicht aus Filename).
   const imageId = crypto.randomUUID();
@@ -291,13 +337,14 @@ export async function chapterImageUploadPrepareAction(input: {
 export async function chapterImageUploadCommitAction(input: {
   projectId: string;
   chapterId: string;
-  section: "start" | "end";
+  section: string;
   imageId: string;
   storagePath: string;
+  format?: "quer" | "hoch";
 }): Promise<{ image?: ChapterImage; error?: string }> {
   const parsed = commitUploadSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
-  const { projectId, chapterId, section, imageId, storagePath } = parsed.data;
+  const { projectId, chapterId, section, imageId, storagePath, format } = parsed.data;
 
   // Nur genau den Pfad akzeptieren, den Schritt 1 vergeben haben kann.
   const allowed = Object.values(IMAGE_EXT).map((ext) => `${projectId}/${chapterId}/${imageId}.${ext}`);
@@ -308,7 +355,15 @@ export async function chapterImageUploadCommitAction(input: {
   const { supabase, sections } = ctx;
 
   // Bild schon eingetragen (doppelter Aufruf)? Dann nichts doppelt anlegen.
-  const already = [...sections.start.images, ...sections.end.images].some((i) => i.id === imageId);
+  const existing = allImages(sections).find((i) => i.id === imageId);
+
+  if (!existing) {
+    const limit = limitAfterAdding(sections, section);
+    if (limit) {
+      await supabase.storage.from("chapter-heroes").remove([storagePath]);
+      return { error: limit };
+    }
+  }
 
   // Datei muss im Bucket liegen — die Signed-URL schlägt sonst fehl.
   const { data: signed, error: signErr } = await supabase.storage
@@ -321,17 +376,19 @@ export async function chapterImageUploadCommitAction(input: {
     storage_path: storagePath,
     signed_url: "",
     alt: "",
+    ...(format === "hoch" ? { format } : {}),
   };
 
-  if (!already) {
-    const next: ImageSections = {
-      start: { ...sections.start },
-      end: { ...sections.end },
+  if (!existing) {
+    // PROJ-34: Ein neuer Abschnitt entsteht hier mit seinem ersten Foto.
+    const target = getImageSection(sections, section) ?? {
+      layout: "1-spaltig" as const,
+      images: [],
     };
-    next[section] = {
-      ...next[section],
-      images: [...next[section].images, newEntry],
-    };
+    const next = withImageSection(sections, section, {
+      ...target,
+      images: [...target.images, newEntry],
+    });
 
     const { error: updateErr } = await supabase
       .from("chapters")
@@ -348,17 +405,72 @@ export async function chapterImageUploadCommitAction(input: {
     }
   }
 
-  return { image: { ...newEntry, signed_url: signed.signedUrl } };
+  return { image: { ...(existing ?? newEntry), signed_url: signed.signedUrl } };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Bild-Löschen (Storage + JSONB atomar)
+// Frische Bildlinks (PROJ-34)
+//
+// Bildlinks gelten eine Stunde. Holt „Rückgängig" später einen Abschnitt zurück,
+// braucht der Editor neue Links. Auch im Lesemodus erlaubt, nur für Dateien im
+// Ordner dieses Projekts und mit den Rechten der angemeldeten Person.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function chapterImageLinksAction(input: {
+  projectId: string;
+  chapterId: string;
+  paths: string[];
+}): Promise<{ links?: Record<string, string>; error?: string }> {
+  const parsed = imageLinksSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+  const { projectId, chapterId, paths } = parsed.data;
+  if (paths.some((path) => !isInProjectFolder(path, projectId))) {
+    return { error: "Ungültiger Speicherpfad." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Nicht angemeldet." };
+
+  const [membership, chapter] = await Promise.all([
+    supabase
+      .from("project_members")
+      .select("role")
+      .eq("project_id", projectId)
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("chapters")
+      .select("id")
+      .eq("id", chapterId)
+      .eq("project_id", projectId)
+      .maybeSingle(),
+  ]);
+  if (membership.error || !membership.data) return { error: "Projekt nicht gefunden." };
+  if (chapter.error || !chapter.data) return { error: "Kapitel nicht gefunden." };
+
+  const { data: signed, error } = await supabase.storage
+    .from("chapter-heroes")
+    .createSignedUrls(paths, SIGNED_URL_TTL_SECONDS);
+  if (error) return { error: "Bildlinks konnten nicht geladen werden." };
+
+  const links: Record<string, string> = {};
+  for (const item of signed ?? []) {
+    if (item.path && item.signedUrl && !item.error) links[item.path] = item.signedUrl;
+  }
+  return { links };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bild-Löschen
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function chapterImageDeleteAction(input: {
   projectId: string;
   chapterId: string;
-  section: "start" | "end";
+  section: string;
   imageId: string;
 }): Promise<{ ok?: true; error?: string }> {
   const parsed = deleteSchema.safeParse(input);
@@ -382,19 +494,22 @@ export async function chapterImageDeleteAction(input: {
     .single();
   if (loadErr || !chapter) return { error: "Kapitel nicht gefunden." };
 
-  const sections = chapter.image_sections as unknown as ImageSections;
-  const target = sections[section].images.find((i) => i.id === imageId);
-  if (!target) return { error: "Bild nicht gefunden." };
+  const sections = parseImageSections(chapter.image_sections);
+  const targetSection = getImageSection(sections, section);
+  if (!targetSection?.images.some((i) => i.id === imageId)) {
+    return { error: "Bild nicht gefunden." };
+  }
 
-  const next: ImageSections = {
-    start: { ...sections.start },
-    end: { ...sections.end },
-  };
-  next[section] = {
-    ...next[section],
-    images: next[section].images.filter((i) => i.id !== imageId),
-  };
+  // PROJ-34: Ohne Fotos gibt es keinen Abschnitt mehr.
+  const remaining = targetSection.images.filter((i) => i.id !== imageId);
+  const next = withImageSection(
+    sections,
+    section,
+    remaining.length > 0 ? { ...targetSection, images: remaining } : null,
+  );
 
+  // Die Datei bleibt zunächst liegen: Die Datenbank setzt sie auf die
+  // Aufräumliste, der tägliche Cron löscht sie nach 14 Tagen (PROJ-34).
   const { error: updateErr } = await supabase
     .from("chapters")
     .update({
@@ -404,12 +519,6 @@ export async function chapterImageDeleteAction(input: {
     .eq("id", chapterId)
     .eq("project_id", projectId);
   if (updateErr) return { error: "Bild konnte nicht entfernt werden." };
-
-  // Storage erst nach erfolgreichem JSONB-Update entfernen — falls Storage-
-  // Delete fehlschlägt, ist das Bild im DOM weg; verwaiste Storage-Objekte
-  // sind tolerierbar (Cleanup-Job kann später laufen). Anders herum würden
-  // wir Daten-Inkonsistenz riskieren.
-  await supabase.storage.from("chapter-heroes").remove([target.storage_path]);
 
   return { ok: true };
 }

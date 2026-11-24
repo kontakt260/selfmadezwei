@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { type Editor } from "@tiptap/react";
 import { type ImageSections } from "@/lib/kapiteleditor/types";
 import { createPageLayoutClock, type PageLayoutClock } from "./pageLayoutClock";
-import { recalcPagination } from "./paginationPasses";
 import { connectPageLayout } from "./tiptap/PaginationDecorations";
 
 type PaginationDeps = {
@@ -15,16 +14,6 @@ type PaginationDeps = {
   titleDep: string;
   initialPageCount: number;
 };
-
-const px = (value: string) => (value ? parseFloat(value).toFixed(1) : "");
-
-// Was die Bildberechnung gesetzt hat. Gerundet, damit winzige Rechenunterschiede
-// nicht wie eine echte Änderung aussehen.
-function imageLayoutSignature(fg: HTMLElement): string {
-  return Array.from(fg.querySelectorAll<HTMLElement>("[data-paginate-row], .a5-page-break"))
-    .map((el) => `${px(el.style.marginTop)}/${px(el.style.height)}/${el.style.getPropertyValue("--row-image-scale")}`)
-    .join(",");
-}
 
 export function usePagination({
   editor,
@@ -53,10 +42,7 @@ export function usePagination({
     let settledSize = "";
     const clock = createPageLayoutClock({
       isVisible: () => fg.getClientRects().length > 0,
-      images: () => recalcPagination(fg, stack, setPageCount),
-      text: () => storage.runTextPass?.(),
-      imageSignature: () => imageLayoutSignature(fg),
-      textSignature: () => storage.textSignature?.() ?? "",
+      layout: () => storage.runLayout?.(setPageCount),
       onSettled: () => {
         settledSize = size();
       },

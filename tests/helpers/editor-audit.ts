@@ -213,10 +213,8 @@ export async function auditEditor(page: Page): Promise<EditorAudit> {
       }
     }
 
-    // Bildreihen mit Bildern (der leere Platzhalter ist Bedienelement).
-    for (const row of document.querySelectorAll<HTMLElement>(
-      "[data-paginate-row]:not(.image-section-empty)",
-    )) {
+    // Bildreihen. PROJ-34: Leere Platzhalter gibt es nicht mehr.
+    for (const row of document.querySelectorAll<HTMLElement>("[data-paginate-row]")) {
       const r = row.getBoundingClientRect();
       const page = pageAt((r.top + r.bottom) / 2);
       if (!page) violations.push({ kind: "Bildreihe im Seitenzwischenraum" });

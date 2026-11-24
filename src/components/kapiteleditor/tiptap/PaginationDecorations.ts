@@ -1,6 +1,12 @@
 import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import { DecorationSet, type EditorView } from "@tiptap/pm/view";
+import {
+  createBlockPlacer,
+  measurePageCount,
+  resetImageRows,
+  unevenPageScales,
+} from "../chapterLayout";
 import { isInDeadZone, placeCaretNearPoint } from "./caretPlacement";
 import { computeDecorations, lineBoxHeight, readGeometry } from "./computeDecorations";
 
@@ -18,8 +24,7 @@ const KEY = new PluginKey<DecorationSet>("paginationSoftBreaks");
 // Das Plugin meldet Textänderungen, gerechnet wird nur im Takt.
 export type PaginationStorage = {
   requestLayout: (() => void) | null;
-  runTextPass: (() => void) | null;
-  textSignature: (() => string) | null;
+  runLayout: ((onPageCount: (pages: number) => void) => void) | null;
 };
 
 declare module "@tiptap/core" {
@@ -37,7 +42,7 @@ export const PaginationDecorations = Extension.create<object, PaginationStorage>
   name: "paginationDecorations",
 
   addStorage() {
-    return { requestLayout: null, runTextPass: null, textSignature: null };
+    return { requestLayout: null, runLayout: null };
   },
 
   addProseMirrorPlugins() {
@@ -98,8 +103,7 @@ export const PaginationDecorations = Extension.create<object, PaginationStorage>
         },
 
         view(editorView) {
-          storage.runTextPass = () => recompute(editorView);
-          storage.textSignature = () => decorationSignature(KEY.getState(editorView.state));
+          storage.runLayout = (onPageCount) => layoutChapter(editorView, onPageCount);
           storage.requestLayout?.();
 
           return {
@@ -107,8 +111,7 @@ export const PaginationDecorations = Extension.create<object, PaginationStorage>
               if (view.state.doc !== prevState.doc) storage.requestLayout?.();
             },
             destroy() {
-              storage.runTextPass = null;
-              storage.textSignature = null;
+              storage.runLayout = null;
             },
           };
         },
@@ -171,44 +174,39 @@ function verticalMoveAcrossSoftBreak(view: EditorView, down: boolean): number | 
   return null;
 }
 
-function recompute(view: EditorView) {
+// PROJ-34: Ein Durchlauf von oben nach unten. Text, Bildreihen und Umbrüche
+// werden in Lesereihenfolge gesetzt, jeder Schritt kennt die Lage darüber.
+function layoutChapter(view: EditorView, onPageCount: (pages: number) => void) {
   const dom = view.dom as HTMLElement;
   const fg = dom.closest(".a5-stack__fg") as HTMLElement | null;
   const stack = dom.closest(".a5-stack") as HTMLElement | null;
-  if (!fg || !stack) return;
+  if (!fg || !stack || fg.getClientRects().length === 0) return;
 
   const geom = readGeometry(stack);
   if (!geom || geom.stride <= 0 || geom.contentHeight <= 0) return;
-
-  const prevSetCaptured = KEY.getState(view.state);
-
-  // PASS 1: alte Decorations löschen, damit die nächste Messung den
-  // natürlichen Text-Fluss sieht (sonst messen wir die Positionen
-  // INKLUSIVE der schon eingefügten Spacer = Daten-Schmutz).
-  if (prevSetCaptured && prevSetCaptured !== DecorationSet.empty) {
+  const zoom = parseFloat(getComputedStyle(stack).getPropertyValue("--ui-zoom") || "1") || 1;
+  // Alte Umbrüche entfernen, damit die Messung den natürlichen Fluss sieht.
+  const previous = KEY.getState(view.state);
+  if (previous && previous !== DecorationSet.empty) {
     view.dispatch(view.state.tr.setMeta(KEY, { decorations: DecorationSet.empty }));
-    // PM hat das DOM synchron aktualisiert; offsetHeight erzwingt Re-Layout
-    void fg.offsetHeight;
+  }
+  resetImageRows(fg);
+
+  let placer = createBlockPlacer(fg, geom, zoom, new Map());
+  let { decorations } = computeDecorations(view, fg, geom, placer.place);
+
+  // Bilder auf derselben Seite bekommen dieselbe Größe. Das verschiebt, was
+  // darunter steht, deshalb genau ein zweiter Durchlauf.
+  const caps = unevenPageScales(placer.rows);
+  if (caps.size > 0) {
+    resetImageRows(fg);
+    placer = createBlockPlacer(fg, geom, zoom, caps);
+    ({ decorations } = computeDecorations(view, fg, geom, placer.place));
   }
 
-  // PASS 2: messen + neue Decorations berechnen
-  const { decorations } = computeDecorations(view, fg, geom);
-
-  if (decorations.length === 0) return;
-
-  const set = DecorationSet.create(view.state.doc, decorations);
-  view.dispatch(view.state.tr.setMeta(KEY, { decorations: set }));
-}
-
-function decorationSignature(set: DecorationSet | null | undefined): string {
-  if (!set || set === DecorationSet.empty) return "";
-  const decos = set.find();
-  return decos
-    .map((d) => {
-      // Spacer-Decorations kodieren die Höhe in ihrem unique `key`
-      // (siehe buildSpacerDecoration: `soft-break@pos@height@…`).
-      const spec = d.spec as { key?: string };
-      return `${d.from}:${d.to}:${spec?.key ?? ""}`;
-    })
-    .join(",");
+  if (decorations.length > 0) {
+    const set = DecorationSet.create(view.state.doc, decorations);
+    view.dispatch(view.state.tr.setMeta(KEY, { decorations: set }));
+  }
+  onPageCount(measurePageCount(fg, dom, geom.stride, zoom));
 }

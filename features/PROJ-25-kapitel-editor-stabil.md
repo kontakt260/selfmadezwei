@@ -1,8 +1,8 @@
 # PROJ-25: Kapitel-Editor stabilisieren
 
-## Status: In Review
+## Status: Approved
 **Created:** 2026-11-23
-**Last Updated:** 2026-11-24 (QA: 24 von 25, BUG-1 behoben, AC-6 wartet auf Jakobs Test auf Stage)
+**Last Updated:** 2026-11-24 (QA: 25 von 25, AC-6 von Jakob auf Stage bestätigt)
 **Freigegeben:** Spec und Tech Design von Jakob am 2026-11-23
 
 ## Dependencies
@@ -47,7 +47,7 @@ Gemessen im echten Production-Build mit einem Testkapitel von 14 Seiten und 7 Bi
 - [x] AC-5: Das Menü funktioniert mit Maus, Tastatur und Touch auf dem Tablet.
 
 ### B. Ruhige Bilder und Seiten
-- [ ] AC-6: Das von Jakob beschriebene lange Hin und Her ist mit echten Fotos reproduziert, seine Ursache ist in dieser Spec dokumentiert und behoben.
+- [x] AC-6: Das von Jakob beschriebene lange Hin und Her ist mit echten Fotos reproduziert, seine Ursache ist in dieser Spec dokumentiert und behoben. **Abnahme:** Jakob hat am 2026-11-24 auf Stage (`c50abd0`) mit eigenen Fotos bestätigt, dass die Bilder ruhig bleiben. **Abweichung:** Das lange Hin und Her selbst wurde im Prüfstand nie nachgestellt. Gemessen und behoben sind die Mehrfachbewegungen und Rücksprünge durch die zwei unabgestimmten Seitenberechnungen. Dass sie auch die Ursache des langen Hin und Her waren, ist wahrscheinlich, aber nicht bewiesen.
 - [x] AC-7: Nach einer Eingabe, die ein Bild verschiebt, ändert es seine Position höchstens einmal.
 - [x] AC-8: Kein Bild springt nach einer Eingabe auf einen früheren Stand zurück.
 - [x] AC-9: Spätestens 0,15 s nach Tippen, Löschen, Hinzufügen, Entfernen, Sortieren oder Layoutwechsel stehen alle Bilder endgültig.
@@ -214,18 +214,17 @@ Keine neuen Pakete.
 - Bei einem Abschnitt über mehrere Seiten sitzt die Bild-Steuerung weiter nur auf der ersten Reihe.
 
 **Noch offen**
-- **AC-6:** Jakob prüft das lange Hin und Her auf Stage mit eigenen Fotos.
-- Safari und Firefox sind nicht geprüft.
+- Safari, Firefox und echte Tablets sind nicht geprüft (vor dem Go-live).
 
 ## QA Test Results
 
 **Getestet:** 2026-11-24, echter Production-Build lokal gegen die Stage-Datenbank, Chromium, eigene temporäre Testdaten.
 
-**Ergebnis:** 24 von 25 Kriterien bestanden. AC-6 kann erst Jakob auf Stage bestätigen. Offen sind 0 Critical, 0 High, 0 Medium, 1 Low. BUG-1 (High) ist behoben.
+**Ergebnis:** 25 von 25 Kriterien bestanden, AC-6 durch Jakobs Test auf Stage. Offen sind 0 Critical, 0 High, 0 Medium, 1 Low. BUG-1 (High) ist behoben.
 
-**Production Ready: NOCH NICHT.** Es gibt keinen offenen Critical- oder High-Bug, der Status bleibt aber „In Review", bis Jakob AC-6 auf Stage bestätigt hat.
+**Production Ready: JA.** Es gibt keinen offenen Critical- oder High-Bug. Vor dem Go-live stehen noch die Prüfungen in Safari, Firefox und auf echten Tablets aus.
 
-**Nicht geprüft:** Safari, Firefox und echte Tablets (Tablet nur als Chromium-Ansicht mit Touch), echte Fotos von Jakob, der Stand auf `stage-app.narravit.de` (nicht deployt).
+**Nicht geprüft:** Safari, Firefox und echte Tablets (Tablet nur als Chromium-Ansicht mit Touch). Die automatischen Tests liefen lokal, nicht gegen das Stage-Deployment.
 
 ### Geprüft
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import Link from "next/link";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { ArrowLeft, Pencil } from "lucide-react";
@@ -10,7 +11,10 @@ import { placeCaretNearPoint } from "./tiptap/caretPlacement";
 import { EditorToolbar } from "./EditorToolbar";
 import { EditorLoadingScreen } from "@/components/loading/LoadingViews";
 import { FirstPageHeader } from "./FirstPageTemplate";
-import { ImageSection } from "./ImageSection";
+import { ImageSectionsProvider, type ImageSectionsApi } from "./ImageSectionsContext";
+import { ImageUploadDialog, type UploadedImage } from "./ImageUploadDialog";
+import { createLinkRefresher, type FreshLinks, type LinkRefresher } from "./freshImageLinks";
+import type { SectionRemovalRequest } from "./tiptap/ImageSectionNode";
 import { SaveStatus } from "./SaveStatus";
 import { WordCount } from "./WordCount";
 import { ImpulseHintBanner } from "./ImpulseHintBanner";
@@ -21,18 +25,38 @@ import { trackSave } from "@/lib/pending-saves";
 import { countWordsFromBody } from "@/lib/kapiteleditor/countWords";
 import { planChapterSave, type SavedChapterState } from "@/lib/kapiteleditor/save-plan";
 import {
+  MAX_IMAGES_PER_CHAPTER,
+  MAX_IMAGES_PER_SECTION,
+  allImages,
+  collectImageSectionIds,
+  getImageSection,
+  isInProjectFolder,
+  withImageSection,
+} from "@/lib/kapiteleditor/image-sections";
+import {
   EMPTY_IMAGE_SECTIONS,
   type ChapterDraft,
   type ChapterImage,
+  type ImageSectionData,
   type ImageSections,
 } from "@/lib/kapiteleditor/types";
-import type { UploadedImage } from "./ImageUploadDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   chapterAutosaveAction,
   chapterPageCountAction,
   chapterImageUploadPrepareAction,
   chapterImageUploadCommitAction,
   chapterImageDeleteAction,
+  chapterImageLinksAction,
 } from "@/app/projektuebersicht/[project_id]/kapiteleditor/[chapter_id]/actions";
 import { createClient as createBrowserSupabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -98,18 +122,7 @@ export function EditorClient({
     extensions: editorExtensions,
     content: initialBody ?? undefined,
     editable: !inputLocked,
-    editorProps: {
-      attributes: {
-        class: "tiptap-editor focus:outline-none",
-      },
-      // Word-/Docs-Verhalten: nach jeder Eingabe folgt der Viewport dem
-      // Cursor. Wir nutzen NICHT mehr `() => true` (das hatte ProseMirrors
-      // scrollIntoView komplett deaktiviert) — stattdessen lassen wir
-      // ProseMirror standardmäßig in den View scrollen UND glätten den
-      // Effekt nach der Pagination-Engine selbst per `keepCursorInView`
-      // unten (sonst kann ein nachträglich eingefügter Spacer den Cursor
-      // wieder aus dem Viewport schieben).
-    },
+    editorProps: EDITOR_PROPS,
     onUpdate: ({ editor, transaction }) => {
       // PROJ-30: Silbentrennung beim Öffnen ändert den Text der Person nicht.
       if (transaction.getMeta(HYPHENATION_META)) return;
@@ -126,7 +139,7 @@ export function EditorClient({
   // Cleanup blob URLs on unmount
   useEffect(() => {
     return () => {
-      [...imageSections.start.images, ...imageSections.end.images].forEach((img) => {
+      allImages(imageSections).forEach((img) => {
         if (img.signed_url.startsWith("blob:")) URL.revokeObjectURL(img.signed_url);
       });
     };
@@ -189,7 +202,7 @@ export function EditorClient({
       title,
       body,
       imageSections,
-      colorPageCount: estimateColorPages(imageSections),
+      colorPageCount: estimateColorPages(imageSections, body),
       // Erst melden, wenn die Pagination eingeschwungen ist. Während des
       // Ladens läuft pageCount über Zwischenwerte (1 → … → Endwert); ein
       // Speichern in diesem Moment — etwa der Flush beim sofortigen
@@ -224,7 +237,10 @@ export function EditorClient({
           projectId,
           chapterId,
           title: d.title,
-          body: d.body,
+          // PROJ-34: ProseMirror legt Attribute als Objekte ohne Prototyp an.
+          // Next.js überträgt solche Objekte nicht an den Server, Zeilenabstand,
+          // Einzug, Ausrichtung und Bildabschnitte gingen so verloren.
+          body: toPlainJson(d.body),
           imageSections: d.imageSections,
           colorPageCount: d.colorPageCount,
           pageCount: d.pageCount,
@@ -241,7 +257,16 @@ export function EditorClient({
     [projectId, chapterId],
   );
 
-  const { state, retry } = useAutoSave(draft, saveDraft, 2_000, !inputLocked);
+  const { state, retry, saveNow } = useAutoSave(draft, saveDraft, 2_000, !inputLocked);
+
+  // PROJ-34: Ein neuer Abschnitt wird sofort gespeichert, nicht erst nach der
+  // Pause. Der Effekt läuft nach dem Effekt von useAutoSave und sieht den neuen Stand.
+  const saveAfterInsertRef = useRef(false);
+  useEffect(() => {
+    if (!saveAfterInsertRef.current) return;
+    saveAfterInsertRef.current = false;
+    saveNow();
+  }, [draft, saveNow]);
 
   // Editor-Ready-Flag setzen, sobald die initialen Pagination-Settling-
   // Passes durch sind. Der Editor mountet, lädt Body/Images, läuft durch
@@ -322,18 +347,8 @@ export function EditorClient({
     };
   }, [editor]);
 
-  // Bild-Skalierung: Per-Row, eingebettet in usePagination → recalc().
-  // Spec 2026-05-20: jede 1-spaltig-Sektion füllt zuerst den Restplatz der
-  // aktuellen Seite mit so vielen Reihen wie passen (Min-Scale 0.65); die
-  // übrigen Reihen rutschen via Block-Push ungeskaliert auf Folgeseiten.
-  // Implementation siehe usePagination unten.
-
-  const updateSection = (key: "start" | "end") => (next: ImageSections["start"]) => {
-    setImageSections((prev) => ({ ...prev, [key]: next }));
-  };
-
   const uploadImage = useCallback(
-    (section: "start" | "end") =>
+    (section: string) =>
       async (img: UploadedImage): Promise<ChapterImage> => {
         // Upload in drei Schritten, damit große Fotos nicht an der 1-MB-
         // Grenze der Server Actions scheitern (Fix 2026-11-20): Link holen,
@@ -365,6 +380,7 @@ export function EditorClient({
           section,
           imageId: prep.upload.imageId,
           storagePath: prep.upload.storagePath,
+          format: img.format,
         });
         if (res.error || !res.image) {
           toast.error(res.error ?? "Bild-Upload fehlgeschlagen.");
@@ -379,7 +395,7 @@ export function EditorClient({
   );
 
   const deleteImage = useCallback(
-    (section: "start" | "end") =>
+    (section: string) =>
       async (image: ChapterImage): Promise<void> => {
         const res = await chapterImageDeleteAction({
           projectId,
@@ -395,6 +411,111 @@ export function EditorClient({
       },
     [projectId, chapterId],
   );
+
+  // PROJ-34: Scheitert ein Foto beim Laden (Link nach einer Stunde abgelaufen,
+  // etwa nach „Rückgängig", oder kurzer Netzaussetzer), holt der Editor einen
+  // frischen Link und baut das Foto neu auf, höchstens dreimal (freshImageLinks.ts).
+  const [freshLinks, setFreshLinks] = useState<FreshLinks>({});
+  const linkRefresherRef = useRef<LinkRefresher | null>(null);
+  useEffect(
+    () => () => {
+      linkRefresherRef.current?.stop();
+      linkRefresherRef.current = null;
+    },
+    [projectId, chapterId],
+  );
+  const requestFreshLink = useCallback(
+    (storagePath: string) => {
+      linkRefresherRef.current ??= createLinkRefresher({
+        fetchLinks: async (paths) => (await chapterImageLinksAction({ projectId, chapterId, paths })).links,
+        onChange: setFreshLinks,
+        isAllowed: (path) => isInProjectFolder(path, projectId),
+      });
+      linkRefresherRef.current.request(storagePath);
+    },
+    [projectId, chapterId],
+  );
+
+  // Fotos, die der Text wirklich verwendet. Entfernte Abschnitte bleiben für
+  // „Rückgängig" im Speicher, zählen aber nicht zur Grenze.
+  const usedPhotos = useMemo(
+    () =>
+      collectImageSectionIds(body).reduce<number>((sum, id) => {
+        const section = typeof id === "string" ? getImageSection(imageSections, id) : undefined;
+        return sum + (section?.images.length ?? 0);
+      }, 0),
+    [body, imageSections],
+  );
+  const photoLimitReached = usedPhotos >= MAX_IMAGES_PER_CHAPTER;
+
+  const imageApi = useMemo<ImageSectionsApi>(
+    () => ({
+      sectionById: (id) => getImageSection(imageSections, id),
+      readOnly: inputLocked,
+      freshLinks,
+      canAddPhoto: (id) =>
+        !photoLimitReached &&
+        (getImageSection(imageSections, id)?.images.length ?? 0) < MAX_IMAGES_PER_SECTION,
+      changeSection: (id: string, next: ImageSectionData) => {
+        setImageSections((prev) => withImageSection(prev, id, next));
+      },
+      uploadPhoto: (id, image) => uploadImage(id)(image),
+      deletePhoto: (id, image) => deleteImage(id)(image),
+      removeSection: (id) => {
+        editor?.commands.removeImageSection(id);
+      },
+      onPhotoError: requestFreshLink,
+    }),
+    [imageSections, inputLocked, freshLinks, photoLimitReached, uploadImage, deleteImage, editor, requestFreshLink],
+  );
+
+  // PROJ-34: Erst das Foto, dann der Abschnitt. So gibt es nie ein leeres Element,
+  // das im Editor Platz einnimmt und im Druck fehlt.
+  const [insertDialogOpen, setInsertDialogOpen] = useState(false);
+  const insertSectionWithPhoto = useCallback(
+    async (img: UploadedImage): Promise<boolean> => {
+      if (!editor) return false;
+      const sectionId = crypto.randomUUID();
+      let image: ChapterImage;
+      try {
+        image = await uploadImage(sectionId)(img);
+      } catch {
+        return false; // Die Meldung kam bereits beim Upload.
+      }
+      flushSync(() => {
+        setImageSections((prev) =>
+          withImageSection(prev, sectionId, { layout: "1-spaltig", images: [image] }),
+        );
+      });
+      if (!editor.commands.insertImageSection(sectionId)) {
+        // Die Stelle grenzt inzwischen an einen Abschnitt: Das Foto geht trotzdem nicht verloren.
+        editor.chain().setTextSelection(editor.state.doc.content.size - 1).insertImageSection(sectionId).run();
+      }
+      saveAfterInsertRef.current = true;
+      return true;
+    },
+    [editor, uploadImage],
+  );
+
+  // PROJ-34: Rückfrage, bevor Fotos aus dem Text verschwinden.
+  const [pendingRemoval, setPendingRemoval] = useState<SectionRemovalRequest | null>(null);
+  useEffect(() => {
+    if (!editor) return;
+    const storage = editor.storage.imageSection;
+    storage.onRemovalRequest = (request) => setPendingRemoval(request);
+    return () => {
+      storage.onRemovalRequest = null;
+    };
+  }, [editor]);
+  const removalPhotos = (pendingRemoval?.sectionIds ?? []).reduce(
+    (sum, id) => sum + (getImageSection(imageSections, id)?.images.length ?? 0),
+    0,
+  );
+  const photoLabel = removalPhotos === 1 ? "1 Foto" : `${removalPhotos} Fotos`;
+  const removalTitle =
+    (pendingRemoval?.sectionIds.length ?? 0) > 1
+      ? `${pendingRemoval?.sectionIds.length} Bildabschnitte mit ${photoLabel} entfernen?`
+      : `Bildabschnitt mit ${photoLabel} entfernen?`;
 
   // Klick auf leere Fläche einer Seite (Seitenränder, Weißraum unter dem
   // letzten Absatz, Lücken zwischen Bild-Sektion und Text): Cursor in die
@@ -426,7 +547,50 @@ export function EditorClient({
       {/* Toolbar an top:0 — direkt im Document-Flow, kein verschachtelter
           Parent. Sticky funktioniert immer, weil document.scrollingElement
           die nächste scroll-Ancestor ist. */}
-      <EditorToolbar editor={editor} readOnly={inputLocked} />
+      <EditorToolbar
+        editor={editor}
+        readOnly={inputLocked}
+        photoLimitReached={photoLimitReached}
+        onInsertImageSection={() => setInsertDialogOpen(true)}
+      />
+      <ImageUploadDialog
+        open={insertDialogOpen}
+        onOpenChange={setInsertDialogOpen}
+        onUploaded={insertSectionWithPhoto}
+        onClosedFocus={() => editor?.view.focus()}
+      />
+      <AlertDialog
+        open={pendingRemoval !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingRemoval(null);
+        }}
+      >
+        <AlertDialogContent
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            editor?.view.focus();
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-normal">{removalTitle}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Die Fotos verschwinden aus diesem Kapitel. Solange das Kapitel geöffnet ist, holen Sie
+              sie mit „Rückgängig“ zurück.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                pendingRemoval?.confirm();
+                setPendingRemoval(null);
+              }}
+            >
+              Entfernen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Chrome unter der Toolbar — scrollt natürlich weg */}
       <header className="flex flex-col gap-2 border-b border-[#e0dcd5] bg-[#ece6df] px-4 py-3 sm:px-6 md:flex-row md:items-center md:justify-between">
@@ -523,21 +687,9 @@ export function EditorClient({
             onMouseDown={handleBlankAreaMouseDown}
           >
             <FirstPageHeader title={title} />
-            <ImageSection
-              data={imageSections.start}
-              onChange={updateSection("start")}
-              onUpload={uploadImage("start")}
-              onDelete={deleteImage("start")}
-              readOnly={inputLocked}
-            />
-            <EditorContent editor={editor} />
-            <ImageSection
-              data={imageSections.end}
-              onChange={updateSection("end")}
-              onUpload={uploadImage("end")}
-              onDelete={deleteImage("end")}
-              readOnly={inputLocked}
-            />
+            <ImageSectionsProvider value={imageApi}>
+              <EditorContent editor={editor} />
+            </ImageSectionsProvider>
           </div>
           {/* Seitenzahl-Overlay: über FG, damit Zahlen nicht von Bildern
               oder Text in der oberen rechten Ecke verdeckt werden.
@@ -574,13 +726,36 @@ export function EditorClient({
   );
 }
 
+// PROJ-34: Fest statt bei jedem Rendern neu. TipTap vergleicht die Optionen und
+// setzt sie bei jeder Abweichung neu, dabei entstanden die Bildabschnitte jedes
+// Mal neu und verloren offene Dialoge.
+//
+// Word-/Docs-Verhalten: nach jeder Eingabe folgt der Viewport dem Cursor. Wir
+// nutzen NICHT mehr `() => true` (das hatte ProseMirrors scrollIntoView komplett
+// deaktiviert) — stattdessen lassen wir ProseMirror standardmäßig in den View
+// scrollen UND glätten den Effekt nach der Pagination-Engine selbst per
+// `keepCursorInView` (sonst kann ein nachträglich eingefügter Spacer den Cursor
+// wieder aus dem Viewport schieben).
+const EDITOR_PROPS = {
+  attributes: {
+    class: "tiptap-editor focus:outline-none",
+  },
+};
+
+function toPlainJson(value: unknown): unknown {
+  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
+
 const CONTENT_CHECK_MS = 60;
 const CONTENT_STABLE_CHECKS = 3;
 const CONTENT_REVEAL_MAX_MS = 900;
 
-function estimateColorPages(s: ImageSections): number {
-  const rows = (sec: ImageSections["start"]) =>
+function estimateColorPages(s: ImageSections, body: unknown): number {
+  const rows = (sec: ImageSectionData) =>
     Math.ceil(sec.images.length / (sec.layout === "2-spaltig" ? 2 : 1));
   const pagesPer = (rowCount: number) => Math.ceil(rowCount / 2);
-  return pagesPer(rows(s.start)) + pagesPer(rows(s.end));
+  return collectImageSectionIds(body).reduce<number>((sum, id) => {
+    const section = typeof id === "string" ? getImageSection(s, id) : undefined;
+    return sum + (section ? pagesPer(rows(section)) : 0);
+  }, 0);
 }

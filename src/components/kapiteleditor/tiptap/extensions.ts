@@ -1,10 +1,11 @@
 import StarterKit from "@tiptap/starter-kit";
-import { Extension } from "@tiptap/core";
+import { Extension, Node as TiptapNode } from "@tiptap/core";
 import Paragraph from "@tiptap/extension-paragraph";
 import TextAlign from "@tiptap/extension-text-align";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import type { ResolvedPos } from "@tiptap/pm/model";
+import { ImageSectionNode } from "./ImageSectionNode";
 import { PageBreakNode } from "./PageBreakNode";
 import { PaginationDecorations } from "./PaginationDecorations";
 import { HyphenationOnLoad } from "./Hyphenation";
@@ -222,8 +223,17 @@ const ParagraphWithLayout = Paragraph.extend({
   },
 });
 
+// PROJ-34: Bildabschnitte sind nur auf oberster Ebene erlaubt.
+const ChapterDocument = TiptapNode.create({
+  name: "doc",
+  topNode: true,
+  content: "(block | imageBlock)+",
+});
+
 export const editorExtensions = [
+  ChapterDocument,
   StarterKit.configure({
+    document: false,
     heading: false,
     horizontalRule: false,
     codeBlock: false,
@@ -244,6 +254,7 @@ export const editorExtensions = [
     emptyEditorClass: "is-editor-empty",
   }),
   PageBreakNode,
+  ImageSectionNode,
   PaginationDecorations,
   NoListInBlockquote,
   TiptapStateHardening,

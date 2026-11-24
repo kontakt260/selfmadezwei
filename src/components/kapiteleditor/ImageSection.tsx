@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useSyncExternalStore } from "react";
-import { GripVertical, ImagePlus, Trash2, Plus } from "lucide-react";
+import { GripVertical, Trash2, Plus } from "lucide-react";
 import {
   DndContext,
   KeyboardSensor,
@@ -39,27 +39,41 @@ import {
   type ImageSectionData,
 } from "@/lib/kapiteleditor/types";
 import { ImageUploadDialog, type UploadedImage } from "./ImageUploadDialog";
+import type { FreshLinks } from "./freshImageLinks";
 
 // Leeres Abonnement für das Hydration-Gate: der Wert ändert sich nie,
 // React muss nichts beobachten.
 const subscribeToNothing = () => () => {};
+
+const formatOf = (image: ChapterImage) => image.format ?? "quer";
 
 export function ImageSection({
   data,
   onChange,
   onUpload,
   onDelete,
+  onRemoveSection,
+  onPhotoError,
+  freshLinks,
+  canAddPhoto,
   readOnly = false,
 }: {
   data: ImageSectionData;
   onChange: (next: ImageSectionData) => void;
   onUpload: (img: UploadedImage) => Promise<ChapterImage>;
   onDelete: (image: ChapterImage) => Promise<void>;
+  onRemoveSection: () => void;
+  onPhotoError: (storagePath: string) => void;
+  freshLinks: FreshLinks;
+  canAddPhoto: boolean;
   // PROJ-28: Bilder bleiben sichtbar, ohne Bedienelemente.
   readOnly?: boolean;
 }) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<ChapterImage | null>(null);
+  // PROJ-34: Die Steuerung sitzt an der Reihe, mit der man gerade arbeitet, auch
+  // wenn sich der Abschnitt über mehrere Seiten verteilt.
+  const [activeRow, setActiveRow] = useState(0);
   // Hydration-Gate: @dnd-kit verwendet einen Modul-globalen Counter für
   // `aria-describedby="DndDescribedBy-N"`. Zwischen SSR und Client-Hydration
   // kann der Counter differieren → React Hydration-Mismatch. Lösung: DnD-
@@ -116,17 +130,24 @@ export function ImageSection({
     scrollSectionIntoView();
   };
 
-  const handleUploaded = async (img: UploadedImage) => {
+  const handleUploaded = async (img: UploadedImage): Promise<boolean> => {
     try {
       const newImage = await onUpload(img);
       onChange({ ...data, images: [...data.images, newImage] });
       scrollSectionIntoView();
+      return true;
     } catch {
       /* upstream already toasted */
+      return false;
     }
   };
 
   const handleDelete = async (image: ChapterImage) => {
+    // Mit dem letzten Foto verschwindet der Abschnitt, „Rückgängig" holt ihn zurück.
+    if (data.images.length === 1) {
+      onRemoveSection();
+      return;
+    }
     try {
       await onDelete(image);
       onChange({ ...data, images: data.images.filter((i) => i.id !== image.id) });
@@ -136,15 +157,61 @@ export function ImageSection({
     }
   };
 
-  const hasImages = data.images.length > 0;
   // Reihen-Chunking: 1-spaltig = 1 Bild/Reihe, 2-spaltig = 2 Bilder/Reihe.
   // Jede Reihe ist eine eigene paginierbare Einheit (data-paginate-row) und
-  // wird von der Pagination-Engine bei Überlauf auf die nächste Seite geschoben.
+  // wird von der Seitenberechnung bei Überlauf auf die nächste Seite geschoben.
   const perRow = data.layout === "2-spaltig" ? 2 : 1;
   const rows: ChapterImage[][] = [];
   for (let i = 0; i < data.images.length; i += perRow) {
     rows.push(data.images.slice(i, i + perRow));
   }
+  const controlsRow = Math.min(activeRow, Math.max(0, rows.length - 1));
+  const photoUrl = (image: ChapterImage) => freshLinks[image.storage_path]?.url ?? image.signed_url;
+  // Jeder neue Ladeversuch baut das <img> neu auf, auch wenn der Link gleich bleibt.
+  const photoAttempt = (image: ChapterImage) => freshLinks[image.storage_path]?.attempt ?? 0;
+
+  // Controls erscheinen auf Hover. PROJ-25: Sie liegen mittig im Bildbereich,
+  // unter den Symbolen zum Verschieben und Löschen, und verdecken keinen Text.
+  // Delay-on-Leave verhindert, dass das Menü beim Übergang zu früh verschwindet.
+  const controls = !readOnly && (
+    <div className="editor-chrome pointer-events-none absolute left-1/2 top-9 z-20 flex -translate-x-1/2 items-center gap-1 opacity-0 transition-opacity duration-150 [transition-delay:300ms] group-hover/section:pointer-events-auto group-hover/section:opacity-100 group-hover/section:[transition-delay:0ms] group-focus-within/section:pointer-events-auto group-focus-within/section:opacity-100 group-focus-within/section:[transition-delay:0ms]">
+      <ToggleGroup
+        type="single"
+        value={data.layout}
+        onValueChange={handleLayoutChange}
+        size="sm"
+        variant="outline"
+        className="rounded-none border border-[#e0dcd5] bg-white shadow-sm"
+      >
+        <ToggleGroupItem value="1-spaltig" aria-label="1 Bild pro Zeile" className="h-7 px-2 text-[10pt]">
+          1
+        </ToggleGroupItem>
+        <ToggleGroupItem value="2-spaltig" aria-label="2 Bilder nebeneinander" className="h-7 px-2 text-[10pt]">
+          2
+        </ToggleGroupItem>
+      </ToggleGroup>
+      <button
+        type="button"
+        onClick={() => setUploadOpen(true)}
+        disabled={!canAddPhoto}
+        title={canAddPhoto ? undefined : "Die Höchstzahl an Fotos ist erreicht."}
+        aria-label="Bild hinzufügen"
+        className="flex h-7 items-center gap-1 border border-[#e0dcd5] bg-white px-2 text-[10pt] text-[#3E3831] shadow-sm transition-colors hover:bg-[#FAF8F6] disabled:cursor-not-allowed disabled:text-[#a8a39b]"
+      >
+        <Plus className="h-3 w-3" />
+        Bild
+      </button>
+    </div>
+  );
+
+  const rowProps = (rowIdx: number, row: ChapterImage[]) => ({
+    className: "image-section",
+    "data-layout": data.layout,
+    "data-formats": row.map(formatOf).join("-"),
+    "data-paginate-row": true,
+    onPointerEnter: () => setActiveRow(rowIdx),
+    onPointerDown: () => setActiveRow(rowIdx),
+  });
 
   return (
     <div
@@ -152,72 +219,23 @@ export function ImageSection({
       className="group/section relative"
       data-image-section-wrapper
     >
-      {/* Controls erscheinen nur wenn Bilder da sind UND auf Hover. PROJ-25:
-       * Sie liegen mittig im Bildbereich, unter den Symbolen zum Verschieben und
-       * Löschen. Oberhalb verdeckten sie die letzte Textzeile. Delay-on-Leave
-       * verhindert, dass das Menu beim Übergang zu früh verschwindet. */}
-      {hasImages && !readOnly && (
-        <>
-          <div
-            className="editor-chrome pointer-events-none absolute left-1/2 top-9 z-20 flex -translate-x-1/2 items-center gap-1 opacity-0 transition-opacity duration-150 [transition-delay:300ms] group-hover/section:pointer-events-auto group-hover/section:opacity-100 group-hover/section:[transition-delay:0ms] group-focus-within/section:pointer-events-auto group-focus-within/section:opacity-100 group-focus-within/section:[transition-delay:0ms]"
-          >
-            <ToggleGroup
-              type="single"
-              value={data.layout}
-              onValueChange={handleLayoutChange}
-              size="sm"
-              variant="outline"
-              className="rounded-none border border-[#e0dcd5] bg-white shadow-sm"
-            >
-              <ToggleGroupItem value="1-spaltig" aria-label="1 Bild pro Zeile" className="h-7 px-2 text-[10pt]">
-                1
-              </ToggleGroupItem>
-              <ToggleGroupItem value="2-spaltig" aria-label="2 Bilder nebeneinander" className="h-7 px-2 text-[10pt]">
-                2
-              </ToggleGroupItem>
-            </ToggleGroup>
-            <button
-              type="button"
-              onClick={() => setUploadOpen(true)}
-              aria-label="Bild hinzufügen"
-              className="flex h-7 items-center gap-1 border border-[#e0dcd5] bg-white px-2 text-[10pt] text-[#3E3831] shadow-sm transition-colors hover:bg-[#FAF8F6]"
-            >
-              <Plus className="h-3 w-3" />
-              Bild
-            </button>
-          </div>
-        </>
-      )}
-
-      {!hasImages ? (
-        <button
-          type="button"
-          onClick={() => setUploadOpen(true)}
-          disabled={readOnly}
-          aria-label="Bild hinzufügen"
-          className={cn("image-section-empty", readOnly && "cursor-not-allowed opacity-40")}
-          data-paginate-row
-        >
-          <ImagePlus className="h-3.5 w-3.5" />
-          Bild hinzufügen
-        </button>
-      ) : !mounted || readOnly ? (
+      {!mounted || readOnly ? (
         // Pre-Hydration: Static-Render der Image-Slots ohne DnD-Attribute.
         // Verhindert Hydration-Mismatch durch @dnd-kit's globalen
         // aria-describedby-Counter, der SSR ↔ Client divergieren kann.
         // PROJ-28: Der Lesemodus nutzt dieselbe Ansicht ohne Verschieben.
         <>
           {rows.map((row, rowIdx) => (
-            <div
-              key={rowIdx}
-              className="image-section"
-              data-layout={data.layout}
-              data-paginate-row
-            >
+            <div key={rowIdx} {...rowProps(rowIdx, row)}>
               {row.map((img) => (
-                <div key={img.id} className="image-slot">
+                <div key={img.id} className="image-slot" data-format={formatOf(img)}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.signed_url} alt={img.alt} />
+                  <img
+                    key={photoAttempt(img)}
+                    src={photoUrl(img)}
+                    alt={img.alt}
+                    onError={() => onPhotoError(img.storage_path)}
+                  />
                 </div>
               ))}
             </div>
@@ -228,25 +246,28 @@ export function ImageSection({
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
+          // PROJ-34: Die Ansage-Region für Screenreader gehört nicht in den Text.
+          // Dort setzt jeder Dialog `aria-hidden` auf die Absätze, ProseMirror
+          // hält das für eine Textänderung und baut den Abschnitt neu auf.
+          accessibility={{ container: document.body }}
         >
           <SortableContext
             items={data.images.map((i) => i.id)}
             strategy={rectSortingStrategy}
           >
             {rows.map((row, rowIdx) => (
-              <div
-                key={rowIdx}
-                className="image-section"
-                data-layout={data.layout}
-                data-paginate-row
-              >
+              <div key={rowIdx} {...rowProps(rowIdx, row)}>
                 {row.map((img) => (
                   <SortableSlot
                     key={img.id}
                     image={img}
+                    url={photoUrl(img)}
+                    attempt={photoAttempt(img)}
+                    onError={() => onPhotoError(img.storage_path)}
                     onDelete={() => setConfirmDelete(img)}
                   />
                 ))}
+                {rowIdx === controlsRow && controls}
               </div>
             ))}
           </SortableContext>
@@ -267,7 +288,9 @@ export function ImageSection({
           <AlertDialogHeader>
             <AlertDialogTitle className="font-normal">Bild entfernen?</AlertDialogTitle>
             <AlertDialogDescription>
-              Das Bild wird aus dieser Bild-Sektion gelöscht. Sie können es danach neu hochladen.
+              {data.images.length === 1
+                ? "Es ist das letzte Foto, der Bildabschnitt verschwindet damit. Mit „Rückgängig“ holen Sie ihn zurück, solange das Kapitel geöffnet ist."
+                : "Das Bild wird aus dieser Bild-Sektion gelöscht. Sie können es danach neu hochladen."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -290,9 +313,16 @@ export function ImageSection({
 
 function SortableSlot({
   image,
+  url,
+  attempt,
+  onError,
   onDelete,
 }: {
   image: ChapterImage;
+  url: string;
+  /** Ladeversuch: ein neuer Wert baut das Foto neu auf. */
+  attempt: number;
+  onError: () => void;
   onDelete: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -307,9 +337,14 @@ function SortableSlot({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className={cn("image-slot group/slot")}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn("image-slot group/slot")}
+      data-format={image.format ?? "quer"}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={image.signed_url} alt={image.alt} />
+      <img key={attempt} src={url} alt={image.alt} onError={onError} />
       <div className="editor-chrome absolute inset-x-0 top-0 flex justify-between p-1.5 opacity-0 transition-opacity group-hover/slot:opacity-100">
         <button
           type="button"

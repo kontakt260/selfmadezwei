@@ -8,6 +8,7 @@ import { calendarDaysUntil, formatGermanDate } from "@/lib/email/format";
 import { processMailRetryQueue, type MailRetryResult } from "@/lib/email/retry-mails";
 import {
   processChapterStorageCleanup,
+  processImageStorageCleanup,
   processStorageCleanup,
   type StorageCleanupResult,
 } from "@/lib/projects/storage-cleanup";
@@ -36,11 +37,12 @@ import { purgeExpiredNarrationDrafts } from "@/lib/purchases/narration-draft";
 //      Fällige Inhalte aus dem Papierkorb werden davor endgültig gelöscht,
 //      damit ihre Dateien im selben Lauf verschwinden (PROJ-26). Noch davor
 //      kommen Projekte, die seit 90 Tagen abgelaufen sind, in den Papierkorb
-//      (PROJ-28).
+//      (PROJ-28). Danach werden entfernte Fotos gelöscht, deren 14 Tage um
+//      sind (PROJ-34).
 //
 // Antwort: JSON mit `processed`, `sent`, `skipped`, `mailRetries`,
-// `retention`, `trashPurge`, `storageCleanup`, `chapterStorageCleanup` und
-// `narrationDrafts` für Monitoring.
+// `retention`, `trashPurge`, `storageCleanup`, `chapterStorageCleanup`,
+// `imageStorageCleanup` und `narrationDrafts` für Monitoring.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -159,6 +161,15 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  let imageStorageCleanup: StorageCleanupResult = { processed: 0, cleaned: 0, failed: 0 };
+  try {
+    imageStorageCleanup = await processImageStorageCleanup();
+  } catch (err) {
+    console.error(
+      `[cron/reminders] image storage cleanup failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
   const supabase = createServiceRoleClient();
 
   // PROJ-24: Kontaktdaten aus nicht abgeschlossenen Käufen entfernen.
@@ -265,6 +276,7 @@ export async function GET(req: NextRequest) {
     trashPurge,
     storageCleanup,
     chapterStorageCleanup,
+    imageStorageCleanup,
     narrationDrafts,
   });
 }

@@ -13,6 +13,8 @@ export function computeDecorations(
   view: EditorView,
   fg: HTMLElement,
   geom: Geometry,
+  // PROJ-34: Setzt Bildabschnitte und Umbrüche, sobald der Text darüber feststeht.
+  placeBlock: (kind: "pageBreak" | "imageSection", dom: HTMLElement, shift: number) => void,
 ): { decorations: Decoration[]; paragraphsWithSoftBreak: Set<HTMLElement> } {
   const fgTop = fg.getBoundingClientRect().top;
   // UI-Zoom: wenn `.a5-stack` per transform: scale skaliert ist, sind
@@ -49,6 +51,13 @@ export function computeDecorations(
   const bqInfo = new Map<number, BqInfo>();
 
   view.state.doc.descendants((node, pos) => {
+    if (node.type.name === "pageBreak" || node.type.name === "imageSection") {
+      const blockDom = view.nodeDOM(pos);
+      if (blockDom instanceof HTMLElement) {
+        placeBlock(node.type.name, blockDom, interParaShift);
+      }
+      return false;
+    }
     if (!node.isTextblock) return true;
     const nodeDom = view.nodeDOM(pos);
     if (!(nodeDom instanceof HTMLElement)) return true;
@@ -58,6 +67,21 @@ export function computeDecorations(
     // Traversierung eine Rand-Decoration auf der Blockquote zu
     // setzen (Border wird in diesen Bereichen sauber ausgeblendet).
     const $pos = view.state.doc.resolve(pos);
+
+    // PROJ-34: Die leere Schreibzeile hinter einem Abschnitt am Kapitelende ist
+    // kein Inhalt. Sie erzeugt keine eigene Seite und wird nicht gedruckt.
+    if (
+      node.content.size === 0 &&
+      $pos.depth === 0 &&
+      pos + node.nodeSize === view.state.doc.content.size &&
+      $pos.nodeBefore?.type.name === "imageSection"
+    ) {
+      decorations.push(
+        Decoration.node(pos, pos + node.nodeSize, { class: "a5-trailing-line" }),
+      );
+      return false;
+    }
+
     const parentIsBlockquote =
       $pos.depth > 0 && $pos.parent.type.name === "blockquote";
     let currentBqStart = -1;

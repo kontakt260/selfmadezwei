@@ -587,7 +587,8 @@ test.describe("PROJ-26 — Papierkorb (nur Stage)", () => {
     await waitForPage(pageC);
     await waitForEditorReady(pageC);
     const editor = pageC.locator(".ProseMirror").first();
-    await editor.click();
+    // PROJ-34: Ein Foto am Anfang steht jetzt im Text. Geschrieben wird im Absatz.
+    await editor.locator("p").first().click();
     await pageC.keyboard.type(" erster Stand");
     await waitForSaved(pageC);
 

@@ -36,7 +36,7 @@
 | PROJ-19 | Production-Hardening (Headers, Middleware-Caching, Env-Failsafe) | P1 | Approved | PROJ-2 | [Spec](PROJ-19-production-hardening.md) | 2026-05-16 |
 | PROJ-22 | Design-Grundlage der Web-App | P1 | Approved | PROJ-3, PROJ-4, PROJ-9, PROJ-10, PROJ-28 | [Spec](PROJ-22-design-grundlage.md) | 2026-11-23 |
 | PROJ-24 | Onboarding optimieren | P1 | Approved | PROJ-6, PROJ-9, PROJ-12, PROJ-22 | [Spec](PROJ-24-onboarding-optimieren.md) | 2026-11-23 |
-| PROJ-25 | Kapitel-Editor stabilisieren | P1 | In Review | PROJ-5, PROJ-7, PROJ-28, PROJ-31 | [Spec](PROJ-25-kapitel-editor-stabil.md) | 2026-11-23 |
+| PROJ-25 | Kapitel-Editor stabilisieren | P1 | Approved | PROJ-5, PROJ-7, PROJ-28, PROJ-31 | [Spec](PROJ-25-kapitel-editor-stabil.md) | 2026-11-23 |
 | PROJ-26 | Papierkorb (serverseitig, 14 Tage) | P0 | Approved | PROJ-1, PROJ-3, PROJ-4, PROJ-5, PROJ-6, PROJ-7, PROJ-9, PROJ-10, PROJ-11 | [Spec](PROJ-26-papierkorb.md) | 2026-11-22 |
 | PROJ-28 | Aufbewahrung, Lesemodus und automatische Löschung | P0 | Approved | PROJ-3, PROJ-5, PROJ-6, PROJ-9, PROJ-10, PROJ-11, PROJ-26 | [Spec](PROJ-28-aufbewahrung-automatische-loeschung.md) | 2026-11-22 |
 | PROJ-29 | Webflow-Landingpage gemeinsam prüfen und überarbeiten (über MCP) | P1 | Roadmap | — | — | 2026-11-23 |
@@ -44,11 +44,13 @@
 | PROJ-31 | Code aufräumen und Tests verschlanken | P2 | Approved | PROJ-24, PROJ-30 | [Spec](PROJ-31-code-aufraeumen.md) | 2026-11-23 |
 | PROJ-32 | Schriftarten im Kapitel-Editor | P1 | Roadmap | PROJ-25 | — | 2026-11-23 |
 | PROJ-33 | Impuls-Bibliothek | P1 | Roadmap | PROJ-8, PROJ-22, PROJ-28 | — | 2026-11-23 |
-| PROJ-34 | Bilder im Kapiteltext und Hochkant | P1 | Planned | PROJ-3, PROJ-5, PROJ-7, PROJ-25, PROJ-26, PROJ-28 | [Spec](PROJ-34-bilder-im-kapitel.md) | 2026-11-23 |
+| PROJ-34 | Bilder im Kapiteltext und Hochkant | P1 | Approved | PROJ-3, PROJ-5, PROJ-7, PROJ-25, PROJ-26, PROJ-28 | [Spec](PROJ-34-bilder-im-kapitel.md) | 2026-11-23 |
+| PROJ-35 | Automatische Silbentrennung | P1 | Roadmap | PROJ-5, PROJ-25, PROJ-34 | — | 2026-11-24 |
+| PROJ-36 | Hilfe und Anleitung in der Seitenleiste | P1 | Roadmap | PROJ-22, PROJ-34 | — | 2026-11-24 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-35
+## Next Available ID: PROJ-37
 
 > PROJ-20, PROJ-21, PROJ-23 und PROJ-27 sind für geplante Themen reserviert und haben noch keine Spec.
 

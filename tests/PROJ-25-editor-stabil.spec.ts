@@ -44,9 +44,13 @@ async function openChapter(page: Page, key: ChapterKey) {
   await page.waitForTimeout(600);
 }
 
+// PROJ-34: Hinter den Fotos am Kapitelende steht die leere Schreibzeile.
+// Getippt wird am Ende des Textes davor, damit die Fotos wirklich wandern.
 async function cursorToEnd(page: Page) {
-  await page.locator(".tiptap-editor p").last().click();
-  await page.keyboard.press("Meta+End");
+  const last = page.locator(`${TEXT_BLOCKS}:not(.a5-trailing-line)`).last();
+  await last.scrollIntoViewIfNeeded();
+  const box = (await last.boundingBox())!;
+  await last.click({ position: { x: box.width - 2, y: box.height - 6 } });
   await page.waitForTimeout(350);
 }
 

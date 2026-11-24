@@ -82,7 +82,8 @@ export async function layoutFingerprint(page: Page): Promise<{ pages: number; sp
     const frames = Array.from(document.querySelectorAll(".a5-page-frame"));
     const stride = frames[1].getBoundingClientRect().top - frames[0].getBoundingClientRect().top;
     const pageOf = (el: Element) => Math.floor((el.getBoundingClientRect().top - top + 2) / stride);
-    const blocks = Array.from(document.querySelectorAll(".tiptap-editor > p")).map(pageOf);
+    // Die leere Schreibzeile hinter einem Abschnitt am Kapitelende ist kein Inhalt.
+    const blocks = Array.from(document.querySelectorAll(".tiptap-editor > p:not(.a5-trailing-line)")).map(pageOf);
     const images = Array.from(document.querySelectorAll("[data-paginate-row] img")).map(pageOf);
     return {
       pages: document.querySelectorAll(".a5-page-frame").length,

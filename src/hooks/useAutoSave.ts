@@ -122,5 +122,5 @@ export function useAutoSave<T>(
           ? "saved"
           : "idle";
 
-  return { state, error, retry };
+  return { state, error, retry, saveNow: flush };
 }

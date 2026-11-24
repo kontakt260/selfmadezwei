@@ -1,10 +1,14 @@
 export type ImageLayout = "1-spaltig" | "2-spaltig";
 
+// PROJ-34: Fehlt die Angabe, ist es ein vorhandenes Foto im Querformat.
+export type ImageFormat = "quer" | "hoch";
+
 export type ChapterImage = {
   id: string;
   storage_path: string;
   signed_url: string;
   alt: string;
+  format?: ImageFormat;
 };
 
 export type ImageSectionData = {
@@ -15,6 +19,11 @@ export type ImageSectionData = {
 export type ImageSections = {
   start: ImageSectionData;
   end: ImageSectionData;
+  // PROJ-34: Bildabschnitte an beliebigen Textstellen, nach ihrer ID.
+  inline?: Record<string, ImageSectionData>;
+  // PROJ-34: Die Position jedes Abschnitts steht im Kapiteltext. Fehlt der
+  // Wert, gehören `start` und `end` wie früher an Kapitelanfang und -ende.
+  placed?: true;
 };
 
 export const EMPTY_IMAGE_SECTIONS: ImageSections = {

@@ -9,10 +9,9 @@ const GAP = (4 / 25.4) * 96;
 
 const plan = (rows: number, availableOnCurrentPage: number) =>
   planRowGroups({
-    rows,
+    rowHeights: Array.from({ length: rows }, () => ROW),
     availableOnCurrentPage,
     pageContentHeight: PAGE,
-    rowHeight: ROW,
     rowGap: GAP,
   });
 
@@ -21,13 +20,20 @@ const groupHeight = (count: number, scale: number) => count * ROW * scale + (cou
 describe("maxGroupScale", () => {
   it("skaliert nur die Bildhöhen, nicht die Abstände", () => {
     const available = 580;
-    const scale = maxGroupScale(3, available, ROW, GAP);
+    const scale = maxGroupScale([ROW, ROW, ROW], available, GAP);
     // Die Gruppe füllt den Platz exakt aus — inklusive der festen Abstände.
     expect(groupHeight(3, scale)).toBeCloseTo(available, 5);
   });
 
   it("überschreitet nie die natürliche Größe", () => {
-    expect(maxGroupScale(1, 5000, ROW, GAP)).toBe(1);
+    expect(maxGroupScale([ROW], 5000, GAP)).toBe(1);
+  });
+
+  it("rechnet mit unterschiedlich hohen Reihen (PROJ-34)", () => {
+    const portrait = ROW * 1.5;
+    const available = 500;
+    const scale = maxGroupScale([ROW, portrait], available, GAP);
+    expect((ROW + portrait) * scale + GAP).toBeCloseTo(available, 5);
   });
 });
 
@@ -60,6 +66,18 @@ describe("planRowGroups", () => {
     const available = ROW * (MIN_ROW_SCALE - 0.02);
     const groups = plan(2, available);
     expect(groups).toEqual([{ count: 2, scale: 1 }]);
+  });
+
+  it("plant Hochformate mit ihrer eigenen Höhe (PROJ-34)", () => {
+    const portrait = ROW * 1.5;
+    const groups = planRowGroups({
+      rowHeights: [portrait, ROW, portrait],
+      availableOnCurrentPage: portrait + GAP + ROW,
+      pageContentHeight: PAGE,
+      rowGap: GAP,
+    });
+    expect(groups[0]).toEqual({ count: 2, scale: 1 });
+    expect(groups[1]).toEqual({ count: 1, scale: 1 });
   });
 
   it("überschreitet in keiner Gruppe den verfügbaren Platz", () => {

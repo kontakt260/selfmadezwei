@@ -565,12 +565,13 @@ html[data-history-refresh] main {
 }
 
 /* Bild-Sektion: feste Slot-Größen, kein freies Layout
- * 1-spaltig: ein Bild pro Reihe, 70% der Inhaltsbreite, zentriert, 3:2
- *           → ermöglicht 2 Bilder auf der Kapitel-Titelseite (zusammen mit
- *             dem Header) und mehrere pro Folgeseite
- * 2-spaltig: zwei Bilder nebeneinander, je 3:2 mit 4mm Gap
+ * 1-spaltig: ein Bild pro Reihe, volle Textbreite, 3:2. Hochformat (2:3) steht
+ *            mittig in zwei Dritteln der Textbreite.
+ * 2-spaltig: zwei Bilder nebeneinander mit 4mm Gap. Hoch- und Querformat in
+ *            einer Reihe sind gleich hoch und füllen zusammen die Textbreite.
  */
 .image-section {
+  position: relative;
   display: grid;
   gap: 4mm;
   margin: 4mm 0;
@@ -585,8 +586,21 @@ html[data-history-refresh] main {
   justify-content: center;
 }
 
+.image-section[data-layout="1-spaltig"][data-formats="hoch"] {
+  grid-template-columns: minmax(0, calc(100% * 2 / 3 * var(--row-image-scale, 1)));
+}
+
 .image-section[data-layout="2-spaltig"] {
   grid-template-columns: 1fr 1fr;
+}
+
+/* Breiten im Verhältnis der Seitenformate (3:2 zu 2:3 = 9:4): gleiche Höhe. */
+.image-section[data-layout="2-spaltig"][data-formats="quer-hoch"] {
+  grid-template-columns: minmax(0, 9fr) minmax(0, 4fr);
+}
+
+.image-section[data-layout="2-spaltig"][data-formats="hoch-quer"] {
+  grid-template-columns: minmax(0, 4fr) minmax(0, 9fr);
 }
 
 .image-slot {
@@ -597,6 +611,10 @@ html[data-history-refresh] main {
   width: 100%;
 }
 
+.image-slot[data-format="hoch"] {
+  aspect-ratio: 2 / 3;
+}
+
 .image-slot img {
   width: 100%;
   height: 100%;
@@ -604,27 +622,9 @@ html[data-history-refresh] main {
   display: block;
 }
 
-/* Bild-Sektion: discreter leerer Platzhalter ohne Chrome */
-.image-section-empty {
-  position: relative;
-  aspect-ratio: 6 / 1;
-  background: transparent;
-  border: 1px dashed #d6d0c5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  color: #a8a39b;
-  font-family: var(--font-lato), sans-serif;
-  font-size: 9pt;
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
-}
-
-.image-section-empty:hover {
-  border-color: var(--narravit-green);
-  color: #3E3831;
-  background: rgba(150, 184, 151, 0.05);
+/* Die Zeile direkt nach einem Bildabschnitt zeigt keinen Eingabe-Hinweis. */
+.tiptap-editor .node-imageSection + p[data-placeholder]::before {
+  content: none;
 }
 
 /* ===== Druck-spezifische Regeln (PROJ-16 nutzt diese Klassen 1:1) ===== */
@@ -660,6 +660,11 @@ html[data-history-refresh] main {
 
   /* Editor-Chrome ausblenden beim Druck */
   .editor-chrome {
+    display: none !important;
+  }
+
+  /* Die leere Schreibzeile hinter einem Abschnitt am Kapitelende. */
+  .a5-trailing-line {
     display: none !important;
   }
 }

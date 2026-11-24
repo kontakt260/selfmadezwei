@@ -23,6 +23,7 @@ vi.mock("@/lib/email/retry-mails", () => ({
 
 const storageCleanupMock = vi.fn(async () => ({ processed: 0, cleaned: 0, failed: 0 }));
 const chapterCleanupMock = vi.fn(async () => ({ processed: 0, cleaned: 0, failed: 0 }));
+const imageCleanupMock = vi.fn(async () => ({ processed: 0, cleaned: 0, failed: 0 }));
 const callOrder: string[] = [];
 vi.mock("@/lib/projects/storage-cleanup", () => ({
   processStorageCleanup: () => {
@@ -32,6 +33,10 @@ vi.mock("@/lib/projects/storage-cleanup", () => ({
   processChapterStorageCleanup: () => {
     callOrder.push("chapters");
     return chapterCleanupMock();
+  },
+  processImageStorageCleanup: () => {
+    callOrder.push("images");
+    return imageCleanupMock();
   },
 }));
 
@@ -312,9 +317,21 @@ describe("/api/cron/reminders — happy path", () => {
     const res = await GET(makeRequest({ "x-cron-secret": "test_cron_secret_123" }));
     const json = await res.json();
 
-    expect(callOrder).toEqual(["retention", "purge", "storage", "chapters"]);
+    expect(callOrder).toEqual(["retention", "purge", "storage", "chapters", "images"]);
     expect(json.trashPurge).toEqual({ projects: 1, chapters: 2 });
     expect(json.chapterStorageCleanup).toEqual({ processed: 2, cleaned: 2, failed: 0 });
+  });
+
+  it("reports removed photos and survives a failed photo cleanup (PROJ-34)", async () => {
+    imageCleanupMock.mockResolvedValueOnce({ processed: 3, cleaned: 2, failed: 1 });
+    const first = await (await GET(makeRequest({ "x-cron-secret": "test_cron_secret_123" }))).json();
+    expect(first.imageStorageCleanup).toEqual({ processed: 3, cleaned: 2, failed: 1 });
+
+    vi.spyOn(console, "error").mockImplementationOnce(() => {});
+    imageCleanupMock.mockRejectedValueOnce(new Error("storage down"));
+    const res = await GET(makeRequest({ "x-cron-secret": "test_cron_secret_123" }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).imageStorageCleanup).toEqual({ processed: 0, cleaned: 0, failed: 0 });
   });
 
   it("does not touch the trash without the secret (PROJ-26)", async () => {

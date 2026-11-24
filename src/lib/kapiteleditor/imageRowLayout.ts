@@ -1,7 +1,7 @@
 // Seitenplanung für 1-spaltige Bildreihen im Kapitel-Editor (PROJ-5).
 //
-// Reine Rechenfunktionen ohne DOM — die Pagination-Engine in
-// `EditorClient.tsx` misst die Geometrie und wendet das Ergebnis an.
+// Reine Rechenfunktionen ohne DOM — die Seitenberechnung in
+// `chapterLayout.ts` misst die Geometrie und wendet das Ergebnis an.
 //
 // Regeln (Spec 2026-05-20):
 //   - Mehrere Reihen, die sich eine Seite teilen, bekommen EINE gemeinsame
@@ -10,6 +10,7 @@
 //     zu passen — aber nie unter die Mindest-Skala.
 //   - Skaliert werden nur die Bildhöhen. Die Abstände zwischen den Reihen
 //     bleiben fest.
+//   - PROJ-34: Reihen können unterschiedlich hoch sein (Quer- und Hochformat).
 
 /** Kleinste zulässige Skala einer Bildreihe. */
 export const MIN_ROW_SCALE = 0.65;
@@ -22,32 +23,26 @@ export type RowGroup = {
 };
 
 export type RowPlanInput = {
-  /** Anzahl der zu verteilenden Reihen. */
-  rows: number;
+  /** Natürliche Höhe jeder Reihe (Skala 1), in Lesereihenfolge. */
+  rowHeights: number[];
   /** Freie Höhe auf der Seite, auf der die erste Reihe natürlich beginnt. */
   availableOnCurrentPage: number;
   /** Höhe des Inhaltsbereichs einer vollen Seite. */
   pageContentHeight: number;
-  /** Natürliche Höhe einer Reihe (Skala 1). */
-  rowHeight: number;
   /** Fester Abstand zwischen zwei Reihen. */
   rowGap: number;
   minScale?: number;
 };
 
 /**
- * Größte Skala (höchstens 1), mit der `rows` Reihen in `available` passen.
+ * Größte Skala (höchstens 1), mit der die Reihen in `available` passen.
  * Kann unter der Mindest-Skala liegen oder negativ sein — der Aufrufer
  * entscheidet, ob das noch zulässig ist.
  */
-export function maxGroupScale(
-  rows: number,
-  available: number,
-  rowHeight: number,
-  rowGap: number,
-): number {
-  if (rows <= 0 || rowHeight <= 0) return 1;
-  return Math.min(1, (available - (rows - 1) * rowGap) / (rows * rowHeight));
+export function maxGroupScale(rowHeights: number[], available: number, rowGap: number): number {
+  const total = rowHeights.reduce((sum, height) => sum + height, 0);
+  if (rowHeights.length === 0 || total <= 0) return 1;
+  return Math.min(1, (available - (rowHeights.length - 1) * rowGap) / total);
 }
 
 /**
@@ -60,10 +55,11 @@ export function maxGroupScale(
  * die Reihen dann unskaliert dorthin.
  */
 export function planRowGroups(input: RowPlanInput): RowGroup[] {
-  const { rows, pageContentHeight, rowHeight, rowGap } = input;
+  const { rowHeights, pageContentHeight, rowGap } = input;
   const minScale = input.minScale ?? MIN_ROW_SCALE;
+  const rows = rowHeights.length;
   const groups: RowGroup[] = [];
-  if (rows <= 0 || rowHeight <= 0) return groups;
+  if (rows === 0 || rowHeights.some((height) => height <= 0)) return groups;
 
   let placed = 0;
   let available = input.availableOnCurrentPage;
@@ -72,12 +68,13 @@ export function planRowGroups(input: RowPlanInput): RowGroup[] {
     // So viele Reihen wie möglich auf diese Seite: erst unskaliert,
     // sonst mit der nötigen Skala, solange sie zulässig bleibt.
     for (let count = rows - placed; count >= 1; count--) {
-      const scale = maxGroupScale(count, available + 0.5, rowHeight, rowGap);
+      const heights = rowHeights.slice(placed, placed + count);
+      const scale = maxGroupScale(heights, available + 0.5, rowGap);
       if (scale >= 1) {
         group = { count, scale: 1 };
         break;
       }
-      const exact = maxGroupScale(count, available, rowHeight, rowGap);
+      const exact = maxGroupScale(heights, available, rowGap);
       if (exact >= minScale) {
         group = { count, scale: exact };
         break;

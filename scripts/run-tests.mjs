@@ -103,13 +103,14 @@ const FULL_GROUPS = [
       "PROJ-24-kaufwege",
       "PROJ-28-lesemodus",
       "PROJ-30-ladezeiten",
+      "PROJ-34-bild-daten",
     ],
   },
   {
     // Misst Bewegungen und Zeiten und läuft deshalb allein.
     name: "Editor-Stabilität",
     workers: 1,
-    files: ["PROJ-25-editor-stabil", "PROJ-25-pruefliste"],
+    files: ["PROJ-25-editor-stabil", "PROJ-25-pruefliste", "PROJ-34-bilder-im-text", "PROJ-34-bilder-pruefliste"],
   },
   {
     // Lösch- und Papierkorb-Läufe wirken auf die ganze Datenbank.

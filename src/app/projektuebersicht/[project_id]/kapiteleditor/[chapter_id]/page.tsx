@@ -6,49 +6,13 @@ import { PhoneNotice } from "@/components/kapiteleditor/PhoneNotice";
 import { EditorClient } from "@/components/kapiteleditor/EditorClient";
 import { isProjectReadOnly } from "@/lib/projects/project-access";
 import {
-  EMPTY_IMAGE_SECTIONS,
-  type ChapterImage,
-  type ImageSectionData,
-  type ImageSections,
-} from "@/lib/kapiteleditor/types";
+  allImages,
+  parseImageSections,
+  prepareChapterImages,
+  withSignedUrls,
+} from "@/lib/kapiteleditor/image-sections";
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 h
-
-function isValidLayout(value: unknown): value is "1-spaltig" | "2-spaltig" {
-  return value === "1-spaltig" || value === "2-spaltig";
-}
-
-function parseSection(raw: unknown): ImageSectionData {
-  if (!raw || typeof raw !== "object") return { layout: "1-spaltig", images: [] };
-  const r = raw as Record<string, unknown>;
-  const layout = isValidLayout(r.layout) ? r.layout : "1-spaltig";
-  const imagesRaw = Array.isArray(r.images) ? r.images : [];
-  const images: ChapterImage[] = imagesRaw
-    .map((it) => {
-      if (!it || typeof it !== "object") return null;
-      const x = it as Record<string, unknown>;
-      const id = typeof x.id === "string" ? x.id : null;
-      const storage_path = typeof x.storage_path === "string" ? x.storage_path : null;
-      if (!id || !storage_path) return null;
-      return {
-        id,
-        storage_path,
-        signed_url: "",
-        alt: typeof x.alt === "string" ? x.alt : "",
-      } as ChapterImage;
-    })
-    .filter((x): x is ChapterImage => x !== null);
-  return { layout, images };
-}
-
-function parseImageSections(raw: unknown): ImageSections {
-  if (!raw || typeof raw !== "object") return EMPTY_IMAGE_SECTIONS;
-  const r = raw as Record<string, unknown>;
-  return {
-    start: parseSection(r.start),
-    end: parseSection(r.end),
-  };
-}
 
 export default async function KapiteleditorPage({
   params,
@@ -88,14 +52,11 @@ export default async function KapiteleditorPage({
   const chapter = chapterResult.data;
   if (!chapter || !membershipResult.data) notFound();
 
-  const initialImageSections = parseImageSections(chapter.image_sections);
+  let initialImageSections = parseImageSections(chapter.image_sections);
 
   // Signed URLs für alle gespeicherten Bilder erzeugen (1h gültig). Falls die
   // Sektionen leer sind, spart das den Storage-Aufruf.
-  const allPaths = [
-    ...initialImageSections.start.images.map((i) => i.storage_path),
-    ...initialImageSections.end.images.map((i) => i.storage_path),
-  ];
+  const allPaths = allImages(initialImageSections).map((i) => i.storage_path);
 
   if (allPaths.length > 0) {
     const { data: signed } = await supabase.storage
@@ -105,15 +66,12 @@ export default async function KapiteleditorPage({
     (signed ?? []).forEach((s) => {
       if (s.path && s.signedUrl) map.set(s.path, s.signedUrl);
     });
-    initialImageSections.start.images = initialImageSections.start.images.map((i) => ({
-      ...i,
-      signed_url: map.get(i.storage_path) ?? "",
-    }));
-    initialImageSections.end.images = initialImageSections.end.images.map((i) => ({
-      ...i,
-      signed_url: map.get(i.storage_path) ?? "",
-    }));
+    initialImageSections = withSignedUrls(initialImageSections, map);
   }
+
+  // PROJ-34: Alte Kapitel bekommen ihre Bildabschnitte in den Text. Gespeichert
+  // wird das erst, wenn jemand das Kapitel wirklich ändert.
+  const prepared = prepareChapterImages(chapter.body, initialImageSections);
 
   // PROJ-8: Ohne Impuls (eigenes Kapitel oder Impuls gelöscht) kein Banner.
   const impulse = chapter.impulse_catalog;
@@ -132,8 +90,8 @@ export default async function KapiteleditorPage({
             projectId={project_id}
             chapterId={chapter_id}
             initialTitle={chapter.title}
-            initialBody={chapter.body}
-            initialImageSections={initialImageSections}
+            initialBody={prepared.body}
+            initialImageSections={prepared.imageSections}
             initialStartPage={chapter.start_page ?? 1}
             initialPageCount={chapter.page_count}
             initialImpulse={initialImpulse}

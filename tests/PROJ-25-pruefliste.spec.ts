@@ -29,7 +29,13 @@ test.use({ storageState: { cookies: [], origins: [] }, viewport: { width: 1440, 
 
 const RUN_ID = crypto.randomBytes(4).toString("hex");
 const SESSION_FILE = path.join(os.tmpdir(), `e2e-proj25-liste-${RUN_ID}.json`);
-const BASE_DOC = doc(...Array.from({ length: 14 }, (_, index) => paragraph(prose(6, index))));
+// PROJ-34: Die Fotos am Ende stehen als Bildabschnitt im Text, dahinter die
+// leere Schreibzeile. Ohne den Abschnitt würde das Zurücksetzen ihn entfernen.
+const BASE_DOC = doc(
+  ...Array.from({ length: 14 }, (_, index) => paragraph(prose(6, index))),
+  { type: "imageSection", attrs: { sectionId: "end" } },
+  { type: "paragraph" },
+);
 
 type Spot = "Seitenanfang" | "Seitenende" | "Kapitelmitte";
 type EditorElement = HTMLElement & {
@@ -173,7 +179,7 @@ test.describe("PROJ-25 — Prüfliste", () => {
         body: BASE_DOC,
         word_count: 900,
         page_count: 6,
-        image_sections: { start: { layout: "1-spaltig", images: [] }, end: { layout: "1-spaltig", images } },
+        image_sections: { start: { layout: "1-spaltig", images: [] }, end: { layout: "1-spaltig", images }, placed: true },
       } as never,
       { defaultToNull: false },
     );
