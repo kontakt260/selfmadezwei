@@ -574,8 +574,7 @@ export function EditorClient({
           <AlertDialogHeader>
             <AlertDialogTitle className="font-normal">{removalTitle}</AlertDialogTitle>
             <AlertDialogDescription>
-              Die Fotos verschwinden aus diesem Kapitel. Solange das Kapitel geöffnet ist, holen Sie
-              sie mit „Rückgängig“ zurück.
+              Die Fotos verschwinden aus diesem Kapitel. Mit „Rückgängig“ holen Sie sie zurück.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

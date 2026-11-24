@@ -252,6 +252,8 @@ Keine neuen Pakete. TipTap, der Bildzuschnitt, das Sortieren und die shadcn/ui-D
 - **Dialoge im Bildabschnitt schlossen sich sofort:** Die Ansage-Region der Foto-Sortierung lag im Text. Jeder Dialog setzt `aria-hidden` auf alles andere, ProseMirror hielt das für eine Textänderung und baute den Abschnitt neu auf. Die Region liegt jetzt am Seitenende.
 - **Pfadprüfung zu streng:** Ältere Fotos aus einem anderen Ordner desselben Projekts hätten nach „Rückgängig" das Speichern blockiert. Erlaubt ist jetzt der ganze Projektordner, gelöscht wird weiter nur im Kapitelordner.
 
+**Nachtrag 2026-11-24 (Jakob):** In beiden Rückfragen zum Entfernen (ganzer Abschnitt, letztes Foto) entfällt der Nebensatz „solange das Kapitel geöffnet ist“. Der Hinweis auf „Rückgängig“ bleibt. Im Zuschnitt-Dialog entfällt der Knopf „Weitere Datei wählen“, er funktionierte nicht und wird nicht gebraucht: Eine andere Datei wählt man über „Abbrechen“ und erneutes Öffnen.
+
 **Gemessen**
 - Vergleich mit 22 Kapiteln vor dem Umbau: 20 identisch, 2 Reihen sitzen jetzt richtig statt 15 bis 37 px zu tief.
 - 20 Abschnitte im Text: vorher 1 bis 2 Randverstöße je Kapitel, jetzt keine. Tippen p95 40 bis 48 ms.

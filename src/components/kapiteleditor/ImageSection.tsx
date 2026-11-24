@@ -289,7 +289,7 @@ export function ImageSection({
             <AlertDialogTitle className="font-normal">Bild entfernen?</AlertDialogTitle>
             <AlertDialogDescription>
               {data.images.length === 1
-                ? "Es ist das letzte Foto, der Bildabschnitt verschwindet damit. Mit „Rückgängig“ holen Sie ihn zurück, solange das Kapitel geöffnet ist."
+                ? "Es ist das letzte Foto, der Bildabschnitt verschwindet damit. Mit „Rückgängig“ holen Sie ihn zurück."
                 : "Das Bild wird aus dieser Bild-Sektion gelöscht. Sie können es danach neu hochladen."}
             </AlertDialogDescription>
           </AlertDialogHeader>

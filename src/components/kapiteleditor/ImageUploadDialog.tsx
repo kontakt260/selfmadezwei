@@ -248,14 +248,9 @@ export function ImageUploadDialog({
             Abbrechen
           </Button>
           {imgSrc && (
-            <>
-              <Button type="button" variant="outline" disabled={busy} onClick={reset}>
-                Weitere Datei wählen
-              </Button>
-              <Button type="button" onClick={confirmCrop} disabled={busy || !completedCrop}>
-                {busy ? "Wird übernommen…" : "Übernehmen"}
-              </Button>
-            </>
+            <Button type="button" onClick={confirmCrop} disabled={busy || !completedCrop}>
+              {busy ? "Wird übernommen…" : "Übernehmen"}
+            </Button>
           )}
         </DialogFooter>
       </DialogContent>
