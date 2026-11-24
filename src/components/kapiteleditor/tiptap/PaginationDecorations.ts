@@ -14,10 +14,34 @@ import { computeDecorations, lineBoxHeight, readGeometry } from "./computeDecora
 
 const KEY = new PluginKey<DecorationSet>("paginationSoftBreaks");
 
-export const PaginationDecorations = Extension.create({
+// PROJ-25: Verbindung zum Seiten-Takt (pageLayoutClock.ts, usePagination.ts).
+// Das Plugin meldet Textänderungen, gerechnet wird nur im Takt.
+export type PaginationStorage = {
+  requestLayout: (() => void) | null;
+  runTextPass: (() => void) | null;
+  textSignature: (() => string) | null;
+};
+
+declare module "@tiptap/core" {
+  interface Storage {
+    paginationDecorations: PaginationStorage;
+  }
+}
+
+/** Meldet den Seiten-Takt beim Plugin an oder mit `null` wieder ab. */
+export function connectPageLayout(storage: PaginationStorage, request: (() => void) | null): void {
+  storage.requestLayout = request;
+}
+
+export const PaginationDecorations = Extension.create<object, PaginationStorage>({
   name: "paginationDecorations",
 
+  addStorage() {
+    return { requestLayout: null, runTextPass: null, textSignature: null };
+  },
+
   addProseMirrorPlugins() {
+    const storage = this.storage;
     return [
       new Plugin<DecorationSet>({
         key: KEY,
@@ -74,121 +98,17 @@ export const PaginationDecorations = Extension.create({
         },
 
         view(editorView) {
-          let raf: number | null = null;
-          let muteUpdates = false;
-          let followUpRaf: number | null = null;
-
-          const schedule = () => {
-            // Cancel-and-requeue rAF: verhindert stuck-state (Bug 2026-05-20).
-            // Throttle auf 10 Hz war zu langsam für die Konvergenz zwischen
-            // PD und usePagination — bei rAF (60 Hz) konvergiert das System
-            // in ~50 ms statt 10+ s.
-            if (raf !== null) cancelAnimationFrame(raf);
-            raf = requestAnimationFrame(() => {
-              raf = null;
-              if (muteUpdates) return;
-              muteUpdates = true;
-              try {
-                recompute(editorView);
-              } finally {
-                muteUpdates = false;
-              }
-              // Settling-Pass: ein zweiter Lauf nach drei rAFs, falls die
-              // parallele Block-Push-Engine (EditorClient.usePagination)
-              // erst nach unserem ersten Pass marginTop/break-Höhe gesetzt
-              // hat → Doc-Positionen verschieben sich nachträglich, ohne
-              // Doc-Transaktion. Der zweite Pass misst den endgültig
-              // gerenderten Stand und korrigiert Spacer-Längen/-Positionen.
-              if (followUpRaf !== null) cancelAnimationFrame(followUpRaf);
-              followUpRaf = requestAnimationFrame(() => {
-                followUpRaf = requestAnimationFrame(() => {
-                  followUpRaf = requestAnimationFrame(() => {
-                    followUpRaf = null;
-                    if (muteUpdates) return;
-                    muteUpdates = true;
-                    try {
-                      recompute(editorView);
-                    } finally {
-                      muteUpdates = false;
-                    }
-                  });
-                });
-              });
-            });
-          };
-
-          schedule();
-
-          const onResize = () => schedule();
-          window.addEventListener("resize", onResize);
-
-          const fg = editorView.dom.closest(".a5-stack__fg") as HTMLElement | null;
-          // RO triggert PD-Recompute nur, wenn fg's HÖHE sich um >5 px ändert
-          // UND die Änderung mind. 250 ms stabil bleibt (Debounce). Verhindert
-          // dass jede Mikro-Schwankung durch Image-Row-Mutation einen PD-
-          // Recompute auslöst, der wiederum usePagination's PASS 1 Push-
-          // Entscheidung verschiebt (Bug 2026-05-20: Layout-Switch Oszillation).
-          let lastFgH = fg ? fg.getBoundingClientRect().height : 0;
-          let roTimer: ReturnType<typeof setTimeout> | null = null;
-          const ro = new ResizeObserver(() => {
-            if (!fg) return;
-            const h = fg.getBoundingClientRect().height;
-            if (Math.abs(h - lastFgH) < 5) return;
-            if (roTimer) clearTimeout(roTimer);
-            roTimer = setTimeout(() => {
-              roTimer = null;
-              lastFgH = fg.getBoundingClientRect().height;
-              schedule();
-            }, 250);
-          });
-          if (fg) ro.observe(fg);
-
-          // IMG-Lade-Listener: nach Image-Upload kann das ResizeObserver-Event
-          // feuern, BEVOR das Bild seine endgültige Pixel-Größe hat (Browser
-          // rendert ein noch nicht geladenes <img> mit 0×0). Wir hängen an
-          // jedes IMG einen `load`-Handler, der nach erfolgtem Laden noch
-          // einmal pagniert. Neue IMGs werden via MutationObserver erkannt.
-          const attached = new WeakSet<HTMLImageElement>();
-          const attachImageListener = (img: HTMLImageElement) => {
-            if (attached.has(img)) return;
-            attached.add(img);
-            if (!img.complete) {
-              img.addEventListener("load", schedule, { once: true });
-            }
-          };
-          if (fg) {
-            fg.querySelectorAll("img").forEach(attachImageListener);
-          }
-          const mo = new MutationObserver((records) => {
-            for (const rec of records) {
-              rec.addedNodes.forEach((n) => {
-                if (n instanceof HTMLImageElement) attachImageListener(n);
-                else if (n instanceof Element) {
-                  n.querySelectorAll("img").forEach(attachImageListener);
-                }
-              });
-            }
-          });
-          if (fg) mo.observe(fg, { childList: true, subtree: true });
-
-          // Externer Trigger für React-State-Änderungen (z. B. setImageSections,
-          // setTitle), die nicht über ProseMirror laufen. EditorClient feuert
-          // dieses Event in einem useEffect, das auf imageSections/title hört.
-          const onExternalTrigger = () => schedule();
-          document.addEventListener("narravit:pagination-recompute", onExternalTrigger);
+          storage.runTextPass = () => recompute(editorView);
+          storage.textSignature = () => decorationSignature(KEY.getState(editorView.state));
+          storage.requestLayout?.();
 
           return {
             update(view, prevState) {
-              if (muteUpdates) return;
-              if (view.state.doc !== prevState.doc) schedule();
+              if (view.state.doc !== prevState.doc) storage.requestLayout?.();
             },
             destroy() {
-              if (raf !== null) cancelAnimationFrame(raf);
-              if (followUpRaf !== null) cancelAnimationFrame(followUpRaf);
-              window.removeEventListener("resize", onResize);
-              document.removeEventListener("narravit:pagination-recompute", onExternalTrigger);
-              ro.disconnect();
-              mo.disconnect();
+              storage.runTextPass = null;
+              storage.textSignature = null;
             },
           };
         },
@@ -260,12 +180,7 @@ function recompute(view: EditorView) {
   const geom = readGeometry(stack);
   if (!geom || geom.stride <= 0 || geom.contentHeight <= 0) return;
 
-  // Vorherigen Decoration-Stand FESTHALTEN, bevor wir ihn (für die
-  // nächste natürliche Messung) clearen. Wir vergleichen am Ende den
-  // neuen mit dem alten Set — gleich = Spacer-Konfiguration unverändert
-  // = kein Trigger für usePagination nötig (verhindert Endlos-Schleife).
   const prevSetCaptured = KEY.getState(view.state);
-  const prevSpec = decorationSignature(prevSetCaptured);
 
   // PASS 1: alte Decorations löschen, damit die nächste Messung den
   // natürlichen Text-Fluss sieht (sonst messen wir die Positionen
@@ -283,18 +198,6 @@ function recompute(view: EditorView) {
 
   const set = DecorationSet.create(view.state.doc, decorations);
   view.dispatch(view.state.tr.setMeta(KEY, { decorations: set }));
-  const newSpec = decorationSignature(set);
-
-  // usePagination informieren wenn sich die Spacer-Konfiguration geändert
-  // hat: Spacer-Tausch (einer schrumpft, anderer wächst) kann die fg-Höhe
-  // unverändert lassen → ResizeObserver feuert nicht → PASS 1a misst HRs
-  // gegen veralteten observedTop. Folge: HR-Höhen zeigen nicht mehr auf
-  // den Frame-Top der Folgeseite (Bug 2026-05-20: Seite 5 beginnt 88 px
-  // tief). Vergleich gegen das ALTE Set (prevSetCaptured) bricht die
-  // Endlos-Schleife — nach Stabilisierung gibt es keinen weiteren Dispatch.
-  if (newSpec !== prevSpec && typeof document !== "undefined") {
-    document.dispatchEvent(new Event("narravit:pagination-recompute"));
-  }
 }
 
 function decorationSignature(set: DecorationSet | null | undefined): string {

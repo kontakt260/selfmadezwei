@@ -152,17 +152,14 @@ export function ImageSection({
       className="group/section relative"
       data-image-section-wrapper
     >
-      {/* Controls erscheinen nur wenn Bilder da sind UND auf Hover.
-       * Hover-Bridge + Delay-on-Leave verhindert, dass das Menu beim
-       * Cursor-Übergang vom Bild zu den Buttons zu früh verschwindet. */}
+      {/* Controls erscheinen nur wenn Bilder da sind UND auf Hover. PROJ-25:
+       * Sie liegen mittig im Bildbereich, unter den Symbolen zum Verschieben und
+       * Löschen. Oberhalb verdeckten sie die letzte Textzeile. Delay-on-Leave
+       * verhindert, dass das Menu beim Übergang zu früh verschwindet. */}
       {hasImages && !readOnly && (
         <>
           <div
-            className="absolute -top-8 left-0 right-0 h-8 z-[5]"
-            aria-hidden
-          />
-          <div
-            className="editor-chrome pointer-events-none absolute -top-9 right-0 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-150 [transition-delay:300ms] group-hover/section:pointer-events-auto group-hover/section:opacity-100 group-hover/section:[transition-delay:0ms] group-focus-within/section:pointer-events-auto group-focus-within/section:opacity-100 group-focus-within/section:[transition-delay:0ms]"
+            className="editor-chrome pointer-events-none absolute left-1/2 top-9 z-20 flex -translate-x-1/2 items-center gap-1 opacity-0 transition-opacity duration-150 [transition-delay:300ms] group-hover/section:pointer-events-auto group-hover/section:opacity-100 group-hover/section:[transition-delay:0ms] group-focus-within/section:pointer-events-auto group-focus-within/section:opacity-100 group-focus-within/section:[transition-delay:0ms]"
           >
             <ToggleGroup
               type="single"

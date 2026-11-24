@@ -105,11 +105,16 @@ async function runRetention(): Promise<RetentionRun> {
 async function trashEntry(projectId: string) {
   const { data, error } = await admin
     .from("trash_projects")
-    .select("reason, purge_at, deleted_by")
+    .select("reason, deleted_at, purge_at, deleted_by")
     .eq("project_id", projectId)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  return data as { reason: string; purge_at: string; deleted_by: string | null } | null;
+  return data as {
+    reason: string;
+    deleted_at: string;
+    purge_at: string;
+    deleted_by: string | null;
+  } | null;
 }
 
 async function memberCount(projectId: string): Promise<number> {
@@ -214,9 +219,11 @@ test.describe("PROJ-28 — Löschlauf (nur Stage)", () => {
     const entry = await trashEntry(due.id);
     expect(entry?.reason).toBe("expired");
     expect(entry?.deleted_by).toBeNull();
-    const daysToPurge = (new Date(entry!.purge_at).getTime() - Date.now()) / DAY_MS;
-    expect(daysToPurge).toBeGreaterThan(13.9);
-    expect(daysToPurge).toBeLessThanOrEqual(14);
+    // Beide Zeitpunkte kommen aus der Datenbank: Die Uhr des Testrechners darf
+    // ein paar Millisekunden abweichen, ohne dass die Prüfung kippt.
+    const deletedAt = new Date(entry!.deleted_at).getTime();
+    expect(new Date(entry!.purge_at).getTime() - deletedAt).toBe(14 * DAY_MS);
+    expect(Math.abs(Date.now() - deletedAt)).toBeLessThan(0.1 * DAY_MS);
     for (const kept of [dayEightyNine, active, renewed]) {
       expect(await trashEntry(kept.id)).toBeNull();
       expect(await memberCount(kept.id)).toBe(2);

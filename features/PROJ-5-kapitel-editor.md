@@ -175,7 +175,7 @@ Bilder können emotional sehr persönlich sein (Familienfotos, Erinnerungen). Pr
 
 ## Offene Punkte
 - RUN2-BUG-1 (Low): Die Zeile vor einem Seitenabstand ist nicht bündig zur rechten Marge, zurückgestellt.
-- Das Springen von etwa 50 ms nach jedem manuellen Umbruch bleibt. Es soll mit PROJ-21 behoben werden, indem beide Engines in fester Reihenfolge laufen.
+- Das Springen von etwa 50 ms nach jedem manuellen Umbruch bleibt. Es soll mit PROJ-25 behoben werden, indem beide Engines in fester Reihenfolge laufen.
 - Die Zusammenlegung der beiden Seitenumbruch-Engines ist vertagt (PROJ-21, PROJ-25).
 - Keep-with-next für Überschriften ist zurückgestellt, weil der Editor-Text keine Überschriften hat.
 - Die Seitenberechnung beim Cursor nach unten ist ab etwa 50 Seiten nicht optimiert. Die Spec akzeptiert kleine Verzögerungen.

@@ -205,6 +205,16 @@
   opacity: 1;
 }
 
+/* PROJ-25: Menüs und Dialoge sperren beim Öffnen die Seite mit `overflow: hidden`
+ * auf dem Body. Weil `html` hier `overflow-x: clip` hat, wird der Body dadurch zu
+ * einem eigenen Scroll-Bereich: Die festsitzende Werkzeugleiste löst sich und
+ * liegt samt Menü über dem Bildschirm. `clip` sperrt genauso, ohne Scroll-Bereich.
+ * Die Scrollleiste bleibt sichtbar, deshalb auch kein Ausgleich am rechten Rand. */
+html body[data-scroll-locked] {
+  overflow: clip !important;
+  margin-right: 0 !important;
+}
+
 /* PROJ-30: Nach Zurück oder Vorwärts bleibt die alte Kopie der Seite unsichtbar,
  * bis der aktuelle Stand da ist. Die Scroll-Position bleibt dabei erhalten. */
 html[data-history-refresh] main {

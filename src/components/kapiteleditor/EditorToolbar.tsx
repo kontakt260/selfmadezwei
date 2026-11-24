@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import type React from "react";
 import type { Editor } from "@tiptap/react";
 import {
@@ -48,6 +49,8 @@ export function EditorToolbar({
   editor: Editor | null;
   readOnly?: boolean;
 }) {
+  const lineHeightMenu = useRef({ openedWithPointer: false, closedWithEscape: false });
+
   if (!editor) return <ToolbarSkeleton />;
 
   const currentLineHeight = (editor.getAttributes("paragraph").lineHeight as string) ?? "1.5";
@@ -57,10 +60,11 @@ export function EditorToolbar({
   // deaktiviert, Tastenkombis blockiert (siehe extensions.ts).
   const inBlockquote = editor.isActive("blockquote");
 
+  // Kein `.focus()` in der Kette: Es greift erst im nächsten Bild und könnte den
+  // Fokus dann noch verschieben. Zurück in den Text führt `onCloseAutoFocus`.
   const setLineHeight = (v: string) => {
     editor
       .chain()
-      .focus()
       .updateAttributes("paragraph", { lineHeight: v === "1.5" ? null : v })
       .run();
   };
@@ -188,15 +192,42 @@ export function EditorToolbar({
 
       <Sep />
 
-      <Select value={currentLineHeight} onValueChange={setLineHeight} disabled={readOnly}>
+      <Select
+        value={currentLineHeight}
+        onValueChange={setLineHeight}
+        onOpenChange={(open) => {
+          if (open) lineHeightMenu.current.closedWithEscape = false;
+        }}
+        disabled={readOnly}
+      >
         <SelectTrigger
           className="h-8 w-[88px] gap-1 border-transparent text-xs hover:bg-accent/40"
           onMouseDown={keepEditorFocus}
+          onPointerDown={() => {
+            lineHeightMenu.current.openedWithPointer = true;
+          }}
+          onKeyDown={() => {
+            lineHeightMenu.current.openedWithPointer = false;
+          }}
           aria-label="Zeilenabstand"
         >
           <SelectValue placeholder="Abstand" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent
+          onEscapeKeyDown={() => {
+            lineHeightMenu.current.closedWithEscape = true;
+          }}
+          onCloseAutoFocus={(event) => {
+            // PROJ-25 BUG-1: Das Menü gibt den Fokus sonst an seinen Schalter
+            // zurück, und die nächsten Tasten landen nirgends. Nur wer es mit
+            // der Tastatur geöffnet und mit Escape abgebrochen hat, bleibt dort.
+            const { openedWithPointer, closedWithEscape } = lineHeightMenu.current;
+            lineHeightMenu.current.closedWithEscape = false;
+            if (closedWithEscape && !openedWithPointer) return;
+            event.preventDefault();
+            editor.view.focus();
+          }}
+        >
           <SelectItem value="1">1,0</SelectItem>
           <SelectItem value="1.5">1,5</SelectItem>
           <SelectItem value="2">2,0</SelectItem>

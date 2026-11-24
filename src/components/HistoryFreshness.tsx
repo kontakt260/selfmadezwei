@@ -13,6 +13,7 @@ import {
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { EditorLoadingScreen, loadingViewKind } from "@/components/loading/LoadingViews";
 import { isFreshDataRoute } from "@/lib/history-freshness";
 import { hasPendingSaves, savesSettled } from "@/lib/pending-saves";
 
@@ -36,6 +37,8 @@ export function HistoryFreshness({ children }: { children: ReactNode }) {
   const beginRef = useRef<() => void>(() => undefined);
   const [isPending, startTransition] = useTransition();
   const [awaitingRefresh, setAwaitingRefresh] = useState(false);
+  // Die Adresse ist hier schon neu, `usePathname` folgt erst mit der neuen Seite.
+  const [refreshPath, setRefreshPath] = useState("");
   const runRef = useRef(0);
   const refreshing = awaitingRefresh || isPending;
 
@@ -73,6 +76,7 @@ export function HistoryFreshness({ children }: { children: ReactNode }) {
       }
       // Direkt am Element, damit die alte Kopie gar nicht erst sichtbar wird.
       root.dataset.historyRefresh = "true";
+      setRefreshPath(window.location.pathname);
       setAwaitingRefresh(true);
       // Erst nach dem Router, sonst würde die vorige Seite neu geladen.
       window.setTimeout(() => void refresh(run), 0);
@@ -111,12 +115,20 @@ export function HistoryFreshness({ children }: { children: ReactNode }) {
     <HistoryRefreshContext.Provider value={refreshing}>
       {children}
       {refreshing ? (
-        <p
-          role="status"
-          className="loading-delayed fixed left-1/2 top-1/2 z-[110] -translate-x-1/2 -translate-y-1/2 text-lg text-[#4A453F]"
-        >
-          Wird geladen …
-        </p>
+        // PROJ-25: Im Editor dieselbe Ansicht wie beim Öffnen, damit man auch
+        // nach Zurück und Vorwärts nur einen Ladezustand sieht.
+        loadingViewKind(refreshPath) === "editor" ? (
+          <div className="loading-delayed pointer-events-none fixed inset-0 z-[110] flex flex-col overflow-y-auto bg-[#FAF8F6]">
+            <EditorLoadingScreen as="div" />
+          </div>
+        ) : (
+          <p
+            role="status"
+            className="loading-delayed fixed left-1/2 top-1/2 z-[110] -translate-x-1/2 -translate-y-1/2 text-lg text-[#4A453F]"
+          >
+            Wird geladen …
+          </p>
+        )
       ) : null}
     </HistoryRefreshContext.Provider>
   );

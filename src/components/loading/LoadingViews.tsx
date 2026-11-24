@@ -92,10 +92,12 @@ function AccountLoadingView() {
 }
 
 // Der Editor hat keine Navigation. Die Ansicht zeigt seinen Tisch mit einer
-// A5-Seite, auf dem Phone nur den Hinweis.
-function EditorLoadingView() {
+// A5-Seite, auf dem Phone nur den Hinweis. PROJ-25: Der Editor zeigt dieselbe
+// Ansicht weiter, bis das Kapitel fertig ist. `as="div"` gilt innerhalb seines
+// eigenen `<main>`.
+export function EditorLoadingScreen({ as: Tag = "main" }: { as?: "main" | "div" }) {
   return (
-    <main className="a5-desk [font-family:var(--font-lato)] flex min-h-[100dvh] flex-col">
+    <Tag data-editor-loading className="a5-desk [font-family:var(--font-lato)] flex min-h-[100dvh] flex-col">
       <div className="hidden h-14 border-b border-[#e0dcd5] bg-[#ece6df] md:block" aria-hidden />
       <div className="hidden h-[3.25rem] border-b border-[#e0dcd5] bg-[#ece6df] md:block" aria-hidden />
       <div className="flex flex-1 flex-col items-center gap-6 px-4 py-8 sm:px-6 md:px-10">
@@ -109,9 +111,11 @@ function EditorLoadingView() {
           <LoadingBlock className="h-4 w-4/5" />
         </div>
       </div>
-    </main>
+    </Tag>
   );
 }
+
+const EditorLoadingView = () => <EditorLoadingScreen />;
 
 export type LoadingViewKind = "start" | "project" | "cover" | "editor" | "account";
 

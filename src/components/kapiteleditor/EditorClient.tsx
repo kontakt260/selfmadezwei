@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { ArrowLeft, Pencil } from "lucide-react";
@@ -8,6 +8,7 @@ import { editorExtensions } from "./tiptap/extensions";
 import { HYPHENATION_META } from "./tiptap/Hyphenation";
 import { placeCaretNearPoint } from "./tiptap/caretPlacement";
 import { EditorToolbar } from "./EditorToolbar";
+import { EditorLoadingScreen } from "@/components/loading/LoadingViews";
 import { FirstPageHeader } from "./FirstPageTemplate";
 import { ImageSection } from "./ImageSection";
 import { SaveStatus } from "./SaveStatus";
@@ -146,6 +147,36 @@ export function EditorClient({
     initialPageCount,
   });
 
+  // PROJ-25: Beim Zoomen bleibt die aktuelle Stelle im Blick. Die Seiten werden
+  // höher oder niedriger, bei gleicher Scroll-Position stünde sonst plötzlich
+  // eine andere Stelle auf dem Bildschirm. Fixpunkt ist der Cursor, wenn er
+  // sichtbar ist, sonst die Bildschirmmitte.
+  const zoomAnchorRef = useRef<{ screenY: number; pageY: number } | null>(null);
+  const changeZoom = (next: ZoomLevel) => {
+    const stack = stackRef.current;
+    if (stack) {
+      let screenY = window.innerHeight / 2;
+      try {
+        if (editor) {
+          const caretTop = editor.view.coordsAtPos(editor.state.selection.head).top;
+          if (caretTop >= 0 && caretTop <= window.innerHeight) screenY = caretTop;
+        }
+      } catch {
+        // coordsAtPos kann werfen, solange das DOM nicht synchron ist.
+      }
+      zoomAnchorRef.current = { screenY, pageY: (screenY - stack.getBoundingClientRect().top) / zoom };
+    }
+    setZoom(next);
+  };
+  useLayoutEffect(() => {
+    const anchor = zoomAnchorRef.current;
+    const stack = stackRef.current;
+    zoomAnchorRef.current = null;
+    if (!anchor || !stack) return;
+    const target = stack.getBoundingClientRect().top + anchor.pageY * zoom;
+    window.scrollBy({ top: target - anchor.screenY, behavior: "instant" });
+  }, [zoom]);
+
   // PROJ-7: Buch-Offset bleibt während der Editor-Session konstant
   // (siehe Tech-Design Sektion C — kein Realtime-Push aus anderen Tabs).
   const startPage = initialStartPage;
@@ -211,13 +242,6 @@ export function EditorClient({
   );
 
   const { state, retry } = useAutoSave(draft, saveDraft, 2_000, !inputLocked);
-
-  // Trigger PaginationDecorations (ProseMirror plugin) bei React-State-
-  // Änderungen, die keine Doc-Transaktion auslösen — sonst zeigen Image-
-  // Section-Mutationen erst nach der nächsten Texteingabe Wirkung.
-  useEffect(() => {
-    document.dispatchEvent(new Event("narravit:pagination-recompute"));
-  }, [imageSections, title]);
 
   // Editor-Ready-Flag setzen, sobald die initialen Pagination-Settling-
   // Passes durch sind. Der Editor mountet, lädt Body/Images, läuft durch
@@ -463,11 +487,11 @@ export function EditorClient({
         )}
         {!contentVisible && (
           // Der A5-Stack bleibt unsichtbar, bis das Layout ruhig ist. Das
-          // verhindert das „zerstückelte" Erscheinen beim Öffnen.
-          <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-[var(--a5-desk-color)]">
-            <p role="status" className="text-lg text-[#4A453F]">
-              Wird geladen …
-            </p>
+          // verhindert das „zerstückelte" Erscheinen beim Öffnen. PROJ-25:
+          // Dieselbe Ansicht wie beim Warten auf den Server, damit man nur
+          // einen Ladezustand sieht.
+          <div className="pointer-events-none visible fixed inset-0 z-[100] flex flex-col overflow-y-auto bg-[#FAF8F6]">
+            <EditorLoadingScreen as="div" />
           </div>
         )}
         <div
@@ -540,7 +564,7 @@ export function EditorClient({
       <footer className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-[#e0dcd5] bg-[#ece6df] px-4 py-2 sm:px-6">
         <div className="flex items-center gap-3">
           <WordCount words={wordCount} />
-          <ZoomControl zoom={zoom} onChange={setZoom} />
+          <ZoomControl zoom={zoom} onChange={changeZoom} />
         </div>
         <span className="hidden text-xs text-[#a8a39b] sm:inline">
           {pageCount === 1 ? "Seite 1" : `${pageCount} Seiten`} · A5-Format · Druck-Vorschau

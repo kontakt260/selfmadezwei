@@ -1,14 +1,11 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 import { type Editor } from "@tiptap/react";
 import { type ImageSections } from "@/lib/kapiteleditor/types";
+import { createPageLayoutClock, type PageLayoutClock } from "./pageLayoutClock";
 import { recalcPagination } from "./paginationPasses";
+import { connectPageLayout } from "./tiptap/PaginationDecorations";
 
 type PaginationDeps = {
   editor: Editor | null;
@@ -18,6 +15,16 @@ type PaginationDeps = {
   titleDep: string;
   initialPageCount: number;
 };
+
+const px = (value: string) => (value ? parseFloat(value).toFixed(1) : "");
+
+// Was die Bildberechnung gesetzt hat. Gerundet, damit winzige Rechenunterschiede
+// nicht wie eine echte Änderung aussehen.
+function imageLayoutSignature(fg: HTMLElement): string {
+  return Array.from(fg.querySelectorAll<HTMLElement>("[data-paginate-row], .a5-page-break"))
+    .map((el) => `${px(el.style.marginTop)}/${px(el.style.height)}/${el.style.getPropertyValue("--row-image-scale")}`)
+    .join(",");
+}
 
 export function usePagination({
   editor,
@@ -30,148 +37,68 @@ export function usePagination({
   // PROJ-30: Start mit der gespeicherten Zahl. Ohne sichtbares Layout (Phone)
   // bleibt sie stehen, statt als 1 gemessen und gespeichert zu werden.
   const [pageCount, setPageCount] = useState(initialPageCount);
-  const rafRef = useRef<number | null>(null);
+  const clockRef = useRef<PageLayoutClock | null>(null);
 
-  const recalc = useCallback(() => {
+  // PROJ-25: Alle Auslöser laufen im Seiten-Takt zusammen (siehe
+  // pageLayoutClock.ts). Textänderungen meldet das Plugin in
+  // PaginationDecorations. Es gibt keine festen Wartezeiten mehr: Gerechnet wird
+  // nur, wenn sich wirklich etwas geändert hat.
+  useEffect(() => {
     const fg = fgRef.current;
     const stack = stackRef.current;
-    if (!fg || !stack) return;
-    recalcPagination(fg, stack, setPageCount);
-  }, [fgRef, stackRef]);
+    if (!editor || !fg || !stack) return;
 
-  // rAF-gebatcht mit cancel-and-requeue (Bug 2026-05-20: ohne cancel blieb
-  // rafRef nach Next.js-Link-Re-Mount non-null hängen → recalc lief nie).
-  // 10 Hz Throttle wurde getestet, bremst aber die Konvergenz zwischen
-  // PD und usePagination zu stark, sodass Initial-Mount + Settling-Passes
-  // nicht in unter 10 s zum Equilibrium kommen. Mit rAF (60 Hz max) ist
-  // jede Eingabe nach ~50 ms stabil paginiert.
-  const schedule = useCallback(() => {
-    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null;
-      recalc();
+    const storage = editor.storage.paginationDecorations;
+    const size = () => `${fg.offsetWidth}x${fg.offsetHeight}`;
+    let settledSize = "";
+    const clock = createPageLayoutClock({
+      isVisible: () => fg.getClientRects().length > 0,
+      images: () => recalcPagination(fg, stack, setPageCount),
+      text: () => storage.runTextPass?.(),
+      imageSignature: () => imageLayoutSignature(fg),
+      textSignature: () => storage.textSignature?.() ?? "",
+      onSettled: () => {
+        settledSize = size();
+      },
     });
-  }, [recalc]);
+    clockRef.current = clock;
+    connectPageLayout(storage, clock.request);
 
-  // Subscribe nur auf Doc-Änderungen — NICHT auf Selection-Wechsel.
-  useEffect(() => {
-    if (!editor) return;
-    const onUpdate = () => schedule();
-    editor.on("update", onUpdate);
-    return () => {
-      editor.off("update", onUpdate);
-    };
-  }, [editor, schedule]);
-
-  // ResizeObserver auf FG für Layout-Änderungen außerhalb des Editors
-  // (Bild-Upload, Layout-Wechsel, Window-Resize).
-  useEffect(() => {
-    const fg = fgRef.current;
-    if (!fg) return;
-    const obs = new ResizeObserver(() => schedule());
-    obs.observe(fg);
-    return () => obs.disconnect();
-  }, [fgRef, schedule]);
-
-  // MutationObserver: PD-Spacer-Updates können fg-Höhe konstant lassen
-  // (Tausch zweier Spacer gleicher Gesamthöhe) → RO feuert nicht.
-  // Wir lauschen nur auf childList-Mutationen (Widget-Add/Remove) — NICHT
-  // auf style-attribute, sonst löst unser eigenes PASS-1b/1d setMarginTop
-  // einen Endlos-Loop aus (60 recalcs/s gemessen 2026-05-21).
-  //
-  // BugFix 2026-05-21 (Cursor-Spin nach Leeren-Absatz-Lösch): PD
-  // (PaginationDecorations) entfernt+setzt bei jedem `recompute` alle
-  // Spacer-Widgets neu (clear + re-add für saubere Messung). Das löst
-  // childList-Mutationen aus, die hier einen schedule() triggern → recalc()
-  // → ggf. weitere DOM-Mutation → MO feuert wieder → Loop. Wir filtern
-  // Spacer-only-Mutationen raus; PD informiert uns selbst via
-  // `narravit:pagination-recompute`-Event, wenn die Spacer-Konfiguration
-  // semantisch geändert hat (Signature-Compare in PD).
-  useEffect(() => {
-    const fg = fgRef.current;
-    if (!fg) return;
-    const isSpacerOnly = (n: Node): boolean =>
-      n instanceof HTMLElement &&
-      (n.classList.contains("a5-soft-break-spacer") ||
-        n.classList.contains("a5-block-push-spacer"));
-    const mo = new MutationObserver((records) => {
-      const meaningful = records.some((rec) => {
-        for (const n of rec.addedNodes) if (!isSpacerOnly(n)) return true;
-        for (const n of rec.removedNodes) if (!isSpacerOnly(n)) return true;
-        return false;
-      });
-      if (meaningful) schedule();
+    // Größenänderungen von außen. Die eigene Berechnung löst keinen neuen Lauf aus.
+    const resizeObserver = new ResizeObserver(() => {
+      if (size() !== settledSize) clock.request();
     });
-    mo.observe(fg, { childList: true, subtree: true });
-    return () => mo.disconnect();
-  }, [fgRef, schedule]);
+    resizeObserver.observe(fg);
+    window.addEventListener("resize", clock.request);
 
-  // Trigger bei Title- oder Image-Section-Änderung.
-  useEffect(() => {
-    schedule();
-  }, [imageSectionsDeps, titleDep, schedule]);
+    // `load` und `error` steigen nicht auf, in der Capture-Phase kommen sie aber
+    // auch von Bildern an, die erst später eingefügt werden.
+    fg.addEventListener("load", clock.request, true);
+    fg.addEventListener("error", clock.request, true);
 
-  // Re-run nach PaginationDecorations-Recompute. PD setzt Soft-Break-
-  // Spacer im Text um, die die Text-Höhe verändern → End-Sektion rutscht
-  // auf eine andere Seite → PASS A (Per-Row-Bild-Skalierung) muss neu
-  // berechnen, sonst landen Bilder mit unterschiedlichen Skalen auf
-  // derselben Seite (Bug 2026-05-20 vom Nutzer).
-  useEffect(() => {
-    const handler = () => schedule();
-    document.addEventListener("narravit:pagination-recompute", handler);
-    return () => document.removeEventListener("narravit:pagination-recompute", handler);
-  }, [schedule]);
+    // Spätere Schriften ändern die Zeilenumbrüche.
+    const fonts = document.fonts;
+    fonts.addEventListener("loadingdone", clock.request);
+    void fonts.ready.then(clock.request);
 
-  // Initialer Pass + Settling-Passes nach 100/300/800/1500/3000/5000 ms +
-  // ein letzter Safety-Pass alle paar Sekunden zur Konvergenz, auch wenn
-  // PD/Image-Loads asynchron später feuern. Dispatcht zusätzlich das
-  // narravit:pagination-recompute-Event, damit PD und usePagination
-  // gemeinsam neu rechnen (PD-only-Schedule erzeugt keine usePagination-
-  // Triggering, wenn fg-Höhe innerhalb der 5-px-Toleranz bleibt).
-  useEffect(() => {
-    const trigger = () => {
-      schedule();
-      document.dispatchEvent(new Event("narravit:pagination-recompute"));
-    };
-    trigger();
-    const timers = [100, 300, 800, 1500, 3000, 5000].map((d) => setTimeout(trigger, d));
+    clock.request();
+
     return () => {
-      for (const t of timers) clearTimeout(t);
+      clock.destroy();
+      clockRef.current = null;
+      connectPageLayout(storage, null);
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", clock.request);
+      fg.removeEventListener("load", clock.request, true);
+      fg.removeEventListener("error", clock.request, true);
+      fonts.removeEventListener("loadingdone", clock.request);
     };
-  }, [schedule]);
+  }, [editor, fgRef, stackRef]);
 
-  // Re-Schedule sobald irgendein <img> im FG fertig lädt (z. B. nach Signed-
-  // URL-Fetch beim ersten Page-Load). MutationObserver + Load-Listener
-  // fängt sowohl bestehende als auch neu hinzugefügte Bilder ab.
+  // Titel und Bilder ändern das Layout, ohne dass sich der Text ändert.
   useEffect(() => {
-    const fg = fgRef.current;
-    if (!fg) return;
-    const attached = new WeakSet<HTMLImageElement>();
-    const attach = (img: HTMLImageElement) => {
-      if (attached.has(img)) return;
-      attached.add(img);
-      if (img.complete) return;
-      img.addEventListener("load", schedule, { once: true });
-      img.addEventListener("error", schedule, { once: true });
-    };
-    fg.querySelectorAll("img").forEach(attach);
-    const mo = new MutationObserver((records) => {
-      for (const rec of records) {
-        rec.addedNodes.forEach((n) => {
-          if (n instanceof HTMLImageElement) attach(n);
-          else if (n instanceof Element) n.querySelectorAll("img").forEach(attach);
-        });
-      }
-    });
-    mo.observe(fg, { childList: true, subtree: true });
-    return () => mo.disconnect();
-  }, [fgRef, schedule]);
-
-  useEffect(() => {
-    return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    };
-  }, []);
+    clockRef.current?.request();
+  }, [imageSectionsDeps, titleDep]);
 
   return { pageCount };
 }

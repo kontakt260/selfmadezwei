@@ -140,7 +140,7 @@ npm run lint         # ESLint
 npm run start        # Production-Server
 npm test             # Vitest
 npm run test:quick   # Unit-Tests + Kernwege, ein Build, höchstens 3 Minuten (bei jeder Änderung)
-npm run test:full    # alle Tests, ein Build, rund 8 Minuten (vor jedem Push und in der QA)
+npm run test:full    # alle Tests, ein Build, rund 11 Minuten (vor jedem Push und in der QA)
 npm run test:all     # wie test:full
 npm run test:e2e     # einzelne Playwright-Läufe in Chromium
 ```

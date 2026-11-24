@@ -23,6 +23,7 @@ const SUITE_SWITCHES = {
   E2E_RETENTION: "1",
   E2E_PURCHASE: "1",
   E2E_LOADING: "1",
+  E2E_EDITOR: "1",
 };
 
 const spec = (name) => `tests/${name}.spec.ts`;
@@ -56,6 +57,12 @@ const QUICK_GROUPS = [
       "AC-22, AC-26: Zurück-Taste",
       "AC-22, AC-26: Langsames Speichern",
     ],
+  },
+  {
+    name: "Kernwege im Editor",
+    workers: 1,
+    files: ["PROJ-25-editor-stabil"],
+    grep: ["AC-1 bis AC-4:", "AC-7 bis AC-9: Bilder bewegen sich beim Tippen", "AC-21 bis AC-23:"],
   },
 ];
 
@@ -97,6 +104,12 @@ const FULL_GROUPS = [
       "PROJ-28-lesemodus",
       "PROJ-30-ladezeiten",
     ],
+  },
+  {
+    // Misst Bewegungen und Zeiten und läuft deshalb allein.
+    name: "Editor-Stabilität",
+    workers: 1,
+    files: ["PROJ-25-editor-stabil", "PROJ-25-pruefliste"],
   },
   {
     // Lösch- und Papierkorb-Läufe wirken auf die ganze Datenbank.
