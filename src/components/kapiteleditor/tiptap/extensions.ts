@@ -8,7 +8,7 @@ import type { ResolvedPos } from "@tiptap/pm/model";
 import { ImageSectionNode } from "./ImageSectionNode";
 import { PageBreakNode } from "./PageBreakNode";
 import { PaginationDecorations } from "./PaginationDecorations";
-import { HyphenationOnLoad } from "./Hyphenation";
+import { HyphenationDisplay } from "./Hyphenation";
 
 // HTML-Paste-Sanitizer (Audit Bug 7): Pastes aus Word, Google Docs oder
 // Webseiten enthalten häufig
@@ -258,5 +258,5 @@ export const editorExtensions = [
   PaginationDecorations,
   NoListInBlockquote,
   TiptapStateHardening,
-  HyphenationOnLoad,
+  HyphenationDisplay,
 ];

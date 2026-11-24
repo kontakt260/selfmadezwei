@@ -380,14 +380,11 @@ html[data-history-refresh] main {
 .a5-page p {
   margin: 0 0 0.6em 0;
   text-align: justify;
-  hyphens: auto;
-  -webkit-hyphens: auto;
-  /* Silbentrennung nur bei längeren Wörtern + mindestens 4 Zeichen vor und
-   * 4 nach dem Bindestrich. Verhindert hässliche „unt"-Reste auf einer
-   * Folgezeile (würde bei text-align: justify zu groben Word-Gaps führen). */
-  -webkit-hyphenate-limit-chars: 8 4 4;
-  hyphenate-limit-chars: 8 4 4;
-  /* lang="de" auf <html> aktiviert deutsche Silbentrennung. */
+  /* PROJ-35: Getrennt wird nur an den Stellen, die der Editor als Markierung
+   * neben den Text setzt (Trenn-Baustein, Buchregeln). Die eigene Trennung des
+   * Browsers bleibt aus, sonst trennt jedes Gerät nach anderen Regeln. */
+  hyphens: manual;
+  -webkit-hyphens: manual;
 
   /* Wortumbruch an Sonderzeichen + Notbruch für überlange Tokens
    * (Audit Bug 17): Wörter wie „TEST_EDIT_CHECK" gelten ohne diese

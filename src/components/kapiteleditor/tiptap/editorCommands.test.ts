@@ -1,13 +1,15 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Editor, type JSONContent } from "@tiptap/core";
+import { Fragment, Slice } from "@tiptap/pm/model";
 import { editorExtensions } from "./extensions";
+import { hyphenationKey, HYPHENATION_REFRESH, isHyphenationPoint } from "./Hyphenation";
+import { hyphenationPoints, loadHyphenation } from "@/lib/hyphenation";
 
 // Editor mit dem echten Schema des Kapitel-Editors. Die Pagination-
 // Erweiterung misst das gerenderte Layout (ResizeObserver, Seitenrahmen) —
 // in jsdom gibt es kein Layout, deshalb bleibt sie hier außen vor.
 const extensions = editorExtensions.filter((e) => e.name !== "paginationDecorations");
 
-const SOFT_HYPHEN = /­/g;
 const text = (t: string, marks?: JSONContent["marks"]): JSONContent => ({
   type: "text",
   text: t,
@@ -37,68 +39,176 @@ const blockTypes = (e: Editor) => {
   return out;
 };
 
-describe("Silbentrennung beim Laden (HyphenationOnLoad)", () => {
+describe("Silbentrennung als Anzeige (PROJ-35)", () => {
   const A = "Meine Großmutter erzählte uns Geschichten aus ihrer Kindheit am Bodensee.";
   const B = "Die Schreinerei meines Vaters lag gegenüber der Dorfkirche.";
   const C = "Sonntags gab es Pflaumenkuchen mit Schlagsahne.";
 
-  it("erhält alle Absätze — keine Verschmelzung (Regression 2026-11-16)", async () => {
-    const e = await create(doc(para(text(A)), para(text(B)), para(text(C))));
-    expect(e.state.doc.childCount).toBe(3);
-    const paragraphs: string[] = [];
-    e.state.doc.forEach((node) => paragraphs.push(node.textContent.replace(SOFT_HYPHEN, "")));
-    expect(paragraphs).toEqual([A, B, C]);
-  });
-
-  it("fügt weiche Trennstellen ein", async () => {
-    const e = await create(doc(para(text(A)), para(text(B))));
-    expect(e.state.doc.textContent).toMatch(SOFT_HYPHEN);
-  });
-
-  it("erhält Auszeichnungen und ihre Grenzen", async () => {
-    const e = await create(
-      doc(
-        para(text("Die "), text("Schreinerwerkstatt", [{ type: "bold" }]), text(" meines Großvaters.")),
-        para(text(B)),
-      ),
-    );
-    expect(e.state.doc.childCount).toBe(2);
-    const bold: string[] = [];
-    e.state.doc.descendants((node) => {
-      if (node.isText && node.marks.some((m) => m.type.name === "bold")) {
-        bold.push((node.text ?? "").replace(SOFT_HYPHEN, ""));
+  // Das Wörterbuch lädt einmal, danach trennt das Plugin das ganze Kapitel.
+  const ready = async (content: JSONContent) => {
+    const e = await create(content);
+    await loadHyphenation();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    return e;
+  };
+  /** Trennstellen als Abstand vom Anfang des n-ten Absatzes im Dokument. */
+  const shown = (e: Editor, index: number) => {
+    let start = -1;
+    let end = -1;
+    let n = 0;
+    e.state.doc.descendants((node, pos) => {
+      if (!node.isTextblock) return true;
+      if (n === index) {
+        start = pos + 1;
+        end = pos + node.nodeSize;
       }
+      n += 1;
+      return false;
     });
-    expect(bold.join("")).toBe("Schreinerwerkstatt");
-    expect(e.state.doc.firstChild?.textContent.replace(SOFT_HYPHEN, "")).toBe(
-      "Die Schreinerwerkstatt meines Großvaters.",
-    );
+    const set = hyphenationKey.getState(e.state)!.set;
+    return set
+      .find(start, end)
+      .map((d) => d.from - start)
+      .sort((a, b) => a - b);
+  };
+  const expected = (t: string) => hyphenationPoints(t);
+
+  it("schreibt keine Trennzeichen in den Text und zeigt die Trennstellen daneben", async () => {
+    const e = await ready(doc(para(text(A)), para(text(B)), para(text(C))));
+    expect(e.state.doc.textContent).not.toContain("­");
+    expect(shown(e, 0)).toEqual(expected(A));
+    expect(shown(e, 1)).toEqual(expected(B));
+    expect(shown(e, 0).length).toBeGreaterThan(0);
   });
 
-  it("lässt Listen, Zitate und Seitenumbrüche strukturell unverändert", async () => {
+  it("trennt auch in Listen und Zitaten und lässt die Struktur unverändert", async () => {
     const content = doc(
       para(text(A)),
-      {
-        type: "bulletList",
-        content: [
-          { type: "listItem", content: [para(text(B))] },
-          { type: "listItem", content: [para(text(C))] },
-        ],
-      },
+      { type: "bulletList", content: [{ type: "listItem", content: [para(text(B))] }] },
       { type: "pageBreak" },
-      { type: "blockquote", content: [para(text(A)), para(text(B))] },
+      { type: "blockquote", content: [para(text(A))] },
       para(text(C)),
     );
-    const e = await create(content);
+    const e = await ready(content);
     expect(blockTypes(e)).toEqual(["paragraph", "bulletList", "pageBreak", "blockquote", "paragraph"]);
-    expect(e.state.doc.child(1).childCount).toBe(2);
-    expect(e.state.doc.child(3).childCount).toBe(2);
-    expect(e.state.doc.lastChild?.textContent.replace(SOFT_HYPHEN, "")).toBe(C);
+    expect(shown(e, 1)).toEqual(expected(B));
+    expect(shown(e, 2)).toEqual(expected(A));
+  });
+
+  it("trennt Wörter mit Auszeichnung wie alle anderen", async () => {
+    const e = await ready(
+      doc(para(text("Die "), text("Schreinerwerkstatt", [{ type: "bold" }]), text(" meines Großvaters."))),
+    );
+    expect(shown(e, 0)).toEqual(expected("Die Schreinerwerkstatt meines Großvaters."));
+  });
+
+  it("trennt zentrierten und rechtsbündigen Text nie und passt sich beim Wechsel sofort an", async () => {
+    const e = await ready(doc(para(text(A))));
+    e.commands.setTextSelection(3);
+    e.commands.setTextAlign("center");
+    expect(shown(e, 0)).toEqual([]);
+    e.commands.setTextAlign("right");
+    expect(shown(e, 0)).toEqual([]);
+    e.commands.setTextAlign("left");
+    expect(shown(e, 0)).toEqual(expected(A));
+  });
+
+  it("trennt beim Tippen den geänderten Absatz neu, das letzte Wort bleibt ganz", async () => {
+    const e = await ready(doc(para(text("Wir besuchten die Großmutter")), para(text(B))));
+    const before = shown(e, 0);
+    expect(before).toEqual(expected("Wir besuchten die Großmutter"));
+    e.commands.setTextSelection(e.state.doc.child(0).nodeSize - 1);
+    e.commands.insertContent(" heute");
+    expect(shown(e, 0)).toEqual(expected("Wir besuchten die Großmutter heute"));
+    expect(shown(e, 0).length).toBe(before.length + 1);
+    expect(shown(e, 1)).toEqual(expected(B));
+  });
+
+  it("wartet während einer Wort-Eingabe mit Autokorrektur und trennt danach", async () => {
+    const e = await ready(doc(para(text("Wir besuchten die Großmutter"))));
+    const before = shown(e, 0);
+    const end = e.state.doc.child(0).nodeSize - 1;
+    e.view.dispatch(e.state.tr.insertText(" heute", end).setMeta("composition", 1));
+    expect(shown(e, 0)).toEqual(before);
+    const deferred = hyphenationKey.getState(e.state)!.deferred;
+    expect(deferred).toBe(0);
+    e.view.dispatch(e.state.tr.setMeta(HYPHENATION_REFRESH, deferred));
+    expect(shown(e, 0)).toEqual(expected("Wir besuchten die Großmutter heute"));
+    expect(hyphenationKey.getState(e.state)!.deferred).toBeNull();
+  });
+
+  it("nimmt keine Trennzeichen aus eingefügtem Text auf", async () => {
+    // jsdom kennt kein Einfügen über die Zwischenablage, deshalb direkt die Filter.
+    const e = await ready(doc(para(text("Start"))));
+    const plugin = hyphenationKey.get(e.state)!;
+    const pastedText = plugin.props.transformPastedText!.call(plugin, " Groß­mut­ter", false, e.view);
+    expect(pastedText).toBe(" Großmutter");
+    const { schema } = e.state;
+    const slice = new Slice(
+      Fragment.from(
+        schema.node("paragraph", null, [
+          schema.text("Kar­tof"),
+          schema.text("­fel", [schema.marks.bold.create()]),
+        ]),
+      ),
+      0,
+      0,
+    );
+    const pasted = plugin.props.transformPasted!.call(plugin, slice, e.view, false);
+    expect(pasted.content.textBetween(0, pasted.content.size)).toBe("Kartoffel");
+    expect(pasted.content.firstChild?.lastChild?.marks.map((m) => m.type.name)).toEqual(["bold"]);
+    const clean = new Slice(Fragment.from(schema.text("Ohne")), 0, 0);
+    expect(plugin.props.transformPasted!.call(plugin, clean, e.view, false)).toBe(clean);
   });
 
   it("landet nicht in der Rückgängig-Historie", async () => {
-    const e = await create(doc(para(text(A)), para(text(B))));
+    const e = await ready(doc(para(text(A)), para(text(B))));
     expect(e.can().undo()).toBe(false);
+  });
+
+  it("meldet dem Seiten-Takt die Trennstellen", async () => {
+    const e = await ready(doc(para(text(A))));
+    const [first] = shown(e, 0);
+    expect(isHyphenationPoint(e.state, 1 + first)).toBe(true);
+    expect(isHyphenationPoint(e.state, 1 + first + 1)).toBe(false);
+  });
+
+  it("macht aus getippten geschützten Leerzeichen normale (Chrome vor einer Trennmarkierung)", async () => {
+    const e = await ready(doc(para(text("Großmutter erzählte"))));
+    e.view.dispatch(e.state.tr.insertText("Weiter ", 1));
+    expect(e.state.doc.textContent).toBe("Weiter Großmutter erzählte");
+    // Rückgängig nimmt das Getippte samt Korrektur in einem Schritt zurück.
+    e.commands.undo();
+    expect(e.state.doc.textContent).toBe("Großmutter erzählte");
+  });
+
+  it("lässt geschützte Leerzeichen am Absatzende stehen, bis weitergeschrieben wird", async () => {
+    // Bei `white-space: normal` wäre ein normales Leerzeichen am Ende unsichtbar.
+    const e = await ready(doc(para(text("Hallo"))));
+    e.view.dispatch(e.state.tr.insertText(" ", 6));
+    expect(e.state.doc.textContent).toBe("Hallo ");
+    e.view.dispatch(e.state.tr.insertText("W", 7));
+    expect(e.state.doc.textContent).toBe("Hallo W");
+    // Doppelte Leerzeichen und der Absatzanfang bleiben ebenso, wie der Browser sie setzt.
+    e.view.dispatch(e.state.tr.insertText(" ", 7));
+    e.view.dispatch(e.state.tr.insertText(" ", 1));
+    expect(e.state.doc.textContent).toBe(" Hallo  W");
+  });
+
+  it("lässt eingefügte geschützte Leerzeichen stehen, auch wenn danach daneben getippt wird", async () => {
+    const e = await ready(doc(para(text("Seite"))));
+    e.view.dispatch(e.state.tr.insertText(" S. 12", 6).setMeta("uiEvent", "paste"));
+    expect(e.state.doc.textContent).toBe("Seite S. 12");
+    e.view.dispatch(e.state.tr.insertText("n", 6));
+    expect(e.state.doc.textContent).toBe("Seiten S. 12");
+  });
+
+  it("ändert während einer Wort-Eingabe nichts und holt die Korrektur danach nach", async () => {
+    const e = await ready(doc(para(text("Seite"))));
+    e.view.dispatch(e.state.tr.insertText("und ", 1).setMeta("composition", 1));
+    expect(e.state.doc.textContent).toBe("und Seite");
+    e.view.dispatch(e.state.tr.setMeta(HYPHENATION_REFRESH, 0));
+    expect(e.state.doc.textContent).toBe("und Seite");
   });
 });
 

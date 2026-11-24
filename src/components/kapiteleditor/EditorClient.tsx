@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { editorExtensions } from "./tiptap/extensions";
-import { HYPHENATION_META } from "./tiptap/Hyphenation";
+import { loadHyphenation } from "@/lib/hyphenation";
 import { placeCaretNearPoint } from "./tiptap/caretPlacement";
 import { EditorToolbar } from "./EditorToolbar";
 import { EditorLoadingScreen } from "@/components/loading/LoadingViews";
@@ -62,6 +62,9 @@ import { createClient as createBrowserSupabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { usePagination } from "./usePagination";
 import { keepCursorInView } from "./keepCursorInView";
+
+// PROJ-35: Das Trennwörterbuch lädt schon, während die Seite aufgebaut wird.
+if (typeof window !== "undefined") void loadHyphenation();
 
 type Props = {
   projectId: string;
@@ -123,9 +126,7 @@ export function EditorClient({
     content: initialBody ?? undefined,
     editable: !inputLocked,
     editorProps: EDITOR_PROPS,
-    onUpdate: ({ editor, transaction }) => {
-      // PROJ-30: Silbentrennung beim Öffnen ändert den Text der Person nicht.
-      if (transaction.getMeta(HYPHENATION_META)) return;
+    onUpdate: ({ editor }) => {
       setBody(editor.getJSON());
       keepCursorInView(editor);
     },
@@ -339,7 +340,9 @@ export function EditorClient({
       }
       checkTimer = setTimeout(check, CONTENT_CHECK_MS);
     };
-    void document.fonts.ready.then(check);
+    // PROJ-35: Erst mit Schrift und Trennwörterbuch stehen die Zeilen fest. Sonst
+    // würden die Zeilen nach dem Einblenden noch einmal umbrechen.
+    void Promise.all([document.fonts.ready, loadHyphenation()]).then(check);
     return () => {
       cancelled = true;
       clearTimeout(fallback);

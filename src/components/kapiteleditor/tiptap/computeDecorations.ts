@@ -1,4 +1,5 @@
 import { Decoration, type EditorView } from "@tiptap/pm/view";
+import { isHyphenationPoint } from "./Hyphenation";
 
 type Geometry = {
   pageHeight: number;
@@ -262,6 +263,11 @@ export function computeDecorations(
             while (insertPos > blockStart) {
               const ch = view.state.doc.textBetween(insertPos - 1, insertPos);
               if (ch === "" || WS_RE.test(ch)) break;
+              // PROJ-35: Eine Trennstelle steht nicht mehr im Text, sondern als
+              // Markierung daneben. Bricht die Zeile dort, gilt sie wie früher
+              // das Trennzeichen als Zeilenanfang, sonst bräche der Rest des
+              // Absatzes anders um als gemessen.
+              if (isHyphenationPoint(view.state, insertPos)) break;
               insertPos--;
             }
             let wsStart = insertPos;

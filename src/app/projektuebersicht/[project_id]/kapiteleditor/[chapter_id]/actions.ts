@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { countWordsFromBody } from "@/lib/kapiteleditor/countWords";
+import { stripSoftHyphensFromBody } from "@/lib/hyphenation";
 import { projectWriteBlockedError } from "@/lib/projects/project-access";
 import {
   MAX_IMAGES_PER_CHAPTER,
@@ -123,7 +124,10 @@ export async function chapterAutosaveAction(input: {
 }): Promise<{ ok?: true; error?: string }> {
   const parsed = autosaveSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
-  const { projectId, chapterId, title, body, imageSections, colorPageCount, pageCount } = parsed.data;
+  const { projectId, chapterId, title, imageSections, colorPageCount, pageCount } = parsed.data;
+  // PROJ-35: Im gespeicherten Text stehen nie Trennzeichen, auch nicht aus
+  // eingefügtem Text oder älteren Editor-Ständen.
+  const body = stripSoftHyphensFromBody(parsed.data.body);
 
   const supabase = await createClient();
   const {

@@ -5,6 +5,7 @@ import { FreshAfterHistory } from "@/components/HistoryFreshness";
 import { PhoneNotice } from "@/components/kapiteleditor/PhoneNotice";
 import { EditorClient } from "@/components/kapiteleditor/EditorClient";
 import { isProjectReadOnly } from "@/lib/projects/project-access";
+import { stripSoftHyphensFromBody } from "@/lib/hyphenation";
 import {
   allImages,
   parseImageSections,
@@ -71,7 +72,12 @@ export default async function KapiteleditorPage({
 
   // PROJ-34: Alte Kapitel bekommen ihre Bildabschnitte in den Text. Gespeichert
   // wird das erst, wenn jemand das Kapitel wirklich ändert.
-  const prepared = prepareChapterImages(chapter.body, initialImageSections);
+  // PROJ-35: Alte unsichtbare Trennzeichen fallen ebenso ohne Speichern weg, die
+  // Trennung zeigt der Editor nur noch an.
+  const prepared = prepareChapterImages(
+    stripSoftHyphensFromBody(chapter.body),
+    initialImageSections,
+  );
 
   // PROJ-8: Ohne Impuls (eigenes Kapitel oder Impuls gelöscht) kein Banner.
   const impulse = chapter.impulse_catalog;

@@ -4,6 +4,7 @@ Verlauf aller Änderungen an der Checkliste [prod-umzug.md](prod-umzug.md). Neue
 
 | Datum | Eintrag |
 |---|---|
+| 2026-11-24 | PROJ-35 Frontend: Neues Paket `hyphen` (ISC) mit dem deutschen Trennwörterbuch aus hyph-utf8 (MIT), die Pakete `hypher`, `hyphenation.de` und `hyphenation.en-us` sind entfernt (das deutsche Musterpaket hatte keine Lizenz). Neuer Punkt in Abschnitt 8: Lizenzhinweise der ausgelieferten Pakete vor dem Go-live bereitstellen. Keine Migration, keine neuen Env-Werte. |
 | 2026-11-24 | PROJ-34 Backend: Migration `20261124100000_proj34_image_cleanup.sql`, auf Stage eingespielt, auf Production noch vor dem Code-Deploy einspielen. Entfernte Fotos werden erst nach 14 Tagen gelöscht, das muss in die Datenschutzerklärung. Keine neuen Env-Werte, der vorhandene Cron übernimmt das Löschen. |
 | 2026-11-23 | PROJ-31 QA: Neue lokale Variable `E2E_QA_PASSWORD` nur für die Tests in `.env.local`, nicht in Vercel setzen. Das QA-Konto bleibt auf Stage. Für Production ist nichts zu tun. |
 | 2026-11-23 | PROJ-31: Änderungsprotokoll in diese eigene Datei ausgelagert. Für Production ist dadurch nichts zu tun. |
