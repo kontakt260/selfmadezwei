@@ -292,17 +292,20 @@ export function StepPurchase({ state, isGuest }: { state: WizardState; isGuest: 
 
   // Geschenk ohne eigenen Zugang: Ohne Anmeldung ist gar kein Konto nötig.
   const isDirectGift = isGuest && withComputer && !state.buyerWantsAccess;
+  // Angemeldet und als Geschenk: Der Satz vom sofortigen Loslegen passt nicht,
+  // die Seite kommt ohne Untertitel aus (Wunsch von Jakob, 2026-11-24).
+  const intro = isDirectGift
+    ? "Nach der Zahlung senden wir das Geschenk direkt an die beschenkte Person. Ein Konto brauchen Sie dafür nicht."
+    : isGuest
+      ? "Nach der Zahlung legen Sie in einem kurzen Schritt Ihr Konto an — danach können Sie sofort loslegen."
+      : isGift
+        ? null
+        : "Mit dem Kauf schalten wir Ihr Projekt frei und Sie können sofort loslegen.";
 
   return (
     <div>
-      <h2 className="heading-style-h3 mb-3">Bereit zum Start?</h2>
-      <p className="mb-6 text-lg leading-7 text-[#4A453F]">
-        {isDirectGift
-          ? "Nach der Zahlung senden wir das Geschenk direkt an die beschenkte Person. Ein Konto brauchen Sie dafür nicht."
-          : isGuest
-            ? "Nach der Zahlung legen Sie in einem kurzen Schritt Ihr Konto an — danach können Sie sofort loslegen."
-            : "Mit dem Kauf schalten wir Ihr Projekt frei und Sie können sofort loslegen."}
-      </p>
+      <h2 className={cn("heading-style-h3", intro ? "mb-3" : "mb-6")}>Bereit zum Start?</h2>
+      {intro && <p className="mb-6 text-lg leading-7 text-[#4A453F]">{intro}</p>}
 
       <dl className="mb-8 grid gap-4 border border-[#e0dcd5] bg-white p-4 sm:gap-3 sm:p-6">
         {summary.map(({ label, value }) => (

@@ -161,3 +161,4 @@ _Kurzform. Die vollständige Begründung steht im Archiv._
 ## Nachtrag 2026-11-24
 - Der Bereich „Wer an diesem Buch beteiligt ist“ in der Projektübersicht hat sein Personen-Symbol zurück, wie die anderen Abschnitte (Hinweis von Jakob). Es fehlte seit dem Umbau der Mitgliederverwaltung.
 - Onboarding-Texte nach Jakobs Vorgabe: „Da Sie selbst keinen Zugang möchten, wird die beschenkte Person das Projekt eigenständig verwalten.“ und „Ihr gedrucktes Hardcover-Buch, …“ ohne „erstes“.
+- Letzte Onboarding-Seite: Kauft man angemeldet ein Geschenk, entfällt der Untertitel „Mit dem Kauf schalten wir Ihr Projekt frei und Sie können sofort loslegen.“ (Jakob: passt bei einem Geschenk nicht). Beim Kauf für sich selbst und für Gäste bleiben die Untertitel. Test: `src/app/onboarding/WizardSteps.test.tsx`.
