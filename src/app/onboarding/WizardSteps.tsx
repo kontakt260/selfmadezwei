@@ -269,8 +269,8 @@ export function StepGiftComputer({
 
       {!buyerWantsAccess && (
         <p className="mt-4 border border-[#e0dcd5] bg-[#FAF8F6] p-5 text-base leading-7 text-[#4A453F]">
-          Da Sie selbst keinen Zugang möchten, wird die beschenkte Person automatisch Projektleiter,
-          denn jedes Projekt braucht eine Projektleitung.
+          Da Sie selbst keinen Zugang möchten, wird die beschenkte Person das Projekt eigenständig
+          verwalten.
         </p>
       )}
     </div>
@@ -322,7 +322,7 @@ export function StepPurchase({ state, isGuest }: { state: WizardState; isGuest: 
         <div className="flex min-w-0 flex-1 flex-col justify-center bg-[#FAF8F6] p-5 sm:p-7">
           <p className="heading-style-h4">249 €</p>
           <p className="mt-2 text-lg leading-7 text-[#3E3831]">
-            Ihr erstes gedrucktes Hardcover-Buch, 12 Monate Projektzugang, Erzählen per
+            Ihr gedrucktes Hardcover-Buch, 12 Monate Projektzugang, Erzählen per
             Sprachnachricht und Editor.
           </p>
         </div>

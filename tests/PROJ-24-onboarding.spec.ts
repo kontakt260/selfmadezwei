@@ -131,7 +131,7 @@ test.describe("PROJ-24 — Onboarding als Gast", () => {
     await weiter(page);
     await expect(
       page.getByText(
-        "Ihr erstes gedrucktes Hardcover-Buch, 12 Monate Projektzugang, Erzählen per Sprachnachricht und Editor.",
+        "Ihr gedrucktes Hardcover-Buch, 12 Monate Projektzugang, Erzählen per Sprachnachricht und Editor.",
       ),
     ).toBeVisible();
     await expect(page.getByRole("img", { name: /Buchcover: Ihr Lebensbuch/ })).toBeVisible();

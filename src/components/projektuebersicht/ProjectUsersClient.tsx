@@ -165,9 +165,14 @@ export function ProjectUsersClient({ projectId, members, myRole, readOnly = fals
     <div className="flex flex-col gap-5 sm:gap-6">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="[font-family:var(--font-pt-serif)] text-2xl leading-8 text-[#3E3831] sm:text-3xl sm:leading-10">
-          Wer an diesem Buch beteiligt ist
-        </h2>
+        <div className="flex min-w-0 flex-row items-center gap-2 sm:gap-3">
+          <span className="shrink-0 [&>svg]:h-7 [&>svg]:w-7">
+            <UsersIcon />
+          </span>
+          <h2 className="[font-family:var(--font-pt-serif)] min-w-0 text-2xl leading-8 text-[#3E3831] sm:text-3xl sm:leading-10">
+            Wer an diesem Buch beteiligt ist
+          </h2>
+        </div>
         {isPL && (
           <button
             type="button"
@@ -478,6 +483,22 @@ function ModalShell({
         {children}
       </div>
     </div>
+  );
+}
+
+// Abschnitts-Icon wie bei den anderen Bereichen der Projektübersicht. Es fehlte
+// seit dem Umbau der Mitgliederverwaltung (PROJ-9), Form wie vorher.
+function UsersIcon() {
+  return (
+    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx={9} cy={8} r={4} stroke="#96B897" strokeWidth={2} />
+      <path
+        d="M2 21c0-3.5 3-6 7-6s7 2.5 7 6M17 11a4 4 0 0 0 0-8M22 21c0-3-2-5-5-5.5"
+        stroke="#96B897"
+        strokeWidth={2}
+        strokeLinecap="square"
+      />
+    </svg>
   );
 }
 

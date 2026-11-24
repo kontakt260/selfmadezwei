@@ -157,3 +157,7 @@ _Kurzform. Die vollständige Begründung steht im Archiv._
 - Hinweis für PROJ-8: Im Lesemodus ist „Erzähl-Impulse ansehen“ gesperrt. Die Bibliothek sollte dort zum Ansehen offen bleiben.
 - Die Druck-Karte zählt ein Kapitel ohne Wörter als offen, auch wenn es nur Bilder enthält. Das wird mit PROJ-16 genauer.
 - Vor dem Go-live: Prüfung in Safari und Firefox, Lösung für die Druck-Karte (Umzugsliste, Abschnitt 9).
+
+## Nachtrag 2026-11-24
+- Der Bereich „Wer an diesem Buch beteiligt ist“ in der Projektübersicht hat sein Personen-Symbol zurück, wie die anderen Abschnitte (Hinweis von Jakob). Es fehlte seit dem Umbau der Mitgliederverwaltung.
+- Onboarding-Texte nach Jakobs Vorgabe: „Da Sie selbst keinen Zugang möchten, wird die beschenkte Person das Projekt eigenständig verwalten.“ und „Ihr gedrucktes Hardcover-Buch, …“ ohne „erstes“.
