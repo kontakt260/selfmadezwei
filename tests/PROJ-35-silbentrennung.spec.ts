@@ -4,7 +4,16 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { assertStage, createTestAccount, readEnvLocal, signIn, type TestAccount } from "./helpers/stage";
+import { solidPng } from "./helpers/editor-bench";
+import {
+  accessToken,
+  assertStage,
+  createTestAccount,
+  readEnvLocal,
+  restRequest,
+  signIn,
+  type TestAccount,
+} from "./helpers/stage";
 import { countWordsFromBody } from "../src/lib/kapiteleditor/countWords";
 
 // PROJ-35: Automatische Silbentrennung als Anzeige, Buchregeln, Seitenregeln.
@@ -31,7 +40,19 @@ const COMPOUNDS =
 let admin: SupabaseClient;
 let account: TestAccount;
 let projectId = "";
-const ch = { buch: crypto.randomUUID(), alt: crypto.randomUUID(), getippt: crypto.randomUUID() };
+let readOnlyProject = "";
+let supabaseUrl = "";
+let anonKey = "";
+const ch = {
+  buch: crypto.randomUUID(),
+  alt: crypto.randomUUID(),
+  getippt: crypto.randomUUID(),
+  bilder: crypto.randomUUID(),
+  einfuegen: crypto.randomUUID(),
+  wechsel: crypto.randomUUID(),
+  angriff: crypto.randomUUID(),
+  lesen: crypto.randomUUID(),
+};
 
 type Block = Record<string, unknown>;
 const para = (text: string, attrs?: Record<string, unknown>): Block => ({
@@ -40,11 +61,18 @@ const para = (text: string, attrs?: Record<string, unknown>): Block => ({
   content: [{ type: "text", text }],
 });
 
-async function open(page: Page, id: string) {
-  await page.goto(`/projektuebersicht/${projectId}/kapiteleditor/${id}`);
+async function open(page: Page, id: string, project = projectId) {
+  await page.goto(`/projektuebersicht/${project}/kapiteleditor/${id}`);
   await page.locator('.a5-stack[data-visible="1"]').waitFor({ timeout: 25_000 });
   await page.waitForTimeout(800);
 }
+
+const docText = (page: Page) =>
+  page.evaluate(
+    () =>
+      (document.querySelector(".tiptap-editor") as unknown as { editor: { state: { doc: { textContent: string } } } }).editor
+        .state.doc.textContent,
+  );
 
 /** Zeilenanfänge aller Absätze (Absatz:Textversatz) und die Seitenzahl. */
 const layout = (page: Page) =>
@@ -128,6 +156,8 @@ test.beforeAll(async ({ browser }) => {
   test.setTimeout(180_000);
   const env = readEnvLocal();
   assertStage(env);
+  supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+  anonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   admin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -151,23 +181,73 @@ test.beforeAll(async ({ browser }) => {
     { type: "bulletList", content: [{ type: "listItem", content: [para(PROSE[0])] }] },
     ...Array.from({ length: 12 }, (_, i) => para(PROSE[i % 3])),
   ];
+  // Projekt im Lesemodus (Zugang abgelaufen) mit demselben Buchtext.
+  const { data: expired } = await admin
+    .from("projects")
+    .insert({ title: "Silbentrennung Lesemodus", owner_id: account.id })
+    .select("id")
+    .single();
+  readOnlyProject = expired!.id as string;
+  await admin.from("project_access").insert({ project_id: readOnlyProject, expires_at: new Date(Date.now() - 5 * 86_400_000).toISOString() });
+  await admin.from("project_members").insert({ project_id: readOnlyProject, user_id: account.id, role: "projektleiter" });
+
+  // Fotos liegen wie im echten Upload im Ordner ihres Kapitels.
+  const photo = async () => {
+    const id = crypto.randomUUID();
+    const storage_path = `${projectId}/${ch.bilder}/${id}.png`;
+    const { error: uploadError } = await admin.storage
+      .from("chapter-heroes")
+      .upload(storage_path, solidPng(900, 600, [150, 184, 151]), { contentType: "image/png" });
+    if (uploadError) throw new Error(uploadError.message);
+    return { id, storage_path, signed_url: "", alt: "" };
+  };
+  const [s1, s2] = [crypto.randomUUID(), crypto.randomUUID()];
+  const empty = { layout: "1-spaltig", images: [] };
+  const bilder = [
+    ...buch.slice(0, 6),
+    { type: "imageSection", attrs: { sectionId: s1 } },
+    ...buch.slice(6, 14),
+    { type: "pageBreak" },
+    para(PROSE[0]),
+    { type: "imageSection", attrs: { sectionId: s2 } },
+    ...buch.slice(14),
+    para("Ende."),
+  ];
+  const bilderSections = {
+    start: empty,
+    end: empty,
+    inline: {
+      [s1]: { layout: "1-spaltig", images: [await photo()] },
+      [s2]: { layout: "2-spaltig", images: [await photo(), await photo()] },
+    },
+    placed: true,
+  };
+
   // Ein Kapitel aus der Zeit vor PROJ-35: Trennzeichen stehen im gespeicherten Text.
   const old = (t: string) => t.replace("Großmutter", `Groß${SHY}mut${SHY}ter`).replace("Winterabenden", `Win${SHY}ter${SHY}aben${SHY}den`);
-  const rows = [
+  const rows: Array<{ id: string; body: unknown; image_sections?: unknown; project?: string }> = [
     { id: ch.buch, body: { type: "doc", content: buch } },
     { id: ch.alt, body: { type: "doc", content: [para(old(PROSE[0])), para(PROSE[1])] } },
     { id: ch.getippt, body: { type: "doc", content: [{ type: "paragraph" }] } },
+    { id: ch.bilder, body: { type: "doc", content: bilder }, image_sections: bilderSections },
+    { id: ch.einfuegen, body: { type: "doc", content: [{ type: "paragraph" }] } },
+    { id: ch.wechsel, body: { type: "doc", content: [para(PROSE[0]), para(PROSE[1])] } },
+    { id: ch.angriff, body: { type: "doc", content: [para(PROSE[0])] } },
+    { id: ch.lesen, body: { type: "doc", content: buch }, project: readOnlyProject },
   ];
   const { error: chapterError } = await admin.from("chapters").insert(
     rows.map((row, index) => ({
-      ...row,
-      project_id: projectId,
+      id: row.id,
+      body: row.body,
+      project_id: row.project ?? projectId,
       title: `Kapitel ${index + 1}`,
       sort_order: index,
       chapter_origin: "custom",
       word_count: 100,
       page_count: 1,
+      image_sections: row.image_sections ?? { start: empty, end: empty },
     })) as never,
+    { defaultToNull: false },
   );
   if (chapterError) throw new Error(chapterError.message);
 
@@ -181,10 +261,17 @@ test.afterAll(async () => {
   fs.rmSync(SESSION_FILE, { force: true });
   if (!admin) return;
   if (projectId) {
-    await admin.from("projects").delete().eq("id", projectId);
-    await admin.from("trash_chapters").delete().eq("project_id", projectId);
-    await admin.from("storage_chapter_cleanup_queue").delete().eq("project_id", projectId);
-    await admin.from("storage_cleanup_queue").delete().eq("project_id", projectId);
+    const { data: files } = await admin.storage.from("chapter-heroes").list(`${projectId}/${ch.bilder}`);
+    if (files?.length) {
+      await admin.storage.from("chapter-heroes").remove(files.map((file) => `${projectId}/${ch.bilder}/${file.name}`));
+    }
+    await admin.from("storage_image_cleanup_queue").delete().eq("project_id", projectId);
+  }
+  for (const id of [projectId, readOnlyProject].filter(Boolean)) {
+    await admin.from("projects").delete().eq("id", id);
+    await admin.from("trash_chapters").delete().eq("project_id", id);
+    await admin.from("storage_chapter_cleanup_queue").delete().eq("project_id", id);
+    await admin.from("storage_cleanup_queue").delete().eq("project_id", id);
   }
   if (account) await admin.auth.admin.deleteUser(account.id);
 });
@@ -289,5 +376,161 @@ test.describe("PROJ-35 — Silbentrennung", () => {
     expect(json).not.toContain(SHY);
     expect(json).not.toContain(NBSP);
     expect(json).toContain(PROSE[0]);
+  });
+
+  test("AC-4, AC-14, AC-23: Lesemodus gleich, Listen und Zitate getrennt, Seitenzahl passt", async ({ page }) => {
+    test.setTimeout(120_000);
+    await open(page, ch.buch);
+    const editor = await layout(page);
+    const kinds = await page.evaluate(() => {
+      const visible = Array.from(document.querySelectorAll<HTMLElement>(".tiptap-editor .a5-shy")).filter(
+        (el) => el.getBoundingClientRect().width > 0.5,
+      );
+      return {
+        list: visible.filter((el) => el.closest("li")).length,
+        quote: visible.filter((el) => el.closest("blockquote")).length,
+      };
+    });
+    expect(kinds.list).toBeGreaterThan(0);
+    expect(kinds.quote).toBeGreaterThan(0);
+
+    await open(page, ch.lesen, readOnlyProject);
+    expect(await layout(page)).toEqual(editor);
+
+    await open(page, ch.bilder);
+    const withImages = await rules(page);
+    expect(withImages.pageEnd).toBe(0);
+    expect(withImages.longest).toBeLessThanOrEqual(3);
+    const first = await layout(page);
+    await open(page, ch.bilder);
+    expect(await layout(page)).toEqual(first);
+    await page.locator(".tiptap-editor p").nth(2).click({ position: { x: 40, y: 4 } });
+    await page.keyboard.type(" Nachtrag");
+    await expect(page.getByText("Gespeichert", { exact: true })).toBeVisible({ timeout: 20_000 });
+    const frames = await page.locator(".a5-page-frame").count();
+    await expect
+      .poll(async () => (await admin.from("chapters").select("page_count").eq("id", ch.bilder).single()).data?.page_count, {
+        timeout: 15_000,
+      })
+      .toBe(frames);
+  });
+
+  test("AC-1, AC-15, AC-17, AC-19, AC-21: Einfügen, Ausrichtung, kein Schalter, Doppelklick, Entf, Ausschneiden", async ({ page, context }) => {
+    test.setTimeout(150_000);
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await open(page, ch.buch);
+    const loaded = await layout(page);
+    const firstThree = (l: { starts: string[] }) => l.starts.filter((s) => Number(s.split(":")[0]) < 3);
+
+    // Eingefügt (mit fremden Trennzeichen) wird wie geladen getrennt.
+    await open(page, ch.einfuegen);
+    const html = PROSE.map((t) => `<p>${t.replace("Großmutter", `Groß${SHY}mutter`)}</p>`).join("");
+    await page.evaluate((value) => {
+      const el = document.querySelector(".tiptap-editor") as unknown as {
+        editor: { view: { pasteHTML: (h: string) => void }; commands: { focus: (p: string) => void } };
+      };
+      el.editor.commands.focus("start");
+      el.editor.view.pasteHTML(value);
+    }, html);
+    await page.waitForTimeout(600);
+    expect(await docText(page)).not.toContain(SHY);
+    expect(firstThree(await layout(page))).toEqual(firstThree(loaded));
+
+    // Ausrichtung: zentriert und rechtsbündig ohne Trennung, Blocksatz wieder mit.
+    await open(page, ch.wechsel);
+    const p = page.locator(".tiptap-editor p").first();
+    const visibleIn = () =>
+      p.evaluate((el) => Array.from(el.querySelectorAll<HTMLElement>(".a5-shy")).filter((s) => s.getBoundingClientRect().width > 0.5).length);
+    const start = await visibleIn();
+    expect(start).toBeGreaterThan(0);
+    await p.click({ position: { x: 20, y: 4 } });
+    await page.getByLabel("Zentriert").click();
+    await expect.poll(visibleIn).toBe(0);
+    await page.getByLabel("Rechtsbündig").click();
+    await expect.poll(visibleIn).toBe(0);
+    await page.getByLabel("Blocksatz").click();
+    await expect.poll(visibleIn).toBe(start);
+    // Es gibt keinen Schalter für die Silbentrennung.
+    await expect(page.getByRole("button", { name: /Trenn/i })).toHaveCount(0);
+
+    // Doppelklick auf den ersten Teil eines getrennten Wortes markiert das ganze Wort.
+    await open(page, ch.buch);
+    const target = await page.evaluate(() => {
+      const el = Array.from(document.querySelectorAll<HTMLElement>(".tiptap-editor .a5-shy")).find(
+        (s) => s.getBoundingClientRect().width > 0.5,
+      )!;
+      const r = el.getBoundingClientRect();
+      return { x: r.left - 6, y: r.top + r.height / 2 };
+    });
+    await page.mouse.dblclick(target.x, target.y);
+    await page.waitForTimeout(200);
+    const selected = await page.evaluate(() => {
+      const ed = (document.querySelector(".tiptap-editor") as unknown as {
+        editor: { state: { selection: { from: number; to: number }; doc: { textBetween: (a: number, b: number) => string } } };
+      }).editor;
+      return ed.state.doc.textBetween(ed.state.selection.from, ed.state.selection.to);
+    });
+    expect(selected).toMatch(/^\p{L}{6,}$/u);
+    expect(PROSE.join(" ")).toContain(selected);
+
+    // Entf löscht je Druck ein sichtbares Zeichen.
+    const first = page.locator(".tiptap-editor p").first();
+    await first.click({ position: { x: 1, y: 4 } });
+    await page.waitForTimeout(150);
+    for (let i = 0; i < 6; i += 1) await page.keyboard.press("ArrowRight");
+    const before = await docText(page);
+    for (let i = 0; i < 5; i += 1) await page.keyboard.press("Delete");
+    expect(before.length - (await docText(page)).length).toBe(5);
+    await page.keyboard.press("ControlOrMeta+z");
+    await expect.poll(() => docText(page)).toBe(before);
+
+    // Ausschneiden: Zwischenablage sauber, Rückgängig stellt Text und Umbrüche her.
+    const layoutBefore = await layout(page);
+    await page.locator(".tiptap-editor p").nth(1).click({ position: { x: 1, y: 4 } });
+    await page.waitForTimeout(150);
+    await page.keyboard.press("Shift+ArrowDown");
+    await page.keyboard.press("Shift+ArrowDown");
+    await page.keyboard.press("ControlOrMeta+x");
+    const cut = await page.evaluate(() => navigator.clipboard.readText());
+    expect(cut.length).toBeGreaterThan(40);
+    expect(cut).not.toContain(SHY);
+    await page.keyboard.press("ControlOrMeta+z");
+    await expect.poll(() => docText(page)).toBe(before);
+    await page.waitForTimeout(400);
+    expect(await layout(page)).toEqual(layoutBefore);
+  });
+
+  test("AC-5: Die Trennung erscheint mit dem Tastendruck, danach springt nichts", async ({ page }) => {
+    await open(page, ch.wechsel);
+    await page.locator(".tiptap-editor p").nth(1).click();
+    await page.keyboard.press("ControlOrMeta+ArrowDown");
+    await page.waitForTimeout(200);
+    for (const word of [" Lebensmittelmarkenausgabe", " Kartoffelschalensuppe", " Bahnhofsvorsteherin"]) {
+      await page.keyboard.type(word);
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      const soon = (await layout(page)).starts;
+      await page.waitForTimeout(600);
+      expect((await layout(page)).starts).toEqual(soon);
+    }
+  });
+
+  test("Red Team: Trennzeichen und geschützte Leerzeichen per REST werden beim Öffnen und Speichern entfernt", async ({ page }) => {
+    await page.goto(`/projektuebersicht/${projectId}`);
+    const token = accessToken(await page.context().cookies());
+    const res = await restRequest(
+      { supabaseUrl, anonKey },
+      `chapters?id=eq.${ch.angriff}`,
+      { method: "PATCH", body: JSON.stringify({ body: { type: "doc", content: [para(`Groß${SHY}${SHY}mutter${SHY} erzählte${NBSP}viel ${SHY.repeat(500)}Ende`)] } }) },
+      token,
+    );
+    expect(res.status).toBeLessThan(300);
+    await open(page, ch.angriff);
+    expect(await docText(page)).not.toContain(SHY);
+    await page.locator(".tiptap-editor p").first().click();
+    await page.keyboard.press("ControlOrMeta+ArrowDown");
+    await page.keyboard.type(" x");
+    await expect(page.getByText("Gespeichert", { exact: true })).toBeVisible({ timeout: 20_000 });
+    const { data } = await admin.from("chapters").select("body").eq("id", ch.angriff).single();
+    expect(JSON.stringify(data!.body)).not.toContain(SHY);
   });
 });

@@ -1,8 +1,8 @@
 # PROJ-35: Automatische Silbentrennung
 
-## Status: In Progress
+## Status: Approved
 **Created:** 2026-11-24
-**Last Updated:** 2026-11-24
+**Last Updated:** 2026-11-24 (QA: 26 von 27, AC-24 von Jakob angepasst, 2 Low-Bugs akzeptiert, AC-3 vor dem Go-live)
 **Freigegeben:** Spec und Tech Design von Jakob am 2026-11-24
 
 ## Dependencies
@@ -67,7 +67,7 @@ Gemessen im Production-Build mit drei Absätzen und einem Zitat voller langer W�
 
 ### E. Seiten und Tempo
 - [ ] AC-23: Seitenzahl des Kapitels und buchweite Seitenzahlen (PROJ-7) passen zu den Trennungen im Editor.
-- [ ] AC-24: Das Tippen bleibt so schnell wie heute: höchstens 50 ms je Tastendruck (p95) im Referenzkapitel aus PROJ-25.
+- [ ] AC-24: Das Tippen wird durch die Silbentrennung nicht spürbar langsamer: je Tastendruck (p95) im Referenzkapitel aus PROJ-25 höchstens so lange wie vor PROJ-35. *(Geändert von Jakob am 2026-11-24. Die frühere Grenze von 50 ms galt schon vor PROJ-35 nicht, dort waren es 56 ms. Das ist in Ordnung.)*
 - [ ] AC-25: Ein Kapitel öffnet höchstens 10 % langsamer als vor diesem Feature (Referenzkapitel und volles Testbuch aus PROJ-30).
 - [ ] AC-26: Umbrüche und Seitenzahlen bestehender Kapitel ändern sich einmalig mit der Einführung. Danach ist der neue Stand der feste Vergleich für den Prüfstand.
 - [ ] AC-27: Alle bestehenden Tests bestehen, neue Abläufe haben eigene Tests.
@@ -97,7 +97,7 @@ Gemessen im Production-Build mit drei Absätzen und einem Zitat voller langer W�
 - **Unabhängig vom Browser:** Das Ergebnis darf nicht vom Wörterbuch des Browsers oder Betriebssystems abhängen.
 - **Lokal:** Kein Text verlässt für die Trennung das Gerät oder den eigenen Server. Kein externer Dienst.
 - **Lizenz:** Das Wörterbuch muss für den kommerziellen Druck von Büchern genutzt werden dürfen.
-- **Tempo:** Tippen p95 höchstens 50 ms, Öffnen höchstens 10 % langsamer (AC-24, AC-25).
+- **Tempo:** Tippen nicht langsamer als vor PROJ-35, Öffnen höchstens 10 % langsamer (AC-24, AC-25).
 - **Browser:** Chrome, Safari und Firefox auf Desktop und Tablet. Phone zeigt weiter den Hinweis statt des Editors.
 
 ---
@@ -146,7 +146,7 @@ Trenn-Baustein (neu, ohne Bildschirm)
 - **Anzeigen statt einschreiben:** Die Trennstellen stehen neben dem Text, nicht in ihm. Dadurch bleiben Speichern, Kopieren, Rückgängig, Wortzahl, Audio-Erzählen und Lektorat automatisch sauber, und die Tasten haben keine unsichtbaren Stopps. Die Probe hat das in Chromium bestätigt.
 - **Ein Trenn-Baustein für alles:** Tippen, Öffnen, Lesemodus und Druckansicht fragen denselben Baustein. Er läuft im Browser und kann später auf dem Server für den Druck (PROJ-16) dieselben Trennstellen liefern. Die Browser-Trennung wird im Buchtext abgeschaltet, damit kein Gerät eigene Regeln einbringt.
 - **Regeln ohne Seitenwissen im Baustein, Regeln mit Seitenwissen im Seiten-Takt:** Mindestlängen, letztes Wort und Ausnahmen entscheidet der Baustein vorab. Ob eine Trennung am Seitenende landet oder die vierte in Folge wäre, zeigt erst das Setzen der Seiten. Der Seiten-Takt hebt dann genau diese Trennstelle auf und setzt die betroffenen Seiten neu, im selben Durchgang vor dem Zeichnen. So bleibt die Ruheregel aus PROJ-25 erfüllt (höchstens eine Bewegung je Eingabe).
-- **Nur geänderte Absätze neu rechnen:** Beim Tippen wird nur der Absatz unter dem Cursor neu getrennt. Das hält das Tippen unter 50 ms.
+- **Nur geänderte Absätze neu rechnen:** Beim Tippen wird nur der Absatz unter dem Cursor neu getrennt. Das hält das Tippen so schnell wie vorher.
 - **Wörterbuch mit klarer Lizenz:** Vor dem Bau wird die Lizenz des deutschen Musterpakets geklärt. Ist sie nicht eindeutig für den kommerziellen Druck nutzbar, kommen die deutschen Trennmuster aus der TeX-Sammlung (hyph-utf8, neue Rechtschreibung, MIT-Lizenz) zum Einsatz. Der Prüfstand vergleicht beide an einer Wortliste.
 - **Einmalige Verschiebung:** Mit der Einführung ändern sich Umbrüche und Seitenzahlen aller Kapitel einmal (AC-26). Das Referenzkapitel im Prüfstand bekommt danach einen neuen festen Stand.
 
@@ -213,7 +213,7 @@ Trenn-Baustein (neu, ohne Bildschirm)
 **Gemessen (Production-Build, Chromium)**
 - Testkapitel mit Fließtext, Zitat, Liste, zentriert, rechtsbündig und drei Absätzen voller Wortungetüme: keine Seite endet mit einem Trennstrich, längste Folge 3, neu geöffnet identisch, auch nach vielen Eingaben.
 - Seiten-Takt beim Tippen (17 Seiten, 105 Absätze): 18,5 ms statt 12,9 ms ohne Schritt 3.
-- **AC-24 (Tippen höchstens 50 ms im PROJ-25-Referenzkapitel):** Der PROJ-25-Test misst dort 56 ms je Tastendruck (p95), mit und ohne Schritt 3 gleich (ohne: 56, 56, 96, 56; mit: viermal 56). Die 50 ms wurden also schon vor PROJ-35 nicht erreicht, die Silbentrennung macht das Tippen nicht messbar langsamer. **Entscheidung für Jakob in der QA:** AC-24 auf „nicht langsamer als vor PROJ-35“ ändern oder den Seiten-Takt gesondert beschleunigen.
+- **AC-24 (Tippen höchstens 50 ms im PROJ-25-Referenzkapitel):** Der PROJ-25-Test misst dort 56 ms je Tastendruck (p95), mit und ohne Schritt 3 gleich (ohne: 56, 56, 96, 56; mit: viermal 56). Die 50 ms wurden also schon vor PROJ-35 nicht erreicht, die Silbentrennung macht das Tippen nicht messbar langsamer. **Entschieden in der QA:** Jakob hat AC-24 auf „nicht langsamer als vor PROJ-35“ geändert.
 - **AC-25 (Öffnen höchstens 10 % langsamer):** Das lange Testkapitel aus PROJ-30 (42 Seiten) ist nach 1076 ms sichtbar, vor PROJ-35 nach 989 ms, also knapp 9 % langsamer. Das liegt knapp unter der Grenze, in der QA mehrfach messen.
 - **AC-26:** Das Referenzkapitel aus PROJ-25 (41 Seiten, 40 Seitenumbrüche im Absatz) hat denselben Fingerabdruck wie vorher, ein neuer fester Stand war nicht nötig.
 - Voller Testlauf grün (14:34, alle 8 Gruppen).
@@ -223,7 +223,106 @@ Trenn-Baustein (neu, ohne Bildschirm)
 - `/qa`, Safari und Firefox, Lizenzhinweise vor dem Go-live (`prod-umzug.md`, Abschnitt 8).
 
 ## QA Test Results
-_To be added by /qa_
+
+**Tested:** 2026-11-24
+**App URL:** http://localhost:3000 (lokaler Production-Build gegen die Stage-Datenbank), Stand `0e2b0e4`
+**Tester:** QA Engineer (AI)
+**Browser:** Chromium auf Desktop (1440 px), Tablet (768 px, Touch) und Phone (375 px). Safari auf dem iPad hat Jakob für die Schritte 1 und 2 von Hand geprüft (alles in Ordnung), die Seitenregeln aus Schritt 3 noch nicht. WebKit startet auf diesem Mac nicht, Firefox ist nicht installiert.
+**Testdaten:** nur eigene temporäre Konten (`e2e-proj35-*@example.test`), nach jedem Lauf gelöscht. QA-Konto, Cron-Route, Mails, SMS und Zahlungen unberührt.
+
+### Acceptance Criteria Status
+
+#### A. Überall gleich
+- [x] AC-1: Getippter, eingefügter (auch mit fremden Trennzeichen) und geladener Text ergeben dieselben Zeilenanfänge.
+- [x] AC-2: Neu geöffnet sind Zeilenanfänge, Trennungen und Seitenzahl identisch, auch mit Bildabschnitten und Seitenumbruch.
+- [ ] AC-3: Chrome gleich, Safari und Firefox nicht automatisch prüfbar. Jakob hat die Anzeige auf dem iPad geprüft, einen Vergleich der Zeilen gibt es nicht. **Vor dem Go-live offen.**
+- [x] AC-4: Lesemodus und Druckansicht zeigen dieselben Umbrüche wie der Editor, auch für ein Kapitel mit alten Trennzeichen.
+- [x] AC-5: Gemessen zwei Frames nach dem Tastendruck und 0,6 s später: gleiche Zeilen, nichts springt nach. Die Ruhe-Tests aus PROJ-25 sind grün.
+
+#### B. Buchregeln
+- [x] AC-6, AC-7: Wortliste im Unit-Test (34 Fälle), neue Rechtschreibung, 3 Buchstaben vor und nach der Trennstelle, Wörter ab 6 Buchstaben.
+- [x] AC-8: Längste Folge 3, auch in Absätzen voller langer Wörter, in Listen und Zitaten und beim Tippen.
+- [x] AC-9: Keine Seite endet mit einem Trennstrich, beim Öffnen, nach vielen Eingaben, mit Bildabschnitten und Seitenumbruch. Ausnahme: Wörter länger als eine Zeile (BUG-1).
+- [x] AC-10 bis AC-13: Letztes Absatzwort, Großbuchstaben, Ziffern, Mail- und Webadressen, Bindestrich-Wörter und englische Wörter im Unit-Test. Im Browser: Wörter mit Bindestrich bekommen keine Markierung.
+
+#### C. Bereiche
+- [x] AC-14: Absätze, Listen und Zitate werden getrennt.
+- [x] AC-15: Zentriert und rechtsbündig ungetrennt. Beim Wechsel verschwinden die Trennungen sofort und kommen mit Blocksatz zurück.
+- [x] AC-16: Kapiteltitel `hyphens: none`.
+- [x] AC-17: Kein Schalter in Werkzeugleiste oder Editor.
+
+#### D. Schreiben und Text
+- [x] AC-18: Pfeiltasten, Rücktaste und Entf ohne unsichtbare Stopps.
+- [x] AC-19: Ein Doppelklick auf den ersten Teil eines getrennten Wortes markiert das ganze Wort („Winterabenden“).
+- [x] AC-20: Alte Trennzeichen fallen beim Öffnen weg, ohne zu speichern. Nach dem Speichern ist der Text sauber.
+- [x] AC-21: Kopieren und Ausschneiden ohne Trennzeichen, auch direkt nach dem Markieren. „Rückgängig“ stellt Text und Umbrüche her.
+- [x] AC-22: Die Wortzahl stimmt.
+
+#### E. Seiten und Tempo
+- [x] AC-23: Die Seitenzahl in der Datenbank entspricht den Seiten im Editor (Kapitel mit Bildern).
+- [x] AC-24 (in der geänderten Fassung): Tippen im PROJ-25-Referenzkapitel fünfmal 56 ms (p95), vor PROJ-35 ebenfalls 56 ms (56, 56, 96, 56 ms). Nicht langsamer. Die frühere 50-ms-Grenze hat Jakob gestrichen (BUG-2).
+- [x] AC-25: Das lange Testkapitel (42 Seiten) ist nach 980, 1036, 1054, 1049 und 1058 ms sichtbar, im Mittel 1049 ms. Vor PROJ-35 waren es 989 ms (eine Messung), also etwa 6 % mehr.
+- [x] AC-26: Das Referenzkapitel hat denselben Fingerabdruck wie vorher.
+- [x] AC-27: Voller Testlauf grün, neue Abläufe mit eigenen Tests.
+
+### Edge Cases Status
+- [x] Ein Wort breiter als die Zeile ohne erlaubte Trennstelle: kein Überlauf über den Rand.
+- [x] Formatwechsel mitten im Wort: im Unit-Test wie ein Wort getrennt.
+- [x] Apostroph: bleibt ganz (Unit-Test).
+- [x] Text aus Word mit eigenen Trennzeichen: Die fremden Trennstellen fallen weg, es wird wie geladener Text getrennt.
+- [x] Getippter Bindestrich: keine zusätzliche Markierung in Bindestrich-Wörtern.
+- [x] Ausrichtung wechselt: Trennungen verschwinden und erscheinen sofort.
+- [x] Seitengrenze verschiebt sich durch Tippen: weiter kein Trennstrich am Seitenende.
+- [x] Rückgängig nach dem Tippen stellt die alten Umbrüche exakt her.
+- [x] Lesemodus mit einem Kapitel von vor PROJ-35: ohne Trennzeichen, getrennt angezeigt.
+- [x] Die längsten echten deutschen Wörter („Grundstücksverkehrsgenehmigungszuständigkeitsübertragungsverordnung“) in 30 Absätzen: kein Trennstrich am Seitenende, sichtbar nach 0,5 s.
+- [x] 300 Absätze (47 Seiten): sichtbar nach 0,9 s, kein Trennstrich am Seitenende.
+- [ ] Wörter länger als eine Zeile (3000 Zeichen): siehe BUG-1.
+
+### Security Audit Results
+- [x] Trennzeichen und geschützte Leerzeichen, die ein Mitglied per REST in den Text schreibt (darunter 500 Trennzeichen am Stück), verschwinden beim Öffnen und beim nächsten Speichern.
+- [x] Die Markierung wird als reiner Text erzeugt, es entsteht keine HTML-Einfügestelle.
+- [x] Neue Rechte, Tabellen oder Endpunkte gibt es nicht, RLS und Auth sind unverändert.
+- [x] Das Wörterbuch (288 KB, gepackt 105 KB) wird nur auf der Kapitel-Editor-Seite geladen.
+- [x] Die Konsole zeigt beim Öffnen und Tippen keine Fehler.
+
+### Regression
+- [x] Voller Testlauf auf genau diesem Code-Stand grün (14:34, alle 8 Gruppen). Die QA hat keinen Code geändert, nur Tests und Doku.
+- [x] Tablet (768 px, Touch): Regeln halten, Tippen per Touch. Phone (375 px): weiter der Hinweis statt des Editors.
+
+### Bugs Found
+
+#### BUG-1: Wörter länger als eine Zeile brechen die Seitenregeln und bremsen das Öffnen
+- **Severity:** Low
+- **Steps to Reproduce:**
+  1. Kapitel mit einem Fantasiewort von 3000 Buchstaben (zum Beispiel „abcdefghij“ 300-mal) und 300 normalen Absätzen öffnen.
+  2. Expected: keine Seite endet mit einem Trennstrich, Öffnen etwa wie ohne das Wort (0,9 s).
+  3. Actual: 3 Seiten enden mitten in diesen Riesenwörtern mit einem Trennstrich, sichtbar erst nach 3,4 s.
+- **Ursache:** Ein Wort über mehrere Zeilen muss an einer Seitengrenze umbrechen, die Regel kann dort nicht greifen. Der Seiten-Takt versucht es trotzdem bis zu 12-mal je Absatz, und die Folgenregel misst Absätze mit Dutzenden getrennten Zeilen in Folge Zeile für Zeile neu.
+- **Echte Texte nicht betroffen:** Die längsten deutschen Wörter passen in eine Zeile und verhalten sich korrekt.
+- **Vorschlag:** Wörter, die länger als eine Zeile sind, von den Seitenregeln ausnehmen.
+- **Priority:** Nice to have
+- **Status:** Von Jakob am 2026-11-24 akzeptiert, wird nicht behoben (kommt in echten Texten nicht vor).
+
+#### BUG-2: AC-24 (Tippen höchstens 50 ms) wird nicht erreicht, schon vor PROJ-35
+- **Severity:** Low (Spec-Frage, keine Verschlechterung)
+- **Steps to Reproduce:**
+  1. `E2E_EDITOR=1`, Test „AC-18: Tippen bleibt im langen Kapitel flüssig“ aus `tests/PROJ-25-editor-stabil.spec.ts` laufen lassen.
+  2. Expected laut AC-24: p95 höchstens 50 ms.
+  3. Actual: 56 ms, mit und ohne PROJ-35 gleich.
+- **Entscheidung für Jakob:** AC-24 auf „nicht langsamer als vor PROJ-35“ ändern oder den Seiten-Takt gesondert beschleunigen (eigenes Projekt).
+- **Priority:** Fix in next sprint
+- **Status:** Erledigt am 2026-11-24. Jakob hat das Kriterium angepasst („6 ms sind nicht schlimm“), AC-24 lautet jetzt „nicht langsamer als vor PROJ-35“.
+
+### Neue feste Tests
+- `tests/PROJ-35-silbentrennung.spec.ts`: 7 Tests (vorher 3), neu Lesemodus, Listen und Zitate, Bilder mit Seitenumbruch, Seitenzahl, Einfügen, Ausrichtung, kein Schalter, Doppelklick, Entf, Ausschneiden, Ruhe und Red Team. Alle grün.
+
+### Summary
+- **Acceptance Criteria:** 26/27 passed (AC-24 in Jakobs geänderter Fassung). AC-3 ist mangels Safari und Firefox offen.
+- **Bugs Found:** 2 total (0 critical, 0 high, 0 medium, 2 low), beide von Jakob akzeptiert: BUG-1 wird nicht behoben, BUG-2 ist durch das geänderte Kriterium erledigt.
+- **Security:** Pass
+- **Production Ready:** YES, mit einer Bedingung vor dem Go-live: Safari- und Firefox-Vergleich (AC-3).
+- **Recommendation:** Deploy nach der Production-Migration der vorherigen Projekte. BUG-1 kann warten.
 
 ## Deployment
 _To be added by /deploy_
