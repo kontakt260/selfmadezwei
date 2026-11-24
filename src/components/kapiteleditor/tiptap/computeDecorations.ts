@@ -1,5 +1,6 @@
 import { Decoration, type EditorView } from "@tiptap/pm/view";
 import { isHyphenationPoint } from "./Hyphenation";
+import type { HyphenLayout } from "./hyphenationLayout";
 
 type Geometry = {
   pageHeight: number;
@@ -16,6 +17,8 @@ export function computeDecorations(
   geom: Geometry,
   // PROJ-34: Setzt Bildabschnitte und Umbrüche, sobald der Text darüber feststeht.
   placeBlock: (kind: "pageBreak" | "imageSection", dom: HTMLElement, shift: number) => void,
+  // PROJ-35: Trennstellen; am Seitenende wird die Trennung abgeschaltet (AC-9).
+  hyphens?: HyphenLayout,
 ): { decorations: Decoration[]; paragraphsWithSoftBreak: Set<HTMLElement> } {
   const fgTop = fg.getBoundingClientRect().top;
   // UI-Zoom: wenn `.a5-stack` per transform: scale skaliert ist, sind
@@ -183,20 +186,22 @@ export function computeDecorations(
 
     // endFrameIdx wird hier nur als Schleifen-Sicherheitslimit verwendet,
     // nicht mehr als „Überschreitet eine Frame-Grenze?"-Filter.
-    const endFrameIdx = Math.max(
+    let endFrameIdx = Math.max(
       startFrameIdx,
       Math.floor((blockBottom - 1) / geom.stride),
     );
 
     const range = document.createRange();
     range.selectNodeContents(nodeDom);
-    const lineRects = mergeLineRects(Array.from(range.getClientRects()));
+    let lineRects = mergeLineRects(Array.from(range.getClientRects()));
     if (lineRects.length === 0) return false;
 
     let currentFrameIdx = startFrameIdx;
     let cumulativeShift = interParaShift;
     let thisParaSpacerHeight = 0;
     let i = 0;
+    // PROJ-35: Wie oft in diesem Absatz eine Trennung am Seitenende abgeschaltet wurde.
+    let pageEndHides = 0;
 
     while (i < lineRects.length) {
       const lr = lineRects[i];
@@ -260,6 +265,7 @@ export function computeDecorations(
             const blockStart = $pos.start();
             const WS_RE = /[\s ­]/;
             let insertPos = coord.pos;
+            let atHyphen = false;
             while (insertPos > blockStart) {
               const ch = view.state.doc.textBetween(insertPos - 1, insertPos);
               if (ch === "" || WS_RE.test(ch)) break;
@@ -267,8 +273,27 @@ export function computeDecorations(
               // Markierung daneben. Bricht die Zeile dort, gilt sie wie früher
               // das Trennzeichen als Zeilenanfang, sonst bräche der Rest des
               // Absatzes anders um als gemessen.
-              if (isHyphenationPoint(view.state, insertPos)) break;
+              if (hyphens ? hyphens.isBreak(insertPos) : isHyphenationPoint(view.state, insertPos)) {
+                atHyphen = true;
+                break;
+              }
               insertPos--;
+            }
+            // PROJ-35 AC-9: Die Seite würde mit einem Trennstrich enden. Diese
+            // Trennstelle wird abgeschaltet, der Absatz neu gemessen und die
+            // Seitengrenze noch einmal gesucht (ohne `i` weiterzuzählen).
+            if (
+              atHyphen &&
+              hyphens &&
+              pageEndHides < 12 &&
+              hyphens.hidePageEnd(nodeDom, node, pos, insertPos)
+            ) {
+              pageEndHides += 1;
+              lineRects = mergeLineRects(Array.from(range.getClientRects()));
+              if (lineRects.length === 0) break;
+              const remeasured = (nodeDom.getBoundingClientRect().bottom - fgTop) / zoom + interParaShift;
+              endFrameIdx = Math.max(startFrameIdx, Math.floor((remeasured - 1) / geom.stride));
+              continue;
             }
             let wsStart = insertPos;
             while (wsStart > blockStart) {

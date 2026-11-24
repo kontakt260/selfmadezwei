@@ -194,12 +194,33 @@ Trenn-Baustein (neu, ohne Bildschirm)
 - Voller Testlauf (15:31): alles grün bis auf zwei Ausreißer. Erstens das Aufräumen nach `PROJ-34-bilder-im-text`, das wie schon zweimal heute an Supabase-Zeitüberschreitungen scheiterte. Zweitens „Bilder bewegen sich beim Tippen höchstens einmal" aus PROJ-25, einmal mit 2 Bewegungen unter Volllast; danach 4 Wiederholungen beider Ruhe-Tests grün. Der Ruhe-Prüfstand wird in Schritt 4 genauer gemessen.
 - Wortliste als Prüfstand: `src/lib/hyphenation/index.test.ts` (34 Tests), Anzeige: `tiptap/editorCommands.test.ts` (13 Tests).
 
-**Für Schritt 3:** Bis dahin kann ein Wort wie bisher über eine Seitengrenze getrennt werden. Schritt 3 hebt diese Trennstelle auf (AC-9) und begrenzt die Trennzeilen in Folge auf 3 (AC-8), jeweils mit neuem Seiten-Takt im selben Durchgang.
+**iPad-Prüfung:** Jakob hat Schritt 1 und 2 am 2026-11-24 auf Stage (`a6be250`) mit dem iPad geprüft: alles in Ordnung.
+
+## Implementation Notes (Frontend, Schritte 3 bis 5, 2026-11-24)
+
+**Gebaut**
+- **Seitenregeln im Seiten-Takt** (`tiptap/hyphenationLayout.ts`, eingebunden in `PaginationDecorations.ts` und `computeDecorations.ts`). Eine Markierung mit sichtbarem Trennstrich hat eine Breite, ohne Trennstrich keine. Gemessen: 48 von 48 stimmen, 627 Markierungen in 2 ms. Daran erkennt der Seiten-Takt getrennte Zeilenenden.
+  - **AC-8 (höchstens 3 in Folge):** Vor dem Setzen der Seiten wird jeder Absatz geprüft, die vierte Trennung einer Folge wird abgeschaltet und neu gemessen. Das Ergebnis hängt nur am Absatztext und wird je Absatz gemerkt, beim Tippen wird nur der geänderte Absatz neu gemessen.
+  - **AC-9 (kein Trennstrich am Seitenende):** Würde eine Seite mit einem Trennstrich enden, wird genau diese Trennstelle abgeschaltet. Danach wird der Absatz neu gemessen und die Seitengrenze noch einmal gesucht, das Wort rückt ganz auf die nächste Seite. Die Folgen danach werden wieder begrenzt, gemerkt je Absatz und Seitengrenze.
+  - Alles geschieht im selben Durchgang vor dem Zeichnen. Zum Messen wird die Markierung kurz per Klasse ausgeblendet, danach übernimmt das Trenn-Plugin die Abschaltung (die Markierung entfällt). Abschaltungen am Seitenende werden bei jedem Seiten-Takt neu bestimmt, dadurch ist das Ergebnis beim Öffnen immer gleich.
+- **Trenn-Plugin:** führt die Abschaltungen getrennt nach Zeilenfolge und Seitenende, verschiebt sie beim Tippen mit und verwirft sie für einen geänderten Absatz. Abschaltungen aus dem Seiten-Takt lösen keinen neuen Seiten-Takt aus.
+
+**Beim Testen gefunden und behoben**
+- Das erste Layout lief, bevor das Wörterbuch geladen war, und merkte sich „nichts abzuschalten“. Folgen von bis zu 11 Zeilen blieben, und das Neuöffnen war nicht gleich. Gemerkt wird jetzt nur mit geladenem Wörterbuch.
+- Absätze voller langer Wörter brauchten mehr als 12 Korrekturen. Die Grenze liegt jetzt bei 60 je Absatz.
+- Nach einer Abschaltung am Seitenende wurden die Folgen bei jedem Tastendruck neu vermessen (Tippen 107 ms im Extremtext). Das Ergebnis wird jetzt je Absatz und Seitengrenze gemerkt (58 ms im Extremtext).
+
+**Gemessen (Production-Build, Chromium)**
+- Testkapitel mit Fließtext, Zitat, Liste, zentriert, rechtsbündig und drei Absätzen voller Wortungetüme: keine Seite endet mit einem Trennstrich, längste Folge 3, neu geöffnet identisch, auch nach vielen Eingaben.
+- Seiten-Takt beim Tippen (17 Seiten, 105 Absätze): 18,5 ms statt 12,9 ms ohne Schritt 3.
+- **AC-24 (Tippen höchstens 50 ms im PROJ-25-Referenzkapitel):** Der PROJ-25-Test misst dort 56 ms je Tastendruck (p95), mit und ohne Schritt 3 gleich (ohne: 56, 56, 96, 56; mit: viermal 56). Die 50 ms wurden also schon vor PROJ-35 nicht erreicht, die Silbentrennung macht das Tippen nicht messbar langsamer. **Entscheidung für Jakob in der QA:** AC-24 auf „nicht langsamer als vor PROJ-35“ ändern oder den Seiten-Takt gesondert beschleunigen.
+- **AC-25 (Öffnen höchstens 10 % langsamer):** Das lange Testkapitel aus PROJ-30 (42 Seiten) ist nach 1076 ms sichtbar, vor PROJ-35 nach 989 ms, also knapp 9 % langsamer. Das liegt knapp unter der Grenze, in der QA mehrfach messen.
+- **AC-26:** Das Referenzkapitel aus PROJ-25 (41 Seiten, 40 Seitenumbrüche im Absatz) hat denselben Fingerabdruck wie vorher, ein neuer fester Stand war nicht nötig.
+- Voller Testlauf grün (14:34, alle 8 Gruppen).
+- Neuer fester Test `tests/PROJ-35-silbentrennung.spec.ts` (3 Tests, Gruppe „Editor-Stabilität“), Unit-Tests `tiptap/hyphenationLayout.test.ts` (12 Tests).
 
 **Noch offen**
-- **Prüfung auf Jakobs iPad über Stage** (Tippen, Pfeiltasten, Rücktaste, Autokorrektur, Kopieren), bevor Schritt 3 beginnt.
-- Schritt 3 (AC-8), Schritt 4 (Messung mit vollem Testbuch, Referenzkapitel neu festhalten), Schritt 5 (E2E-Tests für alle Kriterien).
-- Safari und Firefox, Lizenzhinweise vor dem Go-live (`prod-umzug.md`, Abschnitt 8).
+- `/qa`, Safari und Firefox, Lizenzhinweise vor dem Go-live (`prod-umzug.md`, Abschnitt 8).
 
 ## QA Test Results
 _To be added by /qa_

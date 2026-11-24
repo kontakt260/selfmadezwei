@@ -21,24 +21,64 @@ import {
 // Wort-Eingabe mit Autokorrektur (Tablet, Composition) bleibt der Absatz unter
 // dem Cursor, wie er ist, und wird danach getrennt.
 
+/**
+ * Trennstellen, die der Seiten-Takt abgeschaltet hat (Schritt 3):
+ * `lines` damit höchstens 3 Zeilen in Folge getrennt enden (AC-8), hängt nur am
+ * Absatztext; `page` damit keine Seite mit einem Trennstrich endet (AC-9), wird
+ * bei jedem Seiten-Takt neu bestimmt.
+ */
+export type SuppressedHyphens = { lines: number[]; page: number[] };
+
 type HyphenationState = {
   set: DecorationSet;
   /** Absatz, der wegen einer laufenden Wort-Eingabe noch neu getrennt werden muss. */
   deferred: number | null;
+  suppressed: SuppressedHyphens;
+  /** Die letzte Änderung kam vom Seiten-Takt selbst und braucht keinen neuen. */
+  fromLayout: boolean;
 };
 
 export const hyphenationKey = new PluginKey<HyphenationState>("hyphenation");
 
 /** Meta: `"all"` trennt alles neu, eine Zahl den Absatz an dieser Position. */
 export const HYPHENATION_REFRESH = "hyphenationRefresh";
+/** Meta des Seiten-Takts: neue `SuppressedHyphens`. */
+export const HYPHENATION_SUPPRESS = "hyphenationSuppress";
+
+const NONE: SuppressedHyphens = { lines: [], page: [] };
 
 // Zentrierter und rechtsbündiger Text wird nie getrennt (Spec AC-15).
 const NO_HYPHENATION = new Set(["center", "right"]);
 
+/** Klasse der Markierung, damit der Seiten-Takt sichtbare Trennstriche findet. */
+export const HYPHEN_CLASS = "a5-shy";
+
 // side -2: Die Markierung steht vor einem Seiten-Spacer an derselben Stelle
 // (side -1, computeDecorations.ts), damit der Trennstrich am Zeilenende erscheint.
 const WIDGET_SPEC = { side: -2, key: "soft-hyphen" } as const;
-const softHyphen = () => document.createTextNode(SOFT_HYPHEN);
+const softHyphen = () => {
+  const span = document.createElement("span");
+  span.className = HYPHEN_CLASS;
+  span.textContent = SOFT_HYPHEN;
+  return span;
+};
+
+export function hyphenationSuppressed(state: EditorState): SuppressedHyphens {
+  return hyphenationKey.getState(state)?.suppressed ?? NONE;
+}
+
+function suppressedSet(suppressed: SuppressedHyphens): Set<number> {
+  return new Set([...suppressed.lines, ...suppressed.page]);
+}
+
+function mapPositions(positions: number[], tr: Transaction): number[] {
+  const out: number[] = [];
+  for (const pos of positions) {
+    const result = tr.mapping.mapResult(pos);
+    if (!result.deleted) out.push(result.pos);
+  }
+  return out;
+}
 
 /** Steht an dieser Position eine erlaubte Trennstelle? Für den Seiten-Takt. */
 export function isHyphenationPoint(state: EditorState, pos: number): boolean {
@@ -102,15 +142,16 @@ function normalizeTypedSpaces(
   return tr;
 }
 
-function blockDecorations(node: PMNode, pos: number): Decoration[] {
+function blockDecorations(node: PMNode, pos: number, suppressed: Set<number>): Decoration[] {
   if (!node.isTextblock || node.content.size === 0) return [];
   if (NO_HYPHENATION.has(node.attrs.textAlign as string)) return [];
   // Ein Zeichen je Inline-Knoten ("\n" für Zeilenumbrüche), damit Abstände im
   // Text genau den Positionen im Dokument entsprechen.
   const text = node.textBetween(0, node.content.size, undefined, "\n");
-  return hyphenationPoints(text).map((offset) =>
-    Decoration.widget(pos + 1 + offset, softHyphen, WIDGET_SPEC),
-  );
+  return hyphenationPoints(text)
+    .map((offset) => pos + 1 + offset)
+    .filter((at) => !suppressed.has(at))
+    .map((at) => Decoration.widget(at, softHyphen, WIDGET_SPEC));
 }
 
 function buildAll(doc: PMNode): DecorationSet {
@@ -118,7 +159,7 @@ function buildAll(doc: PMNode): DecorationSet {
   const decorations: Decoration[] = [];
   doc.descendants((node, pos) => {
     if (!node.isTextblock) return true;
-    decorations.push(...blockDecorations(node, pos));
+    decorations.push(...blockDecorations(node, pos, new Set()));
     return false;
   });
   return DecorationSet.create(doc, decorations);
@@ -138,13 +179,16 @@ function changedRanges(tr: Transaction): Array<[number, number]> {
   return ranges;
 }
 
+/** Trennt die betroffenen Absätze neu und meldet deren Bereiche. */
 function refreshBlocks(
   set: DecorationSet,
   doc: PMNode,
   ranges: Array<[number, number]>,
+  suppressed: Set<number>,
   skip: (pos: number, node: PMNode) => boolean,
-): DecorationSet {
+): { set: DecorationSet; blocks: Array<[number, number]> } {
   const seen = new Set<number>();
+  const blocks: Array<[number, number]> = [];
   const size = doc.content.size;
   for (const [from, to] of ranges) {
     const start = Math.max(0, Math.min(from, to) - 1);
@@ -155,37 +199,69 @@ function refreshBlocks(
       if (seen.has(pos)) return false;
       seen.add(pos);
       if (skip(pos, node)) return false;
+      blocks.push([pos, pos + node.nodeSize]);
       set = set.remove(set.find(pos, pos + node.nodeSize));
-      set = set.add(doc, blockDecorations(node, pos));
+      set = set.add(doc, blockDecorations(node, pos, suppressed));
       return false;
     });
   }
-  return set;
+  return { set, blocks };
+}
+
+function outside(positions: number[], blocks: Array<[number, number]>): number[] {
+  return positions.filter((pos) => !blocks.some(([from, to]) => pos > from && pos < to));
 }
 
 function applyTransaction(tr: Transaction, value: HyphenationState, state: EditorState): HyphenationState {
   const refresh = tr.getMeta(HYPHENATION_REFRESH) as "all" | number | undefined;
-  if (refresh === "all") return { set: buildAll(tr.doc), deferred: null };
+  if (refresh === "all") {
+    return { set: buildAll(tr.doc), deferred: null, suppressed: NONE, fromLayout: false };
+  }
 
-  let set = value.set.map(tr.mapping, tr.doc);
+  const set = value.set.map(tr.mapping, tr.doc);
   let deferred = value.deferred === null ? null : tr.mapping.map(value.deferred);
-  if (!isHyphenationReady()) return { set, deferred };
+  let suppressed: SuppressedHyphens = tr.docChanged
+    ? { lines: mapPositions(value.suppressed.lines, tr), page: mapPositions(value.suppressed.page, tr) }
+    : value.suppressed;
+  if (!isHyphenationReady()) return { set, deferred, suppressed, fromLayout: false };
+
+  // Der Seiten-Takt schaltet Trennstellen ab oder wieder ein.
+  const fromLayout = tr.getMeta(HYPHENATION_SUPPRESS) as SuppressedHyphens | undefined;
+  if (fromLayout) {
+    const before = suppressedSet(suppressed);
+    const after = suppressedSet(fromLayout);
+    const changed = [...before, ...after].filter((pos) => before.has(pos) !== after.has(pos));
+    const result = refreshBlocks(
+      set,
+      tr.doc,
+      changed.map((pos) => [pos, pos] as [number, number]),
+      after,
+      (pos) => pos === deferred,
+    );
+    return { set: result.set, deferred, suppressed: fromLayout, fromLayout: true };
+  }
 
   const ranges = tr.docChanged ? changedRanges(tr) : [];
   if (typeof refresh === "number") {
     ranges.push([refresh, refresh + 1]);
     if (deferred === refresh) deferred = null;
   }
-  if (ranges.length === 0) return { set, deferred };
+  if (ranges.length === 0) return { set, deferred, suppressed, fromLayout: false };
 
   const composing = Boolean(tr.getMeta("composition"));
   const head = state.selection.head;
-  set = refreshBlocks(set, tr.doc, ranges, (pos, node) => {
+  // Ein geänderter Absatz wird ohne Abschaltungen neu getrennt, der Seiten-Takt
+  // entscheidet danach neu.
+  const result = refreshBlocks(set, tr.doc, ranges, new Set(), (pos, node) => {
     if (!composing || head <= pos || head >= pos + node.nodeSize) return false;
     deferred = pos;
     return true;
   });
-  return { set, deferred };
+  suppressed = {
+    lines: outside(suppressed.lines, result.blocks),
+    page: outside(suppressed.page, result.blocks),
+  };
+  return { set: result.set, deferred, suppressed, fromLayout: false };
 }
 
 function stripFragment(fragment: Fragment): Fragment {
@@ -229,7 +305,12 @@ export const HyphenationDisplay = Extension.create({
         key: hyphenationKey,
 
         state: {
-          init: (_config, state) => ({ set: buildAll(state.doc), deferred: null }),
+          init: (_config, state) => ({
+            set: buildAll(state.doc),
+            deferred: null,
+            suppressed: NONE,
+            fromLayout: false,
+          }),
           apply: (tr, value, _oldState, newState) => applyTransaction(tr, value, newState),
         },
 
@@ -289,9 +370,9 @@ export const HyphenationDisplay = Extension.create({
               // beendet) brauchen einen neuen Seiten-Takt. Bei Textänderungen
               // meldet sich der Seiten-Takt selbst.
               if (view.state.doc !== prevState.doc) return;
-              if (hyphenationKey.getState(view.state)?.set !== hyphenationKey.getState(prevState)?.set) {
-                requestLayout();
-              }
+              const now = hyphenationKey.getState(view.state);
+              if (!now || now.fromLayout) return;
+              if (now.set !== hyphenationKey.getState(prevState)?.set) requestLayout();
             },
             destroy() {
               destroyed = true;

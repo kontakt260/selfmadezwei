@@ -376,6 +376,12 @@ html[data-history-refresh] main {
   -webkit-hyphens: none !important;
 }
 
+/* PROJ-35: Während der Seiten-Takt misst, ist eine abgeschaltete Trennstelle
+ * kurz ausgeblendet (hyphenationLayout.ts). Danach entfällt die Markierung ganz. */
+.a5-shy.a5-shy-off {
+  display: none;
+}
+
 .a5-stack p,
 .a5-page p {
   margin: 0 0 0.6em 0;

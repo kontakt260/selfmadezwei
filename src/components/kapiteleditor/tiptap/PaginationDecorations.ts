@@ -9,6 +9,8 @@ import {
 } from "../chapterLayout";
 import { isInDeadZone, placeCaretNearPoint } from "./caretPlacement";
 import { computeDecorations, lineBoxHeight, readGeometry } from "./computeDecorations";
+import { HYPHENATION_SUPPRESS, hyphenationSuppressed, type SuppressedHyphens } from "./Hyphenation";
+import { prepareHyphenLayout } from "./hyphenationLayout";
 
 // Spec PROJ-5 — Acceptance „Zeilenweiser Soft-Break in langen Absätzen":
 // wenn ein Absatz nicht vollständig auf die laufende Seite passt, fließen
@@ -186,27 +188,44 @@ function layoutChapter(view: EditorView, onPageCount: (pages: number) => void) {
   if (!geom || geom.stride <= 0 || geom.contentHeight <= 0) return;
   const zoom = parseFloat(getComputedStyle(stack).getPropertyValue("--ui-zoom") || "1") || 1;
   // Alte Umbrüche entfernen, damit die Messung den natürlichen Fluss sieht.
+  // PROJ-35: Abschaltungen am Seitenende gelten nur für einen Durchgang und
+  // werden mit entfernt; die nach Zeilenfolge bleiben (hängen am Absatztext).
   const previous = KEY.getState(view.state);
-  if (previous && previous !== DecorationSet.empty) {
-    view.dispatch(view.state.tr.setMeta(KEY, { decorations: DecorationSet.empty }));
-  }
+  const suppressed = hyphenationSuppressed(view.state);
+  const clear = view.state.tr;
+  if (previous && previous !== DecorationSet.empty) clear.setMeta(KEY, { decorations: DecorationSet.empty });
+  if (suppressed.page.length > 0) clear.setMeta(HYPHENATION_SUPPRESS, { lines: suppressed.lines, page: [] });
+  if (clear.getMeta(KEY) || clear.getMeta(HYPHENATION_SUPPRESS)) view.dispatch(clear);
   resetImageRows(fg);
 
+  const hyphens = prepareHyphenLayout(view);
   let placer = createBlockPlacer(fg, geom, zoom, new Map());
-  let { decorations } = computeDecorations(view, fg, geom, placer.place);
+  let { decorations } = computeDecorations(view, fg, geom, placer.place, hyphens);
 
   // Bilder auf derselben Seite bekommen dieselbe Größe. Das verschiebt, was
   // darunter steht, deshalb genau ein zweiter Durchlauf.
   const caps = unevenPageScales(placer.rows);
   if (caps.size > 0) {
     resetImageRows(fg);
+    hyphens.resetPageEnds();
     placer = createBlockPlacer(fg, geom, zoom, caps);
-    ({ decorations } = computeDecorations(view, fg, geom, placer.place));
+    ({ decorations } = computeDecorations(view, fg, geom, placer.place, hyphens));
   }
 
+  const done = view.state.tr;
   if (decorations.length > 0) {
-    const set = DecorationSet.create(view.state.doc, decorations);
-    view.dispatch(view.state.tr.setMeta(KEY, { decorations: set }));
+    done.setMeta(KEY, { decorations: DecorationSet.create(view.state.doc, decorations) });
   }
+  const next = hyphens.result();
+  const now = hyphenationSuppressed(view.state);
+  if (!sameSuppression(now, next)) done.setMeta(HYPHENATION_SUPPRESS, next);
+  if (done.getMeta(KEY) || done.getMeta(HYPHENATION_SUPPRESS)) view.dispatch(done);
+  hyphens.cleanup(dom);
   onPageCount(measurePageCount(fg, dom, geom.stride, zoom));
+}
+
+function sameSuppression(a: SuppressedHyphens, b: SuppressedHyphens): boolean {
+  const same = (x: number[], y: number[]) =>
+    x.length === y.length && [...x].sort((p, q) => p - q).every((v, i) => v === [...y].sort((p, q) => p - q)[i]);
+  return same(a.lines, b.lines) && same(a.page, b.page);
 }
