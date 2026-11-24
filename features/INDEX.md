@@ -45,7 +45,7 @@
 | PROJ-32 | Schriftarten im Kapitel-Editor | P1 | Roadmap | PROJ-25 | — | 2026-11-23 |
 | PROJ-33 | Impuls-Bibliothek | P1 | Roadmap | PROJ-8, PROJ-22, PROJ-28 | — | 2026-11-23 |
 | PROJ-34 | Bilder im Kapiteltext und Hochkant | P1 | Approved | PROJ-3, PROJ-5, PROJ-7, PROJ-25, PROJ-26, PROJ-28 | [Spec](PROJ-34-bilder-im-kapitel.md) | 2026-11-23 |
-| PROJ-35 | Automatische Silbentrennung | P1 | Roadmap | PROJ-5, PROJ-25, PROJ-34 | — | 2026-11-24 |
+| PROJ-35 | Automatische Silbentrennung | P1 | Planned | PROJ-5, PROJ-7, PROJ-25, PROJ-28, PROJ-34 | [Spec](PROJ-35-silbentrennung.md) | 2026-11-24 |
 | PROJ-36 | Hilfe und Anleitung in der Seitenleiste | P1 | Roadmap | PROJ-22, PROJ-34 | — | 2026-11-24 |
 
 <!-- Add features above this line -->
