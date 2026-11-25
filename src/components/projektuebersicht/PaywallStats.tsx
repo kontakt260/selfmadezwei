@@ -28,17 +28,19 @@ type Props = {
   deletesOn: string | null;
 };
 
+// Die Karte ist selbst die Zelle im Raster der Projektübersicht und wird von
+// ihm auf volle Höhe gestreckt. Keine Prozent-Höhen (`h-full`): Safari löste sie
+// anders auf, die Karten wurden zu hoch und lagen über dem Bereich darunter
+// (Jakob, 2026-11-25).
 export function PaywallStats({ projectId, portalExpiresAt, daysLeft, expiredOn, deletesOn }: Props) {
   return (
-    <div className="grid h-full grid-cols-1">
-      <PortalAccessStat
-        projectId={projectId}
-        expiresAt={portalExpiresAt}
-        daysLeft={daysLeft}
-        expiredOn={expiredOn}
-        deletesOn={deletesOn}
-      />
-    </div>
+    <PortalAccessStat
+      projectId={projectId}
+      expiresAt={portalExpiresAt}
+      daysLeft={daysLeft}
+      expiredOn={expiredOn}
+      deletesOn={deletesOn}
+    />
   );
 }
 
@@ -114,7 +116,7 @@ function StatCard({
   action: React.ReactNode;
 }) {
   return (
-    <div className="flex h-full flex-col gap-3 border border-[#E0DCD5] bg-white p-5 sm:p-8">
+    <div className="flex flex-col gap-3 border border-[#E0DCD5] bg-white p-5 sm:p-8">
       <div className="flex flex-row items-center gap-2 sm:gap-3">
         <span className="shrink-0 [&>svg]:h-6 [&>svg]:w-6 sm:[&>svg]:h-7 sm:[&>svg]:w-7">
           {icon}
