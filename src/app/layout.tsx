@@ -19,10 +19,13 @@ const merriweather = Merriweather({
   weight: ["400", "700"],
 });
 
+// PROJ-32 BUG-1: Auch kursiv, sonst stellt der Browser normales PT Serif nur
+// schräg. PT Serif ist die Vorgabe-Buchschrift und braucht alle vier Schnitte.
 const ptSerif = PT_Serif({
   variable: "--font-pt-serif",
   subsets: ["latin"],
   weight: ["400", "700"],
+  style: ["normal", "italic"],
 });
 
 export const metadata: Metadata = {

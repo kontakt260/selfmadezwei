@@ -147,6 +147,7 @@ describe("addChapterAction", () => {
     const client = makeMockClient();
     client.from
       .mockReturnValueOnce(makeBuilder({ data: null }))               // max sort_order → null
+      .mockReturnValueOnce(makeBuilder({ data: { book_font: "garamond" } })) // PROJ-32: Buchschrift
       .mockReturnValueOnce(makeBuilder({ data: { id: CHAPTER_1 } })) // insert
       .mockReturnValueOnce(makeBuilder());                             // project updated_at touch
     vi.mocked(createClient).mockResolvedValue(client as never);
@@ -154,8 +155,23 @@ describe("addChapterAction", () => {
     const result = await addChapterAction(fd());
 
     expect(result).toEqual({ chapterId: CHAPTER_1 });
-    expect(client.from.mock.results[1].value.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ sort_order: 0, chapter_origin: "custom" }),
+    expect(client.from.mock.results[2].value.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ sort_order: 0, chapter_origin: "custom", page_count_font: "garamond" }),
+    );
+  });
+
+  it("PROJ-32 BUG-2: ohne lesbare Buchschrift bleibt die Mess-Schrift leer", async () => {
+    const client = makeMockClient();
+    client.from
+      .mockReturnValueOnce(makeBuilder({ data: null }))
+      .mockReturnValueOnce(makeBuilder({ data: null, error: { message: "db error" } }))
+      .mockReturnValueOnce(makeBuilder({ data: { id: CHAPTER_1 } }))
+      .mockReturnValueOnce(makeBuilder());
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    expect(await addChapterAction(fd())).toEqual({ chapterId: CHAPTER_1 });
+    expect(client.from.mock.results[2].value.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ page_count_font: null }),
     );
   });
 
@@ -163,13 +179,14 @@ describe("addChapterAction", () => {
     const client = makeMockClient();
     client.from
       .mockReturnValueOnce(makeBuilder({ data: { sort_order: 4 } })) // last chapter
+      .mockReturnValueOnce(makeBuilder({ data: { book_font: "pt-serif" } })) // Buchschrift
       .mockReturnValueOnce(makeBuilder({ data: { id: CHAPTER_1 } })) // insert
       .mockReturnValueOnce(makeBuilder());                             // project touch
     vi.mocked(createClient).mockResolvedValue(client as never);
 
     await addChapterAction(fd());
 
-    expect(client.from.mock.results[1].value.insert).toHaveBeenCalledWith(
+    expect(client.from.mock.results[2].value.insert).toHaveBeenCalledWith(
       expect.objectContaining({ sort_order: 5 }),
     );
   });
@@ -178,6 +195,7 @@ describe("addChapterAction", () => {
     const client = makeMockClient();
     client.from
       .mockReturnValueOnce(makeBuilder({ data: null }))
+      .mockReturnValueOnce(makeBuilder({ data: { book_font: "pt-serif" } }))
       .mockReturnValueOnce(makeBuilder({ data: null, error: { message: "insert failed" } }));
     vi.mocked(createClient).mockResolvedValue(client as never);
     expect(await addChapterAction(fd())).toEqual({
@@ -196,6 +214,7 @@ describe("addImpulseChapterAction", () => {
     form.set("projectId", PROJECT_ID);
     client.from
       .mockReturnValueOnce(makeBuilder({ data: null })) // sort_order lookup
+      .mockReturnValueOnce(makeBuilder({ data: { book_font: "heros" } })) // PROJ-32: Buchschrift
       .mockReturnValueOnce(makeBuilder({ data: { id: CHAPTER_1 } })) // chapter insert
       .mockReturnValueOnce(makeBuilder()); // projects update
     vi.mocked(createClient).mockResolvedValue(client as never);
@@ -203,8 +222,8 @@ describe("addImpulseChapterAction", () => {
     const result = await addImpulseChapterAction(form);
 
     expect(result).toEqual({ chapterId: CHAPTER_1 });
-    expect(client.from.mock.results[1].value.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ chapter_origin: "catalog_impulse", source_impulse_id: null }),
+    expect(client.from.mock.results[2].value.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ chapter_origin: "catalog_impulse", source_impulse_id: null, page_count_font: "heros" }),
     );
   });
 
@@ -218,13 +237,14 @@ describe("addImpulseChapterAction", () => {
     client.from
       .mockReturnValueOnce(makeBuilder({ data: { id: IMPULSE_UUID } })) // impulse exists check
       .mockReturnValueOnce(makeBuilder({ data: null })) // sort_order lookup
+      .mockReturnValueOnce(makeBuilder({ data: { book_font: "pt-serif" } })) // Buchschrift
       .mockReturnValueOnce(makeBuilder({ data: { id: CHAPTER_1 } })) // chapter insert
       .mockReturnValueOnce(makeBuilder()); // projects update
     vi.mocked(createClient).mockResolvedValue(client as never);
 
     const result = await addImpulseChapterAction(form);
     expect(result).toEqual({ chapterId: CHAPTER_1 });
-    expect(client.from.mock.results[2].value.insert).toHaveBeenCalledWith(
+    expect(client.from.mock.results[3].value.insert).toHaveBeenCalledWith(
       expect.objectContaining({ source_impulse_id: IMPULSE_UUID }),
     );
   });

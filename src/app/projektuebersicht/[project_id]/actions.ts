@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { projectWriteBlockedError } from "@/lib/projects/project-access";
+import { bookFontOrDefault, type BookFontId } from "@/lib/book-fonts";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -57,6 +58,33 @@ const addChapterSchema = z.object({
   projectId: uuidSchema,
 });
 
+/**
+ * Platz und Mess-Schrift für ein neues Kapitel. PROJ-32 BUG-2: Ein neues, leeres
+ * Kapitel hat in jeder Schrift eine Seite. Es bekommt deshalb gleich die
+ * Buchschrift als Schrift seiner Seitenzahl und gilt nicht als veraltet (sonst
+ * zeigte die Übersicht kurz „Seitenzahlen werden aktualisiert“). Lässt sich die
+ * Buchschrift nicht lesen, bleibt die Angabe leer und der Neusatz misst nach.
+ */
+async function newChapterPlacement(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  projectId: string,
+): Promise<{ nextSortOrder: number; pageCountFont: BookFontId | null }> {
+  const [lastChapter, project] = await Promise.all([
+    supabase
+      .from("chapters")
+      .select("sort_order")
+      .eq("project_id", projectId)
+      .order("sort_order", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase.from("projects").select("book_font").eq("id", projectId).maybeSingle(),
+  ]);
+  return {
+    nextSortOrder: (lastChapter.data?.sort_order ?? -1) + 1,
+    pageCountFont: project.data ? bookFontOrDefault(project.data.book_font) : null,
+  };
+}
+
 export async function addChapterAction(
   formData: FormData,
 ): Promise<{ chapterId?: string; error?: string }> {
@@ -78,15 +106,7 @@ export async function addChapterAction(
   if (accessError) return { error: accessError };
 
   // Get current max sort_order for this project (RLS enforces membership)
-  const { data: lastChapter } = await supabase
-    .from("chapters")
-    .select("sort_order")
-    .eq("project_id", projectId)
-    .order("sort_order", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const nextSortOrder = (lastChapter?.sort_order ?? -1) + 1;
+  const { nextSortOrder, pageCountFont } = await newChapterPlacement(supabase, projectId);
 
   const { data: newChapter, error } = await supabase
     .from("chapters")
@@ -97,6 +117,7 @@ export async function addChapterAction(
       chapter_origin: "custom",
       body: null,
       word_count: 0,
+      page_count_font: pageCountFont,
     })
     .select("id")
     .single();
@@ -162,15 +183,7 @@ export async function addImpulseChapterAction(
     }
   }
 
-  const { data: lastChapter } = await supabase
-    .from("chapters")
-    .select("sort_order")
-    .eq("project_id", projectId)
-    .order("sort_order", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const nextSortOrder = (lastChapter?.sort_order ?? -1) + 1;
+  const { nextSortOrder, pageCountFont } = await newChapterPlacement(supabase, projectId);
 
   const { data: newChapter, error } = await supabase
     .from("chapters")
@@ -182,6 +195,7 @@ export async function addImpulseChapterAction(
       source_impulse_id: impulseId,
       body: null,
       word_count: 0,
+      page_count_font: pageCountFont,
     })
     .select("id")
     .single();
