@@ -4,9 +4,17 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { assertStage, createTestAccount, readEnvLocal, signIn, type TestAccount } from "./helpers/stage";
+import {
+  accessToken,
+  assertStage,
+  createTestAccount,
+  readEnvLocal,
+  restRequest,
+  signIn,
+  type TestAccount,
+} from "./helpers/stage";
 
-// PROJ-32: Buchschrift im Kapitel-Editor (Schritt 2: Auswahl, Wechsel, Seitenzahl je Schrift).
+// PROJ-32: Buchschrift im Kapitel-Editor: Auswahl, Wechsel, Seitenzahl je Schrift, Neusatz, Cover, QA.
 // Eigene temporäre Konten und Daten auf Stage, die echte Cron-Route wird nie aufgerufen.
 //   E2E_EDITOR=1 npx playwright test tests/PROJ-32-schriftarten.spec.ts --project=chromium
 test.skip(process.env.E2E_EDITOR !== "1", "Nur mit E2E_EDITOR=1");
@@ -82,8 +90,8 @@ async function setBookFont(project: string, font: FontId) {
 }
 
 async function chapterRow(id: string) {
-  const { data } = await admin.from("chapters").select("page_count, page_count_font, body").eq("id", id).single();
-  return data as { page_count: number; page_count_font: string | null; body: unknown };
+  const { data } = await admin.from("chapters").select("page_count, page_count_font, body, updated_at").eq("id", id).single();
+  return data as { page_count: number; page_count_font: string | null; body: unknown; updated_at: string };
 }
 
 const fontOf = (page: Page, selector: string) =>
@@ -736,5 +744,257 @@ test.describe("PROJ-32 — Buchschrift", () => {
     await expect(page.getByRole("option")).toHaveCount(6);
     await page.screenshot({ path: path.join(os.tmpdir(), "proj32-tablet.png") });
     await context.close();
+  });
+});
+
+// ─── QA (2026-11-25) ─────────────────────────────────────────────────────────
+
+type CapturedAction = { url: string; headers: Record<string, string>; body: string };
+
+/** Hält den nächsten Server-Aufruf fest, dessen Daten `match` enthalten. */
+function captureAction(page: Page, match: (body: string) => boolean): Promise<CapturedAction> {
+  return new Promise((resolve) => {
+    page.on("request", (request) => {
+      const body = request.postData() ?? "";
+      if (request.method() !== "POST" || !request.headers()["next-action"] || !match(body)) return;
+      const headers: Record<string, string> = {};
+      for (const [key, value] of Object.entries(request.headers())) {
+        if (!["cookie", "host", "content-length"].includes(key)) headers[key] = value;
+      }
+      resolve({ url: request.url(), headers, body });
+    });
+  });
+}
+
+test.describe("PROJ-32 — QA", () => {
+  test.use({ storageState: SESSION_FILE });
+
+  test("Edge Case Papierkorb: Projekt und Kapitel behalten Schrift und Seitenzahl-Schrift", async ({ page, context }) => {
+    test.setTimeout(90_000);
+    const env = readEnvLocal();
+    const connection = { supabaseUrl: env.NEXT_PUBLIC_SUPABASE_URL, anonKey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY };
+    const book = await makeBook("Papierkorb", [
+      { title: "Bleibt", content: [para(PROSE[0])] },
+      { title: "Kommt zurück", content: [para(PROSE[1])] },
+    ]);
+    await setBookFont(book.id, "pagella");
+    await admin.from("chapters").update({ page_count_font: "pagella" }).eq("id", book.chapterIds[1]);
+    await page.goto("/");
+    const token = accessToken(await context.cookies());
+
+    // Kapitel in den Papierkorb und zurück.
+    const delChapter = await restRequest(connection, `chapters?id=eq.${book.chapterIds[1]}`, { method: "DELETE" }, token);
+    expect(delChapter.ok).toBe(true);
+    expect((await admin.from("chapters").select("id").eq("id", book.chapterIds[1])).data).toEqual([]);
+    const restoredChapter = await admin.rpc("trash_restore_chapter", { p_chapter_id: book.chapterIds[1] });
+    expect(restoredChapter.error).toBeNull();
+    expect((await chapterRow(book.chapterIds[1])).page_count_font).toBe("pagella");
+
+    // Projekt in den Papierkorb und zurück.
+    const delProject = await restRequest(connection, `projects?id=eq.${book.id}`, { method: "DELETE" }, token);
+    expect(delProject.ok).toBe(true);
+    expect((await admin.from("trash_projects").select("project_id").eq("project_id", book.id)).data).toHaveLength(1);
+    const restoredProject = await admin.rpc("trash_restore_project", { p_project_id: book.id });
+    expect(restoredProject.error).toBeNull();
+    const { data } = await admin.from("projects").select("book_font").eq("id", book.id).single();
+    expect(data?.book_font).toBe("pagella");
+    await open(page, book.chapterIds[0], book.id);
+    await expect(page.locator("main .a5-stack")).toHaveAttribute("data-book-font", "pagella");
+  });
+
+  test("AC-21: Die Druckansicht nutzt dieselbe Schrift und dieselben Umbrüche", async ({ page }) => {
+    await setBookFont(projectId, "baskerville");
+    await open(page, ch.zweites);
+    await expect(page.locator("main .a5-stack")).toHaveAttribute("data-book-font", "baskerville");
+    const screen = await layout(page);
+    await page.emulateMedia({ media: "print" });
+    expect(await fontOf(page, "main .tiptap-editor p")).toMatch(FAMILY.baskerville);
+    expect(await page.locator("main .a5-stack").evaluate((el) => getComputedStyle(el).transform)).toBe("none");
+    expect((await layout(page)).starts).toEqual(screen.starts);
+    await page.emulateMedia({ media: "screen" });
+    await setBookFont(projectId, "garamond");
+  });
+
+  test("Edge Case Phone: kein Editor und kein Auswahlfeld, nur der Hinweis", async ({ browser }) => {
+    const context = await browser.newContext({
+      storageState: SESSION_FILE,
+      baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
+      viewport: { width: 375, height: 812 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    const page = await context.newPage();
+    await page.goto(`/projektuebersicht/${projectId}/kapiteleditor/${ch.zweites}`);
+    await expect(page.getByText(/Tablet|Computer/).first()).toBeVisible();
+    await expect(page.getByTestId("book-font-select")).toBeHidden();
+    await context.close();
+  });
+
+  test("BUG-1, AC-4: PT Serif hat echtes Kursiv und Fett-Kursiv", async ({ page }) => {
+    const book = await makeBook("Kursiv", [
+      {
+        title: "Kursiv",
+        content: [
+          marked("Ein kursiver Satz über die Ernte im Herbst.", "italic"),
+          { type: "paragraph", content: [{ type: "text", text: "Fett und kursiv.", marks: [{ type: "bold" }, { type: "italic" }] }] },
+        ],
+      },
+    ]);
+    await open(page, book.chapterIds[0], book.id);
+    await expect(page.locator("main .a5-stack")).toHaveAttribute("data-book-font", "pt-serif");
+    const faces = await page.evaluate(() =>
+      Array.from(document.fonts)
+        .filter((face) => /PT.Serif/i.test(face.family) && !/Fallback/i.test(face.family) && face.status === "loaded")
+        .map((face) => `${face.style} ${face.weight}`),
+    );
+    expect(faces).toEqual(expect.arrayContaining(["italic 400", "italic 700"]));
+  });
+
+  test("BUG-2: Ein neues Kapitel bekommt gleich die Buchschrift, ohne Hinweis in der Übersicht", async ({ page }) => {
+    test.setTimeout(90_000);
+    const book = await makeBook("Neues Kapitel", [{ title: "Erstes", content: [para(PROSE[0])] }]);
+    await setBookFont(book.id, "heros");
+    await admin.from("chapters").update({ page_count_font: "heros" }).eq("id", book.chapterIds[0]);
+    await page.goto(`/projektuebersicht/${book.id}`);
+    await expect(page.getByTestId("page-count-refresh")).toHaveCount(0);
+
+    // Über die Oberfläche anlegen, wie eine schreibende Person.
+    await page.getByRole("button", { name: "Eigenes Kapitel" }).first().click();
+    await page.getByLabel("Kapiteltitel").fill("Zweites Kapitel");
+    await page.getByLabel("Kapiteltitel").press("Enter");
+    await page.waitForURL(/\/kapiteleditor\//, { timeout: 20_000 });
+    const { data: created } = await admin
+      .from("chapters")
+      .select("id, page_count, page_count_font")
+      .eq("project_id", book.id)
+      .eq("title", "Zweites Kapitel")
+      .single();
+    expect(created?.page_count_font).toBe("heros");
+    expect(created?.page_count).toBe(1);
+
+    await page.goto(`/projektuebersicht/${book.id}`);
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByTestId("page-count-refresh")).toHaveCount(0);
+  });
+
+  test("Zoom 200 %: Ein gezogenes Foto folgt der Maus", async ({ page }) => {
+    test.setTimeout(90_000);
+    const sectionId = crypto.randomUUID();
+    const photo = (n: number) => ({ id: crypto.randomUUID(), storage_path: `${projectId}/x/${n}.png`, signed_url: "", alt: "" });
+    const photos = [photo(1), photo(2)];
+    const empty = { layout: "1-spaltig", images: [] };
+    const book = await makeBook("Zoom", [
+      {
+        title: "Fotos",
+        content: [para(PROSE[0]), { type: "imageSection", attrs: { sectionId } }, para(PROSE[1])],
+        sections: { start: empty, end: empty, inline: { [sectionId]: { layout: "2-spaltig", images: photos } }, placed: true },
+      },
+    ]);
+    await open(page, book.chapterIds[0], book.id);
+    for (let i = 0; i < 3; i += 1) await page.getByRole("button", { name: "Vergrößern" }).click();
+    await expect(page.getByText("200 %")).toBeVisible();
+    const slots = page.locator("main .image-slot");
+    await slots.first().scrollIntoViewIfNeeded();
+    await slots.first().hover();
+    const handle = slots.first().getByRole("button", { name: "Bild verschieben" });
+    const start = (await handle.boundingBox())!;
+    const target = (await slots.nth(1).boundingBox())!;
+    await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+    await page.mouse.down();
+    const midX = start.x + 120;
+    const midY = start.y + start.height / 2;
+    await page.mouse.move(start.x + 20, midY, { steps: 4 });
+    await page.mouse.move(midX, midY, { steps: 8 });
+    // Der Griff bleibt unter der Maus, auch bei 200 %.
+    const during = (await handle.boundingBox())!;
+    const drift = Math.abs(during.x + during.width / 2 - midX);
+    console.log(`Abstand Griff zu Maus bei 200 %: ${Math.round(drift)} px`);
+    expect(drift).toBeLessThan(15);
+    await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 10 });
+    await page.mouse.up();
+    await expect
+      .poll(async () => {
+        const { data } = await admin.from("chapters").select("image_sections").eq("id", book.chapterIds[0]).single();
+        const inline = (data?.image_sections as { inline?: Record<string, { images: Array<{ id: string }> }> }).inline;
+        return inline?.[sectionId]?.images.map((image) => image.id);
+      }, { timeout: 15_000 })
+      .toEqual([photos[1].id, photos[0].id]);
+  });
+
+  test("Red Team: Server-Aufrufe und direkte Datenbankzugriffe von außen", async ({ browser, page, context }) => {
+    test.setTimeout(180_000);
+    const env = readEnvLocal();
+    const connection = { supabaseUrl: env.NEXT_PUBLIC_SUPABASE_URL, anonKey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY };
+    const book = await makeBook("Angriff", [
+      { title: "Eins", content: Array.from({ length: 8 }, (_, i) => para(PROSE[i % 3])) },
+      { title: "Zwei", content: [para(PROSE[1])] },
+    ]);
+    await setBookFont(book.id, "garamond");
+
+    // Echte Aufrufe der angemeldeten Person festhalten.
+    const queueCall = captureAction(page, (body) => body === `[{"projectId":"${book.id}"}]`);
+    const typesetCall = captureAction(page, (body) => body.includes(`"chapterId":"${book.chapterIds[0]}"`) && !body.includes("pageCount"));
+    const pageCountCall = captureAction(page, (body) => body.includes('"pageCount"') && body.includes("ifUnchangedSince"));
+    await page.goto(`/projektuebersicht/${book.id}`);
+    const [queue, typeset, pageCount] = await Promise.all([queueCall, typesetCall, pageCountCall]);
+    await expect(page.getByTestId("page-count-refresh")).toHaveCount(0, { timeout: 30_000 });
+    const fontCall = captureAction(page, (body) => body.includes('"bookFont"'));
+    await open(page, book.chapterIds[0], book.id);
+    await page.getByTestId("book-font-select").click();
+    await page.getByRole("option", { name: /Atkinson/ }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Schrift ändern" }).click();
+    const setFont = await fontCall;
+    await expect(page.locator("main .a5-stack")).toHaveAttribute("data-book-font", "atkinson");
+
+    const replay = async (requester: typeof context.request, call: CapturedAction, body = call.body) =>
+      (await requester.post(call.url, { headers: call.headers, data: body })).text();
+
+    // Eigene Aufrufe mit manipulierten Werten.
+    expect(await replay(context.request, setFont, setFont.body.replace("atkinson", "arial"))).toContain("Diese Schrift gibt es nicht.");
+    expect(await replay(context.request, setFont, setFont.body.replace(book.id, readOnlyProject))).toContain("abgelaufen");
+    const before = await chapterRow(book.chapterIds[0]);
+    const faked = pageCount.body
+      .replace(/"pageCount":\d+/, '"pageCount":99')
+      .replace(/"pageCountFont":"\w[\w-]*"/, '"pageCountFont":"atkinson"')
+      .replace(/"ifUnchangedSince":"[^"]+"/, '"ifUnchangedSince":"2000-01-01T00:00:00+00:00"');
+    expect(await replay(context.request, pageCount, faked)).toContain("Speichern fehlgeschlagen.");
+    expect((await chapterRow(book.chapterIds[0])).page_count).toBe(before.page_count);
+
+    // Eine fremde, angemeldete Person ohne Mitgliedschaft.
+    const stranger = await createTestAccount(admin, { email: `e2e-proj32-fremd-${RUN_ID}@example.test`, name: "Fremd" });
+    // Mit eigenem Buch, sonst leitet der Proxy schon vor der Server-Aktion zum Kauf um.
+    const { data: own } = await admin.from("projects").insert({ title: "Fremdes Buch", owner_id: stranger.id }).select("id").single();
+    extraProjects.push(own!.id as string);
+    await admin.from("project_access").insert({ project_id: own!.id, expires_at: "2028-06-15T12:00:00Z" });
+    await admin.from("project_members").insert({ project_id: own!.id, user_id: stranger.id, role: "projektleiter" });
+    const strangerContext = await browser.newContext({ storageState: { cookies: [], origins: [] }, baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000" });
+    try {
+      await signIn(await strangerContext.newPage(), stranger);
+      const other = strangerContext.request;
+      expect(await replay(other, setFont, setFont.body.replace("atkinson", "heros"))).toContain("Projekt nicht gefunden.");
+      expect(await replay(other, queue)).toContain("Projekt nicht gefunden.");
+      expect(await replay(other, typeset)).toContain("Kapitel nicht gefunden.");
+      expect(await replay(other, pageCount, faked.replace("2000-01-01T00:00:00+00:00", before.updated_at ?? ""))).toContain("Speichern fehlgeschlagen.");
+      expect(await replay(other, typeset)).not.toContain(PROSE[0].slice(0, 30));
+      const { data: font } = await admin.from("projects").select("book_font").eq("id", book.id).single();
+      expect(font?.book_font).toBe("atkinson");
+
+      // Direkt über die Datenbank-Schnittstelle.
+      const strangerToken = accessToken(await strangerContext.cookies());
+      const patch = (project: string, values: Record<string, unknown>, token: string, table = "projects") =>
+        restRequest({ ...connection, prefer: "return=representation" }, `${table}?id=eq.${project}`, { method: "PATCH", body: JSON.stringify(values) }, token);
+      const strangerPatch = await patch(book.id, { book_font: "heros" }, strangerToken);
+      expect(await strangerPatch.json()).toEqual([]);
+      const ownToken = accessToken(await context.cookies());
+      expect((await patch(book.id, { book_font: "comic-sans" }, ownToken)).status).toBe(400);
+      const readOnlyPatch = await patch(readOnlyProject, { book_font: "heros" }, ownToken);
+      expect(readOnlyPatch.ok ? await readOnlyPatch.json() : []).toEqual([]);
+      expect((await patch(book.chapterIds[1], { page_count_font: "comic-sans" }, ownToken, "chapters")).status).toBe(400);
+      const { data: still } = await admin.from("projects").select("book_font").eq("id", book.id).single();
+      expect(still?.book_font).toBe("atkinson");
+    } finally {
+      await strangerContext.close();
+      await admin.auth.admin.deleteUser(stranger.id);
+    }
   });
 });

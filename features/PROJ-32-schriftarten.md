@@ -1,6 +1,6 @@
 # PROJ-32: Schriftarten im Kapitel-Editor
 
-## Status: In Progress
+## Status: Approved
 **Created:** 2026-11-24
 **Last Updated:** 2026-11-25
 **Freigegeben:** Spec und Tech Design von Jakob am 2026-11-24
@@ -258,7 +258,103 @@ Schriften-Baustein (neu)
 - Safari selbst lässt sich auf diesem Mac nicht automatisch testen (WebKit startet nicht). Jakob hat beides am 2026-11-25 in Safari am Mac geprüft (lokaler Production-Build gegen Stage): Kästen und Zoom passen.
 
 ## QA Test Results
-_To be added by /qa_
+
+**Tested:** 2026-11-25
+**App URL:** http://localhost:3000 (lokaler Production-Build mit dem Stand von `4d03b7a`, Stage-Datenbank), Stage-Deployment `app-narravit-bthoxupgs` bereit
+**Tester:** QA Engineer (AI)
+**Browser:** Chromium auf Desktop (1440 px), Tablet (768 px, Touch) und Phone (375 px). Safari am Mac: Zoom und Projektübersicht von Jakob bestätigt (2026-11-25). Safari für das ganze Feature, iPad und Firefox prüft Jakob von Hand auf Stage, WebKit startet auf diesem Mac nicht automatisch.
+**Automatisch:** `tests/PROJ-32-schriftarten.spec.ts` mit 22 Tests (15 aus dem Bau, 7 aus der QA und den Korrekturen), alle grün. Nach den Korrekturen `npm run test:full` mit 1076 Unit-Tests und allen Browser-Gruppen grün bis auf eine Zeitmessung unter Volllast (PROJ-34 AC-22 bis AC-25: Ruhe nach 180 statt höchstens 150 ms, nichts sprang zurück), einzeln fünfmal wiederholt grün. `npm run test:full` vor dem Push grün bis auf den bekannten Wackler in PROJ-3 („Wird gelöscht“ zweimal gefunden), einzeln wiederholt 23 von 23 grün. 1075 Unit-Tests grün.
+
+### Acceptance Criteria Status
+
+#### A. Auswahl
+- [x] AC-1: Auswahlfeld „Buchschrift“ mit der aktuellen Schrift, Tooltip und Screenreader-Text in der Sie-Form („gilt für das ganze Buch“).
+- [x] AC-2: Sechs Schriften, vier mit Serifen und zwei ohne (Spec erlaubte 4 bis 5 plus eine serifenlose, Jakob hat zwei serifenlose gewählt). Jeder Name steht in seiner eigenen Schrift, auch im Feld selbst, auf dem Tablet nicht abgeschnitten.
+- [x] AC-3: Neue und bestehende Bücher in PT Serif, unverändert: 11 pt, Titel in Merriweather, keine Buchschrift-Variablen gesetzt.
+- [x] AC-4: Alle sechs Schriften haben vier Schnitte und alle geforderten Zeichen (ä ö ü ß „ “ ‚ ‘ – — € …, geprüft an den ausgelieferten Dateien mit fontTools), Lizenzen OFL bzw. GUST. PT Serif hatte zunächst kein Kursiv (BUG-1, behoben).
+
+#### B. Wechsel
+- [x] AC-5: Rückfrage mit dem Wortlaut der Spec, „Abbrechen“ ändert nichts (auch nicht in der Datenbank).
+- [x] AC-6: Text, Kapiteltitel und Seitenzahl sofort in der neuen Schrift, danach springt nichts nach (Zeilen nach 1,5 s identisch).
+- [x] AC-7: Andere Kapitel, Lesemodus und Druckansicht zeigen die neue Schrift.
+- [x] AC-8: Titel und Seitenzahl folgen, das Logo bleibt unverändert.
+- [x] AC-9: Wahl bleibt nach Neuladen, „Rückgängig“ im Text nimmt sie nicht zurück.
+
+#### C. Rechte
+- [x] AC-10: Projektleitung und Mitschreibende dürfen wechseln, im Lesemodus ist das Feld gesperrt und nennt den Grund.
+- [x] AC-11: Server nimmt nur Schriften aus der Liste an, nur von Mitgliedern, nicht im Lesemodus (siehe Security Audit).
+
+#### D. Seiten und Satz
+- [x] AC-12: Größe je Schrift über die x-Höhe angeglichen, Zeilenabstand je Absatz wirkt relativ. Langes Testkapitel: 6 bis 7 Seiten je nach Schrift.
+- [x] AC-13: Neusatz aller Kapitel ohne Öffnen, Hinweis in der Übersicht. Volles Testbuch (40 Kapitel, 440 Seiten in Garamond) nach 25,4 s. Neusatz gleich Öffnen für Text, Trennungen, Seitenumbruch, Bildabschnitt, Zitat, Liste, Zeilenabstand 2,0.
+- [x] AC-14: Mit allen sechs Schriften kein Trennstrich am Seitenende, höchstens 3 getrennte Zeilen in Folge, neu geöffnet identisch.
+- [x] AC-15: Kein Text über den Rand, langer Titel bricht um, Bildabschnitte und Seitenumbrüche wie bisher.
+
+#### E. Mehrere Personen und Fehler
+- [x] AC-16: Zweite Person mit alter Schrift: Text gespeichert, Seitenzahl nicht, einmaliger Hinweis zum Neu-Öffnen.
+- [x] AC-17: Wechsel ohne Netz: Meldung in der Sie-Form, alte Schrift bleibt überall.
+- [x] AC-18: Schrift lädt nicht: Text in PT Serif mit Hinweis, keine Seitenzahl mit falscher Schrift gespeichert.
+
+#### F. Tempo und Druck
+- [x] AC-19: Öffnen mit jeder Schrift so schnell wie vorher (alt 903 bis 964 ms, neu 922 bis 943 ms, erstes Öffnen mit leerem Cache alt 1023 ms, neu 975 bis 999 ms). Wechsel nach rund 420 ms sichtbar.
+- [x] AC-20 (angepasst): Eine Übersicht mit Buch in PT Serif lädt keine Buchschrift, mit Buch in Pagella nur Pagella.
+- [x] AC-21: Druckansicht mit derselben Schrift und denselben Umbrüchen, ohne Zoom. Schriftdateien liegen auf dem eigenen Server (für PROJ-16).
+- [x] AC-22: Alle bestehenden Tests bestehen (bis auf den bekannten Wackler), neue Abläufe haben eigene Tests.
+
+#### G. Cover
+- [x] AC-23: Titel, Untertitel, Autorzeile und Rücken in der Buchschrift in Übersicht, Startseite und Cover-Editor. Bei PT Serif wie bisher.
+- [x] AC-24: Cover-Editor zeigt die Schrift und verweist auf den Kapitel-Editor, keine eigene Auswahl.
+- [x] AC-25: Nach einem Wechsel zeigt das Cover die neue Schrift beim nächsten Öffnen.
+
+### Edge Cases Status
+- [x] Zwei Personen wechseln fast gleichzeitig: Der zuletzt gespeicherte Wechsel gilt (Last-Writer-Wins, durch Hin und Her abgedeckt).
+- [x] Schnelles Hin- und Herwechseln während des Neusatzes: Am Ende passen alle Seitenzahlen zur zuletzt gewählten Schrift.
+- [x] Wechsel ohne Netz: siehe AC-17.
+- [x] Breite Schrift mit langen Wörtern oder Titeln: siehe AC-15.
+- [x] Kapitel mit vielen Bildern: Bildabschnitt im Neusatz-Test, Seitenzahl gleich Öffnen.
+- [x] Lesemodus und abgelaufener Zugang: Schrift angezeigt, nicht änderbar. Kein Neusatz im Lesemodus.
+- [x] Phone: Hinweis, kein Editor und kein Auswahlfeld.
+- [x] Projekt aus dem Papierkorb: behält seine Schrift. Kapitel aus dem Papierkorb: behält die Schrift seiner Seitenzahl.
+- [x] Zusätzlich: Neues Kapitel in einem Buch mit anderer Schrift hat sofort die richtige Schrift-Angabe (nach BUG-2-Korrektur, ohne Hinweis).
+- [x] Zusätzlich: Tippen während des Neusatzes im selben Editor: langsamste 5 % der Eingaben 56 ms statt 32 ms, höchstens 64 ms, kein spürbares Stocken.
+- [x] Zusätzlich: Fotos ziehen bei 200 %: Der Griff bleibt genau unter der Maus (0 px), die neue Reihenfolge wird gespeichert.
+
+### Security Audit Results
+- [x] Authentifizierung: Ohne Anmeldung keine Aktion (Unit-Tests), ohne eigenes Buch leitet der Proxy schon vor den Aktionen zum Kauf um.
+- [x] Autorisierung, nachgespielte echte Server-Aufrufe einer fremden, angemeldeten Person mit eigenem Buch: Schriftwechsel „Projekt nicht gefunden.“, Neusatz-Liste „Projekt nicht gefunden.“, Kapitelinhalt „Kapitel nicht gefunden.“ ohne Text in der Antwort, Seitenzahl „Speichern fehlgeschlagen.“. Die Buchschrift blieb unverändert.
+- [x] Manipulierte eigene Aufrufe: unbekannte Schrift abgelehnt („Diese Schrift gibt es nicht.“), Projekt im Lesemodus abgelehnt („abgelaufen“), Seitenzahl mit gefälschtem `ifUnchangedSince` nicht gespeichert.
+- [x] Direkt über REST: Fremde ändern `book_font` nicht (0 Zeilen), unbekannte Werte für `book_font` und `page_count_font` lehnt die Datenbank ab (400), im Lesemodus keine Änderung.
+- [x] Eingaben: keine freien Texte, nur feste Kennungen (Zod und Datenbank-Prüfung). Keine Geheimnisse im Browser.
+- [x] Rate Limit: Häufiges Wechseln trifft nur das eigene Buch (Neusatz im eigenen Browser), kein Missbrauch über fremde Bücher möglich.
+
+### Bugs Found
+
+#### BUG-1: PT Serif (Vorgabe) hat kein echtes Kursiv
+- **Severity:** Medium
+- **Steps to Reproduce:**
+  1. Kapitel in einem Buch mit PT Serif öffnen, Text kursiv setzen.
+  2. Expected: echte kursive Buchstaben von PT Serif (AC-4: jede angebotene Schrift hat normal, fett, kursiv und fett-kursiv).
+  3. Actual: Das Root-Layout lädt PT Serif nur in 400 und 700 ohne Kursiv (`src/app/layout.tsx`). Der Browser stellt normales PT Serif schräg. Das wirkt im Buch und später im Druck weniger hochwertig.
+- **Hinweis:** Älter als PROJ-32 (seit PROJ-5). Eine Korrektur macht kursiven Text in bestehenden Büchern etwas schmaler, Zeilen und Seitenzahlen von Kapiteln mit viel Kursiv können sich verschieben. Ihre Seitenzahlen würden erst beim nächsten Öffnen neu gemessen, weil sich die Schrift-Kennung nicht ändert.
+- **Priority:** Vor dem Go-live beheben (Druckqualität), Entscheidung Jakob.
+- **Behoben (2026-11-25, Jakob: „Beide beheben“):** `src/app/layout.tsx` lädt PT Serif jetzt auch kursiv (`style: ["normal", "italic"]`). Test „BUG-1, AC-4“ prüft, dass in einem Buch in PT Serif echte kursive Schnitte in 400 und 700 geladen sind. Kursiver Text in bestehenden PT-Serif-Büchern sieht dadurch anders aus und läuft etwas schmaler. Es gibt noch keine Kundenbücher, Seitenzahlen von Testbüchern auf Stage stimmen nach dem nächsten Öffnen wieder.
+
+#### BUG-2: Kurzer Hinweis „Seitenzahlen werden aktualisiert“ nach jedem neuen Kapitel
+- **Severity:** Low
+- **Steps to Reproduce:**
+  1. Buch mit einer anderen Schrift als PT Serif, Projektübersicht öffnen.
+  2. „Eigenes Kapitel“ oder einen Erzähl-Impuls anlegen.
+  3. Expected: Kein Hinweis, ein neues leeres Kapitel hat in jeder Schrift eine Seite.
+  4. Actual: Das neue Kapitel hat noch keine Schrift-Angabe und gilt als veraltet. Die Übersicht zeigt kurz „Seitenzahlen werden aktualisiert (0 von 1 Kapiteln) …“ und setzt es neu. Das Ergebnis stimmt, der Hinweis verwundert aber.
+- **Priority:** Nice to have. Möglich: neue Kapitel gleich mit der Buchschrift anlegen.
+- **Behoben (2026-11-25):** `addChapterAction` und `addImpulseChapterAction` legen neue Kapitel gleich mit der Buchschrift als Schrift der Seitenzahl an (gelesen parallel zur ohnehin nötigen Abfrage). Lässt sich die Buchschrift nicht lesen, bleibt die Angabe leer und der Neusatz misst nach. Unit-Tests für beide Aktionen, E2E-Test „BUG-2“ über die Oberfläche: Kapitel angelegt, Schrift sofort gesetzt, kein Hinweis in der Übersicht.
+
+### Summary
+- **Acceptance Criteria:** 25/25 passed (nach Behebung von BUG-1)
+- **Bugs Found:** 2 total (0 critical, 0 high, 1 medium, 1 low), beide behoben
+- **Security:** Pass
+- **Production Ready:** YES. Von Hand offen: Safari für das ganze Feature (Zoom und Übersicht bestätigt), iPad und Firefox auf Stage.
+- **Recommendation:** Approved.
 
 ## Deployment
 _To be added by /deploy_

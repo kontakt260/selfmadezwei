@@ -42,7 +42,7 @@
 | PROJ-29 | Webflow-Landingpage gemeinsam prüfen und überarbeiten (über MCP) | P1 | Roadmap | — | — | 2026-11-23 |
 | PROJ-30 | Ladezeiten verbessern (Ladeansicht, weniger Datenbankaufrufe) | P1 | In Review | PROJ-3, PROJ-4, PROJ-5, PROJ-10, PROJ-22, PROJ-28 | [Spec](PROJ-30-ladezeiten.md) | 2026-11-23 |
 | PROJ-31 | Code aufräumen und Tests verschlanken | P2 | Approved | PROJ-24, PROJ-30 | [Spec](PROJ-31-code-aufraeumen.md) | 2026-11-23 |
-| PROJ-32 | Schriftarten im Kapitel-Editor | P1 | In Progress | PROJ-5, PROJ-7, PROJ-9, PROJ-25, PROJ-28, PROJ-34, PROJ-35 | [Spec](PROJ-32-schriftarten.md) | 2026-11-23 |
+| PROJ-32 | Schriftarten im Kapitel-Editor | P1 | Approved | PROJ-5, PROJ-7, PROJ-9, PROJ-25, PROJ-28, PROJ-34, PROJ-35 | [Spec](PROJ-32-schriftarten.md) | 2026-11-23 |
 | PROJ-33 | Impuls-Bibliothek | P1 | Roadmap | PROJ-8, PROJ-22, PROJ-28 | — | 2026-11-23 |
 | PROJ-34 | Bilder im Kapiteltext und Hochkant | P1 | Approved | PROJ-3, PROJ-5, PROJ-7, PROJ-25, PROJ-26, PROJ-28 | [Spec](PROJ-34-bilder-im-kapitel.md) | 2026-11-23 |
 | PROJ-35 | Automatische Silbentrennung | P1 | Approved | PROJ-5, PROJ-7, PROJ-25, PROJ-28, PROJ-34 | [Spec](PROJ-35-silbentrennung.md) | 2026-11-24 |
