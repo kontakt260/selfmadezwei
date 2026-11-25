@@ -21,14 +21,11 @@ export function computeDecorations(
   hyphens?: HyphenLayout,
 ): { decorations: Decoration[]; paragraphsWithSoftBreak: Set<HTMLElement> } {
   const fgTop = fg.getBoundingClientRect().top;
-  // UI-Zoom: wenn `.a5-stack` per transform: scale skaliert ist, sind
-  // alle getBoundingClientRect-Werte mit dem Zoom-Faktor multipliziert.
-  // Wir teilen Positionen und Höhen durch zoom, damit die Engine wieder
-  // im LOGISCHEN A5-Koordinatensystem rechnet.
+  // UI-Zoom: Gemessene Werte werden durch den Zoom-Faktor geteilt, damit die
+  // Engine wieder im LOGISCHEN A5-Koordinatensystem rechnet. Der Faktor wird
+  // gemessen, nicht angenommen (siehe layoutZoom).
   const stackEl = fg.closest(".a5-stack") as HTMLElement | null;
-  const zoom = stackEl
-    ? parseFloat(getComputedStyle(stackEl).getPropertyValue("--ui-zoom") || "1") || 1
-    : 1;
+  const zoom = stackEl ? layoutZoom(stackEl, fg) : 1;
   const decorations: Decoration[] = [];
   const paragraphsWithSoftBreak = new Set<HTMLElement>();
   // Akkumuliert die Spacer-Höhen aller VORHERIGEN Absätze. Wir messen
@@ -571,6 +568,29 @@ function mergeLineRects(rects: DOMRect[]): Line[] {
     }
   }
   return lines;
+}
+
+/**
+ * Faktor zwischen gemessenen Bildschirmmaßen (getBoundingClientRect,
+ * getClientRects) und den A5-Maßen der Seite.
+ *
+ * Chrome und Firefox liefern unter CSS-`zoom` skalierte Werte, Safari liefert
+ * unskalierte (WebKit-Bug 77998). Früher wurde immer durch die Zoom-Stufe
+ * geteilt; in Safari stimmte die Geometrie dann bei jeder Stufe außer 100 %
+ * nicht, und der Text sprang (Jakob, 2026-11-25). Deshalb wird an der Breite
+ * des Vordergrunds gemessen, welcher der beiden Fälle vorliegt.
+ */
+export function layoutZoom(stack: HTMLElement, fg?: HTMLElement | null): number {
+  const cs = getComputedStyle(stack);
+  const uiZoom = parseFloat(cs.getPropertyValue("--ui-zoom") || "1") || 1;
+  if (uiZoom === 1) return 1;
+  const target = fg ?? (stack.querySelector(".a5-stack__fg") as HTMLElement | null) ?? stack;
+  const rootFontPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const logical = parseLen(cs.getPropertyValue("--a5-page-width"), rootFontPx, 559.37);
+  const measured = target.getBoundingClientRect().width;
+  if (!(measured > 0) || !(logical > 0)) return uiZoom;
+  const ratio = measured / logical;
+  return Math.abs(ratio - uiZoom) <= Math.abs(ratio - 1) ? uiZoom : 1;
 }
 
 export function readGeometry(stack: HTMLElement): Geometry | null {

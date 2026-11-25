@@ -8,7 +8,7 @@ import {
   unevenPageScales,
 } from "../chapterLayout";
 import { isInDeadZone, placeCaretNearPoint } from "./caretPlacement";
-import { computeDecorations, lineBoxHeight, readGeometry } from "./computeDecorations";
+import { computeDecorations, layoutZoom, lineBoxHeight, readGeometry } from "./computeDecorations";
 import { HYPHENATION_SUPPRESS, hyphenationSuppressed, type SuppressedHyphens } from "./Hyphenation";
 import { prepareHyphenLayout } from "./hyphenationLayout";
 
@@ -26,8 +26,12 @@ const KEY = new PluginKey<DecorationSet>("paginationSoftBreaks");
 // Das Plugin meldet Textänderungen, gerechnet wird nur im Takt.
 export type PaginationStorage = {
   requestLayout: (() => void) | null;
-  runLayout: ((onPageCount: (pages: number) => void) => void) | null;
+  // PROJ-32: Meldet die Seitenzahl und die Schrift, mit der gemessen wurde
+  // (`null`, solange die Buchschrift noch lädt).
+  runLayout: ((onPageCount: PageCountListener) => void) | null;
 };
+
+export type PageCountListener = (pages: number, fontKey: string | null) => void;
 
 declare module "@tiptap/core" {
   interface Storage {
@@ -143,9 +147,7 @@ function verticalMoveAcrossSoftBreak(view: EditorView, down: boolean): number | 
     return null;
   }
   const stack = blockDom.closest(".a5-stack") as HTMLElement | null;
-  const zoom = stack
-    ? parseFloat(getComputedStyle(stack).getPropertyValue("--ui-zoom") || "1") || 1
-    : 1;
+  const zoom = stack ? layoutZoom(stack) : 1;
   // Zeilenhöhe in Bildschirm-Pixeln (Rects sind mit dem UI-Zoom skaliert).
   const lineHeight = lineBoxHeight(blockDom, caret.bottom - caret.top) * zoom;
   const caretMid = (caret.top + caret.bottom) / 2;
@@ -178,7 +180,7 @@ function verticalMoveAcrossSoftBreak(view: EditorView, down: boolean): number | 
 
 // PROJ-34: Ein Durchlauf von oben nach unten. Text, Bildreihen und Umbrüche
 // werden in Lesereihenfolge gesetzt, jeder Schritt kennt die Lage darüber.
-function layoutChapter(view: EditorView, onPageCount: (pages: number) => void) {
+function layoutChapter(view: EditorView, onPageCount: PageCountListener) {
   const dom = view.dom as HTMLElement;
   const fg = dom.closest(".a5-stack__fg") as HTMLElement | null;
   const stack = dom.closest(".a5-stack") as HTMLElement | null;
@@ -186,7 +188,7 @@ function layoutChapter(view: EditorView, onPageCount: (pages: number) => void) {
 
   const geom = readGeometry(stack);
   if (!geom || geom.stride <= 0 || geom.contentHeight <= 0) return;
-  const zoom = parseFloat(getComputedStyle(stack).getPropertyValue("--ui-zoom") || "1") || 1;
+  const zoom = layoutZoom(stack, fg);
   // Alte Umbrüche entfernen, damit die Messung den natürlichen Fluss sieht.
   // PROJ-35: Abschaltungen am Seitenende gelten nur für einen Durchgang und
   // werden mit entfernt; die nach Zeilenfolge bleiben (hängen am Absatztext).
@@ -198,7 +200,10 @@ function layoutChapter(view: EditorView, onPageCount: (pages: number) => void) {
   if (clear.getMeta(KEY) || clear.getMeta(HYPHENATION_SUPPRESS)) view.dispatch(clear);
   resetImageRows(fg);
 
-  const hyphens = prepareHyphenLayout(view);
+  // PROJ-32: Trennergebnisse gelten je Schrift. Solange die Buchschrift noch
+  // lädt, misst der Takt mit der Ersatzschrift und merkt sich nichts.
+  const fontKey = stack.dataset.fontReady === "1" ? (stack.dataset.bookFont ?? null) : null;
+  const hyphens = prepareHyphenLayout(view, fontKey);
   let placer = createBlockPlacer(fg, geom, zoom, new Map());
   let { decorations } = computeDecorations(view, fg, geom, placer.place, hyphens);
 
@@ -221,7 +226,7 @@ function layoutChapter(view: EditorView, onPageCount: (pages: number) => void) {
   if (!sameSuppression(now, next)) done.setMeta(HYPHENATION_SUPPRESS, next);
   if (done.getMeta(KEY) || done.getMeta(HYPHENATION_SUPPRESS)) view.dispatch(done);
   hyphens.cleanup(dom);
-  onPageCount(measurePageCount(fg, dom, geom.stride, zoom));
+  onPageCount(measurePageCount(fg, dom, geom.stride, zoom), fontKey);
 }
 
 function sameSuppression(a: SuppressedHyphens, b: SuppressedHyphens): boolean {

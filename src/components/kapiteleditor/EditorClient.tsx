@@ -3,10 +3,18 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { editorExtensions } from "./tiptap/extensions";
+import { EDITOR_PROPS } from "./editorProps";
 import { loadHyphenation } from "@/lib/hyphenation";
+import { DEFAULT_BOOK_FONT, bookFont, isBookFontId, type BookFontId } from "@/lib/book-fonts";
+import { bookFontVariables } from "./bookFontFaces";
+import { bookFontStyle, loadBookFont } from "./loadBookFont";
+import { BookFontSelect } from "./BookFontSelect";
+import { HYPHENATION_REFRESH, hyphenationSuppressed } from "./tiptap/Hyphenation";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { placeCaretNearPoint } from "./tiptap/caretPlacement";
 import { EditorToolbar } from "./EditorToolbar";
 import { EditorLoadingScreen } from "@/components/loading/LoadingViews";
@@ -57,11 +65,15 @@ import {
   chapterImageUploadCommitAction,
   chapterImageDeleteAction,
   chapterImageLinksAction,
+  setBookFontAction,
 } from "@/app/projektuebersicht/[project_id]/kapiteleditor/[chapter_id]/actions";
 import { createClient as createBrowserSupabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { usePagination } from "./usePagination";
 import { keepCursorInView } from "./keepCursorInView";
+
+// PROJ-32 Schritt 3: Neusatz der übrigen Kapitel, erst geladen, wenn er gebraucht wird.
+const BackgroundTypesetter = dynamic(() => import("./typeset/BackgroundTypesetter"), { ssr: false });
 
 // PROJ-35: Das Trennwörterbuch lädt schon, während die Seite aufgebaut wird.
 if (typeof window !== "undefined") void loadHyphenation();
@@ -79,6 +91,12 @@ type Props = {
   // PROJ-30: gespeicherte Seitenzahl. Nur wenn die Pagination davon abweicht,
   // wird nach dem Öffnen etwas geschrieben.
   initialPageCount: number;
+  // PROJ-32: Schrift des Buches und Schrift, mit der die gespeicherte
+  // Seitenzahl gemessen wurde.
+  initialBookFont: BookFontId;
+  initialPageCountFont: BookFontId;
+  // PROJ-32: Andere Kapitel haben eine Seitenzahl aus einer anderen Schrift.
+  initialOthersStale?: boolean;
   // PROJ-8: optionaler Impuls für das Banner. Null wenn das Kapitel
   // keinen source_impulse_id hat ODER der referenzierte Impuls nicht
   // mehr existiert. Frontend-Phase reicht null durch (kein DB-Lookup);
@@ -97,6 +115,9 @@ export function EditorClient({
   initialImageSections,
   initialStartPage,
   initialPageCount,
+  initialBookFont,
+  initialPageCountFont,
+  initialOthersStale = false,
   initialImpulse,
   readOnly = false,
 }: Props) {
@@ -120,6 +141,21 @@ export function EditorClient({
   // PROJ-30: Der Inhalt erscheint, sobald das Layout ruhig ist. `editorReady`
   // wartet weiter die langen Settling-Passes ab, bevor die Seitenzahl zählt.
   const [contentVisible, setContentVisible] = useState(false);
+
+  // PROJ-32: Buchschrift, wie sie auf dem Server steht, und die Schrift, die
+  // gerade auf der Seite gilt. `ready`: alle Schnitte geladen, erst dann zählen
+  // Messungen. `failed`: Buchschrift lädt nicht, angezeigt wird PT Serif (AC-18).
+  const [bookFontId, setBookFontId] = useState<BookFontId>(initialBookFont);
+  const [face, setFace] = useState<{ font: BookFontId; ready: boolean; failed: BookFontId | null }>({
+    font: initialBookFont,
+    ready: false,
+    failed: null,
+  });
+  const [pendingFont, setPendingFont] = useState<BookFontId | null>(null);
+  const [fontBusy, setFontBusy] = useState(false);
+  const deskRef = useRef<HTMLDivElement>(null);
+  // PROJ-32 Schritt 3: Durchgang des Neusatzes für die übrigen Kapitel (0 = keiner).
+  const [typesetRun, setTypesetRun] = useState(0);
 
   const editor = useEditor({
     extensions: editorExtensions,
@@ -151,8 +187,17 @@ export function EditorClient({
 
   const stackRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<HTMLDivElement>(null);
+  // Höhe des Seitenstapels in A5-Maßen (ohne Zoom), für den Zoom-Rahmen.
+  const [stackHeight, setStackHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const stack = stackRef.current;
+    if (!stack) return;
+    const observer = new ResizeObserver(() => setStackHeight(stack.offsetHeight));
+    observer.observe(stack);
+    return () => observer.disconnect();
+  }, []);
 
-  const { pageCount } = usePagination({
+  const { pageCount, pageCountFontKey } = usePagination({
     editor,
     stackRef,
     fgRef,
@@ -195,6 +240,9 @@ export function EditorClient({
   // (siehe Tech-Design Sektion C — kein Realtime-Push aus anderen Tabs).
   const startPage = initialStartPage;
 
+  const pageCountCurrent =
+    editorReady && face.failed === null && isBookFontId(pageCountFontKey) && pageCountFontKey === bookFontId;
+
   // PROJ-7: pageCount ist Teil des Auto-Save-Drafts — beim ersten Settle
   // schreibt der Server den realen Wert in chapters.page_count und der
   // DB-Trigger rechnet start_page der Folge-Kapitel neu.
@@ -208,9 +256,11 @@ export function EditorClient({
       // Ladens läuft pageCount über Zwischenwerte (1 → … → Endwert); ein
       // Speichern in diesem Moment — etwa der Flush beim sofortigen
       // Verlassen der Seite — würde einen falschen page_count festschreiben.
-      pageCount: editorReady ? pageCount : undefined,
+      // PROJ-32: Nur eine Seitenzahl, die mit der Buchschrift gemessen wurde.
+      pageCount: pageCountCurrent ? pageCount : undefined,
+      pageCountFont: pageCountCurrent ? bookFontId : undefined,
     }),
-    [title, body, imageSections, pageCount, editorReady],
+    [title, body, imageSections, pageCount, pageCountCurrent, bookFontId],
   );
 
   // PROJ-30: Stand, den der Server sicher kennt. Text, Titel und Bilder gehen
@@ -220,7 +270,19 @@ export function EditorClient({
     body: initialBody,
     imageSections,
     pageCount: initialPageCount,
+    pageCountFont: initialPageCountFont,
   });
+
+  // PROJ-32: Hat jemand anderes die Schrift inzwischen geändert, nimmt der
+  // Server die Seitenzahl nicht an. Einmal Bescheid geben, der Text ist gespeichert.
+  const fontChangedElsewhereRef = useRef(false);
+  const noteFontChangedElsewhere = useCallback((serverFont: BookFontId | undefined) => {
+    if (!serverFont || fontChangedElsewhereRef.current) return;
+    fontChangedElsewhereRef.current = true;
+    toast.info(
+      `Die Buchschrift wurde inzwischen auf „${bookFont(serverFont).label}“ geändert. Bitte öffnen Sie das Kapitel neu, damit Sie es in dieser Schrift sehen.`,
+    );
+  }, []);
 
   const saveDraft = useCallback(
     async (d: ChapterDraft): Promise<void> => {
@@ -228,9 +290,13 @@ export function EditorClient({
       if (plan === "none") return;
       if (plan === "page-count" && d.pageCount !== undefined) {
         const pageCount = d.pageCount;
-        const res = await trackSave(chapterPageCountAction({ projectId, chapterId, pageCount }));
+        const pageCountFont = d.pageCountFont ?? DEFAULT_BOOK_FONT;
+        const res = await trackSave(
+          chapterPageCountAction({ projectId, chapterId, pageCount, pageCountFont }),
+        );
         if (res.error) throw new Error(res.error);
-        lastSavedRef.current = { ...lastSavedRef.current, pageCount };
+        noteFontChangedElsewhere(res.bookFont);
+        lastSavedRef.current = { ...lastSavedRef.current, pageCount, pageCountFont };
         return;
       }
       const res = await trackSave(
@@ -245,17 +311,20 @@ export function EditorClient({
           imageSections: d.imageSections,
           colorPageCount: d.colorPageCount,
           pageCount: d.pageCount,
+          pageCountFont: d.pageCountFont,
         }),
       );
       if (res.error) throw new Error(res.error);
+      noteFontChangedElsewhere(res.bookFont);
       lastSavedRef.current = {
         title: d.title,
         body: d.body,
         imageSections: d.imageSections,
         pageCount: d.pageCount ?? lastSavedRef.current.pageCount,
+        pageCountFont: d.pageCount !== undefined ? (d.pageCountFont ?? DEFAULT_BOOK_FONT) : lastSavedRef.current.pageCountFont,
       };
     },
-    [projectId, chapterId],
+    [projectId, chapterId, noteFontChangedElsewhere],
   );
 
   const { state, retry, saveNow } = useAutoSave(draft, saveDraft, 2_000, !inputLocked);
@@ -317,7 +386,7 @@ export function EditorClient({
   // erscheint es, sobald Schriften geladen sind und sich die Höhe nicht mehr
   // ändert, spätestens nach CONTENT_REVEAL_MAX_MS.
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || !face.ready) return;
     let cancelled = false;
     let checkTimer: ReturnType<typeof setTimeout> | undefined;
     let lastHeight = -1;
@@ -341,14 +410,89 @@ export function EditorClient({
       checkTimer = setTimeout(check, CONTENT_CHECK_MS);
     };
     // PROJ-35: Erst mit Schrift und Trennwörterbuch stehen die Zeilen fest. Sonst
-    // würden die Zeilen nach dem Einblenden noch einmal umbrechen.
+    // würden die Zeilen nach dem Einblenden noch einmal umbrechen. PROJ-32: Die
+    // Buchschrift ist dann schon mit allen Schnitten geladen (`face.ready`).
     void Promise.all([document.fonts.ready, loadHyphenation()]).then(check);
     return () => {
       cancelled = true;
       clearTimeout(fallback);
       if (checkTimer) clearTimeout(checkTimer);
     };
-  }, [editor]);
+  }, [editor, face.ready]);
+
+  // PROJ-32: Buchschrift beim Öffnen mit allen Schnitten laden. Lädt sie nicht,
+  // steht der Text in PT Serif, und es wird keine Seitenzahl gespeichert.
+  useEffect(() => {
+    const scope = deskRef.current;
+    if (!scope) return;
+    let cancelled = false;
+    void loadBookFont(initialBookFont, scope).then(async (loaded) => {
+      if (cancelled) return;
+      if (loaded || initialBookFont === DEFAULT_BOOK_FONT) {
+        setFace({ font: initialBookFont, ready: true, failed: null });
+        return;
+      }
+      await loadBookFont(DEFAULT_BOOK_FONT, scope);
+      if (!cancelled) setFace({ font: DEFAULT_BOOK_FONT, ready: true, failed: initialBookFont });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Nur beim Öffnen; ein Wechsel lädt selbst (confirmFontChange).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // PROJ-32: Neue Schrift auf der Seite: einmal neu setzen. Abschaltungen der
+  // Silbentrennung gelten nur für die Schrift, in der sie gemessen wurden.
+  const layoutFont = face.ready ? face.font : null;
+  useEffect(() => {
+    if (!editor || layoutFont === null) return;
+    const suppressed = hyphenationSuppressed(editor.state);
+    if (suppressed.lines.length > 0 || suppressed.page.length > 0) {
+      editor.view.dispatch(
+        editor.state.tr.setMeta(HYPHENATION_REFRESH, "all").setMeta("addToHistory", false),
+      );
+    }
+    editor.storage.paginationDecorations.requestLayout?.();
+  }, [editor, layoutFont]);
+
+  // PROJ-32 Schritt 3: Beim Öffnen weitermachen, wo ein früherer Neusatz
+  // aufgehört hat. Erst wenn das eigene Kapitel fertig gesetzt ist.
+  useEffect(() => {
+    if (initialOthersStale && editorReady && !inputLocked) setTypesetRun((run) => (run === 0 ? 1 : run));
+  }, [initialOthersStale, editorReady, inputLocked]);
+
+  // PROJ-32: Wechsel nach der Rückfrage. Speichern und Laden laufen zugleich;
+  // umgestellt wird erst, wenn beides fertig ist, dann wird einmal neu gesetzt.
+  const confirmFontChange = async () => {
+    const next = pendingFont;
+    setPendingFont(null);
+    const scope = deskRef.current;
+    if (!next || !scope || next === bookFontId) return;
+    setFontBusy(true);
+    try {
+      const [res, loaded] = await Promise.all([
+        trackSave(setBookFontAction({ projectId, bookFont: next })),
+        loadBookFont(next, scope),
+      ]);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      setBookFontId(next);
+      setFace(
+        loaded
+          ? { font: next, ready: true, failed: null }
+          : { font: DEFAULT_BOOK_FONT, ready: true, failed: next },
+      );
+      // Die übrigen Kapitel bekommen ihre Seitenzahl in der neuen Schrift.
+      setTypesetRun((run) => run + 1);
+    } catch {
+      toast.error("Die Schrift konnte nicht geändert werden. Bitte versuchen Sie es erneut.");
+    } finally {
+      setFontBusy(false);
+    }
+  };
 
   const uploadImage = useCallback(
     (section: string) =>
@@ -455,6 +599,7 @@ export function EditorClient({
     () => ({
       sectionById: (id) => getImageSection(imageSections, id),
       readOnly: inputLocked,
+      zoom,
       freshLinks,
       canAddPhoto: (id) =>
         !photoLimitReached &&
@@ -469,7 +614,7 @@ export function EditorClient({
       },
       onPhotoError: requestFreshLink,
     }),
-    [imageSections, inputLocked, freshLinks, photoLimitReached, uploadImage, deleteImage, editor, requestFreshLink],
+    [imageSections, inputLocked, zoom, freshLinks, photoLimitReached, uploadImage, deleteImage, editor, requestFreshLink],
   );
 
   // PROJ-34: Erst das Foto, dann der Abschnitt. So gibt es nie ein leeres Element,
@@ -539,14 +684,15 @@ export function EditorClient({
 
   return (
     <div
-      className="a5-desk [font-family:var(--font-lato)] flex min-h-[100dvh] flex-col"
+      ref={deskRef}
+      className={`a5-desk ${bookFontVariables} [font-family:var(--font-lato)] flex min-h-[100dvh] flex-col`}
       style={{ ["--ui-zoom" as string]: String(zoom) }}
     >
-      {/* UI-Zoom-Wrapper: skaliert Toolbar, Header, Editor-Seiten und Bild-
-          Sektionen rein VISUELL (transform: scale via CSS-Variable
-          --ui-zoom). Pagination-Engine und Layout-Berechnungen rechnen
-          weiterhin mit 1×-Werten — A5-Logik bleibt unverändert, sodass
-          der spätere PDF-Export (PROJ-16) konsistent bleibt. */}
+      {/* UI-Zoom: skaliert nur die Editor-Seiten samt Bildabschnitten rein
+          VISUELL (transform: scale über die CSS-Variable --ui-zoom, siehe
+          .a5-zoom-frame in globals.css). Pagination-Engine und Layout-
+          Berechnungen rechnen weiterhin mit 1×-Werten — A5-Logik bleibt
+          unverändert, sodass der spätere PDF-Export (PROJ-16) konsistent bleibt. */}
       {/* Toolbar an top:0 — direkt im Document-Flow, kein verschachtelter
           Parent. Sticky funktioniert immer, weil document.scrollingElement
           die nächste scroll-Ancestor ist. */}
@@ -555,7 +701,42 @@ export function EditorClient({
         readOnly={inputLocked}
         photoLimitReached={photoLimitReached}
         onInsertImageSection={() => setInsertDialogOpen(true)}
+        bookFontSelect={
+          <BookFontSelect
+            value={bookFontId}
+            onRequestChange={setPendingFont}
+            onClosedWithoutChange={() => editor?.view.focus()}
+            disabled={inputLocked}
+            readOnly={readOnly}
+            busy={fontBusy}
+          />
+        }
       />
+      <AlertDialog
+        open={pendingFont !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingFont(null);
+        }}
+      >
+        <AlertDialogContent
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            editor?.view.focus();
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-normal">Schrift für das ganze Buch ändern?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Alle Kapitel und die Seitenzahlen passen sich an.
+              {pendingFont && ` Neue Schrift: ${bookFont(pendingFont).label}.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void confirmFontChange()}>Schrift ändern</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <ImageUploadDialog
         open={insertDialogOpen}
         onOpenChange={setInsertDialogOpen}
@@ -651,6 +832,15 @@ export function EditorClient({
             leadingQuestions={initialImpulse.leadingQuestions}
           />
         )}
+        {face.failed && (
+          // PROJ-32 AC-18: Die Buchschrift lädt nicht. Kein Overlay auf der Seite.
+          <Alert role="status" className="w-full max-w-[var(--a5-page-width)] border-[#e0dcd5] bg-white">
+            <AlertDescription className="text-sm text-[#3E3831]">
+              Die Schrift „{bookFont(face.failed).label}“ konnte nicht geladen werden. Sie sehen den
+              Text vorübergehend in PT Serif. Bitte laden Sie die Seite später neu.
+            </AlertDescription>
+          </Alert>
+        )}
         {!contentVisible && (
           // Der A5-Stack bleibt unsichtbar, bis das Layout ruhig ist. Das
           // verhindert das „zerstückelte" Erscheinen beim Öffnen. PROJ-25:
@@ -660,14 +850,29 @@ export function EditorClient({
             <EditorLoadingScreen as="div" />
           </div>
         )}
+        {/* Rahmen in der vergrößerten Größe: `transform` vergrößert die
+            Layout-Box nicht, Tisch und Scrollbereich sollen aber mitwachsen. */}
+        <div
+          className="a5-zoom-frame"
+          style={{
+            width: `calc(var(--a5-page-width) * ${zoom})`,
+            height:
+              stackHeight !== null
+                ? `${stackHeight * zoom}px`
+                : `calc((${pageCount} * (var(--a5-page-height) + var(--a5-page-gap)) - var(--a5-page-gap)) * ${zoom})`,
+          }}
+        >
         <div
           className="a5-stack"
           data-chapter-id={chapterId}
           data-ready={editorReady ? "1" : "0"}
           data-visible={contentVisible ? "1" : "0"}
+          data-book-font={face.font}
+          data-font-ready={face.ready ? "1" : "0"}
           ref={stackRef}
           onMouseDown={handleBlankAreaMouseDown}
           style={{
+            ...bookFontStyle(face.font),
             // bg-Layer (absolute) stapelt N Frames + Gaps; ohne min-height
             // ragt der bg-Layer unter den .a5-stack-Container und damit
             // unter die desk-Wrapper hinaus. Wir machen den stack mindestens
@@ -713,6 +918,7 @@ export function EditorClient({
             ))}
           </div>
         </div>
+        </div>
       </main>
 
       <footer className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-[#e0dcd5] bg-[#ece6df] px-4 py-2 sm:px-6">
@@ -724,25 +930,14 @@ export function EditorClient({
           {pageCount === 1 ? "Seite 1" : `${pageCount} Seiten`} · A5-Format · Druck-Vorschau
         </span>
       </footer>
+      {/* PROJ-32: Neusatz der übrigen Kapitel, unsichtbar und ganz am Ende, damit
+          er nie vor Werkzeugleiste oder Editor im Dokument steht. */}
+      {typesetRun > 0 && !inputLocked && (
+        <BackgroundTypesetter key={typesetRun} projectId={projectId} excludeChapterId={chapterId} />
+      )}
     </div>
   );
 }
-
-// PROJ-34: Fest statt bei jedem Rendern neu. TipTap vergleicht die Optionen und
-// setzt sie bei jeder Abweichung neu, dabei entstanden die Bildabschnitte jedes
-// Mal neu und verloren offene Dialoge.
-//
-// Word-/Docs-Verhalten: nach jeder Eingabe folgt der Viewport dem Cursor. Wir
-// nutzen NICHT mehr `() => true` (das hatte ProseMirrors scrollIntoView komplett
-// deaktiviert) — stattdessen lassen wir ProseMirror standardmäßig in den View
-// scrollen UND glätten den Effekt nach der Pagination-Engine selbst per
-// `keepCursorInView` (sonst kann ein nachträglich eingefügter Spacer den Cursor
-// wieder aus dem Viewport schieben).
-const EDITOR_PROPS = {
-  attributes: {
-    class: "tiptap-editor focus:outline-none",
-  },
-};
 
 function toPlainJson(value: unknown): unknown {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));

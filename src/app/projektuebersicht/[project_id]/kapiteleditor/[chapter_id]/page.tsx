@@ -6,6 +6,7 @@ import { PhoneNotice } from "@/components/kapiteleditor/PhoneNotice";
 import { EditorClient } from "@/components/kapiteleditor/EditorClient";
 import { isProjectReadOnly } from "@/lib/projects/project-access";
 import { stripSoftHyphensFromBody } from "@/lib/hyphenation";
+import { bookFontOrDefault, pageCountIsCurrent } from "@/lib/book-fonts";
 import {
   allImages,
   parseImageSections,
@@ -31,11 +32,11 @@ export default async function KapiteleditorPage({
 
   // PROJ-30: Gleichzeitig statt nacheinander. Der Impuls fürs Banner (PROJ-8)
   // kommt direkt mit dem Kapitel.
-  const [chapterResult, membershipResult, readOnly] = await Promise.all([
+  const [chapterResult, membershipResult, readOnly, fontsResult] = await Promise.all([
     supabase
       .from("chapters")
       .select(
-        "id, title, body, image_sections, project_id, start_page, page_count, updated_at, impulse_catalog(title, leading_questions)",
+        "id, title, body, image_sections, project_id, start_page, page_count, page_count_font, updated_at, impulse_catalog(title, leading_questions), projects(book_font)",
       )
       .eq("id", chapter_id)
       .eq("project_id", project_id)
@@ -47,6 +48,8 @@ export default async function KapiteleditorPage({
       .eq("user_id", user.id)
       .maybeSingle(),
     isProjectReadOnly(supabase, project_id),
+    // PROJ-32: Mit welcher Schrift wurden die Seitenzahlen der Kapitel gemessen?
+    supabase.from("chapters").select("id, page_count_font").eq("project_id", project_id),
   ]);
 
   assertLoaded(chapterResult, membershipResult);
@@ -79,6 +82,14 @@ export default async function KapiteleditorPage({
     initialImageSections,
   );
 
+  // PROJ-32: Schrift des Buches. Unbekannte Werte gelten als Vorgabe PT Serif.
+  const bookFont = bookFontOrDefault(chapter.projects?.book_font);
+  // Andere Kapitel mit veralteter Seitenzahl setzt der Editor im Hintergrund neu.
+  // Lässt sich das nicht lesen, holt der Neusatz die Liste selbst nicht (kein Fehler).
+  const othersStale = (fontsResult.data ?? []).some(
+    (row) => row.id !== chapter_id && !pageCountIsCurrent(row.page_count_font, bookFont),
+  );
+
   // PROJ-8: Ohne Impuls (eigenes Kapitel oder Impuls gelöscht) kein Banner.
   const impulse = chapter.impulse_catalog;
   const initialImpulse = impulse
@@ -100,6 +111,9 @@ export default async function KapiteleditorPage({
             initialImageSections={prepared.imageSections}
             initialStartPage={chapter.start_page ?? 1}
             initialPageCount={chapter.page_count}
+            initialBookFont={bookFont}
+            initialPageCountFont={bookFontOrDefault(chapter.page_count_font)}
+            initialOthersStale={othersStale}
             initialImpulse={initialImpulse}
             readOnly={readOnly}
           />

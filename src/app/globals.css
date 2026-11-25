@@ -178,24 +178,36 @@
   overflow-anchor: none;
 }
 
-/* UI-Zoom (rein visuelle Anzeige): skaliert die A5-Stapel-Spalte + Bild-
- * Sektionen über die CSS-`zoom`-Property. Im Gegensatz zu `transform:
- * scale` skaliert `zoom` die LAYOUT-BOX mit — der Tisch-Hintergrund
- * (.a5-desk) wächst dadurch automatisch mit dem visuell skalierten
- * Stack, sodass kein Body-Hintergrund unter den Seiten durchscheint
- * (Bug 2026-05-20: bei zoom > 100 % wurde unterhalb der Layout-Box
- * der hellere body-bg sichtbar, weil .a5-desk nicht mitwuchs).
+/* UI-Zoom (rein visuelle Anzeige): skaliert die A5-Seiten samt Bildabschnitten
+ * per `transform: scale`. Der Text wird dabei immer im Maßstab 1:1 gesetzt,
+ * Umbrüche und Seiten sind bei jeder Stufe dieselben wie im Druck.
  *
- * getBoundingClientRect() reportet bei `zoom` die skalierten Werte —
- * identisch zu `transform: scale`. Die Pagination-Engine teilt alle
- * Mess-Werte wieder durch `--ui-zoom`, sodass die A5-Logik unverändert
- * in logischen 1×-Koordinaten rechnet.
+ * Früher per CSS-`zoom`. Safari liefert unter `zoom` aber unskalierte Maße
+ * (WebKit-Bug 77998), Chrome und Firefox skalierte. Seiten-Takt, Cursor und
+ * Bildknöpfe rechneten in Safari deshalb falsch, der Text sprang (Jakob,
+ * 2026-11-25). Unter `transform` messen alle Browser gleich.
+ *
+ * Weil `transform` die Layout-Box nicht vergrößert, sitzt der Stapel in einem
+ * Rahmen (.a5-zoom-frame) mit der vergrößerten Breite und Höhe. So wächst der
+ * Tisch-Hintergrund mit (Bug 2026-05-20: Bei Zoom über 100 % schien sonst unter
+ * den Seiten der hellere Seitenhintergrund durch).
+ *
+ * Die Pagination-Engine teilt alle Mess-Werte wieder durch den gemessenen
+ * Faktor (layoutZoom), sodass die A5-Logik in logischen 1×-Koordinaten rechnet.
  *
  * Toolbar, Header und Footer skalieren NICHT mit — die Steuerelemente
  * bleiben in voller Bildschirm-Lesbarkeit. Beim Print/PDF-Export wird
  * der Zoom ignoriert (Override unten in @media print). */
+.a5-zoom-frame {
+  position: relative;
+  flex-shrink: 0;
+}
+.a5-zoom-frame > .a5-stack {
+  margin: 0;
+}
 .a5-stack {
-  zoom: var(--ui-zoom, 1);
+  transform: scale(var(--ui-zoom, 1));
+  transform-origin: top left;
   /* Während der Stack mountet und das Layout noch wandert, bleibt er
    * unsichtbar. Das verhindert das zerstückelte Erscheinen. PROJ-30: Er
    * erscheint ohne Übergang, sobald data-visible="1" gesetzt ist. */
@@ -237,7 +249,11 @@ html[data-history-refresh] main {
 
 @media print {
   .a5-stack {
-    zoom: 1 !important;
+    transform: none !important;
+  }
+  .a5-zoom-frame {
+    width: auto !important;
+    height: auto !important;
   }
 }
 
@@ -255,13 +271,17 @@ html[data-history-refresh] main {
  * Frame zum nächsten. Inhalt, der einen Frame überschreitet, läuft sichtbar
  * auf die Tischfläche → optisches Signal „Seitenumbruch einfügen".
  * ============================================================ */
+/* PROJ-32: Buchschrift. Der Editor setzt --book-font (Schriftfamilie),
+ * --book-title-font (Titel) und --book-scale (Größe im Verhältnis zu 11 pt,
+ * gleiche x-Höhe wie PT Serif) an der A5-Seite, Werte aus src/lib/book-fonts.ts.
+ * Ohne Angabe gilt das bisherige Bild: PT Serif, Titel in Merriweather. */
 .a5-stack {
   position: relative;
   width: var(--a5-page-width);
   margin: 0 auto;
-  font-family: var(--font-pt-serif), serif;
+  font-family: var(--book-font, var(--font-pt-serif)), serif;
   color: #2b2620;
-  font-size: 11pt;
+  font-size: calc(11pt * var(--book-scale, 1));
   line-height: 1.55;
 }
 
@@ -310,8 +330,8 @@ html[data-history-refresh] main {
    * margin-top); Mittelpunkt = (margin-right / 2, margin-top / 2) — also
    * jeweils auf der halben Marge in beiden Richtungen. */
   right: calc(var(--a5-margin-right) / 2);
-  font-family: var(--font-pt-serif), serif;
-  font-size: 10pt;
+  font-family: var(--book-font, var(--font-pt-serif)), serif;
+  font-size: calc(10pt * var(--book-scale, 1));
   color: #848484;
   pointer-events: none;
   transform: translate(50%, -50%);
@@ -326,9 +346,9 @@ html[data-history-refresh] main {
   padding: var(--a5-margin-top) var(--a5-margin-right) var(--a5-margin-bottom) var(--a5-margin-left);
   background: white;
   box-shadow: var(--a5-page-shadow);
-  font-family: var(--font-pt-serif), serif;
+  font-family: var(--book-font, var(--font-pt-serif)), serif;
   color: #2b2620;
-  font-size: 11pt;
+  font-size: calc(11pt * var(--book-scale, 1));
   line-height: 1.55;
   overflow: visible;
 }
@@ -341,14 +361,14 @@ html[data-history-refresh] main {
  * verschieben sich Seitenumbrüche und das spätere Druck-PDF. */
 .a5-stack :is(h1, h2, h3, h4, h5, h6),
 .a5-page :is(h1, h2, h3, h4, h5, h6) {
-  font-family: var(--font-merriweather), ui-serif, Georgia, "Times New Roman", serif;
+  font-family: var(--book-title-font, var(--font-merriweather)), ui-serif, Georgia, "Times New Roman", serif;
   letter-spacing: normal;
 }
 
 .a5-stack h1,
 .a5-page h1 {
-  font-family: var(--font-merriweather), serif;
-  font-size: 22pt;
+  font-family: var(--book-title-font, var(--font-merriweather)), serif;
+  font-size: calc(22pt * var(--book-scale, 1));
   font-weight: 400;
   line-height: 1.2;
   color: #2f3b30;
@@ -367,8 +387,8 @@ html[data-history-refresh] main {
 
 .a5-stack h2,
 .a5-page h2 {
-  font-family: var(--font-merriweather), serif;
-  font-size: 14pt;
+  font-family: var(--book-title-font, var(--font-merriweather)), serif;
+  font-size: calc(14pt * var(--book-scale, 1));
   font-weight: 400;
   line-height: 1.3;
   overflow-wrap: anywhere;

@@ -25,6 +25,7 @@ export type Database = {
           id: string
           image_sections: Json
           page_count: number
+          page_count_font: string | null
           project_id: string
           sort_order: number
           source_impulse_id: string | null
@@ -43,6 +44,7 @@ export type Database = {
           id?: string
           image_sections?: Json
           page_count?: number
+          page_count_font?: string | null
           project_id: string
           sort_order: number
           source_impulse_id?: string | null
@@ -61,6 +63,7 @@ export type Database = {
           id?: string
           image_sections?: Json
           page_count?: number
+          page_count_font?: string | null
           project_id?: string
           sort_order?: number
           source_impulse_id?: string | null
@@ -668,6 +671,7 @@ export type Database = {
       }
       projects: {
         Row: {
+          book_font: string
           created_at: string
           id: string
           logo_url: string | null
@@ -676,6 +680,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          book_font?: string
           created_at?: string
           id?: string
           logo_url?: string | null
@@ -684,6 +689,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          book_font?: string
           created_at?: string
           id?: string
           logo_url?: string | null

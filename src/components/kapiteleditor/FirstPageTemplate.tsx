@@ -12,7 +12,8 @@ export function FirstPageHeader({ title }: { title: string }) {
         style={{ filter: "brightness(0)" }}
         aria-hidden
       />
-      <h1 className="[font-family:var(--font-merriweather)] !mt-4 text-center text-[18pt] font-normal leading-tight text-black">
+      {/* PROJ-32: Der Kapiteltitel folgt der Buchschrift (Vorgabe: Merriweather wie bisher). */}
+      <h1 className="[font-family:var(--book-title-font,var(--font-merriweather))] !mt-4 text-center [font-size:calc(18pt*var(--book-scale,1))] font-normal leading-tight text-black">
         {title.trim() || "Unbenanntes Kapitel"}
       </h1>
       <div className="a5-heading-rule" style={{ alignSelf: "stretch" }} aria-hidden>

@@ -4,6 +4,11 @@ Verlauf aller Änderungen an der Checkliste [prod-umzug.md](prod-umzug.md). Neue
 
 | Datum | Eintrag |
 |---|---|
+| 2026-11-24 | PROJ-32: Migration `20261124200000_proj32_book_font.sql` auf Stage eingespielt (Jakob), Spalten und Prüfregeln per MCP lesend bestätigt. Production steht noch aus. |
+| 2026-11-24 | PROJ-32 Schritt 2 gebaut (Auswahlfeld, Server-Aktion, Seitenzahl je Schrift). Punkt „Schriftnamen anwaltlich prüfen“ ergänzt: Der Hinweis „wie Palatino“ steht im Auswahlfeld. Migration weiter vor dem Code einspielen, keine neuen Env-Werte. |
+| 2026-11-24 | PROJ-32 Schritt 2: Migration `20261124200000_proj32_book_font.sql` (zwei Spalten, keine RLS-Änderung), auf Stage und Production jeweils vor dem Code-Deploy einspielen. Keine neuen Env-Werte. |
+| 2026-11-24 | PROJ-32 Probeseite: Schriftauswahl eingegrenzt (PT Serif, Garamond, Baskerville, Pagella, Heros, eine weitere serifenlose). Punkt „Schriftnamen anwaltlich prüfen“ in Abschnitt 8 angepasst (Marken jetzt Palatino und Helvetica). Keine neuen Env-Werte. |
+| 2026-11-24 | PROJ-32 Tech Design: Neuer Punkt in Abschnitt 8, die Schriftnamen anwaltlich prüfen (freie Nachbauten bekannter Schriften, Marken wie Times, Palatino, Georgia und Arial nicht als Namen). Geplant ist eine Migration mit zwei Spalten (Buchschrift am Projekt, Schrift der Seitenzahl am Kapitel), noch nicht gebaut. Keine neuen Env-Werte. |
 | 2026-11-24 | PROJ-35 Frontend: Neues Paket `hyphen` (ISC) mit dem deutschen Trennwörterbuch aus hyph-utf8 (MIT), die Pakete `hypher`, `hyphenation.de` und `hyphenation.en-us` sind entfernt (das deutsche Musterpaket hatte keine Lizenz). Neuer Punkt in Abschnitt 8: Lizenzhinweise der ausgelieferten Pakete vor dem Go-live bereitstellen. Keine Migration, keine neuen Env-Werte. |
 | 2026-11-24 | PROJ-34 Backend: Migration `20261124100000_proj34_image_cleanup.sql`, auf Stage eingespielt, auf Production noch vor dem Code-Deploy einspielen. Entfernte Fotos werden erst nach 14 Tagen gelöscht, das muss in die Datenschutzerklärung. Keine neuen Env-Werte, der vorhandene Cron übernimmt das Löschen. |
 | 2026-11-23 | PROJ-31 QA: Neue lokale Variable `E2E_QA_PASSWORD` nur für die Tests in `.env.local`, nicht in Vercel setzen. Das QA-Konto bleibt auf Stage. Für Production ist nichts zu tun. |

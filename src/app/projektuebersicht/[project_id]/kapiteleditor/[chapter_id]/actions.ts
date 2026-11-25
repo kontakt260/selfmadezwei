@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { countWordsFromBody } from "@/lib/kapiteleditor/countWords";
 import { stripSoftHyphensFromBody } from "@/lib/hyphenation";
 import { projectWriteBlockedError } from "@/lib/projects/project-access";
+import { BOOK_FONT_IDS, bookFontOrDefault, type BookFontId } from "@/lib/book-fonts";
 import {
   MAX_IMAGES_PER_CHAPTER,
   MAX_IMAGES_PER_SECTION,
@@ -66,13 +67,47 @@ const autosaveSchema = z.object({
   // keinen Wert; der Server lässt page_count dann unverändert (kein
   // Reset auf 1). Range matched chapters_page_count_range-CHECK.
   pageCount: z.number().int().min(1).max(999).optional(),
+  // PROJ-32: Schrift, mit der der Editor die Seitenzahl gemessen hat. Fehlt sie
+  // (alter Client), war es PT Serif.
+  pageCountFont: z.enum(BOOK_FONT_IDS).optional(),
 });
 
 const pageCountSchema = z.object({
   projectId: uuidSchema,
   chapterId: uuidSchema,
   pageCount: z.number().int().min(1).max(999),
+  pageCountFont: z.enum(BOOK_FONT_IDS).optional(),
+  // PROJ-32 Neusatz: nur speichern, wenn das Kapitel seit dem Laden unverändert ist.
+  ifUnchangedSince: z.string().min(10).max(64).optional(),
 });
+
+const bookFontSchema = z.object({
+  projectId: uuidSchema,
+  bookFont: z.enum(BOOK_FONT_IDS, { message: "Diese Schrift gibt es nicht." }),
+});
+
+/**
+ * PROJ-32: Buchschrift laden, wenn eine Seitenzahl gespeichert werden soll.
+ * `null` heißt: nicht prüfbar, dann wird keine Seitenzahl gespeichert.
+ */
+async function currentBookFont(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  projectId: string,
+): Promise<BookFontId | null> {
+  const { data, error } = await supabase
+    .from("projects")
+    .select("book_font")
+    .eq("id", projectId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return bookFontOrDefault(data.book_font);
+}
+
+const BOOK_FONT_SAVE_ERROR =
+  "Die Schrift konnte nicht geändert werden. Bitte versuchen Sie es erneut.";
+
+/** Ergebnis beim Speichern. `bookFont`: Seitenzahl nicht übernommen, das Buch steht inzwischen in dieser Schrift. */
+type SaveResult = { ok?: true; error?: string; bookFont?: BookFontId };
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 h
 
@@ -121,10 +156,12 @@ export async function chapterAutosaveAction(input: {
   imageSections: ImageSections;
   colorPageCount: number;
   pageCount?: number;
-}): Promise<{ ok?: true; error?: string }> {
+  pageCountFont?: BookFontId;
+}): Promise<SaveResult> {
   const parsed = autosaveSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
   const { projectId, chapterId, title, imageSections, colorPageCount, pageCount } = parsed.data;
+  const pageCountFont = bookFontOrDefault(parsed.data.pageCountFont);
   // PROJ-35: Im gespeicherten Text stehen nie Trennzeichen, auch nicht aus
   // eingefügtem Text oder älteren Editor-Ständen.
   const body = stripSoftHyphensFromBody(parsed.data.body);
@@ -135,7 +172,10 @@ export async function chapterAutosaveAction(input: {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
 
-  const accessError = await projectWriteBlockedError(supabase, projectId);
+  const [accessError, bookFont] = await Promise.all([
+    projectWriteBlockedError(supabase, projectId),
+    pageCount !== undefined ? currentBookFont(supabase, projectId) : Promise.resolve(null),
+  ]);
   if (accessError) return { error: accessError };
 
   // Ohne Bildlinks (server-erzeugt zur Laufzeit) und ohne entfernte Abschnitte.
@@ -179,8 +219,13 @@ export async function chapterAutosaveAction(input: {
     color_page_count: colorPageCount,
     updated_at: new Date().toISOString(),
   };
-  if (pageCount !== undefined) {
+  // PROJ-32: Die Seitenzahl zählt nur, wenn sie mit der aktuellen Buchschrift
+  // gemessen wurde. Hat jemand das Kapitel noch mit der alten Schrift offen,
+  // wird sein Text gespeichert, seine Seitenzahl nicht.
+  const pageCountAccepted = pageCount !== undefined && bookFont === pageCountFont;
+  if (pageCountAccepted) {
     updatePayload.page_count = pageCount;
+    updatePayload.page_count_font = pageCountFont;
   }
 
   const { data: savedRows, error } = await supabase
@@ -210,6 +255,7 @@ export async function chapterAutosaveAction(input: {
       .eq("updated_at", saved.updated_at);
     if (countError) console.error(`[chapter-autosave] word count failed: ${countError.message}`);
   }
+  if (pageCount !== undefined && !pageCountAccepted && bookFont) return { ok: true, bookFont };
   return { ok: true };
 }
 
@@ -221,10 +267,13 @@ export async function chapterPageCountAction(input: {
   projectId: string;
   chapterId: string;
   pageCount: number;
-}): Promise<{ ok?: true; error?: string }> {
+  pageCountFont?: BookFontId;
+  ifUnchangedSince?: string;
+}): Promise<SaveResult> {
   const parsed = pageCountSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
-  const { projectId, chapterId, pageCount } = parsed.data;
+  const { projectId, chapterId, pageCount, ifUnchangedSince } = parsed.data;
+  const pageCountFont = bookFontOrDefault(parsed.data.pageCountFont);
 
   const supabase = await createClient();
   const {
@@ -232,18 +281,69 @@ export async function chapterPageCountAction(input: {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Nicht angemeldet." };
 
-  const accessError = await projectWriteBlockedError(supabase, projectId);
+  const [accessError, bookFont] = await Promise.all([
+    projectWriteBlockedError(supabase, projectId),
+    currentBookFont(supabase, projectId),
+  ]);
   if (accessError) return { error: accessError };
+  if (!bookFont) return { error: "Speichern fehlgeschlagen." };
+  // PROJ-32: Mit einer anderen Schrift gemessen. Das ist kein Fehler, die Zahl
+  // wird nur nicht übernommen.
+  if (bookFont !== pageCountFont) return { ok: true, bookFont };
 
-  const { data: savedRows, error } = await supabase
+  let update = supabase
     .from("chapters")
-    .update({ page_count: pageCount })
+    .update({ page_count: pageCount, page_count_font: pageCountFont })
     .eq("id", chapterId)
-    .eq("project_id", projectId)
-    .select("id");
+    .eq("project_id", projectId);
+  // Hat jemand das Kapitel inzwischen geändert, passt die Zahl nicht mehr. Es
+  // bleibt veraltet und wird neu gesetzt.
+  if (ifUnchangedSince) update = update.eq("updated_at", ifUnchangedSince);
+  const { data: savedRows, error } = await update.select("id");
   if (error || !savedRows || savedRows.length === 0) {
     return { error: "Speichern fehlgeschlagen." };
   }
+  return { ok: true };
+}
+
+/**
+ * PROJ-32: Schrift für das ganze Buch ändern. Erlaubt für alle Mitglieder, die
+ * das Buch bearbeiten dürfen, nicht im Lesemodus. Die Datenbank prüft die
+ * Liste zusätzlich, RLS die Mitgliedschaft.
+ */
+export async function setBookFontAction(input: {
+  projectId: string;
+  bookFont: BookFontId;
+}): Promise<{ ok?: true; error?: string }> {
+  const parsed = bookFontSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+  const { projectId, bookFont } = parsed.data;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Nicht angemeldet." };
+
+  const [membership, accessError] = await Promise.all([
+    supabase
+      .from("project_members")
+      .select("role")
+      .eq("project_id", projectId)
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    projectWriteBlockedError(supabase, projectId),
+  ]);
+  if (membership.error) return { error: BOOK_FONT_SAVE_ERROR };
+  if (!membership.data) return { error: "Projekt nicht gefunden." };
+  if (accessError) return { error: accessError };
+
+  const { data: savedRows, error } = await supabase
+    .from("projects")
+    .update({ book_font: bookFont, updated_at: new Date().toISOString() })
+    .eq("id", projectId)
+    .select("id");
+  if (error || !savedRows || savedRows.length === 0) return { error: BOOK_FONT_SAVE_ERROR };
   return { ok: true };
 }
 

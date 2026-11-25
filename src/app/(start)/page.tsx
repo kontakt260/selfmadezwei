@@ -13,6 +13,7 @@ import { deleteProjectAction } from "@/app/projektuebersicht/[project_id]/action
 import { DEFAULT_COLOR_ID } from "@/lib/cover-colors";
 import { DEFAULT_THEME_ID } from "@/lib/cover-themes";
 import type { CoverData, CoverRowRaw } from "@/lib/cover-types";
+import { bookFontOrDefault } from "@/lib/book-fonts";
 import { formatLastEdited, projectCardAccess } from "@/lib/projects/project-card-status";
 
 function IconPlus({ className }: { className?: string }) {
@@ -50,7 +51,7 @@ export default async function HomePage() {
   const [membershipsResult, coversResult, accessResult] = await Promise.all([
     supabase
       .from("project_members")
-      .select("role, projects(id, title, updated_at, chapters(id, updated_at))")
+      .select("role, projects(id, title, updated_at, book_font, chapters(id, updated_at))")
       .eq("user_id", user.id)
       .order("updated_at", { referencedTable: "projects", ascending: false }),
     supabase.from("project_covers").select("project_id, image_url, theme, metadata").limit(500),
@@ -110,6 +111,8 @@ export default async function HomePage() {
         themeId: cover?.theme ?? DEFAULT_THEME_ID,
         colorId: cover?.metadata?.background_color ?? DEFAULT_COLOR_ID,
         imageUrl: signedUrlMap.get(p.id) ?? null,
+        // PROJ-32: Das Cover steht in der Buchschrift.
+        bookFont: bookFontOrDefault(p.book_font),
       };
       return {
         id: p.id,

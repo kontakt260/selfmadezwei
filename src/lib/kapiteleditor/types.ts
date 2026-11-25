@@ -1,3 +1,5 @@
+import type { BookFontId } from "@/lib/book-fonts";
+
 export type ImageLayout = "1-spaltig" | "2-spaltig";
 
 // PROJ-34: Fehlt die Angabe, ist es ein vorhandenes Foto im Querformat.
@@ -51,4 +53,6 @@ export type ChapterDraft = {
   // Folge-Kapitel neu. `undefined`, solange die Pagination nach dem Laden
   // noch einschwingt — der Server lässt page_count dann unverändert.
   pageCount?: number;
+  // PROJ-32: Schrift, mit der `pageCount` gemessen wurde.
+  pageCountFont?: BookFontId;
 };

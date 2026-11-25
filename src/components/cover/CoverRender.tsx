@@ -14,6 +14,7 @@ import Image from "next/image";
 import type { CoverData, CoverSize } from "@/lib/cover-types";
 import { getCoverColor } from "@/lib/cover-colors";
 import { getCoverTheme } from "@/lib/cover-themes";
+import { coverFonts } from "@/components/cover/coverFonts";
 
 type Props = {
   data: CoverData;
@@ -47,6 +48,8 @@ function authorFontSizeCqw(size: CoverSize): number {
 export function CoverRender({ data, size, className }: Props) {
   const color = getCoverColor(data.colorId);
   const theme = getCoverTheme(data.themeId);
+  // PROJ-32: Alle Texte auf dem Cover folgen der Buchschrift.
+  const fonts = coverFonts(data.bookFont);
 
   // In sehr kleinen Größen (Card) müssen Untertitel + Autor unter Umständen
   // ausgeblendet werden, weil die Schrift sonst unleserlich klein wird.
@@ -57,13 +60,13 @@ export function CoverRender({ data, size, className }: Props) {
 
   return (
     <div
-      className={`relative isolate w-full overflow-hidden ${className ?? ""}`}
+      className={`relative isolate w-full overflow-hidden ${fonts.variables} ${className ?? ""}`}
       style={{
         aspectRatio: "148 / 210",
         backgroundColor: color.surface,
         color: color.ink,
         containerType: "inline-size",
-        fontFamily: "var(--font-merriweather), serif",
+        fontFamily: fonts.title,
         boxShadow:
           size === "editor"
             ? "0 6px 20px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.12)"
@@ -119,9 +122,9 @@ export function CoverRender({ data, size, className }: Props) {
           <h2
             style={{
               margin: 0,
-              fontFamily: "var(--font-merriweather), serif",
+              fontFamily: fonts.title,
               fontWeight: 500,
-              fontSize: `${titleFontSizeCqw(size)}cqw`,
+              fontSize: `${titleFontSizeCqw(size) * fonts.scale}cqw`,
               lineHeight: 1.15,
               letterSpacing: "-0.01em",
               color: color.ink,
@@ -136,9 +139,9 @@ export function CoverRender({ data, size, className }: Props) {
               style={{
                 margin: 0,
                 marginTop: "3cqw",
-                fontFamily: "var(--font-pt-serif), serif",
+                fontFamily: fonts.text,
                 fontStyle: "italic",
-                fontSize: `${subtitleFontSizeCqw(size)}cqw`,
+                fontSize: `${subtitleFontSizeCqw(size) * fonts.scale}cqw`,
                 lineHeight: 1.3,
                 color: color.ink,
                 opacity: 0.85,
@@ -158,8 +161,8 @@ export function CoverRender({ data, size, className }: Props) {
               marginTop: "auto",
               paddingBottom: "2cqw",
               textAlign: "center",
-              fontFamily: "var(--font-pt-serif), serif",
-              fontSize: `${authorFontSizeCqw(size)}cqw`,
+              fontFamily: fonts.text,
+              fontSize: `${authorFontSizeCqw(size) * fonts.scale}cqw`,
               lineHeight: 1.25,
               color: color.ink,
               opacity: 0.9,

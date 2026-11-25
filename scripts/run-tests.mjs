@@ -116,6 +116,7 @@ const FULL_GROUPS = [
       "PROJ-34-bilder-im-text",
       "PROJ-34-bilder-pruefliste",
       "PROJ-35-silbentrennung",
+      "PROJ-32-schriftarten",
     ],
   },
   {

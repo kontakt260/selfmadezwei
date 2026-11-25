@@ -10,6 +10,8 @@ import type { FreshLinks } from "./freshImageLinks";
 export type ImageSectionsApi = {
   sectionById: (id: string) => ImageSectionData | undefined;
   readOnly: boolean;
+  /** Zoom-Stufe der Seiten. Verschiebungen beim Ziehen werden dadurch geteilt. */
+  zoom: number;
   /** Frische Bildlinks und Ladeversuch nach Dateipfad, wenn ein Foto nicht geladen hat. */
   freshLinks: FreshLinks;
   canAddPhoto: (sectionId: string) => boolean;

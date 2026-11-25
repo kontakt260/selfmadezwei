@@ -86,11 +86,14 @@ export function EditorToolbar({
   readOnly = false,
   photoLimitReached = false,
   onInsertImageSection,
+  bookFontSelect,
 }: {
   editor: Editor | null;
   readOnly?: boolean;
   photoLimitReached?: boolean;
   onInsertImageSection?: () => void;
+  /** PROJ-32: Auswahlfeld „Buchschrift", steht vorne in der Leiste. */
+  bookFontSelect?: React.ReactNode;
 }) {
   const lineHeightMenu = useRef({ openedWithPointer: false, closedWithEscape: false });
 
@@ -126,6 +129,12 @@ export function EditorToolbar({
       )}
     >
       <ReadOnlyScope readOnly={readOnly}>
+      {bookFontSelect && (
+        <>
+          {bookFontSelect}
+          <Sep />
+        </>
+      )}
       <Toggle
         size="sm"
         pressed={editor.isActive("bold")}

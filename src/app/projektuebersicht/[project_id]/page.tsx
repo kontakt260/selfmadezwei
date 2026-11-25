@@ -20,6 +20,8 @@ import { DEFAULT_COLOR_ID } from "@/lib/cover-colors";
 import { DEFAULT_THEME_ID } from "@/lib/cover-themes";
 import type { CoverData, CoverRowRaw } from "@/lib/cover-types";
 import { type Chapter, countWordsFromBody } from "@/lib/projektuebersicht-chapters";
+import { bookFontOrDefault, pageCountIsCurrent } from "@/lib/book-fonts";
+import { PageCountRefresh } from "@/components/projektuebersicht/PageCountRefresh";
 import {
   addChapterAction,
   addImpulseChapterAction,
@@ -122,7 +124,7 @@ export default async function ProjektuebersichtPage({
     impulsesResult,
     membersResult,
   ] = await Promise.all([
-    supabase.from("projects").select("id, title").eq("id", project_id).maybeSingle(),
+    supabase.from("projects").select("id, title, book_font").eq("id", project_id).maybeSingle(),
     supabase
       .from("project_members")
       .select("role")
@@ -150,7 +152,7 @@ export default async function ProjektuebersichtPage({
     // PROJ-30: Ohne `body`, die Wortzahl ist gespeichert.
     supabase
       .from("chapters")
-      .select("id, title, chapter_origin, word_count, sort_order, page_count")
+      .select("id, title, chapter_origin, word_count, sort_order, page_count, page_count_font")
       .eq("project_id", project_id)
       .order("sort_order", { ascending: true }),
     supabase
@@ -218,6 +220,8 @@ export default async function ProjektuebersichtPage({
     themeId: coverRaw?.theme ?? DEFAULT_THEME_ID,
     colorId: coverRaw?.metadata?.background_color ?? DEFAULT_COLOR_ID,
     imageUrl: signedCover?.data?.signedUrl ?? null,
+    // PROJ-32: Das Cover steht in der Buchschrift.
+    bookFont: bookFontOrDefault(project.book_font),
   };
 
   const hasInitialPayment = (paymentsResult.data ?? []).length > 0;
@@ -240,6 +244,9 @@ export default async function ProjektuebersichtPage({
   // PROJ-22: Kennzahlen für Cover-Karte und Druck-Karte.
   const chapterCount = chapters.length;
   const pageCount = rawChapters.reduce((sum, c) => sum + c.page_count, 0);
+  // PROJ-32: Kapitel, deren Seitenzahl mit einer anderen Schrift gemessen wurde.
+  const bookFont = bookFontOrDefault(project.book_font);
+  const staleCount = rawChapters.filter((c) => !pageCountIsCurrent(c.page_count_font, bookFont)).length;
   const openChapterCount = chapters.filter((c) => c.words === 0).length;
   const bookSummary =
     chapterCount === 0
@@ -301,7 +308,10 @@ export default async function ProjektuebersichtPage({
                   </p>
                 ) : null}
               </div>
-              <p className="text-lg leading-relaxed text-[#4A453F] sm:text-xl">{bookSummary}</p>
+              <div className="flex flex-col gap-2">
+                <p className="text-lg leading-relaxed text-[#4A453F] sm:text-xl">{bookSummary}</p>
+                <PageCountRefresh projectId={project_id} staleCount={staleCount} readOnly={readOnly} />
+              </div>
               <Button asChild className="h-[3.625rem] w-full px-8 text-xl font-bold sm:w-fit">
                 <Link href={`/projektuebersicht/${project_id}/cover-bearbeiten`}>
                   {readOnly ? "Cover ansehen" : "Cover bearbeiten"}

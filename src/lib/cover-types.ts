@@ -1,3 +1,5 @@
+import type { BookFontId } from "@/lib/book-fonts";
+
 // PROJ-10 Cover-Editor — gemeinsame Typen für Server, Client und Render.
 
 /**
@@ -15,6 +17,9 @@ export type CoverData = {
   themeId: string; // theme-Slug oder Default
   colorId: string; // metadata.background_color oder Default
   imageUrl: string | null; // signed URL falls Foto vorhanden, sonst null
+  // PROJ-32: Buchschrift aus projects.book_font. Fehlt sie, gilt PT Serif und
+  // das Cover sieht aus wie bisher.
+  bookFont?: BookFontId;
 };
 
 /**

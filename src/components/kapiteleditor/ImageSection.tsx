@@ -39,6 +39,7 @@ import {
   type ImageSectionData,
 } from "@/lib/kapiteleditor/types";
 import { ImageUploadDialog, type UploadedImage } from "./ImageUploadDialog";
+import { useImageSections } from "./ImageSectionsContext";
 import type { FreshLinks } from "./freshImageLinks";
 
 // Leeres Abonnement für das Hydration-Gate: der Wert ändert sich nie,
@@ -328,9 +329,14 @@ function SortableSlot({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: image.id,
   });
+  // Die Seiten sind per `transform: scale` gezoomt. dnd-kit misst in
+  // Bildschirm-Pixeln, die Verschiebung wirkt aber im skalierten Bereich. Ohne
+  // Teilen liefe ein Foto bei 200 % doppelt so schnell wie die Maus.
+  const zoom = useImageSections()?.zoom ?? 1;
+  const scaled = transform && zoom !== 1 ? { ...transform, x: transform.x / zoom, y: transform.y / zoom } : transform;
 
   const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Transform.toString(scaled),
     transition,
     zIndex: isDragging ? 10 : undefined,
     opacity: isDragging ? 0.7 : 1,

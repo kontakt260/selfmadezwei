@@ -8,6 +8,7 @@ import { CoverEditorClient } from "@/components/cover/CoverEditorClient";
 import { DEFAULT_COLOR_ID } from "@/lib/cover-colors";
 import { DEFAULT_THEME_ID } from "@/lib/cover-themes";
 import type { CoverData, CoverRowRaw } from "@/lib/cover-types";
+import { bookFontOrDefault } from "@/lib/book-fonts";
 import { isProjectReadOnly } from "@/lib/projects/project-access";
 
 function IconArrowLeft() {
@@ -41,7 +42,7 @@ export default async function CoverBearbeitenPage({
   // Projekt, Mitgliedschaft, Cover und Zugang in einem Schwung. Fehlt die
   // Mitgliedschaft, folgt notFound() (kein Leak, dass das Projekt existiert).
   const [projectResult, membershipResult, coverResult, readOnly] = await Promise.all([
-    supabase.from("projects").select("id, title").eq("id", project_id).maybeSingle(),
+    supabase.from("projects").select("id, title, book_font").eq("id", project_id).maybeSingle(),
     supabase
       .from("project_members")
       .select("role")
@@ -93,6 +94,8 @@ export default async function CoverBearbeitenPage({
     themeId: raw?.theme ?? DEFAULT_THEME_ID,
     colorId: raw?.metadata?.background_color ?? DEFAULT_COLOR_ID,
     imageUrl: signedImageUrl,
+    // PROJ-32: Das Cover steht in der Buchschrift, geändert wird sie im Kapitel-Editor.
+    bookFont: bookFontOrDefault(project.book_font),
   };
 
   return (

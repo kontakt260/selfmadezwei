@@ -55,14 +55,23 @@ function positionOf(view: EditorView, el: HTMLElement): number | null {
   }
 }
 
-// AC-8 hängt nur am Absatztext (und der festen A5-Breite). Das Ergebnis wird je
-// Absatz-Knoten gemerkt: Beim Tippen wird nur der geänderte Absatz neu gemessen.
-// Werte sind Abstände vom Absatzanfang.
-const runCache = new WeakMap<PMNode, number[]>();
+// AC-8 hängt nur am Absatztext, an der festen A5-Breite und an der Schrift
+// (PROJ-32). Das Ergebnis wird je Schrift und Absatz-Knoten gemerkt: Beim Tippen
+// wird nur der geänderte Absatz neu gemessen. Werte sind Abstände vom Absatzanfang.
+const runCaches = new Map<string, WeakMap<PMNode, number[]>>();
 // Nach einer Abschaltung am Seitenende bricht der Rest des Absatzes neu um, die
 // Folgen danach werden neu begrenzt. Das Ergebnis hängt am Absatztext und an
 // den Stellen, die am Seitenende abgeschaltet sind. Schlüssel: diese Stellen.
-const pageRunCache = new WeakMap<PMNode, Map<string, number[]>>();
+const pageRunCaches = new Map<string, WeakMap<PMNode, Map<string, number[]>>>();
+
+function cacheFor<T>(caches: Map<string, WeakMap<PMNode, T>>, key: string): WeakMap<PMNode, T> {
+  let cache = caches.get(key);
+  if (!cache) {
+    cache = new WeakMap();
+    caches.set(key, cache);
+  }
+  return cache;
+}
 // Ein Absatz voller langer Wörter kann viele Korrekturen brauchen.
 const MAX_RUN_FIXES = 60;
 
@@ -83,8 +92,14 @@ export type HyphenLayout = {
  * Bereitet den Durchgang vor: Abschaltungen nach AC-8 für alle Absätze
  * bestimmen (gemerkte übernehmen, neue messen). Erwartet den natürlichen Fluss
  * ohne Seiten-Spacer und ohne Abschaltungen am Seitenende.
+ *
+ * `fontKey`: Schrift, in der gerade gemessen wird (PROJ-32). `null`, solange
+ * die Schrift noch nicht geladen ist: Dann wird gemessen, aber nichts gemerkt.
  */
-export function prepareHyphenLayout(view: EditorView): HyphenLayout {
+export function prepareHyphenLayout(view: EditorView, fontKey: string | null): HyphenLayout {
+  const remember = fontKey !== null && isHyphenationReady();
+  const runCache = cacheFor(runCaches, fontKey ?? "");
+  const pageRunCache = cacheFor(pageRunCaches, fontKey ?? "");
   const lines = new Set<number>();
   const page = new Set<number>();
   const pageElements = new Map<number, HTMLElement>();
@@ -120,7 +135,7 @@ export function prepareHyphenLayout(view: EditorView): HyphenLayout {
   view.state.doc.descendants((node, pos) => {
     if (!node.isTextblock) return true;
     const start = pos + 1;
-    const cached = runCache.get(node);
+    const cached = remember ? runCache.get(node) : undefined;
     if (cached) {
       for (const offset of cached) {
         const at = start + offset;
@@ -146,7 +161,7 @@ export function prepareHyphenLayout(view: EditorView): HyphenLayout {
     for (const at of found) lines.add(at);
     // Erst mit geladenem Wörterbuch stehen die Trennstellen fest; vorher würde
     // „nichts abzuschalten" gemerkt und später nie mehr geprüft.
-    if (isHyphenationReady()) runCache.set(node, [...found].map((at) => at - start));
+    if (remember) runCache.set(node, [...found].map((at) => at - start));
     return false;
   });
 
@@ -178,7 +193,7 @@ export function prepareHyphenLayout(view: EditorView): HyphenLayout {
       const ends = [...(pageEndsByNode.get(node) ?? []), pos - start];
       pageEndsByNode.set(node, ends);
       const key = ends.join(",");
-      const known = pageRunCache.get(node)?.get(key);
+      const known = remember ? pageRunCache.get(node)?.get(key) : undefined;
       if (known) {
         for (const offset of known) {
           const at = start + offset;
@@ -196,7 +211,7 @@ export function prepareHyphenLayout(view: EditorView): HyphenLayout {
         const target = elements.get(at);
         if (target) pageElements.set(at, target);
       }
-      if (isHyphenationReady()) {
+      if (remember) {
         const perNode = pageRunCache.get(node) ?? new Map<string, number[]>();
         perNode.set(key, [...found].map((at) => at - start));
         pageRunCache.set(node, perNode);

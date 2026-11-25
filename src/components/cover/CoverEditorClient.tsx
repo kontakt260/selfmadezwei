@@ -28,6 +28,8 @@ import {
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { CoverRender } from "@/components/cover/CoverRender";
+import { coverFonts } from "@/components/cover/coverFonts";
+import { DEFAULT_BOOK_FONT, bookFont } from "@/lib/book-fonts";
 import { ReadOnlyScope } from "@/components/ReadOnlyScope";
 import { COVER_COLORS } from "@/lib/cover-colors";
 import { COVER_THEMES } from "@/lib/cover-themes";
@@ -116,6 +118,13 @@ export function CoverEditorClient({
   // geht beim Verlassen der Seite sofort zum Server.
   const unsavedRef = useRef<SaveCoverInput | null>(null);
 
+  // PROJ-32: Buchschrift, nur zur Anzeige. Der Name steht in seiner eigenen Schrift.
+  const currentBookFont = initialData.bookFont ?? DEFAULT_BOOK_FONT;
+  const fontNameStyle =
+    currentBookFont === DEFAULT_BOOK_FONT
+      ? { variables: "", family: "var(--font-pt-serif), serif" }
+      : { variables: coverFonts(currentBookFont).variables, family: coverFonts(currentBookFont).title };
+
   // ── CoverData für den Renderer ─────────────────────────────────────────
   const previewData: CoverData = useMemo(
     () => ({
@@ -125,8 +134,9 @@ export function CoverEditorClient({
       themeId,
       colorId,
       imageUrl,
+      bookFont: initialData.bookFont,
     }),
-    [title, subtitle, authorLine, themeId, colorId, imageUrl],
+    [title, subtitle, authorLine, themeId, colorId, imageUrl, initialData.bookFont],
   );
 
   // ── Auto-Save (debounced) ──────────────────────────────────────────────
@@ -430,6 +440,17 @@ export function CoverEditorClient({
           />
         </FieldShell>
 
+        {/* PROJ-32: Die Schrift kommt aus dem Buch, geändert wird sie im Kapitel-Editor. */}
+        <FieldShell label="Schrift" as="div">
+          <p className="text-base leading-7 text-[#535252]" data-testid="cover-book-font">
+            <span className={`text-lg text-[#3E3831] ${fontNameStyle.variables}`} style={{ fontFamily: fontNameStyle.family }}>
+              {bookFont(currentBookFont).label}
+            </span>
+            {" "}
+            · Die Schrift gilt für das ganze Buch. Sie ändern sie im Kapitel-Editor über „Buchschrift“ in der Werkzeugleiste.
+          </p>
+        </FieldShell>
+
         {/* Muster-Picker */}
         <FieldShell label="Muster" as="div">
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
@@ -457,6 +478,7 @@ export function CoverEditorClient({
                         themeId: t.id,
                         colorId,
                         imageUrl: null,
+                        bookFont: initialData.bookFont,
                       }}
                       size="card"
                     />

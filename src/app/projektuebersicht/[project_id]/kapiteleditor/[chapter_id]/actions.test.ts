@@ -43,6 +43,8 @@ function makeUpdateBuilder(savedRows: Array<{ id: string }> = [{ id: CHAPTER_ID 
     eq: vi.fn().mockReturnThis(),
     select: vi.fn().mockReturnThis(),
     single: vi.fn().mockResolvedValue({ data: null, error: null }),
+    // PROJ-32: Buchschrift des Projekts, wenn eine Seitenzahl gespeichert wird.
+    maybeSingle: vi.fn().mockResolvedValue({ data: { book_font: "pt-serif" }, error: null }),
   };
   const resolved = Promise.resolve({ data: savedRows, error: null });
   (builder.then as unknown) = resolved.then.bind(resolved);

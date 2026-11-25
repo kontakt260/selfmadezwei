@@ -25,7 +25,12 @@ export function usePagination({
 }: PaginationDeps) {
   // PROJ-30: Start mit der gespeicherten Zahl. Ohne sichtbares Layout (Phone)
   // bleibt sie stehen, statt als 1 gemessen und gespeichert zu werden.
-  const [pageCount, setPageCount] = useState(initialPageCount);
+  // PROJ-32: Zur Zahl gehört die Schrift, mit der sie gemessen wurde. Die
+  // gespeicherte Zahl hat hier keine (`null`), sie wird nie erneut gespeichert.
+  const [measured, setMeasured] = useState<{ pages: number; fontKey: string | null }>({
+    pages: initialPageCount,
+    fontKey: null,
+  });
   const clockRef = useRef<PageLayoutClock | null>(null);
 
   // PROJ-25: Alle Auslöser laufen im Seiten-Takt zusammen (siehe
@@ -42,7 +47,12 @@ export function usePagination({
     let settledSize = "";
     const clock = createPageLayoutClock({
       isVisible: () => fg.getClientRects().length > 0,
-      layout: () => storage.runLayout?.(setPageCount),
+      layout: () =>
+        storage.runLayout?.((pages, fontKey) =>
+          setMeasured((prev) =>
+            prev.pages === pages && prev.fontKey === fontKey ? prev : { pages, fontKey },
+          ),
+        ),
       onSettled: () => {
         settledSize = size();
       },
@@ -86,5 +96,5 @@ export function usePagination({
     clockRef.current?.request();
   }, [imageSectionsDeps, titleDep]);
 
-  return { pageCount };
+  return { pageCount: measured.pages, pageCountFontKey: measured.fontKey };
 }

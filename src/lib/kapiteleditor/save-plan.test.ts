@@ -8,6 +8,7 @@ const saved: SavedChapterState = {
   body,
   imageSections: EMPTY_IMAGE_SECTIONS,
   pageCount: 3,
+  pageCountFont: "pt-serif",
 };
 const draft = (patch: Partial<ChapterDraft> = {}): ChapterDraft => ({
   title: saved.title,
@@ -34,5 +35,12 @@ describe("planChapterSave", () => {
     expect(
       planChapterSave(draft({ imageSections: { ...EMPTY_IMAGE_SECTIONS } }), saved),
     ).toBe("content");
+  });
+
+  it("schreibt die Seitenzahl nach einem Schriftwechsel, auch wenn sie gleich bleibt", () => {
+    expect(planChapterSave(draft({ pageCount: 3, pageCountFont: "garamond" }), saved)).toBe("page-count");
+    expect(planChapterSave(draft({ pageCount: 3, pageCountFont: "pt-serif" }), saved)).toBe("none");
+    // Ohne Angabe gilt die Vorgabe PT Serif.
+    expect(planChapterSave(draft({ pageCount: 3 }), saved)).toBe("none");
   });
 });
